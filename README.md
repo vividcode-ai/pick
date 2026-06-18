@@ -1,6 +1,6 @@
 [中文文档](README.zh-CN.md)
 
-![Pick TUI](docs/image/tui.png)
+![Pick TUI](docs/image/tui-en.png)
 
 # Pick
 
