@@ -1,2 +1,3 @@
 .pick/
 target/
+!examples/**/.pick/
