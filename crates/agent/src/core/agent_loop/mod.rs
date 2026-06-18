@@ -15,11 +15,11 @@ use pick_ai::types::Model;
 
 use super::events::AgentEventHandler;
 use super::state::{AgentTool, ApproveFn, QuestionFn, ThinkingLevel};
-use crate::permission::fs_policy::FileSystemPolicy;
-use crate::permission::manager::PermissionManager;
-use crate::permission::Ruleset;
 use crate::agent_registry::AgentRegistry;
 use crate::extensions::runner::ExtensionRunner;
+use crate::permission::Ruleset;
+use crate::permission::fs_policy::FileSystemPolicy;
+use crate::permission::manager::PermissionManager;
 
 /// Maximum consecutive tool errors before forcing text-only mode.
 pub const MAX_CONSECUTIVE_TOOL_ERRORS: u32 = 10;
@@ -52,19 +52,29 @@ pub struct AgentLoopConfig {
     /// Hook to provide steering messages before each turn
     pub get_steering_messages: Option<Arc<dyn Fn() -> Vec<pick_ai::types::Message> + Send + Sync>>,
     /// Hook to modify context before LLM call
-    pub transform_context: Option<Arc<dyn Fn(pick_ai::types::Context) -> pick_ai::types::Context + Send + Sync>>,
+    pub transform_context:
+        Option<Arc<dyn Fn(pick_ai::types::Context) -> pick_ai::types::Context + Send + Sync>>,
     /// Hook to validate tool calls before execution (return Some(error) to block)
-    pub before_tool_call: Option<Arc<dyn Fn(&pick_ai::types::ToolCall) -> Option<String> + Send + Sync>>,
+    pub before_tool_call:
+        Option<Arc<dyn Fn(&pick_ai::types::ToolCall) -> Option<String> + Send + Sync>>,
     /// Hook to determine if agent should stop after a turn
-    pub should_stop_after_turn: Option<Arc<dyn Fn(&pick_ai::types::AssistantMessage) -> bool + Send + Sync>>,
+    pub should_stop_after_turn:
+        Option<Arc<dyn Fn(&pick_ai::types::AssistantMessage) -> bool + Send + Sync>>,
     /// Hook to provide follow-up messages after agent completes
-    pub get_follow_up_messages: Option<Arc<dyn Fn(&AgentRunResult) -> Vec<pick_ai::types::Message> + Send + Sync>>,
+    pub get_follow_up_messages:
+        Option<Arc<dyn Fn(&AgentRunResult) -> Vec<pick_ai::types::Message> + Send + Sync>>,
     /// Hook to provide dynamic API key
     pub get_api_key: Option<Arc<dyn Fn() -> Option<String> + Send + Sync>>,
     /// Hook called after each turn completes, providing current messages
     /// for incremental session persistence. If this returns an error, it is logged
     /// but does not interrupt the agent loop.
-    pub on_turn_complete: Option<Arc<dyn Fn(&[pick_ai::types::Message]) -> Pin<Box<dyn Send + Future<Output = ()>>> + Send + Sync>>,
+    pub on_turn_complete: Option<
+        Arc<
+            dyn Fn(&[pick_ai::types::Message]) -> Pin<Box<dyn Send + Future<Output = ()>>>
+                + Send
+                + Sync,
+        >,
+    >,
     /// Maximum provider-level HTTP retry attempts (default: 3)
     pub provider_max_retries: Option<u32>,
     /// Maximum provider-level retry delay in ms (default: 60000)

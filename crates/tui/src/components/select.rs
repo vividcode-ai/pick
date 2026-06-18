@@ -1,4 +1,4 @@
-﻿//! Select list component for choosing from options
+//! Select list component for choosing from options
 
 /// An item in a select list
 #[derive(Clone)]
@@ -92,10 +92,7 @@ impl SelectList {
             self.selected_index -= 1;
         } else if self.page > 0 {
             self.page -= 1;
-            self.selected_index = std::cmp::min(
-                (self.page + 1) * self.page_size - 1,
-                len - 1,
-            );
+            self.selected_index = std::cmp::min((self.page + 1) * self.page_size - 1, len - 1);
         }
     }
 

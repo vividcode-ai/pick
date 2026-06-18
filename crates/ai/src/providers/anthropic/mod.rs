@@ -18,7 +18,10 @@ pub fn stream_anthropic(
     let (tx, rx) = tokio::sync::mpsc::channel(64);
 
     let max_retries = options.as_ref().and_then(|o| o.max_retries).unwrap_or(3);
-    let max_delay = options.as_ref().and_then(|o| o.max_retry_delay_ms).unwrap_or(60000);
+    let max_delay = options
+        .as_ref()
+        .and_then(|o| o.max_retry_delay_ms)
+        .unwrap_or(60000);
 
     tokio::spawn(async move {
         let api_key = std::env::var("ANTHROPIC_API_KEY")
@@ -27,11 +30,23 @@ pub fn stream_anthropic(
 
         if api_key.is_empty() {
             let mut msg = AssistantMessage::new(
-                vec![], "anthropic-messages".to_string(), "anthropic".to_string(),
-                model.id.clone(), Usage::zero(), StopReason::Error,
+                vec![],
+                "anthropic-messages".to_string(),
+                "anthropic".to_string(),
+                model.id.clone(),
+                Usage::zero(),
+                StopReason::Error,
             );
-            msg.error_message = Some("ANTHROPIC_API_KEY is not set. Set the ANTHROPIC_API_KEY environment variable.".to_string());
-            let _ = tx.send(StreamEvent::Error { reason: StopReason::Error, error: msg }).await;
+            msg.error_message = Some(
+                "ANTHROPIC_API_KEY is not set. Set the ANTHROPIC_API_KEY environment variable."
+                    .to_string(),
+            );
+            let _ = tx
+                .send(StreamEvent::Error {
+                    reason: StopReason::Error,
+                    error: msg,
+                })
+                .await;
             return;
         }
 
@@ -40,10 +55,19 @@ pub fn stream_anthropic(
                 Ok(url) => url,
                 Err(_) => {
                     let msg = AssistantMessage::new(
-                        vec![], "anthropic-messages".to_string(), "anthropic".to_string(),
-                        model.id.clone(), Usage::zero(), StopReason::Error,
+                        vec![],
+                        "anthropic-messages".to_string(),
+                        "anthropic".to_string(),
+                        model.id.clone(),
+                        Usage::zero(),
+                        StopReason::Error,
                     );
-                    let _ = tx.send(StreamEvent::Error { reason: StopReason::Error, error: msg }).await;
+                    let _ = tx
+                        .send(StreamEvent::Error {
+                            reason: StopReason::Error,
+                            error: msg,
+                        })
+                        .await;
                     return;
                 }
             }
@@ -60,9 +84,7 @@ pub fn stream_anthropic(
 
         let opts = options.as_ref();
 
-        let max_tokens = opts
-            .and_then(|o| o.max_tokens)
-            .unwrap_or(4096);
+        let max_tokens = opts.and_then(|o| o.max_tokens).unwrap_or(4096);
 
         let mut body = serde_json::json!({
             "model": model.id,
@@ -91,11 +113,20 @@ pub fn stream_anthropic(
             if let Some(signal) = opts.and_then(|o| o.signal.as_ref()) {
                 if *signal.borrow() {
                     let mut msg = AssistantMessage::new(
-                        vec![], "anthropic-messages".to_string(), "anthropic".to_string(),
-                        model.id.clone(), Usage::zero(), StopReason::Aborted,
+                        vec![],
+                        "anthropic-messages".to_string(),
+                        "anthropic".to_string(),
+                        model.id.clone(),
+                        Usage::zero(),
+                        StopReason::Aborted,
                     );
                     msg.error_message = Some("LLM call cancelled before request".to_string());
-                    let _ = tx.send(StreamEvent::Error { reason: StopReason::Aborted, error: msg }).await;
+                    let _ = tx
+                        .send(StreamEvent::Error {
+                            reason: StopReason::Aborted,
+                            error: msg,
+                        })
+                        .await;
                     return;
                 }
             }
@@ -114,18 +145,20 @@ pub fn stream_anthropic(
                 StopReason::Stop,
             );
 
-            let _ = tx.send(StreamEvent::Start {
-                partial: crate::types::PartialAssistantMessage {
-                    content: vec![],
-                    api: Some("anthropic-messages".to_string()),
-                    provider: Some("anthropic".to_string()),
-                    model: Some(model.id.clone()),
-                    usage: Some(Usage::zero()),
-                    stop_reason: None,
-                    error_message: None,
-                    timestamp: chrono::Utc::now().timestamp_millis(),
-                },
-            }).await;
+            let _ = tx
+                .send(StreamEvent::Start {
+                    partial: crate::types::PartialAssistantMessage {
+                        content: vec![],
+                        api: Some("anthropic-messages".to_string()),
+                        provider: Some("anthropic".to_string()),
+                        model: Some(model.id.clone()),
+                        usage: Some(Usage::zero()),
+                        stop_reason: None,
+                        error_message: None,
+                        timestamp: chrono::Utc::now().timestamp_millis(),
+                    },
+                })
+                .await;
 
             let client = reqwest::Client::new();
             let request_builder = client
@@ -137,11 +170,7 @@ pub fn stream_anthropic(
             } else {
                 request_builder.header("x-api-key", &api_key)
             };
-            match request_builder
-                .json(&body)
-                .send()
-                .await
-            {
+            match request_builder.json(&body).send().await {
                 Ok(resp) => {
                     if !resp.status().is_success() {
                         let status = resp.status();
@@ -168,7 +197,13 @@ pub fn stream_anthropic(
                     while let Some(chunk_result) = chunk_stream.next().await {
                         if let Some(signal) = opts.and_then(|o| o.signal.as_ref()) {
                             if *signal.borrow() {
-                                emit_error(&tx, &mut output, &model, "LLM call cancelled during streaming").await;
+                                emit_error(
+                                    &tx,
+                                    &mut output,
+                                    &model,
+                                    "LLM call cancelled during streaming",
+                                )
+                                .await;
                                 return;
                             }
                         }
@@ -178,9 +213,16 @@ pub fn stream_anthropic(
                                 let events = parser.feed(&chunk);
                                 for sse_event in events {
                                     if let Err(e) = events::process_anthropic_event(
-                                        &tx, sse_event, &mut output, &mut blocks,
-                                        &mut saw_message_start, &mut saw_message_stop, &mut stream_error,
-                                    ).await {
+                                        &tx,
+                                        sse_event,
+                                        &mut output,
+                                        &mut blocks,
+                                        &mut saw_message_start,
+                                        &mut saw_message_stop,
+                                        &mut stream_error,
+                                    )
+                                    .await
+                                    {
                                         stream_error = Some(e);
                                     }
                                 }
@@ -195,9 +237,16 @@ pub fn stream_anthropic(
                     let remaining = parser.finish();
                     for sse_event in remaining {
                         if let Err(e) = events::process_anthropic_event(
-                            &tx, sse_event, &mut output, &mut blocks,
-                            &mut saw_message_start, &mut saw_message_stop, &mut stream_error,
-                        ).await {
+                            &tx,
+                            sse_event,
+                            &mut output,
+                            &mut blocks,
+                            &mut saw_message_start,
+                            &mut saw_message_stop,
+                            &mut stream_error,
+                        )
+                        .await
+                        {
                             stream_error = Some(e);
                         }
                     }
@@ -208,14 +257,22 @@ pub fn stream_anthropic(
                     }
 
                     if saw_message_start && !saw_message_stop {
-                        emit_error(&tx, &mut output, &model, "Anthropic stream ended before message_stop").await;
+                        emit_error(
+                            &tx,
+                            &mut output,
+                            &model,
+                            "Anthropic stream ended before message_stop",
+                        )
+                        .await;
                         return;
                     }
 
-                    let _ = tx.send(StreamEvent::Done {
-                        reason: output.stop_reason.clone(),
-                        message: output,
-                    }).await;
+                    let _ = tx
+                        .send(StreamEvent::Done {
+                            reason: output.stop_reason.clone(),
+                            message: output,
+                        })
+                        .await;
                     return;
                 }
                 Err(e) => {
@@ -231,11 +288,20 @@ pub fn stream_anthropic(
         }
 
         let mut msg = AssistantMessage::new(
-            vec![], "anthropic-messages".to_string(), "anthropic".to_string(),
-            model.id.clone(), Usage::zero(), StopReason::Error,
+            vec![],
+            "anthropic-messages".to_string(),
+            "anthropic".to_string(),
+            model.id.clone(),
+            Usage::zero(),
+            StopReason::Error,
         );
         msg.error_message = Some("Max retries exceeded".to_string());
-        let _ = tx.send(StreamEvent::Error { reason: StopReason::Error, error: msg }).await;
+        let _ = tx
+            .send(StreamEvent::Error {
+                reason: StopReason::Error,
+                error: msg,
+            })
+            .await;
     });
 
     rx
@@ -249,10 +315,12 @@ async fn emit_error(
 ) {
     output.stop_reason = StopReason::Error;
     output.error_message = Some(msg.to_string());
-    let _ = tx.send(StreamEvent::Error {
-        reason: StopReason::Error,
-        error: output.clone(),
-    }).await;
+    let _ = tx
+        .send(StreamEvent::Error {
+            reason: StopReason::Error,
+            error: output.clone(),
+        })
+        .await;
 }
 
 /// Map Anthropic stop reasons to our StopReason enum
@@ -267,7 +335,9 @@ pub(crate) fn map_anthropic_stop_reason(reason: &str) -> StopReason {
 }
 
 /// Build a PartialAssistantMessage from current output state
-pub(crate) fn partial_from_output(output: &AssistantMessage) -> crate::types::PartialAssistantMessage {
+pub(crate) fn partial_from_output(
+    output: &AssistantMessage,
+) -> crate::types::PartialAssistantMessage {
     crate::types::PartialAssistantMessage {
         content: output.content.clone(),
         api: Some(output.api.clone()),

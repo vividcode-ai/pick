@@ -1,4 +1,4 @@
-﻿//! Path utilities
+//! Path utilities
 
 use std::path::{Path, PathBuf};
 
@@ -51,14 +51,19 @@ pub fn normalize_path(input: &str, options: &PathInputOptions) -> String {
 
     if options.expand_tilde {
         let os_home = dirs::home_dir();
-        let home = options.home_dir.as_deref()
+        let home = options
+            .home_dir
+            .as_deref()
             .or_else(|| os_home.as_ref().and_then(|h| h.to_str()))
             .unwrap_or("~");
         if normalized == "~" {
             return home.to_string();
         }
         if normalized.starts_with("~/") {
-            return Path::new(home).join(&normalized[2..]).to_string_lossy().to_string();
+            return Path::new(home)
+                .join(&normalized[2..])
+                .to_string_lossy()
+                .to_string();
         }
     }
 
@@ -79,11 +84,14 @@ pub fn resolve_path(input: &str, base_dir: &Path) -> PathBuf {
 pub fn get_cwd_relative_path(file_path: &Path, cwd: &Path) -> Option<String> {
     let relative = file_path.strip_prefix(cwd).ok()?;
     let rel_str = relative.to_string_lossy().to_string();
-    if rel_str.is_empty() { Some(".".to_string()) } else { Some(rel_str) }
+    if rel_str.is_empty() {
+        Some(".".to_string())
+    } else {
+        Some(rel_str)
+    }
 }
 
 /// Format path relative to cwd, falling back to absolute
 pub fn format_path_relative_to_cwd_or_absolute(file_path: &Path, cwd: &Path) -> String {
-    get_cwd_relative_path(file_path, cwd)
-        .unwrap_or_else(|| file_path.to_string_lossy().to_string())
+    get_cwd_relative_path(file_path, cwd).unwrap_or_else(|| file_path.to_string_lossy().to_string())
 }

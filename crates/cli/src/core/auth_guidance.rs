@@ -1,5 +1,4 @@
-﻿//! Auth guidance - helper messages for authentication setup
-
+//! Auth guidance - helper messages for authentication setup
 
 use crate::config;
 
@@ -9,7 +8,9 @@ const UNKNOWN_PROVIDER: &str = "unknown";
 pub fn get_provider_login_help() -> String {
     format!(
         "Use /login to log into a provider via OAuth or API key. See:\n  {}\n  {}",
-        config::get_docs_path().join("providers.md").to_string_lossy(),
+        config::get_docs_path()
+            .join("providers.md")
+            .to_string_lossy(),
         config::get_docs_path().join("models.md").to_string_lossy(),
     )
 }

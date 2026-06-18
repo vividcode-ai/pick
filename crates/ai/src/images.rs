@@ -1,4 +1,4 @@
-﻿//! Image generation types and providers
+//! Image generation types and providers
 
 use std::collections::HashMap;
 use std::future::Future;
@@ -23,7 +23,9 @@ pub struct ImagesOptions {
     /// API key override (falls back to env if not set)
     pub api_key: Option<String>,
     /// Optional callback for inspecting or replacing provider payloads before sending.
-    pub on_payload: Option<Arc<dyn Fn(&serde_json::Value, &ImagesModel) -> Option<serde_json::Value> + Send + Sync>>,
+    pub on_payload: Option<
+        Arc<dyn Fn(&serde_json::Value, &ImagesModel) -> Option<serde_json::Value> + Send + Sync>,
+    >,
     /// Optional callback invoked after an HTTP response is received.
     pub on_response: Option<Arc<dyn Fn(&ProviderResponse, &ImagesModel) + Send + Sync>>,
     /// Optional custom HTTP headers to include in API requests.
@@ -50,8 +52,11 @@ impl Default for ImagesOptions {
 /// Image generation provider function signature (async).
 /// Takes owned values to allow the returned future to be 'static/'Send.
 pub type ImagesFunction = Box<
-    dyn Fn(ImagesModel, ImagesContext, Option<ImagesOptions>)
-            -> Pin<Box<dyn Future<Output = Result<AssistantImages, String>> + Send>>
+    dyn Fn(
+            ImagesModel,
+            ImagesContext,
+            Option<ImagesOptions>,
+        ) -> Pin<Box<dyn Future<Output = Result<AssistantImages, String>> + Send>>
         + Send
         + Sync,
 >;
@@ -172,7 +177,11 @@ pub async fn generate_images(
     options: Option<&ImagesOptions>,
 ) -> Result<AssistantImages, String> {
     ensure_image_providers();
-    let registry = IMAGES_API_REGISTRY.read().map_err(|e| format!("Registry lock error: {}", e))?;
-    let provider = registry.get(&model.api).ok_or_else(|| format!("No provider registered for API: {}", model.api))?;
+    let registry = IMAGES_API_REGISTRY
+        .read()
+        .map_err(|e| format!("Registry lock error: {}", e))?;
+    let provider = registry
+        .get(&model.api)
+        .ok_or_else(|| format!("No provider registered for API: {}", model.api))?;
     (provider.generate_images)(model.clone(), context.clone(), options.cloned()).await
 }

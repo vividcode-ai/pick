@@ -73,9 +73,7 @@ pub async fn run_tui_mode(
 
             // Check for pending auto-submit from pending_user_messages flush
             if let Some(text) = ctx.pending_command.take() {
-                if text.starts_with('/')
-                    || ctx.tui.state != pick_tui::app::AppState::Input
-                {
+                if text.starts_with('/') || ctx.tui.state != pick_tui::app::AppState::Input {
                     ctx.pending_command = Some(text);
                 } else if ctx.tui.pending_from_flush {
                     break 'input TuiAction::Submit(text);
@@ -132,7 +130,8 @@ pub async fn run_tui_mode(
         };
 
         let is_submit = matches!(action, TuiAction::Submit(_));
-        let should_quit = action_dispatch::dispatch_action(&mut ctx, &mut cmd_rx, &mut evt_rx, action).await;
+        let should_quit =
+            action_dispatch::dispatch_action(&mut ctx, &mut cmd_rx, &mut evt_rx, action).await;
         if should_quit {
             break;
         }
@@ -144,7 +143,9 @@ pub async fn run_tui_mode(
             let current_pending_count = ctx.tui.pending_user_messages.len();
             let new_count = current_pending_count.saturating_sub(ctx.tui.pending_submitted_count);
             if new_count > 0 {
-                let new_msgs: Vec<String> = ctx.tui.pending_user_messages
+                let new_msgs: Vec<String> = ctx
+                    .tui
+                    .pending_user_messages
                     .iter()
                     .skip(ctx.tui.pending_submitted_count)
                     .cloned()

@@ -1,4 +1,4 @@
-﻿//! Google Vertex AI provider with SSE streaming
+//! Google Vertex AI provider with SSE streaming
 //! Uses the Google Vertex AI Gemini API with GCP auth
 
 use crate::sse::SseParser;
@@ -11,8 +11,8 @@ fn resolve_vertex_url(model_id: &str) -> String {
     let project = std::env::var("GOOGLE_CLOUD_PROJECT")
         .or_else(|_| std::env::var("GCLOUD_PROJECT"))
         .unwrap_or_else(|_| "default".to_string());
-    let location = std::env::var("GOOGLE_CLOUD_LOCATION")
-        .unwrap_or_else(|_| "us-central1".to_string());
+    let location =
+        std::env::var("GOOGLE_CLOUD_LOCATION").unwrap_or_else(|_| "us-central1".to_string());
 
     format!(
         "https://{}-aiplatform.googleapis.com/v1/projects/{}/locations/{}/publishers/google/models/{}:streamGenerateContent",
@@ -28,7 +28,10 @@ pub fn stream_google_vertex(
 ) -> tokio::sync::mpsc::Receiver<StreamEvent> {
     let (tx, rx) = tokio::sync::mpsc::channel(64);
     let max_retries = options.as_ref().and_then(|o| o.max_retries).unwrap_or(3);
-    let max_delay = options.as_ref().and_then(|o| o.max_retry_delay_ms).unwrap_or(60000);
+    let max_delay = options
+        .as_ref()
+        .and_then(|o| o.max_retry_delay_ms)
+        .unwrap_or(60000);
 
     tokio::spawn(async move {
         // Try API key or bearer token for Vertex
@@ -39,19 +42,30 @@ pub fn stream_google_vertex(
 
         if !has_auth {
             let msg = AssistantMessage::new(
-                vec![], "google-vertex".to_string(), "google-vertex".to_string(),
-                model.id.clone(), Usage::zero(), StopReason::Error,
+                vec![],
+                "google-vertex".to_string(),
+                "google-vertex".to_string(),
+                model.id.clone(),
+                Usage::zero(),
+                StopReason::Error,
             );
-            let _ = tx.send(StreamEvent::Error {
-                reason: StopReason::Error,
-                error: msg,
-            }).await;
+            let _ = tx
+                .send(StreamEvent::Error {
+                    reason: StopReason::Error,
+                    error: msg,
+                })
+                .await;
             return;
         }
 
         // If a custom base_url is set (not the default), use it directly
-        let url = if model.base_url.contains("aiplatform.googleapis.com") || model.base_url.contains("googleapis.com") {
-            format!("{}:streamGenerateContent", model.base_url.trim_end_matches('/'))
+        let url = if model.base_url.contains("aiplatform.googleapis.com")
+            || model.base_url.contains("googleapis.com")
+        {
+            format!(
+                "{}:streamGenerateContent",
+                model.base_url.trim_end_matches('/')
+            )
         } else {
             resolve_vertex_url(&model.id)
         };
@@ -124,10 +138,15 @@ pub fn stream_google_vertex(
                     }
                 }
                 crate::types::Message::ToolResult(tr) => {
-                    let text_content: Vec<String> = tr.content.iter()
+                    let text_content: Vec<String> = tr
+                        .content
+                        .iter()
                         .filter_map(|c| {
-                            if let ContentBlock::Text(t) = c { Some(t.text.clone()) }
-                            else { None }
+                            if let ContentBlock::Text(t) = c {
+                                Some(t.text.clone())
+                            } else {
+                                None
+                            }
                         })
                         .collect();
                     let text = text_content.join("\n");
@@ -157,13 +176,16 @@ pub fn stream_google_vertex(
             body["systemInstruction"] = serde_json::json!({"parts": [{"text": system}]});
         }
         if let Some(tools) = &context.tools {
-            let function_declarations: Vec<serde_json::Value> = tools.iter().map(|t| {
-                serde_json::json!({
-                    "name": t.name,
-                    "description": t.description,
-                    "parameters": t.parameters,
+            let function_declarations: Vec<serde_json::Value> = tools
+                .iter()
+                .map(|t| {
+                    serde_json::json!({
+                        "name": t.name,
+                        "description": t.description,
+                        "parameters": t.parameters,
+                    })
                 })
-            }).collect();
+                .collect();
             body["tools"] = serde_json::json!([{
                 "functionDeclarations": function_declarations,
             }]);
@@ -184,109 +206,134 @@ pub fn stream_google_vertex(
             );
 
             // Emit start
-        let _ = tx.send(StreamEvent::Start {
-            partial: crate::types::PartialAssistantMessage {
-                content: vec![],
-                api: Some("google-vertex".to_string()),
-                provider: Some("google-vertex".to_string()),
-                model: Some(model.id.clone()),
-                usage: Some(Usage::zero()),
-                stop_reason: None,
-                error_message: None,
-                timestamp: chrono::Utc::now().timestamp_millis(),
-            },
-        }).await;
+            let _ = tx
+                .send(StreamEvent::Start {
+                    partial: crate::types::PartialAssistantMessage {
+                        content: vec![],
+                        api: Some("google-vertex".to_string()),
+                        provider: Some("google-vertex".to_string()),
+                        model: Some(model.id.clone()),
+                        usage: Some(Usage::zero()),
+                        stop_reason: None,
+                        error_message: None,
+                        timestamp: chrono::Utc::now().timestamp_millis(),
+                    },
+                })
+                .await;
 
-        let client = reqwest::Client::new();
+            let client = reqwest::Client::new();
 
-        let mut request = client
-            .post(&url)
-            .header("content-type", "application/json")
-            .json(&body);
+            let mut request = client
+                .post(&url)
+                .header("content-type", "application/json")
+                .json(&body);
 
-        // Use API key or bearer token
-        if let Some(ref key) = api_key {
-            request = request.header("x-goog-api-key", key);
-        } else if let Some(ref token) = bearer_token {
-            request = request.header("Authorization", format!("Bearer {}", token));
-        }
+            // Use API key or bearer token
+            if let Some(ref key) = api_key {
+                request = request.header("x-goog-api-key", key);
+            } else if let Some(ref token) = bearer_token {
+                request = request.header("Authorization", format!("Bearer {}", token));
+            }
 
-        match request.send().await {
-            Ok(resp) => {
-                if !resp.status().is_success() {
-                    let status = resp.status();
-                    if crate::retry::is_retryable_http_status(status.as_u16()) && crate::retry::should_retry(attempt, max_retries) {
-                        continue;
-                    }
-                    let body_text = resp.text().await.unwrap_or_default();
-                    let err_msg = format!("Google Vertex API error ({}): {}", status, body_text);
-                    output.stop_reason = StopReason::Error;
-                    output.error_message = Some(err_msg);
-                    let _ = tx.send(StreamEvent::Error {
-                        reason: StopReason::Error,
-                        error: output.clone(),
-                    }).await;
-                    return;
-                }
-
-                let mut parser = SseParser::new();
-                let mut text_block_idx: Option<usize> = None;
-                let mut thinking_block_idx: Option<usize> = None;
-
-                use futures::StreamExt;
-                let mut chunk_stream = resp.bytes_stream();
-                while let Some(chunk_result) = chunk_stream.next().await {
-                    match chunk_result {
-                        Ok(chunk) => {
-                            let events = parser.feed(&chunk);
-                            for sse in events {
-                                process_vertex_chunk(
-                                    &tx, &sse, &mut output,
-                                    &mut text_block_idx, &mut thinking_block_idx,
-                                ).await;
-                            }
+            match request.send().await {
+                Ok(resp) => {
+                    if !resp.status().is_success() {
+                        let status = resp.status();
+                        if crate::retry::is_retryable_http_status(status.as_u16())
+                            && crate::retry::should_retry(attempt, max_retries)
+                        {
+                            continue;
                         }
-                        Err(e) => {
-                            output.stop_reason = StopReason::Error;
-                            output.error_message = Some(format!("Stream error: {}", e));
-                            let _ = tx.send(StreamEvent::Error {
+                        let body_text = resp.text().await.unwrap_or_default();
+                        let err_msg =
+                            format!("Google Vertex API error ({}): {}", status, body_text);
+                        output.stop_reason = StopReason::Error;
+                        output.error_message = Some(err_msg);
+                        let _ = tx
+                            .send(StreamEvent::Error {
                                 reason: StopReason::Error,
                                 error: output.clone(),
-                            }).await;
-                            return;
+                            })
+                            .await;
+                        return;
+                    }
+
+                    let mut parser = SseParser::new();
+                    let mut text_block_idx: Option<usize> = None;
+                    let mut thinking_block_idx: Option<usize> = None;
+
+                    use futures::StreamExt;
+                    let mut chunk_stream = resp.bytes_stream();
+                    while let Some(chunk_result) = chunk_stream.next().await {
+                        match chunk_result {
+                            Ok(chunk) => {
+                                let events = parser.feed(&chunk);
+                                for sse in events {
+                                    process_vertex_chunk(
+                                        &tx,
+                                        &sse,
+                                        &mut output,
+                                        &mut text_block_idx,
+                                        &mut thinking_block_idx,
+                                    )
+                                    .await;
+                                }
+                            }
+                            Err(e) => {
+                                output.stop_reason = StopReason::Error;
+                                output.error_message = Some(format!("Stream error: {}", e));
+                                let _ = tx
+                                    .send(StreamEvent::Error {
+                                        reason: StopReason::Error,
+                                        error: output.clone(),
+                                    })
+                                    .await;
+                                return;
+                            }
                         }
                     }
-                }
 
-                let _ = tx.send(StreamEvent::Done {
-                    reason: output.stop_reason.clone(),
-                    message: output,
-                }).await;
-                return;
-            }
-            Err(e) => {
-                if crate::retry::is_retryable_request_error(&e) && crate::retry::should_retry(attempt, max_retries) {
-                    continue;
+                    let _ = tx
+                        .send(StreamEvent::Done {
+                            reason: output.stop_reason.clone(),
+                            message: output,
+                        })
+                        .await;
+                    return;
                 }
-                output.stop_reason = StopReason::Error;
-                output.error_message = Some(format!("Request failed: {}", e));
-                let _ = tx.send(StreamEvent::Error {
-                    reason: StopReason::Error,
-                    error: output.clone(),
-                }).await;
-                return;
+                Err(e) => {
+                    if crate::retry::is_retryable_request_error(&e)
+                        && crate::retry::should_retry(attempt, max_retries)
+                    {
+                        continue;
+                    }
+                    output.stop_reason = StopReason::Error;
+                    output.error_message = Some(format!("Request failed: {}", e));
+                    let _ = tx
+                        .send(StreamEvent::Error {
+                            reason: StopReason::Error,
+                            error: output.clone(),
+                        })
+                        .await;
+                    return;
+                }
             }
         }
-    }
 
-    let err_msg = AssistantMessage::new(
-        vec![], "google-vertex".to_string(), "google-vertex".to_string(),
-        model.id.clone(), Usage::zero(), StopReason::Error,
-    );
-    let _ = tx.send(StreamEvent::Error {
-        reason: StopReason::Error,
-        error: err_msg,
-    }).await;
+        let err_msg = AssistantMessage::new(
+            vec![],
+            "google-vertex".to_string(),
+            "google-vertex".to_string(),
+            model.id.clone(),
+            Usage::zero(),
+            StopReason::Error,
+        );
+        let _ = tx
+            .send(StreamEvent::Error {
+                reason: StopReason::Error,
+                error: err_msg,
+            })
+            .await;
     });
 
     rx
@@ -322,11 +369,26 @@ async fn process_vertex_chunk(
 
         // Process usage metadata
         if let Some(usage) = item.get("usageMetadata") {
-            let input = usage.get("promptTokenCount").and_then(|v| v.as_u64()).unwrap_or(0);
-            let o = usage.get("candidatesTokenCount").and_then(|v| v.as_u64()).unwrap_or(0);
-            let thoughts = usage.get("thoughtsTokenCount").and_then(|v| v.as_u64()).unwrap_or(0);
-            let cache_read = usage.get("cachedContentTokenCount").and_then(|v| v.as_u64()).unwrap_or(0);
-            let total = usage.get("totalTokenCount").and_then(|v| v.as_u64()).unwrap_or(0);
+            let input = usage
+                .get("promptTokenCount")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
+            let o = usage
+                .get("candidatesTokenCount")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
+            let thoughts = usage
+                .get("thoughtsTokenCount")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
+            let cache_read = usage
+                .get("cachedContentTokenCount")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
+            let total = usage
+                .get("totalTokenCount")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
 
             output.usage.input = input;
             output.usage.output = o + thoughts;
@@ -346,7 +408,11 @@ async fn process_vertex_chunk(
                     "MAX_TOKENS" => StopReason::Length,
                     _ => StopReason::Error,
                 };
-                if output.content.iter().any(|c| matches!(c, ContentBlock::ToolCall(_))) {
+                if output
+                    .content
+                    .iter()
+                    .any(|c| matches!(c, ContentBlock::ToolCall(_)))
+                {
                     output.stop_reason = StopReason::ToolUse;
                 }
             }
@@ -363,35 +429,46 @@ async fn process_vertex_chunk(
 
             for part in parts {
                 if let Some(text) = part.get("text").and_then(|v| v.as_str()) {
-                    if text.is_empty() { continue; }
+                    if text.is_empty() {
+                        continue;
+                    }
 
-                    let is_thinking = part.get("thought").and_then(|v| v.as_bool()).unwrap_or(false);
+                    let is_thinking = part
+                        .get("thought")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false);
 
                     if is_thinking {
                         let idx = if let Some(idx) = thinking_block_idx {
                             *idx
                         } else {
                             let idx = output.content.len();
-                            output.content.push(ContentBlock::Thinking(crate::types::ThinkingContent {
-                                thinking: String::new(),
-                                thinking_signature: None,
-                                redacted: false,
-                            }));
+                            output.content.push(ContentBlock::Thinking(
+                                crate::types::ThinkingContent {
+                                    thinking: String::new(),
+                                    thinking_signature: None,
+                                    redacted: false,
+                                },
+                            ));
                             *thinking_block_idx = Some(idx);
-                            let _ = tx.send(StreamEvent::ThinkingStart {
-                                content_index: idx,
-                                partial: partial_from_output(output),
-                            }).await;
+                            let _ = tx
+                                .send(StreamEvent::ThinkingStart {
+                                    content_index: idx,
+                                    partial: partial_from_output(output),
+                                })
+                                .await;
                             idx
                         };
                         if let ContentBlock::Thinking(ref mut tc) = output.content[idx] {
                             tc.thinking.push_str(text);
                         }
-                        let _ = tx.send(StreamEvent::ThinkingDelta {
-                            content_index: idx,
-                            delta: text.to_string(),
-                            partial: partial_from_output(output),
-                        }).await;
+                        let _ = tx
+                            .send(StreamEvent::ThinkingDelta {
+                                content_index: idx,
+                                delta: text.to_string(),
+                                partial: partial_from_output(output),
+                            })
+                            .await;
                     } else {
                         let idx = if let Some(idx) = text_block_idx {
                             *idx
@@ -399,20 +476,24 @@ async fn process_vertex_chunk(
                             let idx = output.content.len();
                             output.content.push(ContentBlock::text(""));
                             *text_block_idx = Some(idx);
-                            let _ = tx.send(StreamEvent::TextStart {
-                                content_index: idx,
-                                partial: partial_from_output(output),
-                            }).await;
+                            let _ = tx
+                                .send(StreamEvent::TextStart {
+                                    content_index: idx,
+                                    partial: partial_from_output(output),
+                                })
+                                .await;
                             idx
                         };
                         if let ContentBlock::Text(ref mut tc) = output.content[idx] {
                             tc.text.push_str(text);
                         }
-                        let _ = tx.send(StreamEvent::TextDelta {
-                            content_index: idx,
-                            delta: text.to_string(),
-                            partial: partial_from_output(output),
-                        }).await;
+                        let _ = tx
+                            .send(StreamEvent::TextDelta {
+                                content_index: idx,
+                                delta: text.to_string(),
+                                partial: partial_from_output(output),
+                            })
+                            .await;
                     }
                 }
 
@@ -427,24 +508,30 @@ async fn process_vertex_chunk(
                         args.clone(),
                     ));
 
-                    let _ = tx.send(StreamEvent::ToolCallStart {
-                        content_index: idx,
-                        partial: partial_from_output(output),
-                    }).await;
+                    let _ = tx
+                        .send(StreamEvent::ToolCallStart {
+                            content_index: idx,
+                            partial: partial_from_output(output),
+                        })
+                        .await;
 
                     let deltas = serde_json::to_string(args).unwrap_or_default();
-                    let _ = tx.send(StreamEvent::ToolCallDelta {
-                        content_index: idx,
-                        delta: deltas,
-                        partial: partial_from_output(output),
-                    }).await;
+                    let _ = tx
+                        .send(StreamEvent::ToolCallDelta {
+                            content_index: idx,
+                            delta: deltas,
+                            partial: partial_from_output(output),
+                        })
+                        .await;
 
                     if let ContentBlock::ToolCall(tc) = &output.content[idx] {
-                        let _ = tx.send(StreamEvent::ToolCallEnd {
-                            content_index: idx,
-                            tool_call: tc.clone(),
-                            partial: partial_from_output(output),
-                        }).await;
+                        let _ = tx
+                            .send(StreamEvent::ToolCallEnd {
+                                content_index: idx,
+                                tool_call: tc.clone(),
+                                partial: partial_from_output(output),
+                            })
+                            .await;
                     }
                 }
             }

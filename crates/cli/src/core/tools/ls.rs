@@ -1,9 +1,10 @@
-﻿use tokio::fs;
+use tokio::fs;
 
-use super::truncate::*;
 use super::path_utils::resolve_to_cwd;
-use super::render_utils::{ToolRenderContext, ToolRenderOptions, ToolRenderOutput, ToolTheme,
-    shorten_path};
+use super::render_utils::{
+    ToolRenderContext, ToolRenderOptions, ToolRenderOutput, ToolTheme, shorten_path,
+};
+use super::truncate::*;
 
 /// Create an ls tool definition
 pub fn create_ls_tool_definition() -> LsToolDefinition {
@@ -31,7 +32,10 @@ impl LsToolDefinition {
         let effective_limit = limit.unwrap_or(500);
 
         // Check if path exists
-        if !tokio::fs::try_exists(&dir_path).await.map_err(|e| e.to_string())? {
+        if !tokio::fs::try_exists(&dir_path)
+            .await
+            .map_err(|e| e.to_string())?
+        {
             return Err(format!("Path not found: {}", dir_path));
         }
 
@@ -81,8 +85,16 @@ impl LsToolDefinition {
         let mut output_text = truncation.content.clone();
 
         let details = LsToolDetails {
-            truncation: if truncation_truncated { Some(truncation) } else { None },
-            entry_limit_reached: if entry_limit_reached { Some(effective_limit) } else { None },
+            truncation: if truncation_truncated {
+                Some(truncation)
+            } else {
+                None
+            },
+            entry_limit_reached: if entry_limit_reached {
+                Some(effective_limit)
+            } else {
+                None
+            },
         };
 
         let mut notices: Vec<String> = Vec::new();
@@ -131,7 +143,8 @@ pub fn render_ls_call(args: &serde_json::Value, _ctx: &ToolRenderContext) -> Too
         _ => ToolTheme::fg("accent", "."),
     };
 
-    let mut label = format!("{} {}",
+    let mut label = format!(
+        "{} {}",
         ToolTheme::fg("toolTitle", &ToolTheme::bold("ls")),
         path_display,
     );
@@ -140,7 +153,10 @@ pub fn render_ls_call(args: &serde_json::Value, _ctx: &ToolRenderContext) -> Too
         label.push_str(&ToolTheme::fg("toolOutput", &format!(" (limit {})", l)));
     }
 
-    ToolRenderOutput { label, formatted: String::new() }
+    ToolRenderOutput {
+        label,
+        formatted: String::new(),
+    }
 }
 
 /// Render an ls tool result — directory entries with warnings
@@ -160,16 +176,18 @@ pub fn render_ls_result(
 
         formatted.push('\n');
         formatted.push_str(
-            &display_lines.iter()
+            &display_lines
+                .iter()
                 .map(|line| ToolTheme::fg("toolOutput", line))
                 .collect::<Vec<_>>()
                 .join("\n"),
         );
 
         if remaining > 0 {
-            formatted.push_str(
-                &ToolTheme::fg("muted", &format!("\n... ({} more lines, use expand to expand)", remaining)),
-            );
+            formatted.push_str(&ToolTheme::fg(
+                "muted",
+                &format!("\n... ({} more lines, use expand to expand)", remaining),
+            ));
         }
     }
 
@@ -184,10 +202,15 @@ pub fn render_ls_result(
             }
         }
         if !warnings.is_empty() {
-            formatted.push_str(&format!("\n{}",
-                ToolTheme::fg("warning", &format!("[Truncated: {}]", warnings.join(", ")))));
+            formatted.push_str(&format!(
+                "\n{}",
+                ToolTheme::fg("warning", &format!("[Truncated: {}]", warnings.join(", ")))
+            ));
         }
     }
 
-    ToolRenderOutput { label: String::new(), formatted }
+    ToolRenderOutput {
+        label: String::new(),
+        formatted,
+    }
 }

@@ -1,5 +1,4 @@
-﻿//! Resource loader - loads extensions, skills, prompts, themes, and context files
-
+//! Resource loader - loads extensions, skills, prompts, themes, and context files
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -99,17 +98,19 @@ impl ResourceLoader {
 
     /// Reload all resources
     pub async fn reload(&mut self, ext_paths: &[String]) {
-        self.reload_with_options(ext_paths, &ResourceLoaderOptions::default()).await;
+        self.reload_with_options(ext_paths, &ResourceLoaderOptions::default())
+            .await;
     }
 
     /// Reload all resources with options to disable specific resource types
-    pub async fn reload_with_options(&mut self, ext_paths: &[String], options: &ResourceLoaderOptions) {
+    pub async fn reload_with_options(
+        &mut self,
+        ext_paths: &[String],
+        options: &ResourceLoaderOptions,
+    ) {
         // Load extensions
-        self.extensions_result = Some(discover_and_load_extensions(
-            ext_paths,
-            &self.cwd,
-            &self.agent_dir,
-        ).await);
+        self.extensions_result =
+            Some(discover_and_load_extensions(ext_paths, &self.cwd, &self.agent_dir).await);
 
         // Load skills (unless disabled)
         if !options.no_skills {
@@ -129,7 +130,8 @@ impl ResourceLoader {
 
         // Load prompts (unless disabled)
         if !options.no_prompt_templates {
-            let prompt_result = load_prompts(&self.agent_dir, &self.cwd, &options.prompt_template_paths);
+            let prompt_result =
+                load_prompts(&self.agent_dir, &self.cwd, &options.prompt_template_paths);
             self.prompts = prompt_result.prompts;
             self.prompt_diagnostics = prompt_result.diagnostics;
         }
@@ -287,11 +289,7 @@ fn load_context_file_from_dir(dir: &Path) -> Option<ContextFile> {
 // Prompt Templates
 // ============================================================================
 
-fn load_prompts(
-    agent_dir: &Path,
-    cwd: &Path,
-    extra_paths: &[PathBuf],
-) -> PromptLoadResult {
+fn load_prompts(agent_dir: &Path, cwd: &Path, extra_paths: &[PathBuf]) -> PromptLoadResult {
     let mut prompts = Vec::new();
     let mut diagnostics = Vec::new();
     let mut seen_names = HashSet::new();
@@ -299,13 +297,23 @@ fn load_prompts(
     // Load from agent dir
     let prompts_dir = agent_dir.join("prompts");
     if prompts_dir.exists() {
-        load_prompts_from_dir(&prompts_dir, &mut prompts, &mut diagnostics, &mut seen_names);
+        load_prompts_from_dir(
+            &prompts_dir,
+            &mut prompts,
+            &mut diagnostics,
+            &mut seen_names,
+        );
     }
 
     // Load from project dir
     let project_prompts_dir = cwd.join(config::CONFIG_DIR_NAME).join("prompts");
     if project_prompts_dir.exists() {
-        load_prompts_from_dir(&project_prompts_dir, &mut prompts, &mut diagnostics, &mut seen_names);
+        load_prompts_from_dir(
+            &project_prompts_dir,
+            &mut prompts,
+            &mut diagnostics,
+            &mut seen_names,
+        );
     }
 
     // Load from extra paths
@@ -317,7 +325,10 @@ fn load_prompts(
         }
     }
 
-    PromptLoadResult { prompts, diagnostics }
+    PromptLoadResult {
+        prompts,
+        diagnostics,
+    }
 }
 
 fn load_prompts_from_dir(
@@ -355,7 +366,8 @@ fn load_prompt_from_file(
         }
     };
 
-    let name = path.file_stem()
+    let name = path
+        .file_stem()
         .and_then(|s| s.to_str())
         .map(|s| s.to_string())
         .unwrap_or_else(|| "unnamed".to_string());
@@ -403,11 +415,7 @@ struct PromptLoadResult {
 // Theme Loading
 // ============================================================================
 
-fn load_themes(
-    agent_dir: &Path,
-    cwd: &Path,
-    extra_paths: &[PathBuf],
-) -> ThemeLoadResult {
+fn load_themes(agent_dir: &Path, cwd: &Path, extra_paths: &[PathBuf]) -> ThemeLoadResult {
     let mut themes = Vec::new();
     let mut diagnostics = Vec::new();
     let mut seen_names = HashSet::new();
@@ -422,7 +430,10 @@ fn load_themes(
                 diagnostics.push(ResourceDiagnostic {
                     r#type: "collision".to_string(),
                     message: format!("Duplicate theme name: {}", name),
-                    path: themes_dir.join(format!("{}.json", name)).to_string_lossy().to_string(),
+                    path: themes_dir
+                        .join(format!("{}.json", name))
+                        .to_string_lossy()
+                        .to_string(),
                     collision: None,
                 });
             }
@@ -439,7 +450,10 @@ fn load_themes(
                 diagnostics.push(ResourceDiagnostic {
                     r#type: "collision".to_string(),
                     message: format!("Duplicate theme name: {}", name),
-                    path: project_themes_dir.join(format!("{}.json", name)).to_string_lossy().to_string(),
+                    path: project_themes_dir
+                        .join(format!("{}.json", name))
+                        .to_string_lossy()
+                        .to_string(),
                     collision: None,
                 });
             }
@@ -464,7 +478,10 @@ fn load_themes(
         }
     }
 
-    ThemeLoadResult { themes, diagnostics }
+    ThemeLoadResult {
+        themes,
+        diagnostics,
+    }
 }
 
 struct ThemeLoadResult {
@@ -476,11 +493,7 @@ struct ThemeLoadResult {
 // Skills
 // ============================================================================
 
-fn load_skills(
-    agent_dir: &Path,
-    cwd: &Path,
-    extra_paths: &[PathBuf],
-) -> SkillLoadResult {
+fn load_skills(agent_dir: &Path, cwd: &Path, extra_paths: &[PathBuf]) -> SkillLoadResult {
     let result = skills::load_skills(agent_dir, cwd, extra_paths);
     SkillLoadResult {
         skills: result.skills,

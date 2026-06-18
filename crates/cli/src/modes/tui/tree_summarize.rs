@@ -25,8 +25,8 @@ pub(crate) async fn handle_tree_summarize(ctx: &mut TuiContext, val: &str) {
 /// Generate branch summary and then navigate to target
 async fn summarize_and_navigate(ctx: &mut TuiContext, target_id: &str) {
     let old_leaf = ctx.session_manager.get_leaf_id();
-    let ancestor = old_leaf
-        .and_then(|old| ctx.session_manager.find_common_ancestor(old, target_id));
+    let ancestor =
+        old_leaf.and_then(|old| ctx.session_manager.find_common_ancestor(old, target_id));
 
     if let (Some(old), Some(ancestor_id)) = (old_leaf, &ancestor) {
         let entries_to_summarize = ctx
@@ -46,10 +46,16 @@ async fn summarize_and_navigate(ctx: &mut TuiContext, target_id: &str) {
                             let texts: Vec<String> = arr
                                 .iter()
                                 .filter_map(|c| {
-                                    c.get("text").and_then(|t| t.as_str()).map(|s| s.to_string())
+                                    c.get("text")
+                                        .and_then(|t| t.as_str())
+                                        .map(|s| s.to_string())
                                 })
                                 .collect();
-                            if texts.is_empty() { None } else { Some(texts.join("\n")) }
+                            if texts.is_empty() {
+                                None
+                            } else {
+                                Some(texts.join("\n"))
+                            }
                         }
                         _ => None,
                     },
@@ -63,7 +69,9 @@ async fn summarize_and_navigate(ctx: &mut TuiContext, target_id: &str) {
             .join("\n\n");
 
         if !conversation.is_empty() {
-            ctx.tui.chat.add_system_message("Generating branch summary...");
+            ctx.tui
+                .chat
+                .add_system_message("Generating branch summary...");
             let _ = ctx.tui.render_with_terminal(&mut ctx.terminal_manager);
 
             let system_prompt = "Summarize the following conversation branch concisely. Focus on key decisions, tool usage, and outcomes.";
@@ -77,12 +85,20 @@ async fn summarize_and_navigate(ctx: &mut TuiContext, target_id: &str) {
                 ctx.provider.to_uppercase().replace('-', "_")
             ))
             .ok();
-            let result =
-                pick_ai::complete_simple(&ctx.model, context, api_key, None, Some(4096), None, None)
-                    .await;
+            let result = pick_ai::complete_simple(
+                &ctx.model,
+                context,
+                api_key,
+                None,
+                Some(4096),
+                None,
+                None,
+            )
+            .await;
 
             if let Some(err) = &result.error_message {
-                ctx.tui.show_error(&format!("Summarization failed: {}", err));
+                ctx.tui
+                    .show_error(&format!("Summarization failed: {}", err));
             } else {
                 let summary: String = result
                     .content
@@ -113,7 +129,9 @@ async fn summarize_and_navigate(ctx: &mut TuiContext, target_id: &str) {
                         summary.len()
                     ));
                 } else {
-                    ctx.tui.chat.add_system_message("Empty summary. Navigating.");
+                    ctx.tui
+                        .chat
+                        .add_system_message("Empty summary. Navigating.");
                 }
             }
         }
@@ -144,12 +162,10 @@ pub(crate) fn navigate_to(ctx: &mut TuiContext, target_id: &str) {
         .collect();
     ctx.all_messages = new_messages;
     ctx.tui.chat.clear();
-    ctx.tui
-        .chat
-        .add_system_message(&format!(
-            "Navigated. Context rebuilt with {} messages.",
-            ctx.all_messages.len()
-        ));
+    ctx.tui.chat.add_system_message(&format!(
+        "Navigated. Context rebuilt with {} messages.",
+        ctx.all_messages.len()
+    ));
     for msg in &ctx.all_messages.clone() {
         if let Message::User(u) = msg {
             for block in &u.content {

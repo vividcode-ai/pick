@@ -1,4 +1,4 @@
-﻿//! Find tool - searches for files by glob pattern
+//! Find tool - searches for files by glob pattern
 
 use std::path::Path;
 
@@ -32,16 +32,46 @@ fn glob_to_regex(glob: &str) -> String {
             '/' => re.push_str("[/\\\\]"),
             '\\' => re.push_str("\\\\"),
             '+' => re.push_str("\\+"),
-            '(' => { re.push('\\'); re.push('('); },
-            ')' => { re.push('\\'); re.push(')'); },
-            '[' => { re.push('\\'); re.push('['); },
-            ']' => { re.push('\\'); re.push(']'); },
-            '{' => { re.push('\\'); re.push('{'); },
-            '}' => { re.push('\\'); re.push('}'); },
-            '^' => { re.push('\\'); re.push('^'); },
-            '$' => { re.push('\\'); re.push('$'); },
-            '|' => { re.push('\\'); re.push('|'); },
-            '!' => { re.push('\\'); re.push('!'); },
+            '(' => {
+                re.push('\\');
+                re.push('(');
+            }
+            ')' => {
+                re.push('\\');
+                re.push(')');
+            }
+            '[' => {
+                re.push('\\');
+                re.push('[');
+            }
+            ']' => {
+                re.push('\\');
+                re.push(']');
+            }
+            '{' => {
+                re.push('\\');
+                re.push('{');
+            }
+            '}' => {
+                re.push('\\');
+                re.push('}');
+            }
+            '^' => {
+                re.push('\\');
+                re.push('^');
+            }
+            '$' => {
+                re.push('\\');
+                re.push('$');
+            }
+            '|' => {
+                re.push('\\');
+                re.push('|');
+            }
+            '!' => {
+                re.push('\\');
+                re.push('!');
+            }
             c => re.push(c),
         }
     }

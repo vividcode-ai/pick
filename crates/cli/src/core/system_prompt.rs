@@ -1,4 +1,4 @@
-﻿//! System prompt construction and project context loading
+//! System prompt construction and project context loading
 
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -8,7 +8,7 @@ use crate::config::{get_docs_path, get_examples_path, get_readme_path};
 use crate::core::agent_mode::AgentMode;
 use crate::core::resource_loader::ContextFile;
 use pick_agent::core::state::AgentTool;
-use pick_agent::skills::{format_skills_for_prompt, Skill};
+use pick_agent::skills::{Skill, format_skills_for_prompt};
 
 /// Options for building a system prompt
 pub struct BuildSystemPromptOptions<'a> {
@@ -89,7 +89,11 @@ pub fn build_system_prompt(options: BuildSystemPromptOptions) -> String {
 
         prompt.push_str(&format!("\nCurrent date: {}", date));
         prompt.push_str(&format!("\nCurrent working directory: {}", prompt_cwd));
-        prompt.push_str(&format!("\nPlatform: {} / {}", std::env::consts::OS, std::env::consts::ARCH));
+        prompt.push_str(&format!(
+            "\nPlatform: {} / {}",
+            std::env::consts::OS,
+            std::env::consts::ARCH
+        ));
 
         return prompt;
     }
@@ -104,7 +108,8 @@ pub fn build_system_prompt(options: BuildSystemPromptOptions) -> String {
     let default_tools_owned: Vec<String> = default_tools.iter().map(|s| s.to_string()).collect();
     let tools = selected_tools.unwrap_or(&default_tools_owned);
 
-    let visible_tools: Vec<&String> = tools.iter()
+    let visible_tools: Vec<&String> = tools
+        .iter()
         .filter(|name| tool_snippets.map_or(false, |s| s.contains_key(*name)))
         .collect();
 
@@ -143,7 +148,9 @@ pub fn build_system_prompt(options: BuildSystemPromptOptions) -> String {
     if has_bash && !has_grep && !has_find && !has_ls {
         add_guideline("Use bash for file operations like ls, rg, find");
     } else if has_bash && (has_grep || has_find || has_ls) {
-        add_guideline("Prefer grep/find/ls tools over bash for file exploration (faster, respects .gitignore)");
+        add_guideline(
+            "Prefer grep/find/ls tools over bash for file exploration (faster, respects .gitignore)",
+        );
     }
 
     if let Some(extra_guidelines) = prompt_guidelines {
@@ -252,7 +259,11 @@ Pick documentation (read only when the user asks about Pick itself, its SDK, ext
     // Add date, working directory, and platform last
     prompt.push_str(&format!("\nCurrent date: {}", date));
     prompt.push_str(&format!("\nCurrent working directory: {}", prompt_cwd));
-    prompt.push_str(&format!("\nPlatform: {} / {}", std::env::consts::OS, std::env::consts::ARCH));
+    prompt.push_str(&format!(
+        "\nPlatform: {} / {}",
+        std::env::consts::OS,
+        std::env::consts::ARCH
+    ));
 
     prompt
 }
@@ -261,10 +272,16 @@ Pick documentation (read only when the user asks about Pick itself, its SDK, ext
 /// Maps tool name → one-line description for inclusion in the system prompt.
 /// Uses prompt_snippet if available, falling back to description.
 pub fn build_tool_snippets(tools: &[AgentTool]) -> HashMap<String, String> {
-    tools.iter().map(|t| {
-        let snippet = t.prompt_snippet.clone().unwrap_or_else(|| t.description.clone());
-        (t.name.clone(), snippet)
-    }).collect()
+    tools
+        .iter()
+        .map(|t| {
+            let snippet = t
+                .prompt_snippet
+                .clone()
+                .unwrap_or_else(|| t.description.clone());
+            (t.name.clone(), snippet)
+        })
+        .collect()
 }
 
 /// Extract tool names from a list of AgentTools.
@@ -275,10 +292,13 @@ pub fn build_tool_names(tools: &[AgentTool]) -> Vec<String> {
 /// Convert ContextFile list (from ResourceLoader) to the ContextFileRef slices
 /// needed by BuildSystemPromptOptions.
 pub fn build_context_file_refs(files: &[ContextFile]) -> Vec<ContextFileRef<'_>> {
-    files.iter().map(|f| ContextFileRef {
-        path: &f.path,
-        content: &f.content,
-    }).collect()
+    files
+        .iter()
+        .map(|f| ContextFileRef {
+            path: &f.path,
+            content: &f.content,
+        })
+        .collect()
 }
 
 /// Convenience wrapper that builds a system prompt from the most common inputs.
@@ -292,7 +312,15 @@ pub fn build_system_prompt_with_defaults(
     append_system_prompt: Option<&str>,
     cwd: &Path,
 ) -> String {
-    build_system_prompt_with_defaults_and_mode(tools, skills, context_files, custom_prompt, append_system_prompt, cwd, None)
+    build_system_prompt_with_defaults_and_mode(
+        tools,
+        skills,
+        context_files,
+        custom_prompt,
+        append_system_prompt,
+        cwd,
+        None,
+    )
 }
 
 /// Build system prompt with defaults and agent mode

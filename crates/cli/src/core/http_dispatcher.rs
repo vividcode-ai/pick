@@ -1,5 +1,4 @@
-﻿//! HTTP dispatcher configuration for API requests
-
+//! HTTP dispatcher configuration for API requests
 
 pub const DEFAULT_HTTP_IDLE_TIMEOUT_MS: u64 = 300_000;
 

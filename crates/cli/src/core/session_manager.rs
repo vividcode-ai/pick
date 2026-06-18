@@ -1,4 +1,4 @@
-﻿//! Session listing utilities for the new format (pick_agent::session)
+//! Session listing utilities for the new format (pick_agent::session)
 //! Reads JSONL files written by pick_agent::session::SessionManager.
 //! No backward compatibility with old format.
 
@@ -50,8 +50,11 @@ pub struct FlatSessionNode {
 
 /// Compute the default session directory for a cwd
 pub fn get_default_session_dir(cwd: &str, agent_dir: &str) -> PathBuf {
-    let safe_path = format!("--{}--", cwd.trim_start_matches(|c: char| c == '/' || c == '\\')
-        .replace(|c: char| c == '/' || c == ':' || c == '\\', "-"));
+    let safe_path = format!(
+        "--{}--",
+        cwd.trim_start_matches(|c: char| c == '/' || c == '\\')
+            .replace(|c: char| c == '/' || c == ':' || c == '\\', "-")
+    );
     let session_dir = Path::new(agent_dir).join("sessions").join(&safe_path);
     std::fs::create_dir_all(&session_dir).ok();
     session_dir
@@ -119,12 +122,34 @@ async fn build_session_info(file_path: &Path) -> Option<SessionInfo> {
         return None;
     }
 
-    let id = header.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
-    let cwd = header.get("cwd").and_then(|v| v.as_str()).unwrap_or("").to_string();
-    let created_ts = header.get("created_at").and_then(|v| v.as_i64()).unwrap_or(0);
-    let updated_ts = header.get("updated_at").and_then(|v| v.as_i64()).unwrap_or(0);
-    let model_from_header = header.get("model").and_then(|v| v.as_str()).unwrap_or("").to_string();
-    let provider_from_header = header.get("provider").and_then(|v| v.as_str()).unwrap_or("").to_string();
+    let id = header
+        .get("id")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let cwd = header
+        .get("cwd")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let created_ts = header
+        .get("created_at")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
+    let updated_ts = header
+        .get("updated_at")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
+    let model_from_header = header
+        .get("model")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let provider_from_header = header
+        .get("provider")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
 
     let created = chrono::DateTime::from_timestamp_millis(created_ts).unwrap_or_else(Utc::now);
     let modified = chrono::DateTime::from_timestamp_millis(updated_ts).unwrap_or_else(Utc::now);
@@ -148,7 +173,10 @@ async fn build_session_info(file_path: &Path) -> Option<SessionInfo> {
         let type_ = entry.get("type").and_then(|v| v.as_str());
 
         if type_ == Some("session_info") {
-            name = entry.get("name").and_then(|v| v.as_str()).map(|s| s.trim().to_string());
+            name = entry
+                .get("name")
+                .and_then(|v| v.as_str())
+                .map(|s| s.trim().to_string());
             if name.as_deref() == Some("") {
                 name = None;
             }
@@ -215,7 +243,11 @@ async fn build_session_info(file_path: &Path) -> Option<SessionInfo> {
         created,
         modified,
         message_count,
-        first_message: if first_message.is_empty() { "(no messages)".to_string() } else { first_message },
+        first_message: if first_message.is_empty() {
+            "(no messages)".to_string()
+        } else {
+            first_message
+        },
         all_messages_text: all_messages.join(" "),
         git_branch,
         model,
@@ -250,14 +282,20 @@ fn detect_git_branch_for_cwd(cwd: &str) -> Option<String> {
 // ============================================================================
 
 fn shorten_path(path: &str) -> String {
-    if let Some(rest) = path.strip_prefix("/home/").or_else(|| path.strip_prefix("/Users/")) {
+    if let Some(rest) = path
+        .strip_prefix("/home/")
+        .or_else(|| path.strip_prefix("/Users/"))
+    {
         let parts: Vec<&str> = rest.split('/').collect();
         if parts.len() > 1 {
             return format!("~{}/{}", parts[0], parts[1..].join("/"));
         }
         return format!("~{}", parts[0]);
     }
-    if let Some(rest) = path.strip_prefix("C:\\Users\\").or_else(|| path.strip_prefix("c:\\Users\\")) {
+    if let Some(rest) = path
+        .strip_prefix("C:\\Users\\")
+        .or_else(|| path.strip_prefix("c:\\Users\\"))
+    {
         let parts: Vec<&str> = rest.split('\\').collect();
         if parts.len() > 1 {
             return format!("~{}/{}", parts[0], parts[1..].join("/"));
@@ -268,7 +306,11 @@ fn shorten_path(path: &str) -> String {
 }
 
 fn format_session_date(iso_timestamp: &str) -> String {
-    if iso_timestamp.is_empty() { "now".to_string() } else { iso_timestamp.to_string() }
+    if iso_timestamp.is_empty() {
+        "now".to_string()
+    } else {
+        iso_timestamp.to_string()
+    }
 }
 
 /// Build session tree from flat session list, returning flat nodes with tree structure.
@@ -278,9 +320,7 @@ pub fn build_session_tree(sessions: &[SessionDisplayInfo]) -> Vec<FlatSessionNod
 
     for (i, session) in sessions.iter().enumerate() {
         let parent_path = session.parent_session_path.as_deref();
-        let parent_idx = parent_path.and_then(|pp| {
-            sessions.iter().position(|s| s.path == pp)
-        });
+        let parent_idx = parent_path.and_then(|pp| sessions.iter().position(|s| s.path == pp));
         if let Some(idx) = parent_idx {
             children[idx].push(i);
         } else {
@@ -290,11 +330,17 @@ pub fn build_session_tree(sessions: &[SessionDisplayInfo]) -> Vec<FlatSessionNod
 
     for child_group in &mut children {
         child_group.sort_by(|&a, &b| {
-            sessions[b].modified.as_str().cmp(sessions[a].modified.as_str())
+            sessions[b]
+                .modified
+                .as_str()
+                .cmp(sessions[a].modified.as_str())
         });
     }
     roots.sort_by(|&a, &b| {
-        sessions[b].modified.as_str().cmp(sessions[a].modified.as_str())
+        sessions[b]
+            .modified
+            .as_str()
+            .cmp(sessions[a].modified.as_str())
     });
 
     let mut result = Vec::new();
@@ -321,7 +367,15 @@ pub fn build_session_tree(sessions: &[SessionDisplayInfo]) -> Vec<FlatSessionNod
             if depth > 0 {
                 ancestor.push(continues);
             }
-            walk(child, sessions, children, depth + 1, &ancestor, child_is_last, result);
+            walk(
+                child,
+                sessions,
+                children,
+                depth + 1,
+                &ancestor,
+                child_is_last,
+                result,
+            );
         }
     }
 

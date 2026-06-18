@@ -17,19 +17,12 @@ pub(crate) fn cleanup_tui_mode(ctx: &mut TuiContext) {
 }
 
 /// Print session resume hint box to stderr
-fn print_session_box(
-    session_manager: &pick_agent::session::SessionManager,
-    version: &str,
-) {
+fn print_session_box(session_manager: &pick_agent::session::SessionManager, version: &str) {
     let path = session_manager.session_path();
     let header = session_manager.header();
     if let (Some(_path), Some(hdr)) = (path, header) {
         let id = &hdr.id;
-        let short_id = if id.len() > 8 {
-            &id[..8]
-        } else {
-            id.as_str()
-        };
+        let short_id = if id.len() > 8 { &id[..8] } else { id.as_str() };
         let msg_count = session_manager.entries().len();
 
         let mut box_content: Vec<String> = Vec::new();
@@ -42,10 +35,7 @@ fn print_session_box(
             box_content.push(format!("   Pick -c {}", short_id));
         }
         box_content.push(String::new());
-        box_content.push(format!(
-            "Session: {} messages  ID: {}",
-            msg_count, short_id
-        ));
+        box_content.push(format!("Session: {} messages  ID: {}", msg_count, short_id));
 
         let natural = box_content
             .iter()

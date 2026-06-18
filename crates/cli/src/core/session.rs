@@ -1,5 +1,4 @@
-﻿//! Session management service
-
+//! Session management service
 
 use std::path::PathBuf;
 
@@ -29,7 +28,10 @@ pub async fn create_session_manager(
     if let Some(ref session_id) = args.session {
         // Try exact match in project dir first, then global dir, then partial search
         let path_candidates = [
-            session_dir.as_ref().unwrap().join(format!("{}.jsonl", session_id)),
+            session_dir
+                .as_ref()
+                .unwrap()
+                .join(format!("{}.jsonl", session_id)),
             global_dir.join(format!("{}.jsonl", session_id)),
         ];
         for path in &path_candidates {
@@ -165,12 +167,20 @@ fn find_session_file(id: &str, search_dir: &PathBuf) -> Option<PathBuf> {
             }
         } else if path.extension().map_or(false, |ext| ext == "jsonl") {
             // Quick check: does the filename contain the ID?
-            if path.file_stem().and_then(|s| s.to_str()).map_or(false, |s| s.contains(id)) {
+            if path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .map_or(false, |s| s.contains(id))
+            {
                 // Verify by reading the header
                 if let Ok(content) = std::fs::read_to_string(&path) {
                     if let Some(first_line) = content.lines().next() {
                         if let Ok(header) = serde_json::from_str::<serde_json::Value>(first_line) {
-                            if header.get("id").and_then(|v| v.as_str()).map_or(false, |hid| hid.starts_with(id)) {
+                            if header
+                                .get("id")
+                                .and_then(|v| v.as_str())
+                                .map_or(false, |hid| hid.starts_with(id))
+                            {
                                 return Some(path);
                             }
                         }
@@ -186,7 +196,7 @@ fn find_session_file(id: &str, search_dir: &PathBuf) -> Option<PathBuf> {
 /// Returns the selected session path, or None if cancelled/picker unavailable.
 async fn try_tui_session_picker(_cwd: &PathBuf, project_dir: &PathBuf) -> Option<String> {
     use crate::cli::session_picker::select_session;
-    use crate::core::session_manager::{list_sessions_from_dir, list_all_sessions, SessionInfo};
+    use crate::core::session_manager::{SessionInfo, list_all_sessions, list_sessions_from_dir};
     use futures::future::BoxFuture;
 
     // Create loaders that list sessions
@@ -197,19 +207,14 @@ async fn try_tui_session_picker(_cwd: &PathBuf, project_dir: &PathBuf) -> Option
         dyn Fn() -> BoxFuture<'static, Vec<SessionInfo>> + Send + Sync,
     > = Box::new(move || {
         let dir = pd.clone();
-        Box::pin(async move {
-            list_sessions_from_dir(&dir).await
-        })
+        Box::pin(async move { list_sessions_from_dir(&dir).await })
     });
 
-    let all_sessions_loader: Box<
-        dyn Fn() -> BoxFuture<'static, Vec<SessionInfo>> + Send + Sync,
-    > = Box::new(move || {
-        let gd = global_dir.clone();
-        Box::pin(async move {
-            list_all_sessions(&gd).await
-        })
-    });
+    let all_sessions_loader: Box<dyn Fn() -> BoxFuture<'static, Vec<SessionInfo>> + Send + Sync> =
+        Box::new(move || {
+            let gd = global_dir.clone();
+            Box::pin(async move { list_all_sessions(&gd).await })
+        });
 
     select_session(current_sessions_loader, all_sessions_loader).await
 }

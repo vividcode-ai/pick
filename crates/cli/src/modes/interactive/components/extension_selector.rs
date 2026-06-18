@@ -1,5 +1,4 @@
-﻿//! Extension selector component for string list selection
-
+//! Extension selector component for string list selection
 
 use crate::core::tools::render_utils::ToolTheme;
 
@@ -52,11 +51,17 @@ pub fn render_extension_selector(
     }
 
     if total > max_visible {
-        lines.push(ToolTheme::fg("muted", &format!("  ({}/{})", selected_index + 1, total)));
+        lines.push(ToolTheme::fg(
+            "muted",
+            &format!("  ({}/{})", selected_index + 1, total),
+        ));
     }
 
     lines.push(String::new());
-    lines.push(ToolTheme::fg("dim", "  ↑↓: navigate · Enter: select · Esc: cancel"));
+    lines.push(ToolTheme::fg(
+        "dim",
+        "  ↑↓: navigate · Enter: select · Esc: cancel",
+    ));
     lines.push(String::new());
     lines.push(ToolTheme::fg("accent", &border));
     lines

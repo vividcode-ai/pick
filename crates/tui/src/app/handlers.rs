@@ -186,22 +186,39 @@ impl TuiApp {
             let s = t.get("status").and_then(|v| v.as_str()).unwrap_or("");
             if s == "in_progress" { 0 } else { 1 }
         });
-        let active_count = self.todo_items.iter().filter(|t| {
-            let s = t.get("status").and_then(|v| v.as_str()).unwrap_or("");
-            s != "completed" && s != "cancelled"
-        }).count();
-
-        if active_count == 0 { return; }
-        let max_scroll = active_count.saturating_sub(5);
-
-        if let Some(idx) = self.todo_items.iter().position(|t| {
-            t.get("status").and_then(|v| v.as_str()).unwrap_or("") == "in_progress"
-        }) {
-            let active_before = self.todo_items.iter().take(idx).filter(|t| {
+        let active_count = self
+            .todo_items
+            .iter()
+            .filter(|t| {
                 let s = t.get("status").and_then(|v| v.as_str()).unwrap_or("");
                 s != "completed" && s != "cancelled"
-            }).count();
-            self.todo_scroll_offset = if active_before + 1 > 5 { active_before + 1 - 5 } else { 0 };
+            })
+            .count();
+
+        if active_count == 0 {
+            return;
+        }
+        let max_scroll = active_count.saturating_sub(5);
+
+        if let Some(idx) = self
+            .todo_items
+            .iter()
+            .position(|t| t.get("status").and_then(|v| v.as_str()).unwrap_or("") == "in_progress")
+        {
+            let active_before = self
+                .todo_items
+                .iter()
+                .take(idx)
+                .filter(|t| {
+                    let s = t.get("status").and_then(|v| v.as_str()).unwrap_or("");
+                    s != "completed" && s != "cancelled"
+                })
+                .count();
+            self.todo_scroll_offset = if active_before + 1 > 5 {
+                active_before + 1 - 5
+            } else {
+                0
+            };
             self.todo_scroll_offset = self.todo_scroll_offset.min(max_scroll);
         } else {
             self.todo_scroll_offset = self.todo_scroll_offset.min(max_scroll);
@@ -257,7 +274,11 @@ impl TuiApp {
     }
 
     /// Handle key events during selection mode
-    fn handle_key_selection(&mut self, code: KeyCode, modifiers: KeyModifiers) -> Option<TuiAction> {
+    fn handle_key_selection(
+        &mut self,
+        code: KeyCode,
+        modifiers: KeyModifiers,
+    ) -> Option<TuiAction> {
         if modifiers.contains(KeyModifiers::CONTROL) {
             match code {
                 KeyCode::Char('c') | KeyCode::Char('d') => {
@@ -326,29 +347,64 @@ impl TuiApp {
     }
 
     /// Handle key events during tree selection mode (/tree command)
-    fn handle_key_tree_selecting(&mut self, code: KeyCode, modifiers: KeyModifiers) -> Option<TuiAction> {
-        if self.tree_view.as_ref().map_or(false, |tv| tv.edit_label_entry_id.is_some()) {
+    fn handle_key_tree_selecting(
+        &mut self,
+        code: KeyCode,
+        modifiers: KeyModifiers,
+    ) -> Option<TuiAction> {
+        if self
+            .tree_view
+            .as_ref()
+            .map_or(false, |tv| tv.edit_label_entry_id.is_some())
+        {
             match code {
                 KeyCode::Enter => {
-                    let entry_id = self.tree_view.as_ref().and_then(|tv| tv.edit_label_entry_id.clone());
-                    let label = self.tree_view.as_ref().map(|tv| tv.edit_label_buffer.clone());
+                    let entry_id = self
+                        .tree_view
+                        .as_ref()
+                        .and_then(|tv| tv.edit_label_entry_id.clone());
+                    let label = self
+                        .tree_view
+                        .as_ref()
+                        .map(|tv| tv.edit_label_buffer.clone());
                     self.cancel_tree_view();
                     if let Some(eid) = entry_id {
                         let lbl = label.filter(|s| !s.is_empty());
-                        return Some(TuiAction::SelectionResult(0, format!("__label__{}:{}", eid, lbl.unwrap_or_default())));
+                        return Some(TuiAction::SelectionResult(
+                            0,
+                            format!("__label__{}:{}", eid, lbl.unwrap_or_default()),
+                        ));
                     }
                     return None;
                 }
-                KeyCode::Esc => { if let Some(ref mut tv) = self.tree_view { tv.cancel_edit_label(); } return None; }
-                KeyCode::Backspace => { if let Some(ref mut tv) = self.tree_view { tv.edit_label_buffer.pop(); } return None; }
-                KeyCode::Char(c) => { if let Some(ref mut tv) = self.tree_view { tv.edit_label_buffer.push(c); } return None; }
+                KeyCode::Esc => {
+                    if let Some(ref mut tv) = self.tree_view {
+                        tv.cancel_edit_label();
+                    }
+                    return None;
+                }
+                KeyCode::Backspace => {
+                    if let Some(ref mut tv) = self.tree_view {
+                        tv.edit_label_buffer.pop();
+                    }
+                    return None;
+                }
+                KeyCode::Char(c) => {
+                    if let Some(ref mut tv) = self.tree_view {
+                        tv.edit_label_buffer.push(c);
+                    }
+                    return None;
+                }
                 _ => return None,
             }
         }
 
         if modifiers.contains(KeyModifiers::CONTROL) {
             match code {
-                KeyCode::Char('c') => { self.cancel_tree_view(); return None; }
+                KeyCode::Char('c') => {
+                    self.cancel_tree_view();
+                    return None;
+                }
                 KeyCode::Char('d') => {
                     if let Some(ref mut tv) = self.tree_view {
                         tv.set_filter_mode(super::types::TreeFilterMode::Default);
@@ -358,45 +414,106 @@ impl TuiApp {
                 KeyCode::Char('t') => {
                     if let Some(ref mut tv) = self.tree_view {
                         let cur = tv.filter_mode;
-                        tv.set_filter_mode(if cur == super::types::TreeFilterMode::NoTools { super::types::TreeFilterMode::Default } else { super::types::TreeFilterMode::NoTools });
+                        tv.set_filter_mode(if cur == super::types::TreeFilterMode::NoTools {
+                            super::types::TreeFilterMode::Default
+                        } else {
+                            super::types::TreeFilterMode::NoTools
+                        });
                     }
                     return None;
                 }
                 KeyCode::Char('u') => {
                     if let Some(ref mut tv) = self.tree_view {
                         let cur = tv.filter_mode;
-                        tv.set_filter_mode(if cur == super::types::TreeFilterMode::UserOnly { super::types::TreeFilterMode::Default } else { super::types::TreeFilterMode::UserOnly });
+                        tv.set_filter_mode(if cur == super::types::TreeFilterMode::UserOnly {
+                            super::types::TreeFilterMode::Default
+                        } else {
+                            super::types::TreeFilterMode::UserOnly
+                        });
                     }
                     return None;
                 }
                 KeyCode::Char('l') => {
                     if let Some(ref mut tv) = self.tree_view {
                         let cur = tv.filter_mode;
-                        tv.set_filter_mode(if cur == super::types::TreeFilterMode::LabeledOnly { super::types::TreeFilterMode::Default } else { super::types::TreeFilterMode::LabeledOnly });
+                        tv.set_filter_mode(if cur == super::types::TreeFilterMode::LabeledOnly {
+                            super::types::TreeFilterMode::Default
+                        } else {
+                            super::types::TreeFilterMode::LabeledOnly
+                        });
                     }
                     return None;
                 }
                 KeyCode::Char('a') => {
                     if let Some(ref mut tv) = self.tree_view {
                         let cur = tv.filter_mode;
-                        tv.set_filter_mode(if cur == super::types::TreeFilterMode::All { super::types::TreeFilterMode::Default } else { super::types::TreeFilterMode::All });
+                        tv.set_filter_mode(if cur == super::types::TreeFilterMode::All {
+                            super::types::TreeFilterMode::Default
+                        } else {
+                            super::types::TreeFilterMode::All
+                        });
                     }
                     return None;
                 }
-                KeyCode::Char('o') => { if let Some(ref mut tv) = self.tree_view { tv.cycle_filter(); } return None; }
-                KeyCode::Left => { if let Some(ref mut tv) = self.tree_view { tv.fold_selected(); } return None; }
-                KeyCode::Right => { if let Some(ref mut tv) = self.tree_view { tv.unfold_selected(); } return None; }
+                KeyCode::Char('o') => {
+                    if let Some(ref mut tv) = self.tree_view {
+                        tv.cycle_filter();
+                    }
+                    return None;
+                }
+                KeyCode::Left => {
+                    if let Some(ref mut tv) = self.tree_view {
+                        tv.fold_selected();
+                    }
+                    return None;
+                }
+                KeyCode::Right => {
+                    if let Some(ref mut tv) = self.tree_view {
+                        tv.unfold_selected();
+                    }
+                    return None;
+                }
                 _ => {}
             }
         }
 
         match code {
-            KeyCode::Up => { if let Some(ref mut tv) = self.tree_view { tv.move_up(); } None }
-            KeyCode::Down => { if let Some(ref mut tv) = self.tree_view { tv.move_down(); } None }
-            KeyCode::PageUp => { if let Some(ref mut tv) = self.tree_view { tv.page_up(); } None }
-            KeyCode::PageDown => { if let Some(ref mut tv) = self.tree_view { tv.page_down(); } None }
-            KeyCode::Home => { if let Some(ref mut tv) = self.tree_view { tv.go_to_home(); } None }
-            KeyCode::End => { if let Some(ref mut tv) = self.tree_view { tv.go_to_end(); } None }
+            KeyCode::Up => {
+                if let Some(ref mut tv) = self.tree_view {
+                    tv.move_up();
+                }
+                None
+            }
+            KeyCode::Down => {
+                if let Some(ref mut tv) = self.tree_view {
+                    tv.move_down();
+                }
+                None
+            }
+            KeyCode::PageUp => {
+                if let Some(ref mut tv) = self.tree_view {
+                    tv.page_up();
+                }
+                None
+            }
+            KeyCode::PageDown => {
+                if let Some(ref mut tv) = self.tree_view {
+                    tv.page_down();
+                }
+                None
+            }
+            KeyCode::Home => {
+                if let Some(ref mut tv) = self.tree_view {
+                    tv.go_to_home();
+                }
+                None
+            }
+            KeyCode::End => {
+                if let Some(ref mut tv) = self.tree_view {
+                    tv.go_to_end();
+                }
+                None
+            }
             KeyCode::Enter => {
                 if let Some(ref tv) = self.tree_view {
                     if let Some(id) = tv.selected_entry_id() {
@@ -405,23 +522,47 @@ impl TuiApp {
                         return Some(TuiAction::SelectionResult(0, val));
                     }
                 }
-                self.cancel_tree_view(); None
+                self.cancel_tree_view();
+                None
             }
             KeyCode::Char('L') if !modifiers.contains(KeyModifiers::CONTROL) => {
-                if let Some(ref mut tv) = self.tree_view { tv.start_edit_label(); } None
+                if let Some(ref mut tv) = self.tree_view {
+                    tv.start_edit_label();
+                }
+                None
             }
             KeyCode::Char('T') if !modifiers.contains(KeyModifiers::CONTROL) => {
-                if let Some(ref mut tv) = self.tree_view { tv.toggle_label_timestamps(); } None
+                if let Some(ref mut tv) = self.tree_view {
+                    tv.toggle_label_timestamps();
+                }
+                None
             }
             KeyCode::Esc => {
                 if let Some(ref mut tv) = self.tree_view {
-                    if tv.search_query.is_empty() { self.cancel_tree_view(); } else { tv.clear_search(); }
-                } else { self.cancel_tree_view(); }
+                    if tv.search_query.is_empty() {
+                        self.cancel_tree_view();
+                    } else {
+                        tv.clear_search();
+                    }
+                } else {
+                    self.cancel_tree_view();
+                }
                 None
             }
-            KeyCode::Backspace => { if let Some(ref mut tv) = self.tree_view { tv.pop_search(); } None }
-            KeyCode::Char(c) if !modifiers.contains(KeyModifiers::CONTROL) && !modifiers.contains(KeyModifiers::ALT) => {
-                if let Some(ref mut tv) = self.tree_view { tv.append_search(c); } None
+            KeyCode::Backspace => {
+                if let Some(ref mut tv) = self.tree_view {
+                    tv.pop_search();
+                }
+                None
+            }
+            KeyCode::Char(c)
+                if !modifiers.contains(KeyModifiers::CONTROL)
+                    && !modifiers.contains(KeyModifiers::ALT) =>
+            {
+                if let Some(ref mut tv) = self.tree_view {
+                    tv.append_search(c);
+                }
+                None
             }
             _ => None,
         }
@@ -436,7 +577,9 @@ impl TuiApp {
                 let next = ((current as isize + delta).rem_euclid(count as isize)) as usize;
                 if let Some(ref mut d) = self.question_dialog {
                     if let Some(q) = d.questions.get_mut(d.current_index) {
-                        if q.multiple { q.selected.clear(); }
+                        if q.multiple {
+                            q.selected.clear();
+                        }
                         q.selected = vec![next];
                     }
                 }
@@ -469,7 +612,10 @@ impl TuiApp {
         let answers: Vec<String> = if dialog.custom_mode {
             vec![dialog.custom_input.clone().unwrap_or_default()]
         } else if q.multiple {
-            q.selected.iter().map(|&i| q.options[i].label.clone()).collect()
+            q.selected
+                .iter()
+                .map(|&i| q.options[i].label.clone())
+                .collect()
         } else {
             let idx = q.selected.first().copied().unwrap_or(0);
             vec![q.options[idx].label.clone()]
@@ -488,13 +634,20 @@ impl TuiApp {
     }
 
     /// Handle key events when in Questioning state
-    fn handle_question_key(&mut self, code: KeyCode, _modifiers: KeyModifiers) -> Option<TuiAction> {
+    fn handle_question_key(
+        &mut self,
+        code: KeyCode,
+        _modifiers: KeyModifiers,
+    ) -> Option<TuiAction> {
         if self.question_dialog.is_none() {
             self.state = AppState::Input;
             return None;
         }
 
-        let in_custom = self.question_dialog.as_ref().map_or(false, |d| d.custom_mode);
+        let in_custom = self
+            .question_dialog
+            .as_ref()
+            .map_or(false, |d| d.custom_mode);
 
         match code {
             KeyCode::Esc => {
@@ -511,9 +664,11 @@ impl TuiApp {
                 self.question_navigate(1);
             }
             KeyCode::Char(' ') if !in_custom => {
-                if self.question_dialog.as_ref().map_or(false, |d| {
-                    d.current().map_or(false, |q| q.multiple)
-                }) {
+                if self
+                    .question_dialog
+                    .as_ref()
+                    .map_or(false, |d| d.current().map_or(false, |q| q.multiple))
+                {
                     self.question_toggle();
                 } else {
                     return self.handle_question_confirm();
@@ -568,7 +723,11 @@ impl TuiApp {
     }
 
     /// Handle key events during update prompt mode
-    fn handle_key_update_prompt(&mut self, code: KeyCode, _modifiers: KeyModifiers) -> Option<TuiAction> {
+    fn handle_key_update_prompt(
+        &mut self,
+        code: KeyCode,
+        _modifiers: KeyModifiers,
+    ) -> Option<TuiAction> {
         match code {
             KeyCode::Up | KeyCode::Char('k') => {
                 if let Some(ref mut p) = self.update_prompt {
@@ -597,8 +756,14 @@ impl TuiApp {
                 Some(TuiAction::UpdateResponse(false))
             }
             KeyCode::Enter => {
-                let should_update = self.update_prompt.as_ref().map_or(false, |p| p.selected == 0);
-                let is_dismiss = self.update_prompt.as_ref().map_or(false, |p| p.selected == 2);
+                let should_update = self
+                    .update_prompt
+                    .as_ref()
+                    .map_or(false, |p| p.selected == 0);
+                let is_dismiss = self
+                    .update_prompt
+                    .as_ref()
+                    .map_or(false, |p| p.selected == 2);
                 if is_dismiss {
                     self.update_prompt = None;
                     self.state = AppState::Input;
@@ -675,7 +840,9 @@ impl TuiApp {
             }
             if self.state == AppState::Input && self.editor.text().trim().is_empty() {
                 let now = std::time::Instant::now();
-                let is_double = self.last_escape_time.map_or(false, |t| now.duration_since(t).as_millis() < 500);
+                let is_double = self
+                    .last_escape_time
+                    .map_or(false, |t| now.duration_since(t).as_millis() < 500);
                 self.last_escape_time = Some(now);
                 if is_double {
                     self.last_escape_time = None;
@@ -712,7 +879,9 @@ impl TuiApp {
                 }
                 _ => {}
             }
-            if modifiers == KeyModifiers::CONTROL && matches!(code, KeyCode::Char('c') | KeyCode::Char('d')) {
+            if modifiers == KeyModifiers::CONTROL
+                && matches!(code, KeyCode::Char('c') | KeyCode::Char('d'))
+            {
                 self.state = AppState::Input;
                 self.api_key_input.clear();
             }
@@ -738,12 +907,15 @@ impl TuiApp {
                 if self.editor.is_autocomplete_active() {
                     self.editor.autocomplete_apply_completion();
                     let trimmed = self.editor.text().trim().to_string();
-                    if trimmed.starts_with('/') && !trimmed.starts_with("/skill:") && trimmed != "/goal" {
+                    if trimmed.starts_with('/')
+                        && !trimmed.starts_with("/skill:")
+                        && trimmed != "/goal"
+                    {
                         return self.submit_input();
                     }
                     return None;
                 }
-                return self.submit_input()
+                return self.submit_input();
             }
             KeyCode::Tab => {
                 if self.editor.is_autocomplete_active() {
@@ -765,7 +937,9 @@ impl TuiApp {
             }
             KeyCode::Backspace => {
                 self.editor.delete_before();
-                if self.editor.is_autocomplete_active() || self.editor.text().trim_start().starts_with('/') {
+                if self.editor.is_autocomplete_active()
+                    || self.editor.text().trim_start().starts_with('/')
+                {
                     self.editor.trigger_autocomplete();
                 }
             }
@@ -784,9 +958,8 @@ impl TuiApp {
                 if self.editor.is_autocomplete_active() {
                     self.editor.autocomplete_previous();
                 } else if !self.pending_user_messages.is_empty() {
-                    self.editor.pending_previous(
-                        &self.pending_user_messages.make_contiguous(),
-                    );
+                    self.editor
+                        .pending_previous(&self.pending_user_messages.make_contiguous());
                 } else if self.editor.history_index.is_some() {
                     self.editor.history_previous();
                 } else if self.editor.buffer.is_empty() {
@@ -799,9 +972,8 @@ impl TuiApp {
                 if self.editor.is_autocomplete_active() {
                     self.editor.autocomplete_next();
                 } else if self.editor.pending_index.is_some() {
-                    self.editor.pending_next(
-                        &self.pending_user_messages.make_contiguous(),
-                    );
+                    self.editor
+                        .pending_next(&self.pending_user_messages.make_contiguous());
                 } else if self.editor.history_index.is_some() {
                     self.editor.history_next();
                 } else if self.editor.buffer.is_empty() {
@@ -859,13 +1031,17 @@ impl TuiApp {
         }
 
         // Ctrl+Shift+P: cycle model backward
-        if modifiers == (KeyModifiers::CONTROL | KeyModifiers::SHIFT) && code == KeyCode::Char('p') {
+        if modifiers == (KeyModifiers::CONTROL | KeyModifiers::SHIFT) && code == KeyCode::Char('p')
+        {
             return Some(TuiAction::CycleModelBackward);
         }
 
         // Ctrl+key shortcuts (emacs-style editing)
         if modifiers.contains(KeyModifiers::CONTROL)
-            && !matches!(code, KeyCode::Char('c') | KeyCode::Char('d') | KeyCode::Char('l'))
+            && !matches!(
+                code,
+                KeyCode::Char('c') | KeyCode::Char('d') | KeyCode::Char('l')
+            )
         {
             match code {
                 KeyCode::Char('n') => self.editor.cursor_down(),
@@ -895,7 +1071,13 @@ impl TuiApp {
     const LARGE_PASTE_CHAR_THRESHOLD: usize = 100;
 
     pub fn handle_paste(&mut self, text: &str) {
-        if matches!(self.state, AppState::Selecting | AppState::TreeSelecting | AppState::ApiKeyInput | AppState::UpdatePrompt) {
+        if matches!(
+            self.state,
+            AppState::Selecting
+                | AppState::TreeSelecting
+                | AppState::ApiKeyInput
+                | AppState::UpdatePrompt
+        ) {
             return;
         }
         let pasted = text.replace("\r\n", "\n").replace('\r', "\n");
@@ -914,7 +1096,8 @@ impl TuiApp {
         } else {
             self.editor.insert_str(&pasted);
         }
-        if self.editor.is_autocomplete_active() || self.editor.text().trim_start().starts_with('/') {
+        if self.editor.is_autocomplete_active() || self.editor.text().trim_start().starts_with('/')
+        {
             self.editor.trigger_autocomplete();
         }
     }

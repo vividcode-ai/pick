@@ -1,5 +1,4 @@
-﻿//! Dynamic border component that adjusts to viewport width
-
+//! Dynamic border component that adjusts to viewport width
 
 use crate::core::tools::render_utils::ToolTheme;
 

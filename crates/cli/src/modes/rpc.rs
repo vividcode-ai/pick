@@ -1,8 +1,8 @@
-﻿use std::io::Write;
+use std::io::Write;
 use std::sync::Arc;
 
-use tokio::sync::watch;
 use tokio::io::AsyncBufReadExt;
+use tokio::sync::watch;
 
 use crate::args::Args;
 use crate::core::auth_storage::AuthStorage;
@@ -15,8 +15,8 @@ use pick_ai::models::get_model;
 use pick_ai::types::{ContentBlock, Message, UserMessage};
 
 use crate::core::agent_mode::AgentMode;
-use crate::core::system_prompt::build_system_prompt_with_defaults;
 use crate::core::agent_session::RetryConfig;
+use crate::core::system_prompt::build_system_prompt_with_defaults;
 
 struct RpcContext {
     model_id: String,
@@ -44,13 +44,22 @@ pub async fn run_rpc_mode(
     platform_sandbox: Option<std::sync::Arc<dyn pick_agent::permission::sandbox::Sandbox>>,
 ) {
     let provider = args.provider.as_deref().unwrap_or("anthropic").to_string();
-    let model_id = args.model.as_deref().unwrap_or("claude-sonnet-4-20250514").to_string();
+    let model_id = args
+        .model
+        .as_deref()
+        .unwrap_or("claude-sonnet-4-20250514")
+        .to_string();
 
     let env_var = format!("{}_API_KEY", provider.to_uppercase().replace('-', "_"));
-    let api_key = auth.get_api_key(&provider, true).await.or_else(|| std::env::var(&env_var).ok());
+    let api_key = auth
+        .get_api_key(&provider, true)
+        .await
+        .or_else(|| std::env::var(&env_var).ok());
     if let Some(ref key) = api_key {
         if std::env::var(&env_var).is_err() {
-            unsafe { std::env::set_var(&env_var, key); }
+            unsafe {
+                std::env::set_var(&env_var, key);
+            }
         }
     }
 
@@ -60,7 +69,12 @@ pub async fn run_rpc_mode(
     let append_text = if args.append_system_prompt.is_empty() {
         format!("Provider: {}  Model: {}", provider, model_id)
     } else {
-        format!("{}\nProvider: {}  Model: {}", args.append_system_prompt.join("\n"), provider, model_id)
+        format!(
+            "{}\nProvider: {}  Model: {}",
+            args.append_system_prompt.join("\n"),
+            provider,
+            model_id
+        )
     };
     let system_prompt = build_system_prompt_with_defaults(
         &tools,
@@ -101,7 +115,10 @@ pub async fn run_rpc_mode(
         }
 
         if let Ok(request) = serde_json::from_str::<serde_json::Value>(&line) {
-            let method = request.get("method").and_then(|m| m.as_str()).unwrap_or("unknown");
+            let method = request
+                .get("method")
+                .and_then(|m| m.as_str())
+                .unwrap_or("unknown");
             let id = request.get("id");
             let params = request.get("params");
 
@@ -157,15 +174,13 @@ pub async fn run_rpc_mode(
                         should_stop_after_turn: None,
                         get_steering_messages: Some(Arc::new({
                             let mode = ctx.agent_mode;
-                            move || {
-                                match mode {
-                                    AgentMode::Plan => {
-                                        vec![Message::User(UserMessage::text(
-                                            crate::core::agent_mode::PLAN_MODE_REMINDER,
-                                        ))]
-                                    }
-                                    AgentMode::Build => vec![],
+                            move || match mode {
+                                AgentMode::Plan => {
+                                    vec![Message::User(UserMessage::text(
+                                        crate::core::agent_mode::PLAN_MODE_REMINDER,
+                                    ))]
                                 }
+                                AgentMode::Build => vec![],
                             }
                         })),
                         get_follow_up_messages: None,
@@ -199,8 +214,12 @@ pub async fn run_rpc_mode(
 
                     let agent_handle = tokio::spawn(async move {
                         crate::core::agent_session::run_agent_loop_with_retry_and_continuation(
-                            config, msgs, retry_config, Some(cancel_rx),
-                        ).await
+                            config,
+                            msgs,
+                            retry_config,
+                            Some(cancel_rx),
+                        )
+                        .await
                     });
 
                     let result = tokio::select! {
@@ -221,19 +240,24 @@ pub async fn run_rpc_mode(
                     match result {
                         Ok(agent_result) => {
                             for msg in &agent_result.messages[msgs_before_submit..] {
-                                if let Err(e) = ctx.session_manager.append(SessionEntry::from(msg)).await {
+                                if let Err(e) =
+                                    ctx.session_manager.append(SessionEntry::from(msg)).await
+                                {
                                     eprintln!("Warning: session persist failed: {}", e);
                                 }
                             }
                             ctx.messages = agent_result.messages;
                             let text = response_text.lock().unwrap().clone();
-                            send_response(id, serde_json::json!({
-                                "content": text,
-                                "usage": {
-                                    "input": agent_result.usage.input,
-                                    "output": agent_result.usage.output,
-                                }
-                            }));
+                            send_response(
+                                id,
+                                serde_json::json!({
+                                    "content": text,
+                                    "usage": {
+                                        "input": agent_result.usage.input,
+                                        "output": agent_result.usage.output,
+                                    }
+                                }),
+                            );
                         }
                         Err(e) => {
                             send_error(id, -32603, e);
@@ -247,7 +271,9 @@ pub async fn run_rpc_mode(
                     send_response(id, serde_json::json!({"success": true}));
                 }
                 "set_auto_retry" => {
-                    if let Some(enabled) = params.and_then(|p| p.get("enabled").and_then(|v| v.as_bool())) {
+                    if let Some(enabled) =
+                        params.and_then(|p| p.get("enabled").and_then(|v| v.as_bool()))
+                    {
                         ctx.auto_retry_enabled = enabled;
                     }
                     send_response(id, serde_json::json!({"success": true}));
@@ -281,10 +307,13 @@ pub async fn run_rpc_mode(
                     send_response(id, serde_json::json!(true));
                 }
                 "model" => {
-                    send_response(id, serde_json::json!({
-                        "provider": ctx.provider,
-                        "model": ctx.model_id,
-                    }));
+                    send_response(
+                        id,
+                        serde_json::json!({
+                            "provider": ctx.provider,
+                            "model": ctx.model_id,
+                        }),
+                    );
                 }
                 "exit" | "shutdown" => {
                     send_response(id, serde_json::json!("bye"));

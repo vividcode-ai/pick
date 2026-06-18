@@ -1,7 +1,10 @@
-﻿use serde_json::Value;
+use serde_json::Value;
 
 use super::compaction::estimate_tokens;
-use super::utils::{compute_file_lists, create_file_ops, extract_file_ops_from_message, format_file_operations, FileOperations};
+use super::utils::{
+    FileOperations, compute_file_lists, create_file_ops, extract_file_ops_from_message,
+    format_file_operations,
+};
 use crate::core::messages;
 
 /// File-operation details stored on generated branch summary entries
@@ -47,31 +50,58 @@ impl Default for GenerateBranchSummaryOptions {
 fn get_message_from_entry(entry: &Value) -> Option<Value> {
     match entry.get("type").and_then(|v| v.as_str()) {
         Some("message") => {
-            let role = entry.get("message").and_then(|m| m.get("role")).and_then(|r| r.as_str()).unwrap_or("");
+            let role = entry
+                .get("message")
+                .and_then(|m| m.get("role"))
+                .and_then(|r| r.as_str())
+                .unwrap_or("");
             if role == "toolResult" {
                 return None;
             }
             entry.get("message").cloned()
         }
         Some("custom_message") => {
-            let custom_type = entry.get("customType").and_then(|v| v.as_str()).unwrap_or("");
+            let custom_type = entry
+                .get("customType")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
             let content = entry.get("content").cloned().unwrap_or(Value::Null);
-            let display = entry.get("display").and_then(|v| v.as_bool()).unwrap_or(true);
+            let display = entry
+                .get("display")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(true);
             let details = entry.get("details").cloned();
             let ts = entry.get("timestamp").and_then(|v| v.as_i64()).unwrap_or(0);
-            Some(messages::create_custom_message(custom_type.to_string(), content, display, details, ts))
+            Some(messages::create_custom_message(
+                custom_type.to_string(),
+                content,
+                display,
+                details,
+                ts,
+            ))
         }
         Some("branch_summary") => {
             let summary = entry.get("summary").and_then(|v| v.as_str()).unwrap_or("");
             let from_id = entry.get("fromId").and_then(|v| v.as_str()).unwrap_or("");
             let ts = entry.get("timestamp").and_then(|v| v.as_i64()).unwrap_or(0);
-            Some(messages::create_branch_summary_message(summary.to_string(), from_id.to_string(), ts))
+            Some(messages::create_branch_summary_message(
+                summary.to_string(),
+                from_id.to_string(),
+                ts,
+            ))
         }
         Some("compaction") => {
             let summary = entry.get("summary").and_then(|v| v.as_str()).unwrap_or("");
-            let tokens_before = entry.get("tokensBefore").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+            let tokens_before = entry
+                .get("tokensBefore")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0) as usize;
             let ts = entry.get("timestamp").and_then(|v| v.as_i64()).unwrap_or(0);
-            Some(messages::create_compaction_summary_message(summary.to_string(), tokens_before, ts))
+            Some(messages::create_compaction_summary_message(
+                summary.to_string(),
+                tokens_before,
+                ts,
+            ))
         }
         _ => None,
     }
@@ -94,7 +124,9 @@ pub fn prepare_branch_entries(entries: &[Value], token_budget: usize) -> BranchP
                             }
                         }
                     }
-                    if let Some(modified_files) = details.get("modifiedFiles").and_then(|v| v.as_array()) {
+                    if let Some(modified_files) =
+                        details.get("modifiedFiles").and_then(|v| v.as_array())
+                    {
                         for f in modified_files {
                             if let Some(s) = f.as_str() {
                                 file_ops.edited.insert(s.to_string());
@@ -144,7 +176,9 @@ pub async fn generate_branch_summary(
     let context_window = 128000;
     let token_budget = context_window - reserve_tokens;
 
-    let BranchPreparation { messages, file_ops, .. } = prepare_branch_entries(entries, token_budget);
+    let BranchPreparation {
+        messages, file_ops, ..
+    } = prepare_branch_entries(entries, token_budget);
 
     if messages.is_empty() {
         return Ok(BranchSummaryResult {
@@ -182,7 +216,8 @@ pub struct BranchSummaryResult {
 
 pub const BRANCH_SUMMARY_PREAMBLE: &str = "The user explored a different conversation branch before returning here.\nSummary of that exploration:\n\n";
 
-pub const BRANCH_SUMMARY_PROMPT: &str = "Create a structured summary of this conversation branch for context when returning later.
+pub const BRANCH_SUMMARY_PROMPT: &str =
+    "Create a structured summary of this conversation branch for context when returning later.
 Use this EXACT format:
 
 ## Goal

@@ -1,5 +1,4 @@
-﻿//! Branch summary message display
-
+//! Branch summary message display
 
 use crate::core::tools::render_utils::ToolTheme;
 

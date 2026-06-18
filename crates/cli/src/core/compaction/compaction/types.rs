@@ -65,5 +65,3 @@ pub struct CompactionError {
     pub code: String,
     pub message: String,
 }
-
-

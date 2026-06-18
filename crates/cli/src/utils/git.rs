@@ -1,4 +1,4 @@
-﻿//! Git URL parsing utilities
+//! Git URL parsing utilities
 
 /// Parsed git source information
 #[derive(Debug, Clone)]
@@ -19,7 +19,11 @@ pub struct GitSource {
 pub fn parse_git_url(source: &str) -> Option<GitSource> {
     let trimmed = source.trim();
     let has_git_prefix = trimmed.starts_with("git:");
-    let url = if has_git_prefix { trimmed[4..].trim() } else { trimmed };
+    let url = if has_git_prefix {
+        trimmed[4..].trim()
+    } else {
+        trimmed
+    };
 
     // Must have a protocol if no git: prefix
     if !has_git_prefix && !url.contains("://") && !url.starts_with("git@") {
@@ -30,7 +34,10 @@ pub fn parse_git_url(source: &str) -> Option<GitSource> {
 
     let (host, path) = if let Some(scp) = repo.strip_prefix("git@") {
         let parts: Vec<&str> = scp.splitn(2, ':').collect();
-        (parts[0].to_string(), parts.get(1).unwrap_or(&"").to_string())
+        (
+            parts[0].to_string(),
+            parts.get(1).unwrap_or(&"").to_string(),
+        )
     } else if repo.contains("://") {
         let parsed = url::Url::parse(&repo).ok()?;
         let host_str = parsed.host_str()?.to_string();
@@ -38,7 +45,10 @@ pub fn parse_git_url(source: &str) -> Option<GitSource> {
         (host_str, path_str)
     } else {
         let parts: Vec<&str> = repo.splitn(2, '/').collect();
-        (parts[0].to_string(), parts.get(1).unwrap_or(&"").to_string())
+        (
+            parts[0].to_string(),
+            parts.get(1).unwrap_or(&"").to_string(),
+        )
     };
 
     let normalized_path = path.trim_end_matches(".git").to_string();
@@ -72,7 +82,11 @@ fn split_ref(url: &str) -> (String, Option<String>) {
     if url.contains("://") {
         if let Some(at_idx) = url.rfind('@') {
             if let Some(slash_before_at) = url[..at_idx].rfind('/') {
-                let repo = format!("{}{}", &url[..=slash_before_at], &url[slash_before_at + 1..at_idx]);
+                let repo = format!(
+                    "{}{}",
+                    &url[..=slash_before_at],
+                    &url[slash_before_at + 1..at_idx]
+                );
                 return (repo, Some(url[at_idx + 1..].to_string()));
             }
         }

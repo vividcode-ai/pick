@@ -1,45 +1,45 @@
-﻿//! Context overflow detection for AI providers
+//! Context overflow detection for AI providers
 
 use crate::types::AssistantMessage;
 
 /// Regex patterns to detect context overflow errors from different providers.
 const OVERFLOW_PATTERNS: &[&str] = &[
-    r"prompt is too long",           // Anthropic token overflow
-    r"request_too_large",            // Anthropic request byte-size overflow (HTTP 413)
+    r"prompt is too long",                    // Anthropic token overflow
+    r"request_too_large",                     // Anthropic request byte-size overflow (HTTP 413)
     r"input is too long for requested model", // Amazon Bedrock
-    r"exceeds the context window",   // OpenAI (Completions & Responses API)
+    r"exceeds the context window",            // OpenAI (Completions & Responses API)
     r"exceeds (?:the )?(?:model'?s )?maximum context length of [\d,]+ tokens?", // OpenAI-compatible proxies
-    r"input token count.*exceeds the maximum", // Google (Gemini)
-    r"maximum prompt length is \d+", // xAI (Grok)
-    r"reduce the length of the messages", // Groq
-    r"maximum context length is \d+ tokens", // OpenRouter
+    r"input token count.*exceeds the maximum",                                  // Google (Gemini)
+    r"maximum prompt length is \d+",                                            // xAI (Grok)
+    r"reduce the length of the messages",                                       // Groq
+    r"maximum context length is \d+ tokens",                                    // OpenRouter
     r"input \(\d+ tokens\) is longer than the model'?s context length \(\d+ tokens\)", // Together AI
-    r"exceeds the limit of \d+",     // GitHub Copilot
+    r"exceeds the limit of \d+",           // GitHub Copilot
     r"exceeds the available context size", // llama.cpp
-    r"greater than the context length", // LM Studio
-    r"context window exceeds limit", // MiniMax
-    r"exceeded model token limit",   // Kimi For Coding
+    r"greater than the context length",    // LM Studio
+    r"context window exceeds limit",       // MiniMax
+    r"exceeded model token limit",         // Kimi For Coding
     r"too large for model with \d+ maximum context length", // Mistral
-    r"model_context_window_exceeded", // z.ai
+    r"model_context_window_exceeded",      // z.ai
     r"prompt too long; exceeded (?:max )?context length", // Ollama
-    r"context[_ ]length[_ ]exceeded", // Generic fallback
-    r"too many tokens",              // Generic fallback
-    r"token limit exceeded",         // Generic fallback
+    r"context[_ ]length[_ ]exceeded",      // Generic fallback
+    r"too many tokens",                    // Generic fallback
+    r"token limit exceeded",               // Generic fallback
     r"^4(?:00|13)\s*(?:status code)?\s*\(no body\)", // Cerebras
 ];
 
 /// Patterns that indicate non-overflow errors (e.g. rate limiting, server errors).
 const NON_OVERFLOW_PATTERNS: &[&str] = &[
     r"^(Throttling error|Service unavailable):", // AWS Bedrock
-    r"rate limit",                   // Generic rate limiting
-    r"too many requests",            // Generic HTTP 429 style
+    r"rate limit",                               // Generic rate limiting
+    r"too many requests",                        // Generic HTTP 429 style
 ];
 
 /// Check if a string matches any of the given regex patterns.
 fn matches_any(s: &str, patterns: &[&str]) -> bool {
-    patterns.iter().any(|p| {
-        regex::Regex::new(p).map_or(false, |re| re.is_match(s))
-    })
+    patterns
+        .iter()
+        .any(|p| regex::Regex::new(p).map_or(false, |re| re.is_match(s)))
 }
 
 /// Check if an assistant message represents a context overflow error.

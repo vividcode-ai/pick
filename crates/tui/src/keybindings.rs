@@ -1,4 +1,4 @@
-﻿//! Keybinding definitions and management.
+//! Keybinding definitions and management.
 
 use std::collections::HashMap;
 
@@ -121,10 +121,7 @@ impl KeybindingsManager {
 
     /// Get the resolved keys for a keybinding
     pub fn get_keys(&self, keybinding: &str) -> Vec<String> {
-        self.keys_by_id
-            .get(keybinding)
-            .cloned()
-            .unwrap_or_default()
+        self.keys_by_id.get(keybinding).cloned().unwrap_or_default()
     }
 
     /// Get the definition for a keybinding
@@ -202,136 +199,237 @@ fn default_tui_keybindings() -> HashMap<String, KeybindingDefinition> {
     let mut map = HashMap::new();
 
     // Editor navigation
-    map.insert("tui.editor.cursorUp".to_string(), KeybindingDefinition {
-        default_keys: vec!["up".to_string()],
-        description: "Move cursor up",
-    });
-    map.insert("tui.editor.cursorDown".to_string(), KeybindingDefinition {
-        default_keys: vec!["down".to_string()],
-        description: "Move cursor down",
-    });
-    map.insert("tui.editor.cursorLeft".to_string(), KeybindingDefinition {
-        default_keys: vec!["left".to_string(), "ctrl+b".to_string()],
-        description: "Move cursor left",
-    });
-    map.insert("tui.editor.cursorRight".to_string(), KeybindingDefinition {
-        default_keys: vec!["right".to_string(), "ctrl+f".to_string()],
-        description: "Move cursor right",
-    });
-    map.insert("tui.editor.cursorWordLeft".to_string(), KeybindingDefinition {
-        default_keys: vec!["alt+left".to_string(), "ctrl+left".to_string(), "alt+b".to_string()],
-        description: "Move cursor word left",
-    });
-    map.insert("tui.editor.cursorWordRight".to_string(), KeybindingDefinition {
-        default_keys: vec!["alt+right".to_string(), "ctrl+right".to_string(), "alt+f".to_string()],
-        description: "Move cursor word right",
-    });
-    map.insert("tui.editor.cursorLineStart".to_string(), KeybindingDefinition {
-        default_keys: vec!["home".to_string(), "ctrl+a".to_string()],
-        description: "Move to line start",
-    });
-    map.insert("tui.editor.cursorLineEnd".to_string(), KeybindingDefinition {
-        default_keys: vec!["end".to_string(), "ctrl+e".to_string()],
-        description: "Move to line end",
-    });
-    map.insert("tui.editor.jumpForward".to_string(), KeybindingDefinition {
-        default_keys: vec!["ctrl+]".to_string()],
-        description: "Jump forward to character",
-    });
-    map.insert("tui.editor.jumpBackward".to_string(), KeybindingDefinition {
-        default_keys: vec!["ctrl+alt+]".to_string()],
-        description: "Jump backward to character",
-    });
-    map.insert("tui.editor.pageUp".to_string(), KeybindingDefinition {
-        default_keys: vec!["pageUp".to_string()],
-        description: "Page up",
-    });
-    map.insert("tui.editor.pageDown".to_string(), KeybindingDefinition {
-        default_keys: vec!["pageDown".to_string()],
-        description: "Page down",
-    });
+    map.insert(
+        "tui.editor.cursorUp".to_string(),
+        KeybindingDefinition {
+            default_keys: vec!["up".to_string()],
+            description: "Move cursor up",
+        },
+    );
+    map.insert(
+        "tui.editor.cursorDown".to_string(),
+        KeybindingDefinition {
+            default_keys: vec!["down".to_string()],
+            description: "Move cursor down",
+        },
+    );
+    map.insert(
+        "tui.editor.cursorLeft".to_string(),
+        KeybindingDefinition {
+            default_keys: vec!["left".to_string(), "ctrl+b".to_string()],
+            description: "Move cursor left",
+        },
+    );
+    map.insert(
+        "tui.editor.cursorRight".to_string(),
+        KeybindingDefinition {
+            default_keys: vec!["right".to_string(), "ctrl+f".to_string()],
+            description: "Move cursor right",
+        },
+    );
+    map.insert(
+        "tui.editor.cursorWordLeft".to_string(),
+        KeybindingDefinition {
+            default_keys: vec![
+                "alt+left".to_string(),
+                "ctrl+left".to_string(),
+                "alt+b".to_string(),
+            ],
+            description: "Move cursor word left",
+        },
+    );
+    map.insert(
+        "tui.editor.cursorWordRight".to_string(),
+        KeybindingDefinition {
+            default_keys: vec![
+                "alt+right".to_string(),
+                "ctrl+right".to_string(),
+                "alt+f".to_string(),
+            ],
+            description: "Move cursor word right",
+        },
+    );
+    map.insert(
+        "tui.editor.cursorLineStart".to_string(),
+        KeybindingDefinition {
+            default_keys: vec!["home".to_string(), "ctrl+a".to_string()],
+            description: "Move to line start",
+        },
+    );
+    map.insert(
+        "tui.editor.cursorLineEnd".to_string(),
+        KeybindingDefinition {
+            default_keys: vec!["end".to_string(), "ctrl+e".to_string()],
+            description: "Move to line end",
+        },
+    );
+    map.insert(
+        "tui.editor.jumpForward".to_string(),
+        KeybindingDefinition {
+            default_keys: vec!["ctrl+]".to_string()],
+            description: "Jump forward to character",
+        },
+    );
+    map.insert(
+        "tui.editor.jumpBackward".to_string(),
+        KeybindingDefinition {
+            default_keys: vec!["ctrl+alt+]".to_string()],
+            description: "Jump backward to character",
+        },
+    );
+    map.insert(
+        "tui.editor.pageUp".to_string(),
+        KeybindingDefinition {
+            default_keys: vec!["pageUp".to_string()],
+            description: "Page up",
+        },
+    );
+    map.insert(
+        "tui.editor.pageDown".to_string(),
+        KeybindingDefinition {
+            default_keys: vec!["pageDown".to_string()],
+            description: "Page down",
+        },
+    );
 
     // Editor editing
-    map.insert("tui.editor.deleteCharBackward".to_string(), KeybindingDefinition {
-        default_keys: vec!["backspace".to_string()],
-        description: "Delete character backward",
-    });
-    map.insert("tui.editor.deleteCharForward".to_string(), KeybindingDefinition {
-        default_keys: vec!["delete".to_string(), "ctrl+d".to_string()],
-        description: "Delete character forward",
-    });
-    map.insert("tui.editor.deleteWordBackward".to_string(), KeybindingDefinition {
-        default_keys: vec!["ctrl+w".to_string(), "alt+backspace".to_string()],
-        description: "Delete word backward",
-    });
-    map.insert("tui.editor.deleteWordForward".to_string(), KeybindingDefinition {
-        default_keys: vec!["alt+d".to_string(), "alt+delete".to_string()],
-        description: "Delete word forward",
-    });
-    map.insert("tui.editor.deleteToLineStart".to_string(), KeybindingDefinition {
-        default_keys: vec!["ctrl+u".to_string()],
-        description: "Delete to line start",
-    });
-    map.insert("tui.editor.deleteToLineEnd".to_string(), KeybindingDefinition {
-        default_keys: vec!["ctrl+k".to_string()],
-        description: "Delete to line end",
-    });
-    map.insert("tui.editor.yank".to_string(), KeybindingDefinition {
-        default_keys: vec!["ctrl+y".to_string()],
-        description: "Yank",
-    });
-    map.insert("tui.editor.yankPop".to_string(), KeybindingDefinition {
-        default_keys: vec!["alt+y".to_string()],
-        description: "Yank pop",
-    });
-    map.insert("tui.editor.undo".to_string(), KeybindingDefinition {
-        default_keys: vec!["ctrl+-".to_string()],
-        description: "Undo",
-    });
+    map.insert(
+        "tui.editor.deleteCharBackward".to_string(),
+        KeybindingDefinition {
+            default_keys: vec!["backspace".to_string()],
+            description: "Delete character backward",
+        },
+    );
+    map.insert(
+        "tui.editor.deleteCharForward".to_string(),
+        KeybindingDefinition {
+            default_keys: vec!["delete".to_string(), "ctrl+d".to_string()],
+            description: "Delete character forward",
+        },
+    );
+    map.insert(
+        "tui.editor.deleteWordBackward".to_string(),
+        KeybindingDefinition {
+            default_keys: vec!["ctrl+w".to_string(), "alt+backspace".to_string()],
+            description: "Delete word backward",
+        },
+    );
+    map.insert(
+        "tui.editor.deleteWordForward".to_string(),
+        KeybindingDefinition {
+            default_keys: vec!["alt+d".to_string(), "alt+delete".to_string()],
+            description: "Delete word forward",
+        },
+    );
+    map.insert(
+        "tui.editor.deleteToLineStart".to_string(),
+        KeybindingDefinition {
+            default_keys: vec!["ctrl+u".to_string()],
+            description: "Delete to line start",
+        },
+    );
+    map.insert(
+        "tui.editor.deleteToLineEnd".to_string(),
+        KeybindingDefinition {
+            default_keys: vec!["ctrl+k".to_string()],
+            description: "Delete to line end",
+        },
+    );
+    map.insert(
+        "tui.editor.yank".to_string(),
+        KeybindingDefinition {
+            default_keys: vec!["ctrl+y".to_string()],
+            description: "Yank",
+        },
+    );
+    map.insert(
+        "tui.editor.yankPop".to_string(),
+        KeybindingDefinition {
+            default_keys: vec!["alt+y".to_string()],
+            description: "Yank pop",
+        },
+    );
+    map.insert(
+        "tui.editor.undo".to_string(),
+        KeybindingDefinition {
+            default_keys: vec!["ctrl+-".to_string()],
+            description: "Undo",
+        },
+    );
 
     // Input actions
-    map.insert("tui.input.newLine".to_string(), KeybindingDefinition {
-        default_keys: vec!["shift+enter".to_string()],
-        description: "Insert newline",
-    });
-    map.insert("tui.input.submit".to_string(), KeybindingDefinition {
-        default_keys: vec!["enter".to_string()],
-        description: "Submit input",
-    });
-    map.insert("tui.input.tab".to_string(), KeybindingDefinition {
-        default_keys: vec!["tab".to_string()],
-        description: "Tab / autocomplete",
-    });
-    map.insert("tui.input.copy".to_string(), KeybindingDefinition {
-        default_keys: vec!["ctrl+c".to_string()],
-        description: "Copy selection",
-    });
+    map.insert(
+        "tui.input.newLine".to_string(),
+        KeybindingDefinition {
+            default_keys: vec!["shift+enter".to_string()],
+            description: "Insert newline",
+        },
+    );
+    map.insert(
+        "tui.input.submit".to_string(),
+        KeybindingDefinition {
+            default_keys: vec!["enter".to_string()],
+            description: "Submit input",
+        },
+    );
+    map.insert(
+        "tui.input.tab".to_string(),
+        KeybindingDefinition {
+            default_keys: vec!["tab".to_string()],
+            description: "Tab / autocomplete",
+        },
+    );
+    map.insert(
+        "tui.input.copy".to_string(),
+        KeybindingDefinition {
+            default_keys: vec!["ctrl+c".to_string()],
+            description: "Copy selection",
+        },
+    );
 
     // Selection actions
-    map.insert("tui.select.up".to_string(), KeybindingDefinition {
-        default_keys: vec!["up".to_string()],
-        description: "Move selection up",
-    });
-    map.insert("tui.select.down".to_string(), KeybindingDefinition {
-        default_keys: vec!["down".to_string()],
-        description: "Move selection down",
-    });
-    map.insert("tui.select.pageUp".to_string(), KeybindingDefinition {
-        default_keys: vec!["pageUp".to_string()],
-        description: "Selection page up",
-    });
-    map.insert("tui.select.pageDown".to_string(), KeybindingDefinition {
-        default_keys: vec!["pageDown".to_string()],
-        description: "Selection page down",
-    });
-    map.insert("tui.select.confirm".to_string(), KeybindingDefinition {
-        default_keys: vec!["enter".to_string()],
-        description: "Confirm selection",
-    });
-    map.insert("tui.select.cancel".to_string(), KeybindingDefinition {
-        default_keys: vec!["escape".to_string(), "ctrl+c".to_string()],
-        description: "Cancel selection",
-    });
+    map.insert(
+        "tui.select.up".to_string(),
+        KeybindingDefinition {
+            default_keys: vec!["up".to_string()],
+            description: "Move selection up",
+        },
+    );
+    map.insert(
+        "tui.select.down".to_string(),
+        KeybindingDefinition {
+            default_keys: vec!["down".to_string()],
+            description: "Move selection down",
+        },
+    );
+    map.insert(
+        "tui.select.pageUp".to_string(),
+        KeybindingDefinition {
+            default_keys: vec!["pageUp".to_string()],
+            description: "Selection page up",
+        },
+    );
+    map.insert(
+        "tui.select.pageDown".to_string(),
+        KeybindingDefinition {
+            default_keys: vec!["pageDown".to_string()],
+            description: "Selection page down",
+        },
+    );
+    map.insert(
+        "tui.select.confirm".to_string(),
+        KeybindingDefinition {
+            default_keys: vec!["enter".to_string()],
+            description: "Confirm selection",
+        },
+    );
+    map.insert(
+        "tui.select.cancel".to_string(),
+        KeybindingDefinition {
+            default_keys: vec!["escape".to_string(), "ctrl+c".to_string()],
+            description: "Cancel selection",
+        },
+    );
 
     map
 }

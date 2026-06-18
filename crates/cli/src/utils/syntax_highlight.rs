@@ -1,4 +1,4 @@
-﻿//! Syntax highlighting utilities
+//! Syntax highlighting utilities
 
 use std::collections::HashMap;
 use std::sync::LazyLock;
@@ -18,7 +18,11 @@ pub struct HighlightOptions<'a> {
 
 impl Default for HighlightOptions<'_> {
     fn default() -> Self {
-        Self { language: None, ignore_illegals: false, theme: None }
+        Self {
+            language: None,
+            ignore_illegals: false,
+            theme: None,
+        }
     }
 }
 
@@ -51,7 +55,10 @@ fn get_scope_from_span_tag(tag: &str) -> Option<String> {
 
 /// Find active formatter from scope stack
 /// Returns the formatter reference (not cloned) - must be used immediately
-fn get_active_formatter<'a>(scopes: &[Option<String>], theme: &'a HighlightTheme) -> Option<&'a HighlightFormatter> {
+fn get_active_formatter<'a>(
+    scopes: &[Option<String>],
+    theme: &'a HighlightTheme,
+) -> Option<&'a HighlightFormatter> {
     for scope in scopes.iter().rev() {
         if let Some(s) = scope {
             // Exact match
@@ -81,9 +88,9 @@ fn is_span_open_tag_start(html: &str, index: usize) -> bool {
         return false;
     }
     let after_span = index + "<span".len();
-    html.as_bytes().get(after_span).is_some_and(|&c| {
-        c == b'>' || c == b' ' || c == b'\t' || c == b'\n' || c == b'\r'
-    })
+    html.as_bytes()
+        .get(after_span)
+        .is_some_and(|&c| c == b'>' || c == b' ' || c == b'\t' || c == b'\n' || c == b'\r')
 }
 
 /// Render highlighted HTML by applying theme formatters to span-wrapped text
@@ -96,7 +103,10 @@ pub fn render_highlighted_html(html: &str, theme: &HighlightTheme) -> String {
     // We use `bytes` for byte-level checks and `char_indices` for char boundaries.
     let char_indices: Vec<(usize, char)> = html.char_indices().collect();
 
-    let flush_text = |output: &mut String, text_buffer: &mut String, scopes: &[Option<String>], theme: &HighlightTheme| {
+    let flush_text = |output: &mut String,
+                      text_buffer: &mut String,
+                      scopes: &[Option<String>],
+                      theme: &HighlightTheme| {
         if text_buffer.is_empty() {
             return;
         }
@@ -198,8 +208,12 @@ pub fn highlight(code: &str, options: &HighlightOptions) -> String {
     let ts = ThemeSet::load_defaults();
 
     let syntax = match options.language {
-        Some(lang) => ss.find_syntax_by_token(lang).unwrap_or_else(|| ss.find_syntax_plain_text()),
-        None => ss.find_syntax_by_first_line(code).unwrap_or_else(|| ss.find_syntax_plain_text()),
+        Some(lang) => ss
+            .find_syntax_by_token(lang)
+            .unwrap_or_else(|| ss.find_syntax_plain_text()),
+        None => ss
+            .find_syntax_by_first_line(code)
+            .unwrap_or_else(|| ss.find_syntax_plain_text()),
     };
 
     let theme = &ts.themes["base16-ocean.dark"];
@@ -208,7 +222,9 @@ pub fn highlight(code: &str, options: &HighlightOptions) -> String {
     let mut output = String::new();
     for line in code.lines() {
         if let Ok(ranges) = highlighter.highlight_line(line, &ss) {
-            if let Ok(html) = styled_line_to_highlighted_html(&ranges, syntect::html::IncludeBackground::No) {
+            if let Ok(html) =
+                styled_line_to_highlighted_html(&ranges, syntect::html::IncludeBackground::No)
+            {
                 output.push_str(&html);
             }
         }
@@ -229,20 +245,24 @@ pub fn supports_language(name: &str) -> bool {
     ss.find_syntax_by_token(name).is_some()
 }
 
-static SYNTAX_SET: LazyLock<syntect::parsing::SyntaxSet> = LazyLock::new(|| {
-    syntect::parsing::SyntaxSet::load_defaults_newlines()
-});
+static SYNTAX_SET: LazyLock<syntect::parsing::SyntaxSet> =
+    LazyLock::new(|| syntect::parsing::SyntaxSet::load_defaults_newlines());
 
-static THEME_SET: LazyLock<syntect::highlighting::ThemeSet> = LazyLock::new(|| {
-    syntect::highlighting::ThemeSet::load_defaults()
-});
+static THEME_SET: LazyLock<syntect::highlighting::ThemeSet> =
+    LazyLock::new(|| syntect::highlighting::ThemeSet::load_defaults());
 
 /// Build a HighlightTheme from the 9 syntax* colors.
 /// Maps syntect scope categories to theme color ANSI formatters.
 pub fn build_highlight_theme(
-    comment: &str, keyword: &str, function: &str,
-    variable: &str, string: &str, number: &str,
-    r#type: &str, operator: &str, punctuation: &str,
+    comment: &str,
+    keyword: &str,
+    function: &str,
+    variable: &str,
+    string: &str,
+    number: &str,
+    r#type: &str,
+    operator: &str,
+    punctuation: &str,
 ) -> HighlightTheme {
     let mut theme: HighlightTheme = HashMap::new();
 
@@ -258,21 +278,36 @@ pub fn build_highlight_theme(
     theme.insert("keyword".to_string(), make_fmt(keyword.to_string()));
 
     // Function / method (each entry gets its own cloned string)
-    theme.insert("entity.name.function".to_string(), make_fmt(function.to_string()));
-    theme.insert("support.function".to_string(), make_fmt(function.to_string()));
-    theme.insert("meta.function-call".to_string(), make_fmt(function.to_string()));
+    theme.insert(
+        "entity.name.function".to_string(),
+        make_fmt(function.to_string()),
+    );
+    theme.insert(
+        "support.function".to_string(),
+        make_fmt(function.to_string()),
+    );
+    theme.insert(
+        "meta.function-call".to_string(),
+        make_fmt(function.to_string()),
+    );
 
     // Variable
     theme.insert("variable".to_string(), make_fmt(variable.to_string()));
     theme.insert("variable.other".to_string(), make_fmt(variable.to_string()));
-    theme.insert("variable.parameter".to_string(), make_fmt(variable.to_string()));
+    theme.insert(
+        "variable.parameter".to_string(),
+        make_fmt(variable.to_string()),
+    );
 
     // String
     theme.insert("string".to_string(), make_fmt(string.to_string()));
 
     // Number / constant
     theme.insert("constant.numeric".to_string(), make_fmt(number.to_string()));
-    theme.insert("constant.language".to_string(), make_fmt(number.to_string()));
+    theme.insert(
+        "constant.language".to_string(),
+        make_fmt(number.to_string()),
+    );
 
     // Type
     theme.insert("entity.name.type".to_string(), make_fmt(r#type.to_string()));
@@ -280,11 +315,17 @@ pub fn build_highlight_theme(
     theme.insert("storage.type".to_string(), make_fmt(r#type.to_string()));
 
     // Operator
-    theme.insert("keyword.operator".to_string(), make_fmt(operator.to_string()));
+    theme.insert(
+        "keyword.operator".to_string(),
+        make_fmt(operator.to_string()),
+    );
 
     // Punctuation
     theme.insert("punctuation".to_string(), make_fmt(punctuation.to_string()));
-    theme.insert("punctuation.definition".to_string(), make_fmt(punctuation.to_string()));
+    theme.insert(
+        "punctuation.definition".to_string(),
+        make_fmt(punctuation.to_string()),
+    );
 
     // Default (same as comment)
     theme.insert("default".to_string(), make_fmt(comment.to_string()));
@@ -341,12 +382,16 @@ pub fn highlight_to_ansi_with_theme(
     if let Some(theme) = highlight_theme {
         if !theme.is_empty() {
             // Use syntect's HTML output then map scopes to theme colors
-            let mut highlighter = HighlightLines::new(syntax, &THEME_SET.themes["base16-ocean.dark"]);
+            let mut highlighter =
+                HighlightLines::new(syntax, &THEME_SET.themes["base16-ocean.dark"]);
             use syntect::html::styled_line_to_highlighted_html;
             let mut html_output = String::new();
             for line in code.lines() {
                 if let Ok(ranges) = highlighter.highlight_line(line, &SYNTAX_SET) {
-                    if let Ok(html) = styled_line_to_highlighted_html(&ranges, syntect::html::IncludeBackground::No) {
+                    if let Ok(html) = styled_line_to_highlighted_html(
+                        &ranges,
+                        syntect::html::IncludeBackground::No,
+                    ) {
                         html_output.push_str(&html);
                     }
                 }

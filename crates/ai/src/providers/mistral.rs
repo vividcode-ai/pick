@@ -1,4 +1,4 @@
-﻿//! Mistral Chat Completions API provider with SSE streaming
+//! Mistral Chat Completions API provider with SSE streaming
 //! Mistral uses an OpenAI-compatible chat completions API
 
 use crate::sse::SseParser;
@@ -15,24 +15,40 @@ pub fn stream_mistral(
     let (tx, rx) = tokio::sync::mpsc::channel(64);
 
     let max_retries = options.as_ref().and_then(|o| o.max_retries).unwrap_or(3);
-    let max_delay = options.as_ref().and_then(|o| o.max_retry_delay_ms).unwrap_or(60000);
+    let max_delay = options
+        .as_ref()
+        .and_then(|o| o.max_retry_delay_ms)
+        .unwrap_or(60000);
 
     tokio::spawn(async move {
         let api_key = std::env::var("MISTRAL_API_KEY").unwrap_or_default();
 
         if api_key.is_empty() {
             let mut msg = AssistantMessage::new(
-                vec![], "mistral-conversations".to_string(), "mistral".to_string(),
-                model.id.clone(), Usage::zero(), StopReason::Error,
+                vec![],
+                "mistral-conversations".to_string(),
+                "mistral".to_string(),
+                model.id.clone(),
+                Usage::zero(),
+                StopReason::Error,
             );
             msg.error_message = Some("MISTRAL_API_KEY is not set.".to_string());
-            let _ = tx.send(StreamEvent::Error { reason: StopReason::Error, error: msg }).await;
+            let _ = tx
+                .send(StreamEvent::Error {
+                    reason: StopReason::Error,
+                    error: msg,
+                })
+                .await;
             return;
         }
 
-        let url = format!("{}/v1/chat/completions", model.base_url.trim_end_matches('/'));
+        let url = format!(
+            "{}/v1/chat/completions",
+            model.base_url.trim_end_matches('/')
+        );
 
-        let messages: Vec<serde_json::Value> = crate::providers::openai::convert_to_openai_messages(&context.messages);
+        let messages: Vec<serde_json::Value> =
+            crate::providers::openai::convert_to_openai_messages(&context.messages);
 
         let mut body = serde_json::json!({
             "model": model.id,
@@ -66,18 +82,20 @@ pub fn stream_mistral(
             );
 
             // Emit start
-            let _ = tx.send(StreamEvent::Start {
-                partial: crate::types::PartialAssistantMessage {
-                    content: vec![],
-                    api: Some("mistral-conversations".to_string()),
-                    provider: Some("mistral".to_string()),
-                    model: Some(model.id.clone()),
-                    usage: Some(Usage::zero()),
-                    stop_reason: None,
-                    error_message: None,
-                    timestamp: chrono::Utc::now().timestamp_millis(),
-                },
-            }).await;
+            let _ = tx
+                .send(StreamEvent::Start {
+                    partial: crate::types::PartialAssistantMessage {
+                        content: vec![],
+                        api: Some("mistral-conversations".to_string()),
+                        provider: Some("mistral".to_string()),
+                        model: Some(model.id.clone()),
+                        usage: Some(Usage::zero()),
+                        stop_reason: None,
+                        error_message: None,
+                        timestamp: chrono::Utc::now().timestamp_millis(),
+                    },
+                })
+                .await;
 
             let client = reqwest::Client::new();
             match client
@@ -100,10 +118,12 @@ pub fn stream_mistral(
                         }
                         output.stop_reason = StopReason::Error;
                         output.error_message = Some(err_msg);
-                        let _ = tx.send(StreamEvent::Error {
-                            reason: StopReason::Error,
-                            error: output,
-                        }).await;
+                        let _ = tx
+                            .send(StreamEvent::Error {
+                                reason: StopReason::Error,
+                                error: output,
+                            })
+                            .await;
                         return;
                     }
 
@@ -119,27 +139,35 @@ pub fn stream_mistral(
                                 let events = parser.feed(&chunk);
                                 for sse in events {
                                     process_mistral_line(
-                                        &tx, &sse, &mut output,
-                                        &mut text_block_idx, &mut tool_blocks,
-                                    ).await;
+                                        &tx,
+                                        &sse,
+                                        &mut output,
+                                        &mut text_block_idx,
+                                        &mut tool_blocks,
+                                    )
+                                    .await;
                                 }
                             }
                             Err(e) => {
                                 output.stop_reason = StopReason::Error;
                                 output.error_message = Some(format!("Stream error: {}", e));
-                                let _ = tx.send(StreamEvent::Error {
-                                    reason: StopReason::Error,
-                                    error: output,
-                                }).await;
+                                let _ = tx
+                                    .send(StreamEvent::Error {
+                                        reason: StopReason::Error,
+                                        error: output,
+                                    })
+                                    .await;
                                 return;
                             }
                         }
                     }
 
-                    let _ = tx.send(StreamEvent::Done {
-                        reason: output.stop_reason.clone(),
-                        message: output,
-                    }).await;
+                    let _ = tx
+                        .send(StreamEvent::Done {
+                            reason: output.stop_reason.clone(),
+                            message: output,
+                        })
+                        .await;
                     return;
                 }
                 Err(e) => {
@@ -150,10 +178,12 @@ pub fn stream_mistral(
                     }
                     output.stop_reason = StopReason::Error;
                     output.error_message = Some(format!("Request failed: {}", e));
-                    let _ = tx.send(StreamEvent::Error {
-                        reason: StopReason::Error,
-                        error: output,
-                    }).await;
+                    let _ = tx
+                        .send(StreamEvent::Error {
+                            reason: StopReason::Error,
+                            error: output,
+                        })
+                        .await;
                     return;
                 }
             }
@@ -161,11 +191,20 @@ pub fn stream_mistral(
 
         // Exhausted all retries
         let mut msg = AssistantMessage::new(
-            vec![], "mistral-conversations".to_string(), "mistral".to_string(),
-            model.id.clone(), Usage::zero(), StopReason::Error,
+            vec![],
+            "mistral-conversations".to_string(),
+            "mistral".to_string(),
+            model.id.clone(),
+            Usage::zero(),
+            StopReason::Error,
         );
         msg.error_message = Some("Max retries exceeded".to_string());
-        let _ = tx.send(StreamEvent::Error { reason: StopReason::Error, error: msg }).await;
+        let _ = tx
+            .send(StreamEvent::Error {
+                reason: StopReason::Error,
+                error: msg,
+            })
+            .await;
     });
 
     rx
@@ -189,7 +228,10 @@ async fn process_mistral_line(
 
     // Capture response id and model
     if output.response_id.is_none() {
-        output.response_id = chunk.get("id").and_then(|v| v.as_str()).map(|s| s.to_string());
+        output.response_id = chunk
+            .get("id")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
     }
     if output.response_model.is_none() {
         if let Some(model_str) = chunk.get("model").and_then(|v| v.as_str()) {
@@ -239,20 +281,24 @@ async fn process_mistral_line(
                 let idx = output.content.len();
                 output.content.push(ContentBlock::text(""));
                 *text_block_idx = Some(idx);
-                let _ = tx.send(StreamEvent::TextStart {
-                    content_index: idx,
-                    partial: partial_from_output(output),
-                }).await;
+                let _ = tx
+                    .send(StreamEvent::TextStart {
+                        content_index: idx,
+                        partial: partial_from_output(output),
+                    })
+                    .await;
                 idx
             };
             if let ContentBlock::Text(ref mut tc) = output.content[idx] {
                 tc.text.push_str(content);
             }
-            let _ = tx.send(StreamEvent::TextDelta {
-                content_index: idx,
-                delta: content.to_string(),
-                partial: partial_from_output(output),
-            }).await;
+            let _ = tx
+                .send(StreamEvent::TextDelta {
+                    content_index: idx,
+                    delta: content.to_string(),
+                    partial: partial_from_output(output),
+                })
+                .await;
         }
     }
 
@@ -270,9 +316,14 @@ async fn process_mistral_tool_call(
     output: &mut AssistantMessage,
     tool_blocks: &mut Vec<(usize, String, String, String)>,
 ) {
-    let stream_idx = tc_val.get("index").and_then(|v| v.as_u64()).map(|v| v as usize).unwrap_or(0);
+    let stream_idx = tc_val
+        .get("index")
+        .and_then(|v| v.as_u64())
+        .map(|v| v as usize)
+        .unwrap_or(0);
     let tc_id = tc_val.get("id").and_then(|v| v.as_str()).unwrap_or("");
-    let tc_name = tc_val.get("function")
+    let tc_name = tc_val
+        .get("function")
         .and_then(|f| f.get("name"))
         .and_then(|v| v.as_str())
         .unwrap_or("");
@@ -282,26 +333,32 @@ async fn process_mistral_tool_call(
 
     if let Some(pos) = existing_pos {
         // Update existing block - append arguments delta
-        if let Some(args) = tc_val.get("function")
+        if let Some(args) = tc_val
+            .get("function")
             .and_then(|f| f.get("arguments"))
             .and_then(|v| v.as_str())
         {
             let (_idx, _id, _name, partial_json) = &mut tool_blocks[pos];
             partial_json.push_str(args);
-            let arguments: serde_json::Value = serde_json::from_str(partial_json)
-                .unwrap_or(serde_json::Value::Null);
+            let arguments: serde_json::Value =
+                serde_json::from_str(partial_json).unwrap_or(serde_json::Value::Null);
 
             // Find matching content block
-            let content_idx = output.content.iter().position(|c| matches!(c, ContentBlock::ToolCall(_)));
+            let content_idx = output
+                .content
+                .iter()
+                .position(|c| matches!(c, ContentBlock::ToolCall(_)));
             if let Some(idx) = content_idx {
                 if let ContentBlock::ToolCall(ref mut tc) = output.content[idx] {
                     tc.arguments = arguments;
                 }
-                let _ = tx.send(StreamEvent::ToolCallDelta {
-                    content_index: idx,
-                    delta: args.to_string(),
-                    partial: partial_from_output(output),
-                }).await;
+                let _ = tx
+                    .send(StreamEvent::ToolCallDelta {
+                        content_index: idx,
+                        delta: args.to_string(),
+                        partial: partial_from_output(output),
+                    })
+                    .await;
             }
         }
     } else {
@@ -312,31 +369,38 @@ async fn process_mistral_tool_call(
         tool_blocks.push((stream_idx, id.clone(), name.clone(), String::new()));
 
         let content_idx = output.content.len();
-        output.content.push(ContentBlock::tool_call(id, name, serde_json::Value::Null));
+        output
+            .content
+            .push(ContentBlock::tool_call(id, name, serde_json::Value::Null));
 
-        let _ = tx.send(StreamEvent::ToolCallStart {
-            content_index: content_idx,
-            partial: partial_from_output(output),
-        }).await;
+        let _ = tx
+            .send(StreamEvent::ToolCallStart {
+                content_index: content_idx,
+                partial: partial_from_output(output),
+            })
+            .await;
 
         // Handle initial arguments if present
-        if let Some(args) = tc_val.get("function")
+        if let Some(args) = tc_val
+            .get("function")
             .and_then(|f| f.get("arguments"))
             .and_then(|v| v.as_str())
         {
             if !args.is_empty() {
                 let pos = tool_blocks.len() - 1;
                 tool_blocks[pos].3.push_str(args);
-                let arguments: serde_json::Value = serde_json::from_str(&tool_blocks[pos].3)
-                    .unwrap_or(serde_json::Value::Null);
+                let arguments: serde_json::Value =
+                    serde_json::from_str(&tool_blocks[pos].3).unwrap_or(serde_json::Value::Null);
                 if let ContentBlock::ToolCall(ref mut tc) = output.content[content_idx] {
                     tc.arguments = arguments;
                 }
-                let _ = tx.send(StreamEvent::ToolCallDelta {
-                    content_index: content_idx,
-                    delta: args.to_string(),
-                    partial: partial_from_output(output),
-                }).await;
+                let _ = tx
+                    .send(StreamEvent::ToolCallDelta {
+                        content_index: content_idx,
+                        delta: args.to_string(),
+                        partial: partial_from_output(output),
+                    })
+                    .await;
             }
         }
     }

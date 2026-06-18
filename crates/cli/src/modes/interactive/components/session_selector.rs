@@ -1,5 +1,4 @@
-﻿//! Session selector component with tree view and search
-
+//! Session selector component with tree view and search
 
 use crate::core::tools::render_utils::ToolTheme;
 
@@ -27,14 +26,20 @@ pub struct FlatSessionNode {
 
 fn shorten_path(path: &str) -> String {
     // Simple home dir shortening
-    if let Some(rest) = path.strip_prefix("/home/").or_else(|| path.strip_prefix("/Users/")) {
+    if let Some(rest) = path
+        .strip_prefix("/home/")
+        .or_else(|| path.strip_prefix("/Users/"))
+    {
         let parts: Vec<&str> = rest.split('/').collect();
         if parts.len() > 1 {
             return format!("~{}/{}", parts[0], parts[1..].join("/"));
         }
         return format!("~{}", parts[0]);
     }
-    if let Some(rest) = path.strip_prefix("C:\\Users\\").or_else(|| path.strip_prefix("c:\\Users\\")) {
+    if let Some(rest) = path
+        .strip_prefix("C:\\Users\\")
+        .or_else(|| path.strip_prefix("c:\\Users\\"))
+    {
         let parts: Vec<&str> = rest.split('\\').collect();
         if parts.len() > 1 {
             return format!("~{}/{}", parts[0], parts[1..].join("/"));
@@ -47,7 +52,11 @@ fn shorten_path(path: &str) -> String {
 fn format_session_date(_iso_timestamp: &str) -> String {
     // Return a simple relative time string from the stored value
     // The caller should provide already-formatted relative time strings
-    if _iso_timestamp.is_empty() { "now".to_string() } else { _iso_timestamp.to_string() }
+    if _iso_timestamp.is_empty() {
+        "now".to_string()
+    } else {
+        _iso_timestamp.to_string()
+    }
 }
 
 /// Build session tree from flat session list, returning flat nodes with tree structure.
@@ -57,9 +66,7 @@ pub fn build_session_tree(sessions: &[SessionDisplayInfo]) -> Vec<FlatSessionNod
 
     for (i, session) in sessions.iter().enumerate() {
         let parent_path = session.parent_session_path.as_deref();
-        let parent_idx = parent_path.and_then(|pp| {
-            sessions.iter().position(|s| s.path == pp)
-        });
+        let parent_idx = parent_path.and_then(|pp| sessions.iter().position(|s| s.path == pp));
         if let Some(idx) = parent_idx {
             children[idx].push(i);
         } else {
@@ -70,11 +77,17 @@ pub fn build_session_tree(sessions: &[SessionDisplayInfo]) -> Vec<FlatSessionNod
     // Sort each children group by modified date (descending)
     for child_group in &mut children {
         child_group.sort_by(|&a, &b| {
-            sessions[b].modified.as_str().cmp(sessions[a].modified.as_str())
+            sessions[b]
+                .modified
+                .as_str()
+                .cmp(sessions[a].modified.as_str())
         });
     }
     roots.sort_by(|&a, &b| {
-        sessions[b].modified.as_str().cmp(sessions[a].modified.as_str())
+        sessions[b]
+            .modified
+            .as_str()
+            .cmp(sessions[a].modified.as_str())
     });
 
     // Flatten
@@ -100,12 +113,28 @@ pub fn build_session_tree(sessions: &[SessionDisplayInfo]) -> Vec<FlatSessionNod
             let continues = if depth > 0 { !is_last } else { false };
             let mut child_ancestors = ancestor_continues.to_vec();
             child_ancestors.push(continues);
-            walk(child, sessions, children, depth + 1, &child_ancestors, child_is_last, result);
+            walk(
+                child,
+                sessions,
+                children,
+                depth + 1,
+                &child_ancestors,
+                child_is_last,
+                result,
+            );
         }
     }
 
     for (i, &root) in roots.iter().enumerate() {
-        walk(root, sessions, &children, 0, &[], i == roots.len() - 1, &mut result);
+        walk(
+            root,
+            sessions,
+            &children,
+            0,
+            &[],
+            i == roots.len() - 1,
+            &mut result,
+        );
     }
 
     result
@@ -132,28 +161,33 @@ pub fn render_session_selector_header(
         "relevance" => "Fuzzy",
         _ => sort_mode,
     };
-    let sort_text = format!("{}{}",
+    let sort_text = format!(
+        "{}{}",
         ToolTheme::fg("muted", "Sort: "),
         ToolTheme::fg("accent", sort_label),
     );
     let name_label = if name_filter == "all" { "All" } else { "Named" };
-    let name_text = format!("{}{}",
+    let name_text = format!(
+        "{}{}",
         ToolTheme::fg("muted", "Name: "),
         ToolTheme::fg("accent", name_label),
     );
 
     let scope_text = if loading {
-        format!("{}{}",
+        format!(
+            "{}{}",
             ToolTheme::fg("muted", "○ Current Folder | "),
             ToolTheme::fg("accent", "Loading..."),
         )
     } else if scope == "current" {
-        format!("{}{}",
+        format!(
+            "{}{}",
             ToolTheme::fg("accent", "◉ Current Folder"),
             ToolTheme::fg("muted", " | ○ All"),
         )
     } else {
-        format!("{}{}",
+        format!(
+            "{}{}",
             ToolTheme::fg("muted", "○ Current Folder | "),
             ToolTheme::fg("accent", "◉ All"),
         )
@@ -212,7 +246,10 @@ pub fn render_session_list(
     lines.push(String::new());
 
     if sessions.is_empty() {
-        lines.push(ToolTheme::fg("muted", "  No sessions found. Press Tab to view all."));
+        lines.push(ToolTheme::fg(
+            "muted",
+            "  No sessions found. Press Tab to view all.",
+        ));
         return lines;
     }
 
@@ -241,10 +278,13 @@ pub fn render_session_list(
 
             // Display text
             let has_name = session.name.is_some();
-            let display_text = session.name.as_deref()
+            let display_text = session
+                .name
+                .as_deref()
                 .or(session.first_message.as_deref())
                 .unwrap_or("(empty)");
-            let normalized: String = display_text.chars()
+            let normalized: String = display_text
+                .chars()
                 .filter(|&c| !c.is_control() || c == '\t')
                 .collect();
             let normalized = normalized.trim();
@@ -288,9 +328,18 @@ pub fn render_session_list(
             } else {
                 truncated
             };
-            let styled_msg = if is_selected { ToolTheme::bold(&styled_msg) } else { styled_msg };
+            let styled_msg = if is_selected {
+                ToolTheme::bold(&styled_msg)
+            } else {
+                styled_msg
+            };
 
-            let left = format!("{}{}{}", cursor, ToolTheme::fg("dim", &tree_prefix), styled_msg);
+            let left = format!(
+                "{}{}{}",
+                cursor,
+                ToolTheme::fg("dim", &tree_prefix),
+                styled_msg
+            );
             let spacing = width.saturating_sub(left.len() + right.len());
             let styled_right = if is_confirming_delete {
                 ToolTheme::fg("error", &right)
@@ -308,7 +357,10 @@ pub fn render_session_list(
     }
 
     if total > max_visible {
-        lines.push(ToolTheme::fg("muted", &format!("  ({}/{})", selected_index + 1, total)));
+        lines.push(ToolTheme::fg(
+            "muted",
+            &format!("  ({}/{})", selected_index + 1, total),
+        ));
     }
 
     lines
@@ -336,10 +388,7 @@ fn build_tree_prefix(node: &FlatSessionNode) -> String {
 }
 
 /// Render rename mode panel
-pub fn render_rename_panel(
-    current_name: &str,
-    width: usize,
-) -> Vec<String> {
+pub fn render_rename_panel(current_name: &str, width: usize) -> Vec<String> {
     let mut lines = Vec::new();
     let border = "─".repeat(std::cmp::max(1, width));
     lines.push(ToolTheme::fg("accent", &border));

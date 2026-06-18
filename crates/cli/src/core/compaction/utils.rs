@@ -1,5 +1,5 @@
-﻿use std::collections::HashSet;
 use serde_json::Value;
+use std::collections::HashSet;
 
 /// File paths touched by a session branch or compaction range
 #[derive(Debug, Clone, Default)]
@@ -187,10 +187,7 @@ pub fn serialize_conversation(messages: &[Value]) -> String {
                     parts.push(format!("[Assistant]: {}", text_parts.join("\n")));
                 }
                 if !tool_calls.is_empty() {
-                    parts.push(format!(
-                        "[Assistant tool calls]: {}",
-                        tool_calls.join("; ")
-                    ));
+                    parts.push(format!("[Assistant tool calls]: {}", tool_calls.join("; ")));
                 }
             }
             "toolResult" => {

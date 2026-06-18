@@ -1,11 +1,9 @@
-﻿//! Model registry - model definitions and lookup functions
+//! Model registry - model definitions and lookup functions
 
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
-use crate::types::{
-    Model, ThinkingLevel, Usage,
-};
+use crate::types::{Model, ThinkingLevel, Usage};
 
 // Include the auto-generated model registry (produced by build.rs)
 include!(concat!(env!("OUT_DIR"), "/models_generated.rs"));
@@ -38,7 +36,8 @@ pub fn calculate_cost(model: &Model, usage: &mut Usage) {
     usage.cost.output = (model.cost.output / 1_000_000.0) * usage.output as f64;
     usage.cost.cache_read = (model.cost.cache_read / 1_000_000.0) * usage.cache_read as f64;
     usage.cost.cache_write = (model.cost.cache_write / 1_000_000.0) * usage.cache_write as f64;
-    usage.cost.total = usage.cost.input + usage.cost.output + usage.cost.cache_read + usage.cost.cache_write;
+    usage.cost.total =
+        usage.cost.input + usage.cost.output + usage.cost.cache_read + usage.cost.cache_write;
 }
 
 /// Get supported thinking levels for a model
@@ -57,21 +56,24 @@ pub fn get_supported_thinking_levels(model: &Model) -> Vec<ThinkingLevel> {
     ];
 
     if let Some(ref tlm) = model.thinking_level_map {
-        all_levels.into_iter().filter(|level| {
-            if *level == ThinkingLevel::XHigh {
-                tlm.get("xhigh").and_then(|v| v.as_ref()).is_some()
-            } else {
-                let key = match level {
-                    ThinkingLevel::Off => "off",
-                    ThinkingLevel::Minimal => "minimal",
-                    ThinkingLevel::Low => "low",
-                    ThinkingLevel::Medium => "medium",
-                    ThinkingLevel::High => "high",
-                    ThinkingLevel::XHigh => "xhigh",
-                };
-                tlm.get(key).map(|v| v.is_some()).unwrap_or(true)
-            }
-        }).collect()
+        all_levels
+            .into_iter()
+            .filter(|level| {
+                if *level == ThinkingLevel::XHigh {
+                    tlm.get("xhigh").and_then(|v| v.as_ref()).is_some()
+                } else {
+                    let key = match level {
+                        ThinkingLevel::Off => "off",
+                        ThinkingLevel::Minimal => "minimal",
+                        ThinkingLevel::Low => "low",
+                        ThinkingLevel::Medium => "medium",
+                        ThinkingLevel::High => "high",
+                        ThinkingLevel::XHigh => "xhigh",
+                    };
+                    tlm.get(key).map(|v| v.is_some()).unwrap_or(true)
+                }
+            })
+            .collect()
     } else {
         all_levels.to_vec()
     }
@@ -154,7 +156,11 @@ mod tests {
 
     #[test]
     fn test_get_bedrock_model() {
-        let model = get_model("amazon-bedrock", "anthropic.claude-sonnet-4-5-20250929-v1:0").unwrap();
+        let model = get_model(
+            "amazon-bedrock",
+            "anthropic.claude-sonnet-4-5-20250929-v1:0",
+        )
+        .unwrap();
         assert_eq!(model.provider.as_str(), "amazon-bedrock");
         assert_eq!(model.api.as_str(), "bedrock-converse-stream");
     }
@@ -167,12 +173,36 @@ mod tests {
     #[test]
     fn test_get_providers() {
         let providers = get_providers();
-        assert!(providers.contains(&"anthropic".to_string()), "anthropic not found: {:?}", providers);
-        assert!(providers.contains(&"openai".to_string()), "openai not found: {:?}", providers);
-        assert!(providers.contains(&"mistral".to_string()), "mistral not found: {:?}", providers);
-        assert!(providers.contains(&"google".to_string()), "google not found: {:?}", providers);
-        assert!(providers.contains(&"google-vertex".to_string()), "google-vertex not found: {:?}", providers);
-        assert!(providers.contains(&"amazon-bedrock".to_string()), "amazon-bedrock not found: {:?}", providers);
+        assert!(
+            providers.contains(&"anthropic".to_string()),
+            "anthropic not found: {:?}",
+            providers
+        );
+        assert!(
+            providers.contains(&"openai".to_string()),
+            "openai not found: {:?}",
+            providers
+        );
+        assert!(
+            providers.contains(&"mistral".to_string()),
+            "mistral not found: {:?}",
+            providers
+        );
+        assert!(
+            providers.contains(&"google".to_string()),
+            "google not found: {:?}",
+            providers
+        );
+        assert!(
+            providers.contains(&"google-vertex".to_string()),
+            "google-vertex not found: {:?}",
+            providers
+        );
+        assert!(
+            providers.contains(&"amazon-bedrock".to_string()),
+            "amazon-bedrock not found: {:?}",
+            providers
+        );
     }
 
     #[test]

@@ -1,5 +1,4 @@
-﻿//! Session resource cleanup registry.
-
+//! Session resource cleanup registry.
 
 use std::sync::Mutex;
 

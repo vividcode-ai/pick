@@ -1,13 +1,13 @@
-﻿//! Agent registry and lifecycle management
+//! Agent registry and lifecycle management
 
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use tokio::sync::{RwLock, watch};
 use pick_ai::types::Message;
+use tokio::sync::{RwLock, watch};
 
-use crate::core::agent_loop::{run_agent_loop, AgentLoopConfig, AgentRunResult};
+use crate::core::agent_loop::{AgentLoopConfig, AgentRunResult, run_agent_loop};
 use crate::inter_agent::{AgentStatus, InterAgentMessage, Mailbox};
 
 /// Information about a running child agent
@@ -31,7 +31,15 @@ impl ChildAgent {
         mailbox: Arc<Mailbox>,
         cancel_tx: watch::Sender<bool>,
     ) -> Self {
-        Self { id, name, handle, status_tx, status_rx, mailbox, cancel_tx }
+        Self {
+            id,
+            name,
+            handle,
+            status_tx,
+            status_rx,
+            mailbox,
+            cancel_tx,
+        }
     }
 }
 

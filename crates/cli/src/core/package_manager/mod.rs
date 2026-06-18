@@ -1,8 +1,8 @@
-﻿mod types;
 mod resolve;
+mod types;
 
-use types::*;
 use resolve::*;
+use types::*;
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -119,39 +119,66 @@ impl DefaultPackageManager {
 
     fn get_managed_npm_install_path(&self, source: &NpmSource, scope: &SourceScope) -> PathBuf {
         match scope {
-            SourceScope::Temporary => {
-                std::env::temp_dir().join("pick-extensions").join("npm").join("node_modules").join(&source.name)
-            }
-            SourceScope::Project => {
-                self.cwd.join(CONFIG_DIR_NAME).join("npm").join("node_modules").join(&source.name)
-            }
-            SourceScope::User => {
-                self.agent_dir.join("npm").join("node_modules").join(&source.name)
-            }
+            SourceScope::Temporary => std::env::temp_dir()
+                .join("pick-extensions")
+                .join("npm")
+                .join("node_modules")
+                .join(&source.name),
+            SourceScope::Project => self
+                .cwd
+                .join(CONFIG_DIR_NAME)
+                .join("npm")
+                .join("node_modules")
+                .join(&source.name),
+            SourceScope::User => self
+                .agent_dir
+                .join("npm")
+                .join("node_modules")
+                .join(&source.name),
         }
     }
 
     fn get_npm_install_path(&self, source: &NpmSource, scope: &SourceScope) -> PathBuf {
         let managed_path = self.get_managed_npm_install_path(source, scope);
-        if scope != &SourceScope::User || managed_path.exists() || !self.agent_dir.join("npm").join("node_modules").join(&source.name).exists() {
+        if scope != &SourceScope::User
+            || managed_path.exists()
+            || !self
+                .agent_dir
+                .join("npm")
+                .join("node_modules")
+                .join(&source.name)
+                .exists()
+        {
             return managed_path;
         }
         // Check legacy global npm root
-        self.agent_dir.join("npm").join("node_modules").join(&source.name)
+        self.agent_dir
+            .join("npm")
+            .join("node_modules")
+            .join(&source.name)
     }
 
     fn get_git_install_path(&self, source: &GitSource, scope: &SourceScope) -> PathBuf {
         match scope {
             SourceScope::Temporary => {
                 let hash = sha256_hash(&format!("git-{}-{}", source.host, source.path_));
-                std::env::temp_dir().join("pick-extensions").join("git").join(&hash[..8]).join(&source.path_)
+                std::env::temp_dir()
+                    .join("pick-extensions")
+                    .join("git")
+                    .join(&hash[..8])
+                    .join(&source.path_)
             }
-            SourceScope::Project => {
-                self.cwd.join(CONFIG_DIR_NAME).join("git").join(&source.host).join(&source.path_)
-            }
-            SourceScope::User => {
-                self.agent_dir.join("git").join(&source.host).join(&source.path_)
-            }
+            SourceScope::Project => self
+                .cwd
+                .join(CONFIG_DIR_NAME)
+                .join("git")
+                .join(&source.host)
+                .join(&source.path_),
+            SourceScope::User => self
+                .agent_dir
+                .join("git")
+                .join(&source.host)
+                .join(&source.path_),
         }
     }
 
@@ -163,9 +190,16 @@ impl DefaultPackageManager {
             ParsedSource::Local(ref local) => {
                 if let Some(s) = scope {
                     let base_dir = self.get_base_dir_for_scope(s);
-                    format!("local:{}", self.resolve_path_from_base(&local.path_, &base_dir).to_string_lossy())
+                    format!(
+                        "local:{}",
+                        self.resolve_path_from_base(&local.path_, &base_dir)
+                            .to_string_lossy()
+                    )
                 } else {
-                    format!("local:{}", self.resolve_path(&local.path_).to_string_lossy())
+                    format!(
+                        "local:{}",
+                        self.resolve_path(&local.path_).to_string_lossy()
+                    )
                 }
             }
         }
@@ -177,7 +211,11 @@ impl DefaultPackageManager {
 
     pub async fn add_source_to_settings(&self, source: &str, local: bool) -> bool {
         let mut settings = self.settings_manager.lock().await;
-        let scope = if local { SourceScope::Project } else { SourceScope::User };
+        let scope = if local {
+            SourceScope::Project
+        } else {
+            SourceScope::User
+        };
         let identity = self.get_package_identity(source, Some(&scope));
 
         let target = if local {
@@ -206,7 +244,11 @@ impl DefaultPackageManager {
 
     pub async fn remove_source_from_settings(&self, source: &str, local: bool) -> bool {
         let mut settings = self.settings_manager.lock().await;
-        let scope = if local { SourceScope::Project } else { SourceScope::User };
+        let scope = if local {
+            SourceScope::Project
+        } else {
+            SourceScope::User
+        };
         let identity = self.get_package_identity(source, Some(&scope));
 
         let target = if local {
@@ -246,7 +288,8 @@ impl DefaultPackageManager {
         if let Some(extensions) = &global.extensions {
             for source in extensions {
                 let parsed = parse_source(source);
-                let installed_path = self.get_installed_path_for_source(&parsed, &SourceScope::User);
+                let installed_path =
+                    self.get_installed_path_for_source(&parsed, &SourceScope::User);
                 packages.push(ConfiguredPackage {
                     source: source.clone(),
                     scope: "user".to_string(),
@@ -261,7 +304,8 @@ impl DefaultPackageManager {
         if let Some(extensions) = &project.extensions {
             for source in extensions {
                 let parsed = parse_source(source);
-                let installed_path = self.get_installed_path_for_source(&parsed, &SourceScope::Project);
+                let installed_path =
+                    self.get_installed_path_for_source(&parsed, &SourceScope::Project);
                 packages.push(ConfiguredPackage {
                     source: source.clone(),
                     scope: "project".to_string(),
@@ -283,12 +327,17 @@ impl DefaultPackageManager {
             match parsed {
                 ParsedSource::Npm(ref npm) => {
                     if let Some(ref installed_path) = pkg.installed_path {
-                        if let Some(current_version) = self.get_installed_npm_version(Path::new(installed_path)) {
+                        if let Some(current_version) =
+                            self.get_installed_npm_version(Path::new(installed_path))
+                        {
                             let url = format!("https://registry.npmjs.org/{}", npm.name);
                             if let Ok(response) = reqwest::get(&url).await {
                                 if let Ok(body) = response.text().await {
-                                    if let Ok(data) = serde_json::from_str::<serde_json::Value>(&body) {
-                                        if let Some(latest) = data.get("dist-tags")
+                                    if let Ok(data) =
+                                        serde_json::from_str::<serde_json::Value>(&body)
+                                    {
+                                        if let Some(latest) = data
+                                            .get("dist-tags")
                                             .and_then(|t| t.get("latest"))
                                             .and_then(|v| v.as_str())
                                         {
@@ -308,13 +357,27 @@ impl DefaultPackageManager {
                     }
                 }
                 ParsedSource::Git(ref git) => {
-                    let scope = if pkg.scope == "project" { SourceScope::Project } else { SourceScope::User };
+                    let scope = if pkg.scope == "project" {
+                        SourceScope::Project
+                    } else {
+                        SourceScope::User
+                    };
                     let install_path = self.get_git_install_path(git, &scope);
                     if install_path.exists() {
-                        if let Ok(local) = self.run_command_capture("git", &["rev-parse", "HEAD"], Some(&install_path)).await {
-                            if let Ok(remote_output) = self.run_command_capture("git", &["ls-remote", &git.repo, "HEAD"], None).await {
-                                let remote_sha = remote_output.split_whitespace().next().unwrap_or("");
-                                if !local.trim().is_empty() && !remote_sha.is_empty() && remote_sha != local.trim() {
+                        if let Ok(local) = self
+                            .run_command_capture("git", &["rev-parse", "HEAD"], Some(&install_path))
+                            .await
+                        {
+                            if let Ok(remote_output) = self
+                                .run_command_capture("git", &["ls-remote", &git.repo, "HEAD"], None)
+                                .await
+                            {
+                                let remote_sha =
+                                    remote_output.split_whitespace().next().unwrap_or("");
+                                if !local.trim().is_empty()
+                                    && !remote_sha.is_empty()
+                                    && remote_sha != local.trim()
+                                {
                                     updates.push(PackageUpdate {
                                         source: pkg.source,
                                         display_name: format!("{}/{}", git.host, git.path_),
@@ -333,7 +396,12 @@ impl DefaultPackageManager {
         updates
     }
 
-    fn package_sources_match(&self, existing_source: &str, input_source: &str, scope: &SourceScope) -> bool {
+    fn package_sources_match(
+        &self,
+        existing_source: &str,
+        input_source: &str,
+        scope: &SourceScope,
+    ) -> bool {
         let left = self.get_source_match_key_for_settings(existing_source, scope);
         let right = self.get_source_match_key_for_input(input_source);
         left == right
@@ -344,7 +412,10 @@ impl DefaultPackageManager {
         match parsed {
             ParsedSource::Npm(ref npm) => format!("npm:{}", npm.name),
             ParsedSource::Git(ref git) => format!("git:{}/{}", git.host, git.path_),
-            ParsedSource::Local(ref local) => format!("local:{}", self.resolve_path(&local.path_).to_string_lossy()),
+            ParsedSource::Local(ref local) => format!(
+                "local:{}",
+                self.resolve_path(&local.path_).to_string_lossy()
+            ),
         }
     }
 
@@ -355,12 +426,19 @@ impl DefaultPackageManager {
             ParsedSource::Git(ref git) => format!("git:{}/{}", git.host, git.path_),
             ParsedSource::Local(ref local) => {
                 let base_dir = self.get_base_dir_for_scope(scope);
-                format!("local:{}", self.resolve_path_from_base(&local.path_, &base_dir).to_string_lossy())
+                format!(
+                    "local:{}",
+                    self.resolve_path_from_base(&local.path_, &base_dir)
+                        .to_string_lossy()
+                )
             }
         }
     }
 
-    fn dedupe_packages(&self, packages: &[(PackageSource, SourceScope)]) -> Vec<(PackageSource, SourceScope)> {
+    fn dedupe_packages(
+        &self,
+        packages: &[(PackageSource, SourceScope)],
+    ) -> Vec<(PackageSource, SourceScope)> {
         let mut seen: HashMap<String, (PackageSource, SourceScope)> = HashMap::new();
 
         for (pkg, scope) in packages {
@@ -373,7 +451,9 @@ impl DefaultPackageManager {
                 }
                 Some((_, existing_scope)) => {
                     // Project wins over user
-                    if matches!(scope, SourceScope::Project) && matches!(existing_scope, SourceScope::User) {
+                    if matches!(scope, SourceScope::Project)
+                        && matches!(existing_scope, SourceScope::User)
+                    {
                         seen.insert(identity, (pkg.clone(), scope.clone()));
                     }
                 }
@@ -434,8 +514,10 @@ impl DefaultPackageManager {
                 Err(_) => continue,
             };
 
-            let is_dir = metadata.is_dir() || (metadata.file_type().is_symlink() && full_path.is_dir());
-            let is_file = metadata.is_file() || (metadata.file_type().is_symlink() && full_path.is_file());
+            let is_dir =
+                metadata.is_dir() || (metadata.file_type().is_symlink() && full_path.is_dir());
+            let is_file =
+                metadata.is_file() || (metadata.file_type().is_symlink() && full_path.is_file());
 
             let rel_path = pathdiff::diff_paths(&full_path, dir)
                 .unwrap_or_else(|| full_path.clone())
@@ -443,7 +525,11 @@ impl DefaultPackageManager {
                 .to_string()
                 .replace('\\', "/");
 
-            let ignore_path = if is_dir { format!("{}/", rel_path) } else { rel_path.clone() };
+            let ignore_path = if is_dir {
+                format!("{}/", rel_path)
+            } else {
+                rel_path.clone()
+            };
             if ig.ignores(&ignore_path) {
                 continue;
             }
@@ -468,7 +554,9 @@ impl DefaultPackageManager {
                 if let Ok(pkg) = serde_json::from_str::<PackageJson>(&content) {
                     if let Some(ref manifest) = pkg.pick {
                         if !manifest.extensions.is_empty() {
-                            let entries: Vec<String> = manifest.extensions.iter()
+                            let entries: Vec<String> = manifest
+                                .extensions
+                                .iter()
                                 .map(|ext_path| {
                                     let resolved = dir.join(ext_path);
                                     resolved.to_string_lossy().to_string()
@@ -534,7 +622,13 @@ impl DefaultPackageManager {
                     "themes" => &manifest.themes,
                     _ => continue,
                 };
-                self.add_manifest_entries(entries, package_root, resource_type, self.get_target_map(accumulator, resource_type), metadata);
+                self.add_manifest_entries(
+                    entries,
+                    package_root,
+                    resource_type,
+                    self.get_target_map(accumulator, resource_type),
+                    metadata,
+                );
             }
             return true;
         }
@@ -603,7 +697,8 @@ impl DefaultPackageManager {
             return;
         }
 
-        let enabled_by_user = apply_patterns(&all_files, user_patterns, &package_root.to_string_lossy());
+        let enabled_by_user =
+            apply_patterns(&all_files, user_patterns, &package_root.to_string_lossy());
 
         for f in &all_files {
             let enabled = enabled_by_user.contains(f);
@@ -611,7 +706,11 @@ impl DefaultPackageManager {
         }
     }
 
-    fn collect_manifest_files(&self, package_root: &Path, resource_type: &str) -> (Vec<String>, HashSet<String>) {
+    fn collect_manifest_files(
+        &self,
+        package_root: &Path,
+        resource_type: &str,
+    ) -> (Vec<String>, HashSet<String>) {
         if let Some(manifest) = self.read_pick_manifest(package_root) {
             let entries = match resource_type {
                 "extensions" => manifest.extensions,
@@ -622,8 +721,10 @@ impl DefaultPackageManager {
             };
 
             if !entries.is_empty() {
-                let all_files = self.collect_files_from_manifest_entries(&entries, package_root, resource_type);
-                let manifest_patterns: Vec<String> = entries.into_iter()
+                let all_files =
+                    self.collect_files_from_manifest_entries(&entries, package_root, resource_type);
+                let manifest_patterns: Vec<String> = entries
+                    .into_iter()
                     .filter(|e| is_override_pattern(e))
                     .collect();
                 let enabled_by_manifest = if manifest_patterns.is_empty() {
@@ -632,7 +733,10 @@ impl DefaultPackageManager {
                     let base_str = package_root.to_string_lossy().to_string();
                     apply_patterns(&all_files, &manifest_patterns, &base_str)
                 };
-                return (enabled_by_manifest.iter().cloned().collect(), enabled_by_manifest);
+                return (
+                    enabled_by_manifest.iter().cloned().collect(),
+                    enabled_by_manifest,
+                );
             }
         }
 
@@ -654,7 +758,11 @@ impl DefaultPackageManager {
         metadata: &PathMetadata,
     ) {
         let all_files = self.collect_files_from_manifest_entries(entries, root, resource_type);
-        let patterns: Vec<String> = entries.iter().filter(|e| is_override_pattern(e)).cloned().collect();
+        let patterns: Vec<String> = entries
+            .iter()
+            .filter(|e| is_override_pattern(e))
+            .cloned()
+            .collect();
         let base_str = root.to_string_lossy().to_string();
         let enabled_paths = apply_patterns(&all_files, &patterns, &base_str);
 
@@ -665,10 +773,14 @@ impl DefaultPackageManager {
         }
     }
 
-    fn collect_files_from_manifest_entries(&self, entries: &[String], root: &Path, resource_type: &str) -> Vec<String> {
-        let source_entries: Vec<&String> = entries.iter()
-            .filter(|e| !is_override_pattern(e))
-            .collect();
+    fn collect_files_from_manifest_entries(
+        &self,
+        entries: &[String],
+        root: &Path,
+        resource_type: &str,
+    ) -> Vec<String> {
+        let source_entries: Vec<&String> =
+            entries.iter().filter(|e| !is_override_pattern(e)).collect();
 
         let mut resolved: Vec<PathBuf> = Vec::new();
         for entry in source_entries {
@@ -682,7 +794,9 @@ impl DefaultPackageManager {
                             // Simple glob matching
                             let glob_pattern = entry.replace('*', ".*");
                             if let Ok(re) = regex::Regex::new(&format!("^{}$", glob_pattern)) {
-                                if re.is_match(&name) || re.is_match(&dir_entry.path().to_string_lossy()) {
+                                if re.is_match(&name)
+                                    || re.is_match(&dir_entry.path().to_string_lossy())
+                                {
                                     resolved.push(dir_entry.path());
                                 }
                             }
@@ -758,27 +872,44 @@ impl DefaultPackageManager {
         scope_base + source_add
     }
 
-    fn get_installed_path_for_source(&self, parsed: &ParsedSource, scope: &SourceScope) -> Option<String> {
+    fn get_installed_path_for_source(
+        &self,
+        parsed: &ParsedSource,
+        scope: &SourceScope,
+    ) -> Option<String> {
         match parsed {
             ParsedSource::Npm(npm) => {
                 let path = self.get_managed_npm_install_path(npm, scope);
-                if path.exists() { Some(path.to_string_lossy().to_string()) } else { None }
+                if path.exists() {
+                    Some(path.to_string_lossy().to_string())
+                } else {
+                    None
+                }
             }
             ParsedSource::Git(git) => {
                 let path = self.get_git_install_path(git, scope);
-                if path.exists() { Some(path.to_string_lossy().to_string()) } else { None }
+                if path.exists() {
+                    Some(path.to_string_lossy().to_string())
+                } else {
+                    None
+                }
             }
             ParsedSource::Local(local) => {
                 let base_dir = self.get_base_dir_for_scope(scope);
                 let path = self.resolve_path_from_base(&local.path_, &base_dir);
-                if path.exists() { Some(path.to_string_lossy().to_string()) } else { None }
+                if path.exists() {
+                    Some(path.to_string_lossy().to_string())
+                } else {
+                    None
+                }
             }
         }
     }
 
     fn to_resolved_paths(&self, accumulator: ResourceAccumulator) -> ResolvedPaths {
         let map_to_resolved = |entries: HashMap<String, ResourceEntry>| -> Vec<ResolvedResource> {
-            let mut resolved: Vec<ResolvedResource> = entries.into_iter()
+            let mut resolved: Vec<ResolvedResource> = entries
+                .into_iter()
                 .map(|(path, entry)| ResolvedResource {
                     path,
                     enabled: entry.enabled,
@@ -888,21 +1019,24 @@ impl DefaultPackageManager {
 
     /// Install a package
     pub async fn install(&self, source: &str, local: bool) -> Result<(), String> {
-        let scope = if local { SourceScope::Project } else { SourceScope::User };
+        let scope = if local {
+            SourceScope::Project
+        } else {
+            SourceScope::User
+        };
         let parsed = parse_source(source);
 
         match parsed {
-            ParsedSource::Npm(ref npm) => {
-                self.install_npm(npm, &scope, false).await
-            }
-            ParsedSource::Git(ref git) => {
-                self.install_git(git, &scope).await
-            }
+            ParsedSource::Npm(ref npm) => self.install_npm(npm, &scope, false).await,
+            ParsedSource::Git(ref git) => self.install_git(git, &scope).await,
             ParsedSource::Local(ref local) => {
                 let base_dir = self.get_base_dir_for_scope(&scope);
                 let resolved = self.resolve_path_from_base(&local.path_, &base_dir);
                 if !resolved.exists() {
-                    return Err(format!("Path does not exist: {}", resolved.to_string_lossy()));
+                    return Err(format!(
+                        "Path does not exist: {}",
+                        resolved.to_string_lossy()
+                    ));
                 }
                 Ok(())
             }
@@ -911,16 +1045,16 @@ impl DefaultPackageManager {
 
     /// Remove a package
     pub async fn remove(&self, source: &str, local: bool) -> Result<(), String> {
-        let scope = if local { SourceScope::Project } else { SourceScope::User };
+        let scope = if local {
+            SourceScope::Project
+        } else {
+            SourceScope::User
+        };
         let parsed = parse_source(source);
 
         match parsed {
-            ParsedSource::Npm(ref npm) => {
-                self.uninstall_npm(npm, &scope).await
-            }
-            ParsedSource::Git(ref git) => {
-                self.remove_git(git, &scope).await
-            }
+            ParsedSource::Npm(ref npm) => self.uninstall_npm(npm, &scope).await,
+            ParsedSource::Git(ref git) => self.remove_git(git, &scope).await,
             ParsedSource::Local(_) => Ok(()),
         }
     }
@@ -966,7 +1100,8 @@ impl DefaultPackageManager {
                     if install_path.exists() {
                         let output = tokio::process::Command::new("git")
                             .args(["-C", &install_path.to_string_lossy(), "pull", "--ff-only"])
-                            .output().await
+                            .output()
+                            .await
                             .map_err(|e| format!("Git pull failed: {}", e))?;
                         if !output.status.success() {
                             let stderr = String::from_utf8_lossy(&output.stderr);
@@ -987,7 +1122,12 @@ impl DefaultPackageManager {
 // ============================================================================
 
 impl DefaultPackageManager {
-    async fn install_npm(&self, source: &NpmSource, scope: &SourceScope, temporary: bool) -> Result<(), String> {
+    async fn install_npm(
+        &self,
+        source: &NpmSource,
+        scope: &SourceScope,
+        temporary: bool,
+    ) -> Result<(), String> {
         let install_root = self.get_npm_install_root(scope, temporary);
         self.ensure_npm_project(&install_root);
         let (cmd, args) = self.get_npm_command();
@@ -1024,7 +1164,11 @@ impl DefaultPackageManager {
         let package_json_path = install_root.join("package.json");
         if !package_json_path.exists() {
             let pkg_json = serde_json::json!({ "name": "pick-extensions", "private": true });
-            std::fs::write(&package_json_path, serde_json::to_string_pretty(&pkg_json).unwrap()).ok();
+            std::fs::write(
+                &package_json_path,
+                serde_json::to_string_pretty(&pkg_json).unwrap(),
+            )
+            .ok();
         }
     }
 
@@ -1049,10 +1193,26 @@ impl DefaultPackageManager {
 
         if target_dir.exists() {
             if let Some(ref r#ref) = source.r#ref {
-                self.ensure_git_ref(&target_dir, &["fetch", "origin", r#ref.as_str()], "FETCH_HEAD").await?;
+                self.ensure_git_ref(
+                    &target_dir,
+                    &["fetch", "origin", r#ref.as_str()],
+                    "FETCH_HEAD",
+                )
+                .await?;
             } else {
                 // Just update
-                self.run_command("git", &["fetch", "--prune", "--no-tags", "origin", "+HEAD:refs/remotes/origin/HEAD"], Some(&target_dir)).await?;
+                self.run_command(
+                    "git",
+                    &[
+                        "fetch",
+                        "--prune",
+                        "--no-tags",
+                        "origin",
+                        "+HEAD:refs/remotes/origin/HEAD",
+                    ],
+                    Some(&target_dir),
+                )
+                .await?;
             }
             return Ok(());
         }
@@ -1061,10 +1221,16 @@ impl DefaultPackageManager {
             std::fs::create_dir_all(parent).map_err(|e| format!("Failed to create dir: {}", e))?;
         }
 
-        self.run_command("git", &["clone", &source.repo, &target_dir.to_string_lossy()], None).await?;
+        self.run_command(
+            "git",
+            &["clone", &source.repo, &target_dir.to_string_lossy()],
+            None,
+        )
+        .await?;
 
         if let Some(ref r#ref) = source.r#ref {
-            self.run_command("git", &["checkout", r#ref.as_str()], Some(&target_dir)).await?;
+            self.run_command("git", &["checkout", r#ref.as_str()], Some(&target_dir))
+                .await?;
         }
 
         // Install dependencies if package.json exists
@@ -1089,20 +1255,32 @@ impl DefaultPackageManager {
             .map_err(|e| format!("Failed to remove {}: {}", target_dir.to_string_lossy(), e))
     }
 
-    async fn ensure_git_ref(&self, target_dir: &Path, fetch_args: &[&str], ref_name: &str) -> Result<(), String> {
-        self.run_command("git", fetch_args, Some(target_dir)).await?;
+    async fn ensure_git_ref(
+        &self,
+        target_dir: &Path,
+        fetch_args: &[&str],
+        ref_name: &str,
+    ) -> Result<(), String> {
+        self.run_command("git", fetch_args, Some(target_dir))
+            .await?;
 
         // Check if we need to reset
-        let local_head = self.run_command_capture("git", &["rev-parse", "HEAD"], Some(target_dir)).await?;
+        let local_head = self
+            .run_command_capture("git", &["rev-parse", "HEAD"], Some(target_dir))
+            .await?;
         let target_ref = format!("{}^{{commit}}", ref_name);
-        let target_head = self.run_command_capture("git", &["rev-parse", &target_ref], Some(target_dir)).await?;
+        let target_head = self
+            .run_command_capture("git", &["rev-parse", &target_ref], Some(target_dir))
+            .await?;
 
         if local_head.trim() == target_head.trim() {
             return Ok(());
         }
 
-        self.run_command("git", &["reset", "--hard", &target_ref], Some(target_dir)).await?;
-        self.run_command("git", &["clean", "-fdx"], Some(target_dir)).await?;
+        self.run_command("git", &["reset", "--hard", &target_ref], Some(target_dir))
+            .await?;
+        self.run_command("git", &["clean", "-fdx"], Some(target_dir))
+            .await?;
 
         // Reinstall dependencies
         let package_json_path = target_dir.join("package.json");
@@ -1123,7 +1301,12 @@ impl DefaultPackageManager {
 // ============================================================================
 
 impl DefaultPackageManager {
-    async fn run_command<S: AsRef<str>>(&self, cmd: &str, args: &[S], cwd: Option<&Path>) -> Result<(), String> {
+    async fn run_command<S: AsRef<str>>(
+        &self,
+        cmd: &str,
+        args: &[S],
+        cwd: Option<&Path>,
+    ) -> Result<(), String> {
         let output = tokio::process::Command::new(cmd)
             .args(args.iter().map(|s| s.as_ref()))
             .current_dir(cwd.unwrap_or(&self.cwd))
@@ -1134,13 +1317,23 @@ impl DefaultPackageManager {
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
             let args_str: Vec<&str> = args.iter().map(|s| s.as_ref()).collect();
-            return Err(format!("{} {} failed: {}", cmd, args_str.join(" "), stderr.trim()));
+            return Err(format!(
+                "{} {} failed: {}",
+                cmd,
+                args_str.join(" "),
+                stderr.trim()
+            ));
         }
 
         Ok(())
     }
 
-    async fn run_command_capture(&self, cmd: &str, args: &[&str], cwd: Option<&Path>) -> Result<String, String> {
+    async fn run_command_capture(
+        &self,
+        cmd: &str,
+        args: &[&str],
+        cwd: Option<&Path>,
+    ) -> Result<String, String> {
         let output = tokio::process::Command::new(cmd)
             .args(args)
             .current_dir(cwd.unwrap_or(&self.cwd))
@@ -1150,7 +1343,12 @@ impl DefaultPackageManager {
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(format!("{} {} failed: {}", cmd, args.join(" "), stderr.trim()));
+            return Err(format!(
+                "{} {} failed: {}",
+                cmd,
+                args.join(" "),
+                stderr.trim()
+            ));
         }
 
         Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
@@ -1283,7 +1481,10 @@ mod tests {
             origin: SourceOrigin::Package,
             base_dir: None,
         };
-        assert_eq!(DefaultPackageManager::resource_precedence_rank(&pkg_meta), 4);
+        assert_eq!(
+            DefaultPackageManager::resource_precedence_rank(&pkg_meta),
+            4
+        );
 
         let project_local = PathMetadata {
             source: "local".to_string(),
@@ -1291,6 +1492,9 @@ mod tests {
             origin: SourceOrigin::TopLevel,
             base_dir: None,
         };
-        assert_eq!(DefaultPackageManager::resource_precedence_rank(&project_local), 0);
+        assert_eq!(
+            DefaultPackageManager::resource_precedence_rank(&project_local),
+            0
+        );
     }
 }

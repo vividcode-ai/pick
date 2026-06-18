@@ -1,5 +1,4 @@
-﻿//! CLI tools module
-
+//! CLI tools module
 
 pub mod config_selector;
 pub mod file_processor;

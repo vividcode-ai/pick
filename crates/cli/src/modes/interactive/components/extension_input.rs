@@ -1,5 +1,4 @@
-﻿//! Extension input component with countdown timer
-
+//! Extension input component with countdown timer
 
 use crate::core::tools::render_utils::ToolTheme;
 
@@ -21,7 +20,10 @@ pub fn render_extension_input(
     } else {
         title.to_string()
     };
-    lines.push(ToolTheme::fg("accent", &format!("\x1b[1m{}\x1b[22m", title_display)));
+    lines.push(ToolTheme::fg(
+        "accent",
+        &format!("\x1b[1m{}\x1b[22m", title_display),
+    ));
 
     lines.push(String::new());
     // Input value

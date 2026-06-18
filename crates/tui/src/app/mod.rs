@@ -1,10 +1,10 @@
-﻿//! TUI application - main interactive event loop with rendering
+//! TUI application - main interactive event loop with rendering
 //! stdout-based terminal rendering (append-only chat + editor at bottom)
 
-pub(crate) mod types;
-pub(crate) mod tree;
-pub(crate) mod render;
 pub(crate) mod handlers;
+pub(crate) mod render;
+pub(crate) mod tree;
+pub(crate) mod types;
 
 pub use types::*;
 
@@ -51,9 +51,15 @@ mod tests {
         fn build_header(&self, width: usize) -> Vec<String> {
             let mut lines: Vec<String> = Vec::new();
             lines.push(String::new());
-            lines.push(format!("\x1b[1m{}\x1b[0m\x1b[2m v{}\x1b[0m", self.app_name, self.version));
+            lines.push(format!(
+                "\x1b[1m{}\x1b[0m\x1b[2m v{}\x1b[0m",
+                self.app_name, self.version
+            ));
             lines.push("\x1b[2mescape interrupt · ctrl+c twice to exit · / commands · ! bash · ctrl+o more\x1b[0m".to_string());
-            lines.push("\x1b[2mPress ctrl+o to show full startup help and loaded resources.\x1b[0m".to_string());
+            lines.push(
+                "\x1b[2mPress ctrl+o to show full startup help and loaded resources.\x1b[0m"
+                    .to_string(),
+            );
             let title = "Pick";
             lines.push(format!(
                 "\x1b[2m{} can explain its own features and look up its docs. Ask it how to use or extend {}.\x1b[0m",
@@ -61,7 +67,10 @@ mod tests {
             ));
             if !self.context_file_names.is_empty() {
                 lines.push("\x1b[1m[Context]\x1b[0m".to_string());
-                lines.push(format!("\x1b[2m  {}\x1b[0m", self.context_file_names.join(", ")));
+                lines.push(format!(
+                    "\x1b[2m  {}\x1b[0m",
+                    self.context_file_names.join(", ")
+                ));
             }
             if !self.skill_names.is_empty() {
                 lines.push("\x1b[1m[Skills]\x1b[0m".to_string());
@@ -73,7 +82,10 @@ mod tests {
 
     #[test]
     fn test_startup_header_version() {
-        let data = HeaderTestData::new(vec!["CLAUDE.md".to_string()], vec!["agent-browser".to_string()]);
+        let data = HeaderTestData::new(
+            vec!["CLAUDE.md".to_string()],
+            vec!["agent-browser".to_string()],
+        );
         let lines = data.build_header(80);
         assert_eq!(lines[0], "");
         assert_eq!(lines[1], "\x1b[1mPick\x1b[0m\x1b[2m v0.1.0\x1b[0m");
@@ -81,7 +93,10 @@ mod tests {
 
     #[test]
     fn test_startup_header_keybinding_hints() {
-        let data = HeaderTestData::new(vec!["CLAUDE.md".to_string()], vec!["agent-browser".to_string()]);
+        let data = HeaderTestData::new(
+            vec!["CLAUDE.md".to_string()],
+            vec!["agent-browser".to_string()],
+        );
         let lines = data.build_header(80);
         assert_eq!(
             lines[2],
@@ -91,7 +106,10 @@ mod tests {
 
     #[test]
     fn test_startup_header_compact_onboarding() {
-        let data = HeaderTestData::new(vec!["CLAUDE.md".to_string()], vec!["agent-browser".to_string()]);
+        let data = HeaderTestData::new(
+            vec!["CLAUDE.md".to_string()],
+            vec!["agent-browser".to_string()],
+        );
         let lines = data.build_header(80);
         assert_eq!(
             lines[3],
@@ -101,7 +119,10 @@ mod tests {
 
     #[test]
     fn test_startup_header_general_onboarding() {
-        let data = HeaderTestData::new(vec!["CLAUDE.md".to_string()], vec!["agent-browser".to_string()]);
+        let data = HeaderTestData::new(
+            vec!["CLAUDE.md".to_string()],
+            vec!["agent-browser".to_string()],
+        );
         let lines = data.build_header(80);
         assert_eq!(
             lines[4],
@@ -111,7 +132,10 @@ mod tests {
 
     #[test]
     fn test_startup_header_context_section() {
-        let data = HeaderTestData::new(vec!["CLAUDE.md".to_string()], vec!["agent-browser".to_string()]);
+        let data = HeaderTestData::new(
+            vec!["CLAUDE.md".to_string()],
+            vec!["agent-browser".to_string()],
+        );
         let lines = data.build_header(80);
         assert_eq!(lines[5], "\x1b[1m[Context]\x1b[0m");
         assert_eq!(lines[6], "\x1b[2m  CLAUDE.md\x1b[0m");
@@ -119,7 +143,10 @@ mod tests {
 
     #[test]
     fn test_startup_header_skills_section() {
-        let data = HeaderTestData::new(vec!["CLAUDE.md".to_string()], vec!["agent-browser".to_string()]);
+        let data = HeaderTestData::new(
+            vec!["CLAUDE.md".to_string()],
+            vec!["agent-browser".to_string()],
+        );
         let lines = data.build_header(80);
         assert_eq!(lines[7], "\x1b[1m[Skills]\x1b[0m");
         assert_eq!(lines[8], "\x1b[2m  agent-browser\x1b[0m");
@@ -127,7 +154,10 @@ mod tests {
 
     #[test]
     fn test_startup_header_separators() {
-        let data = HeaderTestData::new(vec!["CLAUDE.md".to_string()], vec!["agent-browser".to_string()]);
+        let data = HeaderTestData::new(
+            vec!["CLAUDE.md".to_string()],
+            vec!["agent-browser".to_string()],
+        );
         let lines = data.build_header(80);
         assert_eq!(lines.len(), 9);
         assert_eq!(lines[0], "");
@@ -139,7 +169,10 @@ mod tests {
         let lines = data.build_header(80);
         assert_eq!(lines.len(), 5);
         assert_eq!(lines[0], "");
-        assert_eq!(lines[4], "\x1b[2mPick can explain its own features and look up its docs. Ask it how to use or extend Pick.\x1b[0m");
+        assert_eq!(
+            lines[4],
+            "\x1b[2mPick can explain its own features and look up its docs. Ask it how to use or extend Pick.\x1b[0m"
+        );
     }
 
     #[test]
@@ -153,7 +186,12 @@ mod tests {
 
     #[test]
     fn test_footer_line1_cwd_with_home() {
-        let line = render_footer_line1_test("D:\\autoway\\Project\\agent\\vividCode", Some("D:\\autoway"), None, 120);
+        let line = render_footer_line1_test(
+            "D:\\autoway\\Project\\agent\\vividCode",
+            Some("D:\\autoway"),
+            None,
+            120,
+        );
         assert!(line.starts_with("\x1b[2m~"));
         assert!(line.ends_with("\x1b[0m"));
     }
@@ -164,7 +202,12 @@ mod tests {
         assert!(line.contains("main"));
     }
 
-    fn render_footer_line1_test(cwd: &str, home: Option<&str>, git_branch: Option<&str>, width: u16) -> String {
+    fn render_footer_line1_test(
+        cwd: &str,
+        home: Option<&str>,
+        git_branch: Option<&str>,
+        width: u16,
+    ) -> String {
         let mut pwd = format_cwd_for_footer(cwd, home);
         if let Some(branch) = git_branch {
             pwd = format!("{} ({})", pwd, branch);
@@ -178,37 +221,93 @@ mod tests {
 
     #[test]
     fn test_footer_line2_no_usage() {
-        let line = render_footer_line2_test(0, 0, 0, 0, Some(0.0), 1_000_000, "claude-sonnet-4-20250514", "off", true, 120);
+        let line = render_footer_line2_test(
+            0,
+            0,
+            0,
+            0,
+            Some(0.0),
+            1_000_000,
+            "claude-sonnet-4-20250514",
+            "off",
+            true,
+            120,
+        );
         assert!(line.contains("0.0%/1.0M"), "line = {:?}", line);
         assert!(line.contains("(auto)"), "line = {:?}", line);
-        assert!(line.contains("claude-sonnet-4-20250514"), "line = {:?}", line);
+        assert!(
+            line.contains("claude-sonnet-4-20250514"),
+            "line = {:?}",
+            line
+        );
     }
 
     #[test]
     fn test_footer_line2_with_usage() {
-        let line = render_footer_line2_test(1500, 3000, 500, 200, Some(50.0), 1_000_000, "claude-sonnet-4-20250514", "off", true, 120);
+        let line = render_footer_line2_test(
+            1500,
+            3000,
+            500,
+            200,
+            Some(50.0),
+            1_000_000,
+            "claude-sonnet-4-20250514",
+            "off",
+            true,
+            120,
+        );
         assert!(line.contains("50.0%/1.0M"), "line = {:?}", line);
         assert!(line.contains("(auto)"), "line = {:?}", line);
-        assert!(line.contains("claude-sonnet-4-20250514"), "line = {:?}", line);
+        assert!(
+            line.contains("claude-sonnet-4-20250514"),
+            "line = {:?}",
+            line
+        );
     }
 
     #[test]
     fn test_footer_line2_with_thinking() {
-        let line = render_footer_line2_test(0, 0, 0, 0, None, 1_000_000, "claude-sonnet-4-20250514", "high", true, 120);
+        let line = render_footer_line2_test(
+            0,
+            0,
+            0,
+            0,
+            None,
+            1_000_000,
+            "claude-sonnet-4-20250514",
+            "high",
+            true,
+            120,
+        );
         assert!(line.contains("high"));
     }
 
     fn render_footer_line2_test(
-        total_input: u64, total_output: u64,
-        total_cache_read: u64, total_cache_write: u64,
-        context_percent: Option<f64>, context_window: u64,
-        model_id: &str, thinking_level: &str,
-        auto_compact: bool, width: u16,
+        total_input: u64,
+        total_output: u64,
+        total_cache_read: u64,
+        total_cache_write: u64,
+        context_percent: Option<f64>,
+        context_window: u64,
+        model_id: &str,
+        thinking_level: &str,
+        auto_compact: bool,
+        width: u16,
     ) -> String {
-        let _ = (total_input, total_output, total_cache_read, total_cache_write);
+        let _ = (
+            total_input,
+            total_output,
+            total_cache_read,
+            total_cache_write,
+        );
         let auto_indicator = if auto_compact { " (auto)" } else { "" };
         let left_side = match context_percent {
-            Some(pct) => format!("{:.1}%/{}{}", pct, format_tokens(context_window), auto_indicator),
+            Some(pct) => format!(
+                "{:.1}%/{}{}",
+                pct,
+                format_tokens(context_window),
+                auto_indicator
+            ),
             None => format!("?/{}{}", format_tokens(context_window), auto_indicator),
         };
         let mut right_side = model_id.to_string();
@@ -222,7 +321,13 @@ mod tests {
         let available = width as usize;
         if visible_left + visible_right + 2 < available {
             let padding = available - visible_left - visible_right;
-            format!("{}{:padding$}{}", left_colored, "", right_colored, padding = padding)
+            format!(
+                "{}{:padding$}{}",
+                left_colored,
+                "",
+                right_colored,
+                padding = padding
+            )
         } else {
             format!("{}  {}", left_colored, right_colored)
         }
@@ -246,28 +351,76 @@ mod tests {
         );
 
         app.ensure_startup_header(120);
-        assert!(app.startup_header_added, "startup_header_added should be true");
+        assert!(
+            app.startup_header_added,
+            "startup_header_added should be true"
+        );
 
         let rendered = app.chat.render_lines(120, 200);
         let rendered_text: Vec<String> = rendered.iter().map(line_text).collect();
-        assert!(!rendered_text.is_empty(), "chat render should not be empty; got {} lines", rendered_text.len());
-
-        assert!(rendered_text[0].starts_with('╭'), "top border should start with ╭, got: {:?}", rendered_text[0]);
-        assert!(rendered_text[1].contains("🤖 Pick"), "title should contain '🤖 Pick', got: {:?}", rendered_text[1]);
-        assert!(rendered_text[3].contains("model:"), "model line should be present, got: {:?}", rendered_text[3]);
-        assert!(rendered_text[4].contains("directory:"), "directory line should be present, got: {:?}", rendered_text[4]);
-        assert!(rendered_text[6].contains("Pick can explain"),
-            "description should be present, got: {:?}", rendered_text[6]
+        assert!(
+            !rendered_text.is_empty(),
+            "chat render should not be empty; got {} lines",
+            rendered_text.len()
         );
-        assert!(rendered_text[7].contains("extend Pick"),
-            "description continuation should be present, got: {:?}", rendered_text[7]
-        );
-        assert!(rendered_text[9].contains("[Context]"), "Context section header should be present, got: {:?}", rendered_text[9]);
-        assert!(rendered_text[10].contains("[Skills]"), "Skills section header should be present, got: {:?}", rendered_text[10]);
-        assert!(rendered_text[11].starts_with('╰'), "bottom border should start with ╰, got: {:?}", rendered_text[11]);
-        assert!(rendered_text[12].contains("Tip:"), "tip line should be present, got: {:?}", rendered_text[12]);
 
-        assert_eq!(rendered_text.len(), 13, "should have 13 lines, got {}", rendered_text.len());
+        assert!(
+            rendered_text[0].starts_with('╭'),
+            "top border should start with ╭, got: {:?}",
+            rendered_text[0]
+        );
+        assert!(
+            rendered_text[1].contains("🤖 Pick"),
+            "title should contain '🤖 Pick', got: {:?}",
+            rendered_text[1]
+        );
+        assert!(
+            rendered_text[3].contains("model:"),
+            "model line should be present, got: {:?}",
+            rendered_text[3]
+        );
+        assert!(
+            rendered_text[4].contains("directory:"),
+            "directory line should be present, got: {:?}",
+            rendered_text[4]
+        );
+        assert!(
+            rendered_text[6].contains("Pick can explain"),
+            "description should be present, got: {:?}",
+            rendered_text[6]
+        );
+        assert!(
+            rendered_text[7].contains("extend Pick"),
+            "description continuation should be present, got: {:?}",
+            rendered_text[7]
+        );
+        assert!(
+            rendered_text[9].contains("[Context]"),
+            "Context section header should be present, got: {:?}",
+            rendered_text[9]
+        );
+        assert!(
+            rendered_text[10].contains("[Skills]"),
+            "Skills section header should be present, got: {:?}",
+            rendered_text[10]
+        );
+        assert!(
+            rendered_text[11].starts_with('╰'),
+            "bottom border should start with ╰, got: {:?}",
+            rendered_text[11]
+        );
+        assert!(
+            rendered_text[12].contains("Tip:"),
+            "tip line should be present, got: {:?}",
+            rendered_text[12]
+        );
+
+        assert_eq!(
+            rendered_text.len(),
+            13,
+            "should have 13 lines, got {}",
+            rendered_text.len()
+        );
     }
 
     #[test]
@@ -329,7 +482,12 @@ mod tests {
         let (lines, cursor_row, cursor_col) = app.editor.render(80, 5);
 
         assert!(!lines.is_empty(), "editor should produce at least one line");
-        assert_eq!(line_text(&lines[0]), "\u{276f} hello", "first line should show prompt and text. got: {:?}", lines[0]);
+        assert_eq!(
+            line_text(&lines[0]),
+            "\u{276f} hello",
+            "first line should show prompt and text. got: {:?}",
+            lines[0]
+        );
         assert_eq!(cursor_row, 0, "cursor should be on first row");
         assert_eq!(cursor_col, 7, "cursor should be after prompt (2) + 5 chars");
     }
@@ -357,9 +515,17 @@ mod tests {
         let (lines, cursor_row, cursor_col) = app.editor.render(80, 5);
 
         assert!(!lines.is_empty(), "editor should produce at least one line");
-        assert_eq!(line_text(&lines[0]), "\u{276f} 你好", "line content should be '❯ 你好'. got: {:?}", lines[0]);
+        assert_eq!(
+            line_text(&lines[0]),
+            "\u{276f} 你好",
+            "line content should be '❯ 你好'. got: {:?}",
+            lines[0]
+        );
         assert_eq!(cursor_row, 0, "cursor should be on first row");
-        assert_eq!(cursor_col, 6, "cursor col should be 6 (prompt 2 + 2 CJK chars × 2 width), not 8 (byte offset)");
+        assert_eq!(
+            cursor_col, 6,
+            "cursor col should be 6 (prompt 2 + 2 CJK chars × 2 width), not 8 (byte offset)"
+        );
 
         let action = app.submit_input();
         assert!(action.is_some(), "should submit");
@@ -369,8 +535,16 @@ mod tests {
         }
 
         let chat_lines = app.chat.render_lines(80, 200);
-        let all_text: String = chat_lines.iter().map(line_text).collect::<Vec<_>>().join(" ");
-        assert!(all_text.contains("你好"), "chat should contain '你好'. got: {:?}", all_text);
+        let all_text: String = chat_lines
+            .iter()
+            .map(line_text)
+            .collect::<Vec<_>>()
+            .join(" ");
+        assert!(
+            all_text.contains("你好"),
+            "chat should contain '你好'. got: {:?}",
+            all_text
+        );
     }
 
     #[test]
@@ -402,27 +576,58 @@ mod tests {
             panic!("expected Submit action, got {:?}", action);
         }
 
-        assert!(app.editor.buffer.is_empty(), "editor should be cleared after submit");
+        assert!(
+            app.editor.buffer.is_empty(),
+            "editor should be cleared after submit"
+        );
 
         let chat_lines = app.chat.render_lines(80, 200);
-        assert!(!chat_lines.is_empty(), "chat should have content after submit");
-        let all_text: String = chat_lines.iter().map(line_text).collect::<Vec<_>>().join(" ");
-        assert!(all_text.contains("hi"), "chat should contain submitted text 'hi'. got: {:?}", all_text);
+        assert!(
+            !chat_lines.is_empty(),
+            "chat should have content after submit"
+        );
+        let all_text: String = chat_lines
+            .iter()
+            .map(line_text)
+            .collect::<Vec<_>>()
+            .join(" ");
+        assert!(
+            all_text.contains("hi"),
+            "chat should contain submitted text 'hi'. got: {:?}",
+            all_text
+        );
     }
 
     #[test]
     fn test_separator_renders_dimmed() {
         let separator = format!("\x1b[2m{}\x1b[0m", "\u{2500}".repeat(40));
-        assert!(separator.contains("\u{2500}"), "separator should use box-drawing char");
-        assert!(separator.contains("\x1b[2m"), "separator should have ANSI dim code");
-        assert!(separator.contains("\x1b[0m"), "separator should have ANSI reset code");
+        assert!(
+            separator.contains("\u{2500}"),
+            "separator should use box-drawing char"
+        );
+        assert!(
+            separator.contains("\x1b[2m"),
+            "separator should have ANSI dim code"
+        );
+        assert!(
+            separator.contains("\x1b[0m"),
+            "separator should have ANSI reset code"
+        );
     }
 
     #[test]
     fn test_selection_popup_uses_accent_style() {
         let mut app = TuiApp::new_inner(
-            "anthropic", "claude", "test", "1.0",
-            vec![], vec![], "/tmp", None, "off", None,
+            "anthropic",
+            "claude",
+            "test",
+            "1.0",
+            vec![],
+            vec![],
+            "/tmp",
+            None,
+            "off",
+            None,
             "test",
             "",
         );
@@ -438,16 +643,45 @@ mod tests {
         let lines = app.build_selection_popup_lines(60);
         assert!(!lines.is_empty(), "should have popup lines");
 
-        assert!(lines[0].spans[0].style.add_modifier.contains(Modifier::BOLD),
-            "title should be bold");
-        assert!(line_text(&lines[0]).contains("Test Title"), "title should contain 'Test Title', got: {}", line_text(&lines[0]));
+        assert!(
+            lines[0].spans[0]
+                .style
+                .add_modifier
+                .contains(Modifier::BOLD),
+            "title should be bold"
+        );
+        assert!(
+            line_text(&lines[0]).contains("Test Title"),
+            "title should contain 'Test Title', got: {}",
+            line_text(&lines[0])
+        );
 
-        assert!(lines.len() > 1, "should have at least 2 lines, got {}", lines.len());
-        assert!(line_text(&lines[1]).contains("\u{2192}"), "selected item should have arrow marker, got: {}", line_text(&lines[1]));
-        assert_eq!(lines[1].spans[0].style.fg, Some(Color::Cyan), "selected arrow should be cyan");
+        assert!(
+            lines.len() > 1,
+            "should have at least 2 lines, got {}",
+            lines.len()
+        );
+        assert!(
+            line_text(&lines[1]).contains("\u{2192}"),
+            "selected item should have arrow marker, got: {}",
+            line_text(&lines[1])
+        );
+        assert_eq!(
+            lines[1].spans[0].style.fg,
+            Some(Color::Cyan),
+            "selected arrow should be cyan"
+        );
 
-        let all_text: String = lines.iter().map(|l| line_text(l)).collect::<Vec<_>>().join(" ");
-        assert!(all_text.contains("First option"), "should contain description 'First option', got: {}", all_text);
+        let all_text: String = lines
+            .iter()
+            .map(|l| line_text(l))
+            .collect::<Vec<_>>()
+            .join(" ");
+        assert!(
+            all_text.contains("First option"),
+            "should contain description 'First option', got: {}",
+            all_text
+        );
     }
 
     #[test]
@@ -472,37 +706,82 @@ mod tests {
             },
         ];
         ed.set_autocomplete_provider(Box::new(
-            crate::autocomplete::CombinedAutocompleteProvider::new(commands, std::path::PathBuf::from("/tmp"))
+            crate::autocomplete::CombinedAutocompleteProvider::new(
+                commands,
+                std::path::PathBuf::from("/tmp"),
+            ),
         ));
 
         ed.insert_char('/');
         assert!(ed.is_autocomplete_active());
 
         let ac_lines = ed.render_autocomplete(80, 10);
-        assert!(ac_lines.len() >= 4, "should have 3 suggestions + counter, got {} lines", ac_lines.len());
+        assert!(
+            ac_lines.len() >= 4,
+            "should have 3 suggestions + counter, got {} lines",
+            ac_lines.len()
+        );
 
         let first = &ac_lines[0];
-        assert!(line_text(first).contains("→"), "selected item should have → marker: {}", line_text(first));
-        assert_eq!(first.spans[0].style.fg, Some(Color::Cyan), "selected arrow should be cyan");
-        assert!(line_text(first).contains("settings"), "first item should be settings: {}", line_text(first));
+        assert!(
+            line_text(first).contains("→"),
+            "selected item should have → marker: {}",
+            line_text(first)
+        );
+        assert_eq!(
+            first.spans[0].style.fg,
+            Some(Color::Cyan),
+            "selected arrow should be cyan"
+        );
+        assert!(
+            line_text(first).contains("settings"),
+            "first item should be settings: {}",
+            line_text(first)
+        );
 
         let second = &ac_lines[1];
-        assert!(!line_text(second).contains("→"), "non-selected should not have arrow: {}", line_text(second));
-        assert!(line_text(second).contains("model"), "second item should be model: {}", line_text(second));
+        assert!(
+            !line_text(second).contains("→"),
+            "non-selected should not have arrow: {}",
+            line_text(second)
+        );
+        assert!(
+            line_text(second).contains("model"),
+            "second item should be model: {}",
+            line_text(second)
+        );
 
         let last_span = second.spans.last().unwrap();
-        assert!(last_span.style.add_modifier.contains(Modifier::DIM), "non-selected description should be dimmed");
+        assert!(
+            last_span.style.add_modifier.contains(Modifier::DIM),
+            "non-selected description should be dimmed"
+        );
 
         let last = ac_lines.last().unwrap();
-        assert!(line_text(last).contains("(1/3)"), "counter should show (1/3), got: {}", line_text(last));
-        assert!(last.spans[0].style.add_modifier.contains(Modifier::DIM), "counter should be dimmed");
+        assert!(
+            line_text(last).contains("(1/3)"),
+            "counter should show (1/3), got: {}",
+            line_text(last)
+        );
+        assert!(
+            last.spans[0].style.add_modifier.contains(Modifier::DIM),
+            "counter should be dimmed"
+        );
 
         ed.autocomplete_next();
         let ac_lines2 = ed.render_autocomplete(80, 10);
         let t0 = line_text(&ac_lines2[0]);
         let t1 = line_text(&ac_lines2[1]);
-        assert!(t1.contains("→"), "after next(), second line should have arrow, got: {}", t1);
-        assert!(!t0.contains("→"), "after next(), first line should NOT have arrow, got: {}", t0);
+        assert!(
+            t1.contains("→"),
+            "after next(), second line should have arrow, got: {}",
+            t1
+        );
+        assert!(
+            !t0.contains("→"),
+            "after next(), first line should NOT have arrow, got: {}",
+            t0
+        );
     }
 
     #[test]
@@ -511,22 +790,43 @@ mod tests {
         let mut ed = Editor::new();
 
         let builtin_names = [
-            "settings", "model", "scoped-models", "export", "import",
-            "share", "copy", "name", "session", "changelog",
-            "hotkeys", "fork", "clone", "tree", "login",
-            "logout", "new", "compact", "resume", "reload", "quit",
+            "settings",
+            "model",
+            "scoped-models",
+            "export",
+            "import",
+            "share",
+            "copy",
+            "name",
+            "session",
+            "changelog",
+            "hotkeys",
+            "fork",
+            "clone",
+            "tree",
+            "login",
+            "logout",
+            "new",
+            "compact",
+            "resume",
+            "reload",
+            "quit",
         ];
 
-        let commands: Vec<crate::autocomplete::SlashCommand> = builtin_names.iter().map(|name| {
-            crate::autocomplete::SlashCommand {
+        let commands: Vec<crate::autocomplete::SlashCommand> = builtin_names
+            .iter()
+            .map(|name| crate::autocomplete::SlashCommand {
                 name: name.to_string(),
                 description: Some(format!("Command: {}", name)),
                 argument_hint: None,
-            }
-        }).collect();
+            })
+            .collect();
 
         ed.set_autocomplete_provider(Box::new(
-            crate::autocomplete::CombinedAutocompleteProvider::new(commands, std::path::PathBuf::from("/tmp"))
+            crate::autocomplete::CombinedAutocompleteProvider::new(
+                commands,
+                std::path::PathBuf::from("/tmp"),
+            ),
         ));
 
         ed.insert_char('/');
@@ -545,7 +845,11 @@ mod tests {
             ed.autocomplete_next();
         }
         for (idx, name) in builtin_names.iter().enumerate() {
-            assert!(seen[idx], "command /{} should be visible in autocomplete", *name);
+            assert!(
+                seen[idx],
+                "command /{} should be visible in autocomplete",
+                *name
+            );
         }
     }
 
@@ -572,9 +876,15 @@ mod tests {
         app.editor.insert_char('t');
 
         let (editor_lines, cursor_row, cursor_col) = app.editor.render(80, 1);
-        assert!(!editor_lines.is_empty(), "editor should produce at least one line");
-        assert!(line_text(&editor_lines[0]).contains("test"),
-            "editor should show typed text 'test'. got: {:?}", editor_lines[0]);
+        assert!(
+            !editor_lines.is_empty(),
+            "editor should produce at least one line"
+        );
+        assert!(
+            line_text(&editor_lines[0]).contains("test"),
+            "editor should show typed text 'test'. got: {:?}",
+            editor_lines[0]
+        );
         assert_eq!(cursor_row, 0, "cursor should be on first row");
         assert!(cursor_col > 0, "cursor should be past the prompt");
 
@@ -665,16 +975,30 @@ mod tests {
             panic!("Expected Submit action, got {:?}", action);
         }
 
-        assert_eq!(app.state, AppState::Streaming, "state should be Streaming after submit");
-        assert!(app.editor.buffer.is_empty(), "editor should be cleared after submit");
+        assert_eq!(
+            app.state,
+            AppState::Streaming,
+            "state should be Streaming after submit"
+        );
+        assert!(
+            app.editor.buffer.is_empty(),
+            "editor should be cleared after submit"
+        );
 
         let thinking = "用户发来问候，我需要礼貌地回应";
         let response = "你好！有什么我可以帮助你的吗？😊";
-        let combined = format!("\x1b[3m\x1b[38;2;128;128;128m\u{2022} {}\x1b[23m\x1b[39m\n\n{}", thinking, response);
+        let combined = format!(
+            "\x1b[3m\x1b[38;2;128;128;128m\u{2022} {}\x1b[23m\x1b[39m\n\n{}",
+            thinking, response
+        );
         app.stream_content(&combined);
 
         app.finalize_turn();
-        assert_eq!(app.state, AppState::Input, "state should be Input after finalize_turn");
+        assert_eq!(
+            app.state,
+            AppState::Input,
+            "state should be Input after finalize_turn"
+        );
 
         let chat_lines = app.chat.render_lines(80, usize::MAX);
         let line_texts: Vec<String> = chat_lines.iter().map(line_text).collect();
@@ -709,7 +1033,8 @@ mod tests {
         assert!(
             max_blank_run <= 2,
             "At most 2 consecutive blank lines, got {}. Lines:\n{:?}",
-            max_blank_run, line_texts
+            max_blank_run,
+            line_texts
         );
 
         eprintln!("\n===== FULL INTEGRATION TEST: RENDERED CHAT =====");
@@ -744,12 +1069,21 @@ mod tests {
         let footer2 = app.render_footer_line2(80);
         let footer2_text: String = footer2.spans.iter().map(|s| s.content.as_ref()).collect();
 
-        assert!(footer2_text.contains("claude-sonnet-4-20250514"),
-            "model name should be in footer, got: {:?}", footer2_text);
-        assert!(footer2_text.contains("0.0%/1.0M"),
-            "context info should be in footer, got: {:?}", footer2_text);
-        assert!(footer2_text.contains("high"),
-            "thinking level should be in footer, got: {:?}", footer2_text);
+        assert!(
+            footer2_text.contains("claude-sonnet-4-20250514"),
+            "model name should be in footer, got: {:?}",
+            footer2_text
+        );
+        assert!(
+            footer2_text.contains("0.0%/1.0M"),
+            "context info should be in footer, got: {:?}",
+            footer2_text
+        );
+        assert!(
+            footer2_text.contains("high"),
+            "thinking level should be in footer, got: {:?}",
+            footer2_text
+        );
     }
 
     #[test]
@@ -792,8 +1126,11 @@ mod tests {
         let text2: String = lines2.iter().map(line_text).collect::<Vec<_>>().join(" ");
         assert_eq!(text2.matches("Pick").count(), 3);
         assert_eq!(text2.matches("hello").count(), 1);
-        assert_eq!(text2.matches("Hi there!").count(), 1,
-            "first assistant content persists (each turn commits separately)");
+        assert_eq!(
+            text2.matches("Hi there!").count(),
+            1,
+            "first assistant content persists (each turn commits separately)"
+        );
         assert_eq!(text2.matches("how are you?").count(), 1);
         assert_eq!(text2.matches("Doing well!").count(), 1);
 
@@ -819,11 +1156,16 @@ mod tests {
     #[test]
     fn test_typing_no_blank_accumulation() {
         let mut app = TuiApp::new_inner(
-            "anthropic", "claude-sonnet-4-20250514",
-            "Pick", "0.1.0",
-            vec!["CLAUDE.md".to_string()], vec![],
-            "D:\\test", Some("D:\\".to_string()),
-            "off", None,
+            "anthropic",
+            "claude-sonnet-4-20250514",
+            "Pick",
+            "0.1.0",
+            vec!["CLAUDE.md".to_string()],
+            vec![],
+            "D:\\test",
+            Some("D:\\".to_string()),
+            "off",
+            None,
             "test",
             "",
         );
@@ -842,7 +1184,9 @@ mod tests {
         for i in 0..5 {
             let lines = app.chat.render_lines(80, usize::MAX);
             let count = lines.len();
-            if let Some(p) = prev { assert_eq!(count, p, "typing render {} has mismatched line count", i); }
+            if let Some(p) = prev {
+                assert_eq!(count, p, "typing render {} has mismatched line count", i);
+            }
             prev = Some(count);
         }
     }

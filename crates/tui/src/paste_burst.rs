@@ -1,4 +1,4 @@
-﻿//! Timing-based paste burst detection with retroactive capture.
+//! Timing-based paste burst detection with retroactive capture.
 //! On Windows, crossterm never emits `Event::Paste(String)` — pasted text
 //! arrives as individual `Event::Key(Char(c))` events in rapid succession.
 //! This module detects such bursts by tracking inter-character timing.
@@ -46,10 +46,7 @@ pub enum CharAction {
     /// and insert the full batch as a paste.
     /// The event loop should call `editor.delete_last_chars(retro_count)` then
     /// `handle_paste(&text)`.
-    RetroFlush {
-        text: String,
-        retro_count: usize,
-    },
+    RetroFlush { text: String, retro_count: usize },
     /// A paste burst completed (idle timeout or non-char input);
     /// insert the buffered text via handle_paste.
     Flush(String),
@@ -99,7 +96,9 @@ impl PasteBurst {
     ///   `editor.delete_last_chars(retro_count)` then `handle_paste(&text)`.
     /// - `Flush(text)` — buffered chars ready as paste (via handle_paste).
     pub fn push_char(&mut self, c: char, now: Instant) -> CharAction {
-        let gap = self.last_char_time.map(|t| now.duration_since(t).as_millis());
+        let gap = self
+            .last_char_time
+            .map(|t| now.duration_since(t).as_millis());
 
         match &self.state {
             PasteBurstState::Idle => {

@@ -17,8 +17,7 @@ pub(crate) fn process_key_event(
 
     // Ctrl+Shift+V: direct clipboard read
     if key.code == KeyCode::Char('v')
-        && key.modifiers
-            == (KeyModifiers::CONTROL | KeyModifiers::SHIFT)
+        && key.modifiers == (KeyModifiers::CONTROL | KeyModifiers::SHIFT)
     {
         if let Ok(mut clipboard) = arboard::Clipboard::new() {
             if let Ok(text) = clipboard.get_text() {
@@ -30,7 +29,10 @@ pub(crate) fn process_key_event(
 
     // Route Char + Enter to paste accumulator
     let mut paste_handled = false;
-    if !key.modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) {
+    if !key
+        .modifiers
+        .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT)
+    {
         match key.code {
             KeyCode::Char(c) => {
                 tui.paste_accumulator.push(c);
@@ -68,8 +70,7 @@ pub(crate) fn process_key_event_during_agent(
 
     // Ctrl+Shift+V: direct clipboard read
     if key.code == KeyCode::Char('v')
-        && key.modifiers
-            == (KeyModifiers::CONTROL | KeyModifiers::SHIFT)
+        && key.modifiers == (KeyModifiers::CONTROL | KeyModifiers::SHIFT)
     {
         if let Ok(mut clipboard) = arboard::Clipboard::new() {
             if let Ok(text) = clipboard.get_text() {
@@ -87,7 +88,10 @@ pub(crate) fn process_key_event_during_agent(
 
     // Route Char + Enter to paste accumulator
     let mut paste_handled = false;
-    if !key.modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) {
+    if !key
+        .modifiers
+        .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT)
+    {
         match key.code {
             KeyCode::Char(c) => {
                 tui.paste_accumulator.push(c);
@@ -125,9 +129,9 @@ pub(crate) fn drain_key_events(
             match evt_rx.try_recv() {
                 Ok(crossterm::event::Event::Key(key))
                     if key.kind == KeyEventKind::Press
-                        && !key.modifiers.intersects(
-                            KeyModifiers::CONTROL | KeyModifiers::ALT,
-                        ) =>
+                        && !key
+                            .modifiers
+                            .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
                 {
                     match key.code {
                         KeyCode::Char(c) => {
@@ -203,9 +207,9 @@ pub(crate) fn drain_key_events_during_agent(
             match evt_rx.try_recv() {
                 Ok(crossterm::event::Event::Key(key))
                     if key.kind == KeyEventKind::Press
-                        && !key.modifiers.intersects(
-                            KeyModifiers::CONTROL | KeyModifiers::ALT,
-                        ) =>
+                        && !key
+                            .modifiers
+                            .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
                 {
                     match key.code {
                         KeyCode::Char(c) => {
@@ -214,10 +218,7 @@ pub(crate) fn drain_key_events_during_agent(
                         }
                         KeyCode::Enter => {
                             tui.finalize_paste_accumulator(now);
-                            if let Some(a) = tui.handle_key(
-                                KeyCode::Enter,
-                                KeyModifiers::NONE,
-                            ) {
+                            if let Some(a) = tui.handle_key(KeyCode::Enter, KeyModifiers::NONE) {
                                 if matches!(a, TuiAction::Quit) {
                                     action = Some(a);
                                     had_action = true;

@@ -1,9 +1,11 @@
-﻿use tokio::fs;
 use std::path::Path;
+use tokio::fs;
 
 use super::path_utils::resolve_to_cwd;
-use super::render_utils::{ToolRenderContext, ToolRenderOptions, ToolRenderOutput, ToolTheme,
-    shorten_path, invalid_arg_text, normalize_display_text, replace_tabs};
+use super::render_utils::{
+    ToolRenderContext, ToolRenderOptions, ToolRenderOutput, ToolTheme, invalid_arg_text,
+    normalize_display_text, replace_tabs, shorten_path,
+};
 
 /// Create a write tool definition
 pub fn create_write_tool_definition() -> WriteToolDefinition {
@@ -68,7 +70,9 @@ fn trim_trailing_empty_lines_write(lines: Vec<&str>) -> Vec<&str> {
 
 /// Render a write tool call — `write /path/to/file` with content preview
 pub fn render_write_call(args: &serde_json::Value, ctx: &ToolRenderContext) -> ToolRenderOutput {
-    let path = args.get("path").and_then(|v| v.as_str())
+    let path = args
+        .get("path")
+        .and_then(|v| v.as_str())
         .or_else(|| args.get("file_path").and_then(|v| v.as_str()));
     let content = args.get("content").and_then(|v| v.as_str());
 
@@ -77,7 +81,8 @@ pub fn render_write_call(args: &serde_json::Value, ctx: &ToolRenderContext) -> T
         None => invalid_arg_text(&|s| ToolTheme::fg("error", s)),
     };
 
-    let mut label = format!("{} {}",
+    let mut label = format!(
+        "{} {}",
         ToolTheme::fg("toolTitle", &ToolTheme::bold("write")),
         path_display,
     );
@@ -94,20 +99,28 @@ pub fn render_write_call(args: &serde_json::Value, ctx: &ToolRenderContext) -> T
 
         label.push_str("\n\n");
         label.push_str(
-            &display_lines.iter()
+            &display_lines
+                .iter()
                 .map(|line| ToolTheme::fg("toolOutput", line))
                 .collect::<Vec<_>>()
                 .join("\n"),
         );
 
         if remaining > 0 {
-            label.push_str(
-                &ToolTheme::fg("muted", &format!("\n... ({} more lines, {} total, use expand to expand)", remaining, total_lines)),
-            );
+            label.push_str(&ToolTheme::fg(
+                "muted",
+                &format!(
+                    "\n... ({} more lines, {} total, use expand to expand)",
+                    remaining, total_lines
+                ),
+            ));
         }
     }
 
-    ToolRenderOutput { label, formatted: String::new() }
+    ToolRenderOutput {
+        label,
+        formatted: String::new(),
+    }
 }
 
 /// Render a write tool result — error message if failed, empty on success
@@ -117,7 +130,8 @@ pub fn render_write_result(
     ctx: &ToolRenderContext,
 ) -> ToolRenderOutput {
     if ctx.is_error {
-        let error_text: String = output.content
+        let error_text: String = output
+            .content
             .iter()
             .filter_map(|c| c.get("text").and_then(|v| v.as_str()))
             .collect::<Vec<_>>()
@@ -131,5 +145,8 @@ pub fn render_write_result(
     }
 
     // On success, render nothing extra
-    ToolRenderOutput { label: String::new(), formatted: String::new() }
+    ToolRenderOutput {
+        label: String::new(),
+        formatted: String::new(),
+    }
 }

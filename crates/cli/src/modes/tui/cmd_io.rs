@@ -112,7 +112,9 @@ pub(crate) async fn handle_export(ctx: &mut TuiContext, args: &[String]) {
 pub(crate) async fn handle_import(ctx: &mut TuiContext, args: &[String]) {
     let path = args.join(" ");
     if path.is_empty() {
-        ctx.tui.chat.add_system_message("Usage: /import <path.jsonl>");
+        ctx.tui
+            .chat
+            .add_system_message("Usage: /import <path.jsonl>");
     } else if !path.ends_with(".jsonl") {
         ctx.tui
             .chat
@@ -139,44 +141,42 @@ pub(crate) async fn handle_import(ctx: &mut TuiContext, args: &[String]) {
                         .add_system_message("Session file contains no message entries.");
                 }
             }
-            Err(_) => {
-                match std::fs::read_to_string(&import_path) {
-                    Ok(content) => {
-                        let msgs: Vec<Message> = content
-                            .lines()
-                            .filter(|l| !l.trim().is_empty())
-                            .filter_map(|l| serde_json::from_str(l).ok())
-                            .collect();
-                        let msg_count = msgs.len();
-                        if msg_count == 0 {
-                            ctx.tui.chat.add_system_message(&format!(
-                                "No parseable messages in '\x1b[1m{}\x1b[0m'.",
-                                path
-                            ));
-                        } else {
-                            match SessionManager::create(cwd, Some(session_dir)).await {
-                                Ok(mut sess) => {
-                                    for msg in &msgs {
-                                        let _ = sess.append(SessionEntry::from(msg)).await;
-                                    }
-                                    ctx.all_messages = msgs;
-                                    ctx.session_manager = sess;
-                                    ctx.tui.chat.add_system_message(&format!(
-                                        "Imported \x1b[1m{}\x1b[0m messages.",
-                                        msg_count
-                                    ));
+            Err(_) => match std::fs::read_to_string(&import_path) {
+                Ok(content) => {
+                    let msgs: Vec<Message> = content
+                        .lines()
+                        .filter(|l| !l.trim().is_empty())
+                        .filter_map(|l| serde_json::from_str(l).ok())
+                        .collect();
+                    let msg_count = msgs.len();
+                    if msg_count == 0 {
+                        ctx.tui.chat.add_system_message(&format!(
+                            "No parseable messages in '\x1b[1m{}\x1b[0m'.",
+                            path
+                        ));
+                    } else {
+                        match SessionManager::create(cwd, Some(session_dir)).await {
+                            Ok(mut sess) => {
+                                for msg in &msgs {
+                                    let _ = sess.append(SessionEntry::from(msg)).await;
                                 }
-                                Err(e) => ctx
-                                    .tui
-                                    .show_error(&format!("Failed to create session: {}", e)),
+                                ctx.all_messages = msgs;
+                                ctx.session_manager = sess;
+                                ctx.tui.chat.add_system_message(&format!(
+                                    "Imported \x1b[1m{}\x1b[0m messages.",
+                                    msg_count
+                                ));
                             }
+                            Err(e) => ctx
+                                .tui
+                                .show_error(&format!("Failed to create session: {}", e)),
                         }
                     }
-                    Err(e) => ctx
-                        .tui
-                        .show_error(&format!("Cannot read '{}': {}", path, e)),
                 }
-            }
+                Err(e) => ctx
+                    .tui
+                    .show_error(&format!("Cannot read '{}': {}", path, e)),
+            },
         }
     }
 }
@@ -193,8 +193,7 @@ pub(crate) async fn handle_share(ctx: &mut TuiContext) {
                 .header()
                 .map(|h| h.id.as_str())
                 .unwrap_or("unknown");
-            let tmp_path =
-                std::env::temp_dir().join(format!("Pick-session-{}.md", session_id));
+            let tmp_path = std::env::temp_dir().join(format!("Pick-session-{}.md", session_id));
             let md_content: String = ctx
                 .all_messages
                 .iter()
@@ -251,8 +250,9 @@ pub(crate) async fn handle_share(ctx: &mut TuiContext) {
                         .output()
                     {
                         Ok(gist_output) if gist_output.status.success() => {
-                            let url =
-                                String::from_utf8_lossy(&gist_output.stdout).trim().to_string();
+                            let url = String::from_utf8_lossy(&gist_output.stdout)
+                                .trim()
+                                .to_string();
                             ctx.tui.chat.add_system_message(&format!(
                                 "Session shared as gist: \x1b[1m{}\x1b[0m",
                                 url
@@ -323,13 +323,18 @@ pub(crate) fn handle_copy(ctx: &mut TuiContext) {
                         "Copied \x1b[1m{}\x1b[0m characters to clipboard.",
                         text.len()
                     ));
-                    ctx.tui
-                        .chat
-                        .add_system_message(&format!("\x1b[2m  {}\x1b[0m", preview.replace('\n', " ")));
+                    ctx.tui.chat.add_system_message(&format!(
+                        "\x1b[2m  {}\x1b[0m",
+                        preview.replace('\n', " ")
+                    ));
                 }
-                Err(e) => ctx.tui.show_error(&format!("Clipboard write failed: {}", e)),
+                Err(e) => ctx
+                    .tui
+                    .show_error(&format!("Clipboard write failed: {}", e)),
             },
-            Err(e) => ctx.tui.show_error(&format!("Clipboard access failed: {}", e)),
+            Err(e) => ctx
+                .tui
+                .show_error(&format!("Clipboard access failed: {}", e)),
         }
     } else {
         ctx.tui

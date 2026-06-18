@@ -8,42 +8,72 @@ use crate::app::types::{TreeFilterMode, TreeView, TreeViewItem};
 use super::types::TuiApp;
 
 impl TreeView {
-    pub fn new(items: Vec<TreeViewItem>, current_leaf_id: Option<String>, active_path_ids: Vec<String>) -> Self {
+    pub fn new(
+        items: Vec<TreeViewItem>,
+        current_leaf_id: Option<String>,
+        active_path_ids: Vec<String>,
+    ) -> Self {
         let count = items.len();
         let visible: Vec<usize> = (0..count).collect();
         Self {
-            items, visible_indices: visible, selected_index: 0,
-            current_leaf_id, active_path_ids,
+            items,
+            visible_indices: visible,
+            selected_index: 0,
+            current_leaf_id,
+            active_path_ids,
             folded_ids: std::collections::HashSet::new(),
             filter_mode: TreeFilterMode::Default,
-            search_query: String::new(), show_label_timestamps: false,
-            edit_label_entry_id: None, edit_label_buffer: String::new(),
+            search_query: String::new(),
+            show_label_timestamps: false,
+            edit_label_entry_id: None,
+            edit_label_buffer: String::new(),
         }
     }
 
     pub fn selected_entry_id(&self) -> Option<&str> {
-        self.visible_indices.get(self.selected_index).map(|&idx| self.items[idx].entry_id.as_str())
+        self.visible_indices
+            .get(self.selected_index)
+            .map(|&idx| self.items[idx].entry_id.as_str())
     }
-    pub fn visible_count(&self) -> usize { self.visible_indices.len() }
+    pub fn visible_count(&self) -> usize {
+        self.visible_indices.len()
+    }
 
-    pub fn move_up(&mut self) { if self.selected_index > 0 { self.selected_index -= 1; } }
-    pub fn move_down(&mut self) { if self.selected_index + 1 < self.visible_indices.len() { self.selected_index += 1; } }
-    pub fn page_up(&mut self) { self.selected_index = self.selected_index.saturating_sub(10); }
+    pub fn move_up(&mut self) {
+        if self.selected_index > 0 {
+            self.selected_index -= 1;
+        }
+    }
+    pub fn move_down(&mut self) {
+        if self.selected_index + 1 < self.visible_indices.len() {
+            self.selected_index += 1;
+        }
+    }
+    pub fn page_up(&mut self) {
+        self.selected_index = self.selected_index.saturating_sub(10);
+    }
     pub fn page_down(&mut self) {
         let max = self.visible_indices.len().saturating_sub(1);
         self.selected_index = (self.selected_index + 10).min(max);
     }
 
-    pub fn go_to_home(&mut self) { self.selected_index = 0; }
-    pub fn go_to_end(&mut self) { self.selected_index = self.visible_count().saturating_sub(1); }
+    pub fn go_to_home(&mut self) {
+        self.selected_index = 0;
+    }
+    pub fn go_to_end(&mut self) {
+        self.selected_index = self.visible_count().saturating_sub(1);
+    }
 
     pub fn toggle_fold(&mut self) {
         if let Some(idx) = self.visible_indices.get(self.selected_index) {
             let item = &self.items[*idx];
             if item.has_children {
                 let id = &item.entry_id;
-                if self.folded_ids.contains(id) { self.folded_ids.remove(id); }
-                else { self.folded_ids.insert(id.clone()); }
+                if self.folded_ids.contains(id) {
+                    self.folded_ids.remove(id);
+                } else {
+                    self.folded_ids.insert(id.clone());
+                }
                 self.rebuild_visible();
             }
         }
@@ -70,35 +100,65 @@ impl TreeView {
     }
 
     fn is_settings_kind(k: &str) -> bool {
-        matches!(k, "model_change" | "thinking_level_change" | "custom" | "session_info" | "leaf_change" | "label")
+        matches!(
+            k,
+            "model_change"
+                | "thinking_level_change"
+                | "custom"
+                | "session_info"
+                | "leaf_change"
+                | "label"
+        )
     }
 
     fn rebuild_visible(&mut self) {
         let search_tokens: Vec<String> = if self.search_query.is_empty() {
             Vec::new()
         } else {
-            self.search_query.to_lowercase().split_whitespace().map(|s| s.to_string()).collect()
+            self.search_query
+                .to_lowercase()
+                .split_whitespace()
+                .map(|s| s.to_string())
+                .collect()
         };
         let folded = &self.folded_ids;
-        self.visible_indices = self.items.iter().enumerate()
+        self.visible_indices = self
+            .items
+            .iter()
+            .enumerate()
             .filter(|(_, item)| {
                 match self.filter_mode {
                     TreeFilterMode::UserOnly if item.kind_str != "user" => return false,
-                    TreeFilterMode::NoTools if Self::is_settings_kind(&item.kind_str) || item.kind_str == "tool_result" => return false,
-                    TreeFilterMode::Default if Self::is_settings_kind(&item.kind_str) => return false,
+                    TreeFilterMode::NoTools
+                        if Self::is_settings_kind(&item.kind_str)
+                            || item.kind_str == "tool_result" =>
+                    {
+                        return false;
+                    }
+                    TreeFilterMode::Default if Self::is_settings_kind(&item.kind_str) => {
+                        return false;
+                    }
                     TreeFilterMode::LabeledOnly if item.label.is_none() => return false,
                     _ => {}
                 }
                 if !folded.is_empty() {
                     let mut current = item.parent_id.as_deref();
                     while let Some(pid) = current {
-                        if folded.contains(pid) { return false; }
-                        current = self.items.iter().find(|i| i.entry_id == pid).and_then(|i| i.parent_id.as_deref());
+                        if folded.contains(pid) {
+                            return false;
+                        }
+                        current = self
+                            .items
+                            .iter()
+                            .find(|i| i.entry_id == pid)
+                            .and_then(|i| i.parent_id.as_deref());
                     }
                 }
                 if !search_tokens.is_empty() {
                     let lower = item.searchable_text.to_lowercase();
-                    if !search_tokens.iter().all(|t| lower.contains(t.as_str())) { return false; }
+                    if !search_tokens.iter().all(|t| lower.contains(t.as_str())) {
+                        return false;
+                    }
                 }
                 true
             })
@@ -108,7 +168,9 @@ impl TreeView {
             if self.selected_index >= self.visible_indices.len() {
                 self.selected_index = self.visible_indices.len() - 1;
             }
-        } else { self.selected_index = 0; }
+        } else {
+            self.selected_index = 0;
+        }
 
         // Recalculate visual structure for visible subset
         self.recalculate_visual_structure();
@@ -117,15 +179,23 @@ impl TreeView {
     /// Recalculate depth/is_last/gutters for visible nodes after filtering.
     /// This prevents dangling connectors when middle nodes are filtered out.
     fn recalculate_visual_structure(&mut self) {
-        if self.visible_indices.is_empty() { return; }
+        if self.visible_indices.is_empty() {
+            return;
+        }
 
         // Build visible node map: entry_id -> (depth, is_last, parent_id)
-        let visible_ids: std::collections::HashSet<&str> = self.visible_indices
-            .iter().map(|&idx| self.items[idx].entry_id.as_str()).collect();
+        let visible_ids: std::collections::HashSet<&str> = self
+            .visible_indices
+            .iter()
+            .map(|&idx| self.items[idx].entry_id.as_str())
+            .collect();
 
         // Find nearest visible ancestor for each visible node (use owned strings)
-        let mut visible_parent: std::collections::HashMap<String, String> = std::collections::HashMap::new();
-        let item_refs: Vec<(String, Option<String>)> = self.visible_indices.iter()
+        let mut visible_parent: std::collections::HashMap<String, String> =
+            std::collections::HashMap::new();
+        let item_refs: Vec<(String, Option<String>)> = self
+            .visible_indices
+            .iter()
             .map(|&idx| {
                 let item = &self.items[idx];
                 (item.entry_id.clone(), item.parent_id.clone())
@@ -139,12 +209,17 @@ impl TreeView {
                     visible_parent.insert(entry_id.clone(), pid.to_string());
                     break;
                 }
-                current = self.items.iter().find(|i| i.entry_id == pid).and_then(|i| i.parent_id.as_deref());
+                current = self
+                    .items
+                    .iter()
+                    .find(|i| i.entry_id == pid)
+                    .and_then(|i| i.parent_id.as_deref());
             }
         }
 
         // Build visible children map (owned keys)
-        let mut visible_children: std::collections::HashMap<String, Vec<usize>> = std::collections::HashMap::new();
+        let mut visible_children: std::collections::HashMap<String, Vec<usize>> =
+            std::collections::HashMap::new();
         for &idx in &self.visible_indices {
             let entry_id = &self.items[idx].entry_id;
             let parent = visible_parent.get(entry_id).cloned().unwrap_or_default();
@@ -152,13 +227,21 @@ impl TreeView {
         }
 
         // Sort children by original order
-        for (_, children) in visible_children.iter_mut() { children.sort(); }
+        for (_, children) in visible_children.iter_mut() {
+            children.sort();
+        }
 
         // DFS from roots (entries with no visible parent)
-        let roots: Vec<String> = self.visible_indices.iter()
+        let roots: Vec<String> = self
+            .visible_indices
+            .iter()
             .filter_map(|&idx| {
                 let entry_id = &self.items[idx].entry_id;
-                if !visible_parent.contains_key(entry_id) { Some(entry_id.clone()) } else { None }
+                if !visible_parent.contains_key(entry_id) {
+                    Some(entry_id.clone())
+                } else {
+                    None
+                }
             })
             .collect();
 
@@ -170,7 +253,11 @@ impl TreeView {
         // Recalculate depth/is_last/gutters via DFS
         let mut updates: Vec<(usize, usize, bool, Vec<bool>)> = Vec::new();
         while let Some((depth, entry_id, is_last, gutters)) = stack.pop() {
-            if let Some(&idx) = self.visible_indices.iter().find(|&&i| self.items[i].entry_id == entry_id) {
+            if let Some(&idx) = self
+                .visible_indices
+                .iter()
+                .find(|&&i| self.items[i].entry_id == entry_id)
+            {
                 updates.push((idx, depth, is_last, gutters.clone()));
             }
             if let Some(children) = visible_children.get(&entry_id) {
@@ -193,7 +280,10 @@ impl TreeView {
         }
     }
 
-    pub fn set_filter_mode(&mut self, mode: TreeFilterMode) { self.filter_mode = mode; self.rebuild_visible(); }
+    pub fn set_filter_mode(&mut self, mode: TreeFilterMode) {
+        self.filter_mode = mode;
+        self.rebuild_visible();
+    }
     pub fn cycle_filter(&mut self) {
         self.filter_mode = match self.filter_mode {
             TreeFilterMode::Default => TreeFilterMode::NoTools,
@@ -205,10 +295,24 @@ impl TreeView {
         self.rebuild_visible();
     }
 
-    pub fn append_search(&mut self, c: char) { self.search_query.push(c); self.folded_ids.clear(); self.rebuild_visible(); }
-    pub fn pop_search(&mut self) { self.search_query.pop(); self.folded_ids.clear(); self.rebuild_visible(); }
-    pub fn clear_search(&mut self) { self.search_query.clear(); self.folded_ids.clear(); self.rebuild_visible(); }
-    pub fn toggle_label_timestamps(&mut self) { self.show_label_timestamps = !self.show_label_timestamps; }
+    pub fn append_search(&mut self, c: char) {
+        self.search_query.push(c);
+        self.folded_ids.clear();
+        self.rebuild_visible();
+    }
+    pub fn pop_search(&mut self) {
+        self.search_query.pop();
+        self.folded_ids.clear();
+        self.rebuild_visible();
+    }
+    pub fn clear_search(&mut self) {
+        self.search_query.clear();
+        self.folded_ids.clear();
+        self.rebuild_visible();
+    }
+    pub fn toggle_label_timestamps(&mut self) {
+        self.show_label_timestamps = !self.show_label_timestamps;
+    }
 
     pub fn start_edit_label(&mut self) {
         if let Some(idx) = self.visible_indices.get(self.selected_index) {
@@ -237,7 +341,10 @@ impl TuiApp {
             let mut result: Vec<Line<'static>> = Vec::new();
             result.push(Line::from(Span::styled("Session Tree", bold)));
             if !tv.search_query.is_empty() {
-                result.push(Line::from(Span::styled(format!("Search: {}", tv.search_query), dim)));
+                result.push(Line::from(Span::styled(
+                    format!("Search: {}", tv.search_query),
+                    dim,
+                )));
             }
 
             for (vi, &item_idx) in tv.visible_indices.iter().enumerate() {
@@ -296,7 +403,9 @@ impl TuiApp {
                 let display = if item.display_label.len() > label_max {
                     let max_b = label_max.saturating_sub(3);
                     let mut end = max_b;
-                    while !item.display_label.is_char_boundary(end) { end -= 1; }
+                    while !item.display_label.is_char_boundary(end) {
+                        end -= 1;
+                    }
                     format!("{}...", &item.display_label[..end])
                 } else {
                     item.display_label.clone()
@@ -323,9 +432,16 @@ impl TuiApp {
 
             // Status line
             let mode_label = tv.filter_mode.label();
-            let status = format!("  ({}/{}) [{}]{}",
-                tv.selected_index + 1, tv.visible_count(), mode_label,
-                if tv.show_label_timestamps { " [+label time]" } else { "" },
+            let status = format!(
+                "  ({}/{}) [{}]{}",
+                tv.selected_index + 1,
+                tv.visible_count(),
+                mode_label,
+                if tv.show_label_timestamps {
+                    " [+label time]"
+                } else {
+                    ""
+                },
             );
             result.push(Line::from(Span::styled(status, dim)));
             result.push(Line::from(""));

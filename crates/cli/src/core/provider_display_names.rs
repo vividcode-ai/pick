@@ -1,5 +1,4 @@
-﻿//! Provider display names - human-readable names for provider IDs
-
+//! Provider display names - human-readable names for provider IDs
 
 use std::collections::HashMap;
 
@@ -34,8 +33,14 @@ fn built_in_provider_display_names() -> HashMap<&'static str, &'static str> {
     m.insert("zai", "ZAI");
     m.insert("xiaomi", "Xiaomi MiMo");
     m.insert("xiaomi-token-plan-cn", "Xiaomi MiMo Token Plan (China)");
-    m.insert("xiaomi-token-plan-ams", "Xiaomi MiMo Token Plan (Amsterdam)");
-    m.insert("xiaomi-token-plan-sgp", "Xiaomi MiMo Token Plan (Singapore)");
+    m.insert(
+        "xiaomi-token-plan-ams",
+        "Xiaomi MiMo Token Plan (Amsterdam)",
+    );
+    m.insert(
+        "xiaomi-token-plan-sgp",
+        "Xiaomi MiMo Token Plan (Singapore)",
+    );
     m
 }
 

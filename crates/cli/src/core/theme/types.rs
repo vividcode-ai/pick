@@ -349,11 +349,14 @@ fn resolve_var_refs(
         }
         ColorValue::Hex(var_name) => {
             if visited.contains(var_name) {
-                return Err(format!("Circular variable reference detected: {}", var_name));
+                return Err(format!(
+                    "Circular variable reference detected: {}",
+                    var_name
+                ));
             }
-            let resolved = vars.get(var_name).ok_or_else(|| {
-                format!("Variable reference not found: {}", var_name)
-            })?;
+            let resolved = vars
+                .get(var_name)
+                .ok_or_else(|| format!("Variable reference not found: {}", var_name))?;
             visited.insert(var_name.clone());
             resolve_var_refs(resolved, vars, visited)
         }
@@ -377,7 +380,10 @@ const BG_COLOR_KEYS: &[&str] = &[
     "toolErrorBg",
 ];
 
-pub(super) fn color_value_to_resolved(value: &ColorValue, vars: &HashMap<String, ColorValue>) -> ResolvedColor {
+pub(super) fn color_value_to_resolved(
+    value: &ColorValue,
+    vars: &HashMap<String, ColorValue>,
+) -> ResolvedColor {
     resolve_color_value(value, vars).unwrap_or(ResolvedColor::Empty)
 }
 
@@ -495,7 +501,10 @@ impl Theme {
     }
 
     pub fn bg(&self, color: ThemeBg, text: &str) -> String {
-        let ansi = self.bg_colors.get(&color).expect("Unknown theme background color");
+        let ansi = self
+            .bg_colors
+            .get(&color)
+            .expect("Unknown theme background color");
         format!("{}{}\x1b[49m", ansi, text)
     }
 
@@ -524,7 +533,9 @@ impl Theme {
     }
 
     pub fn get_bg_ansi(&self, color: ThemeBg) -> &str {
-        self.bg_colors.get(&color).expect("Unknown theme background color")
+        self.bg_colors
+            .get(&color)
+            .expect("Unknown theme background color")
     }
 
     pub fn color_mode(&self) -> ColorMode {
@@ -708,9 +719,7 @@ fn ansi_to_color(ansi: &str, default: ratatui::style::Color) -> ratatui::style::
     if bytes.len() < 12 || bytes[0] != 0x1b || bytes[1] != b'[' {
         return default;
     }
-    let parts: Vec<&str> = ansi.trim_end_matches('m')
-        .split(';')
-        .collect();
+    let parts: Vec<&str> = ansi.trim_end_matches('m').split(';').collect();
     if parts.len() >= 3 {
         if let (Ok(r), Ok(g), Ok(b)) = (
             parts[parts.len() - 3].parse::<u8>(),
@@ -728,10 +737,16 @@ pub fn theme_to_tui_colors(theme: &Theme) -> pick_tui::components::theme::TuiCol
     use ratatui::style::Color;
 
     let fg = |c: ThemeColor, fallback: (u8, u8, u8)| -> Option<Color> {
-        Some(ansi_to_color(theme.get_fg_ansi(c), Color::Rgb(fallback.0, fallback.1, fallback.2)))
+        Some(ansi_to_color(
+            theme.get_fg_ansi(c),
+            Color::Rgb(fallback.0, fallback.1, fallback.2),
+        ))
     };
     let bg = |c: ThemeBg, fallback: (u8, u8, u8)| -> Option<Color> {
-        Some(ansi_to_color(theme.get_bg_ansi(c), Color::Rgb(fallback.0, fallback.1, fallback.2)))
+        Some(ansi_to_color(
+            theme.get_bg_ansi(c),
+            Color::Rgb(fallback.0, fallback.1, fallback.2),
+        ))
     };
 
     TuiColors {

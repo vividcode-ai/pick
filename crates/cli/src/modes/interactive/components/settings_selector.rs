@@ -1,5 +1,4 @@
-﻿//! Settings selector component with settings list and submenus
-
+//! Settings selector component with settings list and submenus
 
 use crate::core::tools::render_utils::ToolTheme;
 
@@ -76,7 +75,8 @@ pub fn build_settings_items(
         SettingDisplayItem {
             id: "auto-resize-images".to_string(),
             label: "Auto-resize images".to_string(),
-            description: "Resize large images to 2000x2000 max for better model compatibility".to_string(),
+            description: "Resize large images to 2000x2000 max for better model compatibility"
+                .to_string(),
             current_value: if auto_resize_images { "true" } else { "false" }.to_string(),
             has_submenu: false,
         },
@@ -91,7 +91,12 @@ pub fn build_settings_items(
             id: "skill-commands".to_string(),
             label: "Skill commands".to_string(),
             description: "Register skills as /skill:name commands".to_string(),
-            current_value: if enable_skill_commands { "true" } else { "false" }.to_string(),
+            current_value: if enable_skill_commands {
+                "true"
+            } else {
+                "false"
+            }
+            .to_string(),
             has_submenu: false,
         },
         SettingDisplayItem {
@@ -111,14 +116,16 @@ pub fn build_settings_items(
         SettingDisplayItem {
             id: "transport".to_string(),
             label: "Transport".to_string(),
-            description: "Preferred transport for providers that support multiple transports".to_string(),
+            description: "Preferred transport for providers that support multiple transports"
+                .to_string(),
             current_value: transport.to_string(),
             has_submenu: false,
         },
         SettingDisplayItem {
             id: "http-idle-timeout".to_string(),
             label: "HTTP idle timeout".to_string(),
-            description: "Maximum idle gap while waiting for HTTP headers or body chunks".to_string(),
+            description: "Maximum idle gap while waiting for HTTP headers or body chunks"
+                .to_string(),
             current_value: format_http_idle_timeout(http_idle_timeout_ms),
             has_submenu: false,
         },
@@ -146,8 +153,14 @@ pub fn build_settings_items(
         SettingDisplayItem {
             id: "install-telemetry".to_string(),
             label: "Install telemetry".to_string(),
-            description: "Send an anonymous version/update ping after changelog-detected updates".to_string(),
-            current_value: if enable_install_telemetry { "true" } else { "false" }.to_string(),
+            description: "Send an anonymous version/update ping after changelog-detected updates"
+                .to_string(),
+            current_value: if enable_install_telemetry {
+                "true"
+            } else {
+                "false"
+            }
+            .to_string(),
             has_submenu: false,
         },
         SettingDisplayItem {
@@ -188,8 +201,14 @@ pub fn build_settings_items(
         SettingDisplayItem {
             id: "show-hardware-cursor".to_string(),
             label: "Show hardware cursor".to_string(),
-            description: "Show the terminal cursor while still positioning it for IME support".to_string(),
-            current_value: if show_hardware_cursor { "true" } else { "false" }.to_string(),
+            description: "Show the terminal cursor while still positioning it for IME support"
+                .to_string(),
+            current_value: if show_hardware_cursor {
+                "true"
+            } else {
+                "false"
+            }
+            .to_string(),
             has_submenu: false,
         },
         SettingDisplayItem {
@@ -217,7 +236,12 @@ pub fn build_settings_items(
             id: "terminal-progress".to_string(),
             label: "Terminal progress".to_string(),
             description: "Show OSC 9;4 progress indicators in the terminal tab bar".to_string(),
-            current_value: if show_terminal_progress { "true" } else { "false" }.to_string(),
+            current_value: if show_terminal_progress {
+                "true"
+            } else {
+                "false"
+            }
+            .to_string(),
             has_submenu: false,
         },
     ]
@@ -285,7 +309,10 @@ pub fn render_settings_selector(
             let value_display = if has_submenu {
                 format!(" {}>", ToolTheme::fg("accent", "▶"))
             } else {
-                format!(" {}", ToolTheme::fg("muted", &format!("[{}]", item.current_value)))
+                format!(
+                    " {}",
+                    ToolTheme::fg("muted", &format!("[{}]", item.current_value))
+                )
             };
 
             let label = if is_selected {
@@ -301,11 +328,17 @@ pub fn render_settings_selector(
     }
 
     if total > max_visible {
-        lines.push(ToolTheme::fg("muted", &format!("  ({}/{})", selected_index + 1, total)));
+        lines.push(ToolTheme::fg(
+            "muted",
+            &format!("  ({}/{})", selected_index + 1, total),
+        ));
     }
 
     lines.push(String::new());
-    lines.push(ToolTheme::fg("dim", "  ↑↓: navigate · Enter: toggle · Esc: close"));
+    lines.push(ToolTheme::fg(
+        "dim",
+        "  ↑↓: navigate · Enter: toggle · Esc: close",
+    ));
     lines.push(String::new());
     lines.push(ToolTheme::fg("accent", &border));
     lines
@@ -322,7 +355,10 @@ pub fn render_submenu_selector(
     let mut lines = Vec::new();
     let border = "─".repeat(std::cmp::max(1, width));
     lines.push(ToolTheme::fg("accent", &border));
-    lines.push(ToolTheme::fg("accent", &format!("\x1b[1m{}\x1b[22m", title)));
+    lines.push(ToolTheme::fg(
+        "accent",
+        &format!("\x1b[1m{}\x1b[22m", title),
+    ));
     if !description.is_empty() {
         lines.push(ToolTheme::fg("muted", description));
     }
@@ -360,7 +396,10 @@ pub fn render_submenu_selector(
     }
 
     if total > max_visible {
-        lines.push(ToolTheme::fg("muted", &format!("  ({}/{})", selected_index + 1, total)));
+        lines.push(ToolTheme::fg(
+            "muted",
+            &format!("  ({}/{})", selected_index + 1, total),
+        ));
     }
 
     lines.push(String::new());
@@ -378,22 +417,37 @@ pub fn render_warning_settings(
     let mut lines = Vec::new();
     let border = "─".repeat(std::cmp::max(1, width));
     lines.push(ToolTheme::fg("accent", &border));
-    lines.push(ToolTheme::fg("accent", &format!("\x1b[1m{}\x1b[22m", "Warning Settings")));
+    lines.push(ToolTheme::fg(
+        "accent",
+        &format!("\x1b[1m{}\x1b[22m", "Warning Settings"),
+    ));
     lines.push(String::new());
 
-    let items = vec![
-        ("anthropic-extra-usage", "Anthropic extra usage", "Warn when Anthropic subscription auth may use paid extra usage"),
-    ];
+    let items = vec![(
+        "anthropic-extra-usage",
+        "Anthropic extra usage",
+        "Warn when Anthropic subscription auth may use paid extra usage",
+    )];
 
     for (i, (id, label, desc)) in items.iter().enumerate() {
         let is_selected = i == selected_index;
         let cursor = if is_selected { "› " } else { "  " };
         let value = if id == &"anthropic-extra-usage" {
-            if anthropic_extra_usage { "true" } else { "false" }
+            if anthropic_extra_usage {
+                "true"
+            } else {
+                "false"
+            }
         } else {
             ""
         };
-        let line = format!("{}{} {}  {}", cursor, label, ToolTheme::fg("muted", &format!("[{}]", value)), ToolTheme::fg("muted", desc));
+        let line = format!(
+            "{}{} {}  {}",
+            cursor,
+            label,
+            ToolTheme::fg("muted", &format!("[{}]", value)),
+            ToolTheme::fg("muted", desc)
+        );
         lines.push(line);
     }
 

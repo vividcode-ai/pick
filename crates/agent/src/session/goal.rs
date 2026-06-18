@@ -1,5 +1,5 @@
-﻿use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::RwLock;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 use super::entries::GoalEntry;
 
@@ -34,7 +34,11 @@ impl GoalManager {
         self.goal.read().ok()?.clone()
     }
 
-    pub fn create(&self, objective: String, token_budget: Option<i64>) -> Result<GoalEntry, String> {
+    pub fn create(
+        &self,
+        objective: String,
+        token_budget: Option<i64>,
+    ) -> Result<GoalEntry, String> {
         let mut guard = self.goal.write().map_err(|e| e.to_string())?;
         if guard.is_some() {
             return Err("cannot create a new goal because this thread already has a goal; use update_goal only when the existing goal is complete".to_string());
@@ -55,13 +59,18 @@ impl GoalManager {
 
     pub fn update_status(&self, status: String) -> Result<GoalEntry, String> {
         let mut guard = self.goal.write().map_err(|e| e.to_string())?;
-        let entry = guard.as_mut().ok_or_else(|| "no active goal to update".to_string())?;
+        let entry = guard
+            .as_mut()
+            .ok_or_else(|| "no active goal to update".to_string())?;
         let allowed = match status.as_str() {
             "complete" | "blocked" | "budget_limited" => true,
             _ => false,
         };
         if !allowed {
-            return Err("update_goal can only mark the existing goal complete, blocked, or budget_limited".to_string());
+            return Err(
+                "update_goal can only mark the existing goal complete, blocked, or budget_limited"
+                    .to_string(),
+            );
         }
         entry.status = status;
         entry.updated_at = chrono::Utc::now().timestamp_millis();
@@ -87,9 +96,11 @@ impl GoalManager {
     }
 
     pub fn remaining_tokens(&self) -> Option<i64> {
-        self.goal.read().ok()?.as_ref().and_then(|g| {
-            g.token_budget.map(|budget| (budget - g.tokens_used).max(0))
-        })
+        self.goal
+            .read()
+            .ok()?
+            .as_ref()
+            .and_then(|g| g.token_budget.map(|budget| (budget - g.tokens_used).max(0)))
     }
 
     pub fn clear(&self) -> Result<(), String> {
@@ -101,7 +112,9 @@ impl GoalManager {
 
     pub fn set_paused(&self) -> Result<GoalEntry, String> {
         let mut guard = self.goal.write().map_err(|e| e.to_string())?;
-        let entry = guard.as_mut().ok_or_else(|| "no goal to pause".to_string())?;
+        let entry = guard
+            .as_mut()
+            .ok_or_else(|| "no goal to pause".to_string())?;
         if entry.status != "active" && entry.status != "budget_limited" {
             return Err(format!("cannot pause goal with status '{}'", entry.status));
         }
@@ -113,7 +126,9 @@ impl GoalManager {
 
     pub fn set_active(&self) -> Result<GoalEntry, String> {
         let mut guard = self.goal.write().map_err(|e| e.to_string())?;
-        let entry = guard.as_mut().ok_or_else(|| "no goal to resume".to_string())?;
+        let entry = guard
+            .as_mut()
+            .ok_or_else(|| "no goal to resume".to_string())?;
         if entry.status != "paused" && entry.status != "blocked" {
             return Err(format!("cannot resume goal with status '{}'", entry.status));
         }
@@ -125,7 +140,9 @@ impl GoalManager {
 
     pub fn set_objective(&self, objective: String) -> Result<GoalEntry, String> {
         let mut guard = self.goal.write().map_err(|e| e.to_string())?;
-        let entry = guard.as_mut().ok_or_else(|| "no goal to edit".to_string())?;
+        let entry = guard
+            .as_mut()
+            .ok_or_else(|| "no goal to edit".to_string())?;
         entry.objective = objective;
         entry.updated_at = chrono::Utc::now().timestamp_millis();
         Ok(entry.clone())
@@ -136,9 +153,11 @@ impl GoalManager {
         if count >= self.max_continuations {
             return false;
         }
-        self.goal.read().ok().and_then(|g| {
-            g.as_ref().map(|e| e.status == "active")
-        }).unwrap_or(false)
+        self.goal
+            .read()
+            .ok()
+            .and_then(|g| g.as_ref().map(|e| e.status == "active"))
+            .unwrap_or(false)
     }
 
     pub fn register_continuation(&self) -> bool {
@@ -151,11 +170,14 @@ impl GoalManager {
     }
 
     pub fn is_budget_exhausted(&self) -> bool {
-        self.goal.read().ok().and_then(|g| {
-            g.as_ref().map(|e| {
-                e.token_budget.map(|b| e.tokens_used >= b).unwrap_or(false)
+        self.goal
+            .read()
+            .ok()
+            .and_then(|g| {
+                g.as_ref()
+                    .map(|e| e.token_budget.map(|b| e.tokens_used >= b).unwrap_or(false))
             })
-        }).unwrap_or(false)
+            .unwrap_or(false)
     }
 
     pub fn status(&self) -> Option<String> {
@@ -173,7 +195,10 @@ impl std::fmt::Debug for GoalManager {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("GoalManager")
             .field("goal", &self.goal)
-            .field("continuation_count", &self.continuation_count.load(Ordering::Relaxed))
+            .field(
+                "continuation_count",
+                &self.continuation_count.load(Ordering::Relaxed),
+            )
             .field("max_continuations", &self.max_continuations)
             .finish()
     }

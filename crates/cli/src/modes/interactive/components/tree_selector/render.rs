@@ -3,12 +3,13 @@ use std::collections::HashSet;
 
 use crate::core::tools::render_utils::ToolTheme;
 
-use super::{FlatTreeDisplayNode, TreeNodeInfo, ToolCallInfo, TreeFilterMode};
+use super::{FlatTreeDisplayNode, ToolCallInfo, TreeFilterMode, TreeNodeInfo};
 
-pub fn get_entry_display_text(node: &TreeNodeInfo, tool_calls: &HashMap<String, ToolCallInfo>) -> String {
-    let normalize = |s: &str| -> String {
-        s.replace('\n', " ").trim().to_string()
-    };
+pub fn get_entry_display_text(
+    node: &TreeNodeInfo,
+    tool_calls: &HashMap<String, ToolCallInfo>,
+) -> String {
+    let normalize = |s: &str| -> String { s.replace('\n', " ").trim().to_string() };
 
     match node.entry_type.as_str() {
         "message" => {
@@ -16,7 +17,8 @@ pub fn get_entry_display_text(node: &TreeNodeInfo, tool_calls: &HashMap<String, 
             match role {
                 "user" => {
                     let content = node.content_text.as_deref().unwrap_or("");
-                    format!("{}{}",
+                    format!(
+                        "{}{}",
                         ToolTheme::fg("accent", "user: "),
                         normalize(content),
                     )
@@ -24,30 +26,39 @@ pub fn get_entry_display_text(node: &TreeNodeInfo, tool_calls: &HashMap<String, 
                 "assistant" => {
                     if let Some(ref text) = node.content_text {
                         if !text.trim().is_empty() {
-                            format!("{}{}",
+                            format!(
+                                "{}{}",
                                 ToolTheme::fg("success", "assistant: "),
                                 normalize(text),
                             )
                         } else if node.stop_reason.as_deref() == Some("aborted") {
-                            format!("{}{}",
+                            format!(
+                                "{}{}",
                                 ToolTheme::fg("success", "assistant: "),
                                 ToolTheme::fg("muted", "(aborted)"),
                             )
                         } else if let Some(ref err) = node.error_message {
                             let truncated = normalize(err);
-                            let truncated = if truncated.len() > 80 { format!("{}...", &truncated[..80]) } else { truncated };
-                            format!("{}{}",
+                            let truncated = if truncated.len() > 80 {
+                                format!("{}...", &truncated[..80])
+                            } else {
+                                truncated
+                            };
+                            format!(
+                                "{}{}",
                                 ToolTheme::fg("success", "assistant: "),
                                 ToolTheme::fg("error", &truncated),
                             )
                         } else {
-                            format!("{}{}",
+                            format!(
+                                "{}{}",
                                 ToolTheme::fg("success", "assistant: "),
                                 ToolTheme::fg("muted", "(no content)"),
                             )
                         }
                     } else {
-                        format!("{}{}",
+                        format!(
+                            "{}{}",
                             ToolTheme::fg("success", "assistant: "),
                             ToolTheme::fg("muted", "(no content)"),
                         )
@@ -58,10 +69,16 @@ pub fn get_entry_display_text(node: &TreeNodeInfo, tool_calls: &HashMap<String, 
                         if let Some(tc) = tool_calls.get(id) {
                             ToolTheme::fg("muted", &format_tool_call(&tc.name, &tc.args))
                         } else {
-                            ToolTheme::fg("muted", &format!("[{}]", node.tool_name.as_deref().unwrap_or("tool")))
+                            ToolTheme::fg(
+                                "muted",
+                                &format!("[{}]", node.tool_name.as_deref().unwrap_or("tool")),
+                            )
                         }
                     } else {
-                        ToolTheme::fg("muted", &format!("[{}]", node.tool_name.as_deref().unwrap_or("tool")))
+                        ToolTheme::fg(
+                            "muted",
+                            &format!("[{}]", node.tool_name.as_deref().unwrap_or("tool")),
+                        )
                     }
                 }
                 "bashExecution" => {
@@ -74,7 +91,8 @@ pub fn get_entry_display_text(node: &TreeNodeInfo, tool_calls: &HashMap<String, 
         "custom_message" => {
             let content = node.content_text.as_deref().unwrap_or("");
             let ct = node.custom_type.as_deref().unwrap_or("custom");
-            format!("{}{}",
+            format!(
+                "{}{}",
                 ToolTheme::fg("customMessageLabel", &format!("[{}]: ", ct)),
                 normalize(content),
             )
@@ -85,7 +103,8 @@ pub fn get_entry_display_text(node: &TreeNodeInfo, tool_calls: &HashMap<String, 
         }
         "branch_summary" => {
             let summary = node.summary.as_deref().unwrap_or("");
-            format!("{}{}",
+            format!(
+                "{}{}",
                 ToolTheme::fg("warning", "[branch summary]: "),
                 normalize(summary),
             )
@@ -108,13 +127,15 @@ pub fn get_entry_display_text(node: &TreeNodeInfo, tool_calls: &HashMap<String, 
         }
         "session_info" => {
             if let Some(ref name) = node.name {
-                format!("{}{}{}",
+                format!(
+                    "{}{}{}",
                     ToolTheme::fg("dim", "[title: "),
                     ToolTheme::fg("dim", name),
                     ToolTheme::fg("dim", "]"),
                 )
             } else {
-                format!("{}{}{}",
+                format!(
+                    "{}{}{}",
                     ToolTheme::fg("dim", "[title: "),
                     ToolTheme::fg("dim", "empty"),
                     ToolTheme::fg("dim", "]"),
@@ -207,7 +228,11 @@ pub fn render_tree_list(
                 String::new()
             };
 
-            let label = node.label.as_ref().map(|l| ToolTheme::fg("warning", &format!("[{}] ", l))).unwrap_or_default();
+            let label = node
+                .label
+                .as_ref()
+                .map(|l| ToolTheme::fg("warning", &format!("[{}] ", l)))
+                .unwrap_or_default();
             let label_ts = if show_label_timestamps && node.label.is_some() {
                 if let Some(ref ts) = node.label_timestamp {
                     format!("{} ", ToolTheme::fg("muted", &format_label_timestamp(ts)))
@@ -220,10 +245,12 @@ pub fn render_tree_list(
 
             let content = get_entry_display_text(node, tool_calls);
 
-            let mut line = format!("{}{}{}{}{}{}",
+            let mut line = format!(
+                "{}{}{}{}{}{}",
                 cursor,
                 ToolTheme::fg("dim", &prefix),
-                label, label_ts,
+                label,
+                label_ts,
                 path_marker,
                 content,
             );
@@ -242,12 +269,19 @@ pub fn render_tree_list(
     }
 
     let status = get_status_labels(filter_mode, show_label_timestamps);
-    lines.push(ToolTheme::fg("muted", &format!("  ({}/{}){}", selected_index + 1, total, status)));
+    lines.push(ToolTheme::fg(
+        "muted",
+        &format!("  ({}/{}){}", selected_index + 1, total, status),
+    ));
 
     lines
 }
 
-fn build_tree_prefix_flat(flat_node: &FlatTreeDisplayNode, is_folded: bool, display_indent: usize) -> String {
+fn build_tree_prefix_flat(
+    flat_node: &FlatTreeDisplayNode,
+    is_folded: bool,
+    display_indent: usize,
+) -> String {
     if display_indent == 0 {
         return String::new();
     }

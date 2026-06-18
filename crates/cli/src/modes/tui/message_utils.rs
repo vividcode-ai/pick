@@ -48,17 +48,15 @@ pub(crate) fn entries_to_messages(entries: &[SessionEntry]) -> Vec<Message> {
                             timestamp: entry.timestamp,
                         }))
                     }
-                    "tool_result" => {
-                        Some(Message::ToolResult(pick_ai::types::ToolResultMessage {
-                            role: pick_ai::types::ToolResultMessageRole::ToolResult,
-                            tool_call_id: String::new(),
-                            tool_name: String::new(),
-                            content,
-                            is_error: false,
-                            details: None,
-                            timestamp: entry.timestamp,
-                        }))
-                    }
+                    "tool_result" => Some(Message::ToolResult(pick_ai::types::ToolResultMessage {
+                        role: pick_ai::types::ToolResultMessageRole::ToolResult,
+                        tool_call_id: String::new(),
+                        tool_name: String::new(),
+                        content,
+                        is_error: false,
+                        details: None,
+                        timestamp: entry.timestamp,
+                    })),
                     _ => None,
                 }
             }
@@ -68,10 +66,7 @@ pub(crate) fn entries_to_messages(entries: &[SessionEntry]) -> Vec<Message> {
 }
 
 /// Extract text content from all_messages for export
-pub(crate) fn export_messages_to_jsonl(
-    messages: &[Message],
-    path: &Path,
-) -> Result<(), String> {
+pub(crate) fn export_messages_to_jsonl(messages: &[Message], path: &Path) -> Result<(), String> {
     use std::io::Write;
     let file = std::fs::File::create(path).map_err(|e| format!("Cannot create file: {}", e))?;
     let mut writer = std::io::BufWriter::new(file);

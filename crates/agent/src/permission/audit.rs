@@ -1,4 +1,4 @@
-﻿//! Permission audit trail — records all permission decisions for inspection.
+//! Permission audit trail — records all permission decisions for inspection.
 //!
 //! Each decision (allow/deny) is logged with the tool name, permission key,
 //! matched rule/pattern, source layer, and a human-readable reason.
@@ -147,7 +147,13 @@ impl AuditTrail {
     where
         F: Fn(&AuditEvent) -> bool,
     {
-        self.events.lock().unwrap().iter().filter(|e| filter(e)).cloned().collect()
+        self.events
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|e| filter(e))
+            .cloned()
+            .collect()
     }
 
     /// Return recent events (last N).

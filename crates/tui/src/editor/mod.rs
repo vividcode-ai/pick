@@ -1,4 +1,4 @@
-﻿//! Multi-line text editor with Emacs-style keybindings
+//! Multi-line text editor with Emacs-style keybindings
 
 use unicode_width::UnicodeWidthStr;
 
@@ -103,7 +103,6 @@ impl Editor {
 
     /// Insert a character at cursor position
     pub fn insert_char(&mut self, c: char) {
-        
         self.push_undo();
         self.buffer.insert(self.cursor, c);
         self.cursor += c.len_utf8();
@@ -182,9 +181,15 @@ impl Editor {
     pub fn insert_newline_auto_indent(&mut self) {
         self.push_undo();
         // Get current line's leading whitespace
-        let line_start = self.buffer[..self.cursor].rfind('\n').map(|i| i + 1).unwrap_or(0);
+        let line_start = self.buffer[..self.cursor]
+            .rfind('\n')
+            .map(|i| i + 1)
+            .unwrap_or(0);
         let line_prefix = &self.buffer[line_start..self.cursor];
-        let indent: String = line_prefix.chars().take_while(|c| *c == ' ' || *c == '\t').collect();
+        let indent: String = line_prefix
+            .chars()
+            .take_while(|c| *c == ' ' || *c == '\t')
+            .collect();
 
         self.buffer.insert(self.cursor, '\n');
         self.cursor += 1;
@@ -204,7 +209,10 @@ impl Editor {
             return;
         }
         let target_col = self.visual_col_at_line(row, col);
-        let prev_line_start = self.buffer[..self.cursor].rfind('\n').map(|i| i + 1).unwrap_or(0);
+        let prev_line_start = self.buffer[..self.cursor]
+            .rfind('\n')
+            .map(|i| i + 1)
+            .unwrap_or(0);
         if prev_line_start == 0 {
             self.cursor = 0;
             return;
@@ -213,7 +221,11 @@ impl Editor {
             .rfind('\n')
             .map(|i| i + 1)
             .unwrap_or(0);
-        self.cursor = self.offset_from_visual_col(prev_prev_line_start, prev_line_start.saturating_sub(1), target_col);
+        self.cursor = self.offset_from_visual_col(
+            prev_prev_line_start,
+            prev_line_start.saturating_sub(1),
+            target_col,
+        );
         self.mark = None;
         self.kill_accumulating = false;
     }
@@ -222,21 +234,31 @@ impl Editor {
     pub fn cursor_down(&mut self) {
         let (row, col) = self.cursor_row_col();
         let target_col = self.visual_col_at_line(row, col);
-        let next_line_start = self.cursor + self.buffer[self.cursor..].find('\n').map(|i| i + 1).unwrap_or(self.buffer.len() - self.cursor);
+        let next_line_start = self.cursor
+            + self.buffer[self.cursor..]
+                .find('\n')
+                .map(|i| i + 1)
+                .unwrap_or(self.buffer.len() - self.cursor);
         if next_line_start >= self.buffer.len() {
             self.cursor = self.buffer.len();
             return;
         }
         let next_next_line_start = next_line_start
-            + self.buffer[next_line_start..].find('\n').map(|i| i + 1).unwrap_or(self.buffer.len() - next_line_start);
-        self.cursor = self.offset_from_visual_col(next_line_start, next_next_line_start.saturating_sub(1), target_col);
+            + self.buffer[next_line_start..]
+                .find('\n')
+                .map(|i| i + 1)
+                .unwrap_or(self.buffer.len() - next_line_start);
+        self.cursor = self.offset_from_visual_col(
+            next_line_start,
+            next_next_line_start.saturating_sub(1),
+            target_col,
+        );
         self.mark = None;
         self.kill_accumulating = false;
     }
 
     /// Move cursor left by one character
     pub fn cursor_left(&mut self) {
-        
         if self.cursor > 0 {
             self.cursor = self.cursor.saturating_sub(1);
             while self.buffer.is_char_boundary(self.cursor) == false {
@@ -249,10 +271,11 @@ impl Editor {
 
     /// Move cursor right by one character
     pub fn cursor_right(&mut self) {
-        
         if self.cursor < self.buffer.len() {
             self.cursor += 1;
-            while self.cursor < self.buffer.len() && self.buffer.is_char_boundary(self.cursor) == false {
+            while self.cursor < self.buffer.len()
+                && self.buffer.is_char_boundary(self.cursor) == false
+            {
                 self.cursor += 1;
             }
         }
@@ -269,7 +292,11 @@ impl Editor {
         let mut pos = self.cursor;
         while pos > 0 {
             let prev = self.prev_char_boundary(pos);
-            if self.buffer[prev..pos].chars().next().map_or(false, |c| c.is_alphanumeric() || c == '_') {
+            if self.buffer[prev..pos]
+                .chars()
+                .next()
+                .map_or(false, |c| c.is_alphanumeric() || c == '_')
+            {
                 break;
             }
             pos = prev;
@@ -277,7 +304,11 @@ impl Editor {
         // Skip to start of word
         while pos > 0 {
             let prev = self.prev_char_boundary(pos);
-            if !self.buffer[prev..pos].chars().next().map_or(false, |c| c.is_alphanumeric() || c == '_') {
+            if !self.buffer[prev..pos]
+                .chars()
+                .next()
+                .map_or(false, |c| c.is_alphanumeric() || c == '_')
+            {
                 break;
             }
             pos = prev;
@@ -317,7 +348,10 @@ impl Editor {
 
     /// Move cursor to start of line
     pub fn cursor_line_start(&mut self) {
-        let line_start = self.buffer[..self.cursor].rfind('\n').map(|i| i + 1).unwrap_or(0);
+        let line_start = self.buffer[..self.cursor]
+            .rfind('\n')
+            .map(|i| i + 1)
+            .unwrap_or(0);
         self.cursor = line_start;
         self.mark = None;
         self.kill_accumulating = false;
@@ -325,7 +359,8 @@ impl Editor {
 
     /// Move cursor to end of line
     pub fn cursor_line_end(&mut self) {
-        let line_end = self.buffer[self.cursor..].find('\n')
+        let line_end = self.buffer[self.cursor..]
+            .find('\n')
             .map(|i| self.cursor + i)
             .unwrap_or(self.buffer.len());
         self.cursor = line_end;
@@ -449,7 +484,6 @@ impl Editor {
 
     /// Delete character before cursor (backspace)
     pub fn delete_before(&mut self) {
-        
         if self.cursor == 0 {
             return;
         }
@@ -491,7 +525,6 @@ impl Editor {
 
     /// Delete character after cursor (delete)
     pub fn delete_after(&mut self) {
-        
         if self.cursor >= self.buffer.len() {
             return;
         }
@@ -539,7 +572,10 @@ impl Editor {
 
     /// Delete from cursor to start of line
     pub fn delete_to_line_start(&mut self) {
-        let line_start = self.buffer[..self.cursor].rfind('\n').map(|i| i + 1).unwrap_or(0);
+        let line_start = self.buffer[..self.cursor]
+            .rfind('\n')
+            .map(|i| i + 1)
+            .unwrap_or(0);
         if line_start == self.cursor {
             return;
         }
@@ -554,7 +590,8 @@ impl Editor {
 
     /// Delete from cursor to end of line
     pub fn delete_to_line_end(&mut self) {
-        let line_end = self.buffer[self.cursor..].find('\n')
+        let line_end = self.buffer[self.cursor..]
+            .find('\n')
             .map(|i| self.cursor + i)
             .unwrap_or(self.buffer.len());
         if line_end == self.cursor {
@@ -570,8 +607,12 @@ impl Editor {
 
     /// Delete current line and add to kill ring
     pub fn delete_line(&mut self) {
-        let line_start = self.buffer[..self.cursor].rfind('\n').map(|i| i + 1).unwrap_or(0);
-        let line_end = self.buffer[self.cursor..].find('\n')
+        let line_start = self.buffer[..self.cursor]
+            .rfind('\n')
+            .map(|i| i + 1)
+            .unwrap_or(0);
+        let line_end = self.buffer[self.cursor..]
+            .find('\n')
             .map(|i| self.cursor + i + 1)
             .unwrap_or(self.buffer.len());
         if line_start == line_end {
@@ -757,7 +798,8 @@ impl Editor {
     pub fn autocomplete_next(&mut self) {
         if let Some(ref suggestions) = self.autocomplete_suggestions {
             if suggestions.items.len() > 1 {
-                self.autocomplete_selection = (self.autocomplete_selection + 1) % suggestions.items.len();
+                self.autocomplete_selection =
+                    (self.autocomplete_selection + 1) % suggestions.items.len();
             }
         }
     }
@@ -778,17 +820,19 @@ impl Editor {
     /// Apply the currently selected autocomplete completion.
     /// Returns true if a completion was applied.
     pub fn autocomplete_apply_completion(&mut self) -> bool {
-        let (suggestions, provider) = match (&self.autocomplete_suggestions, &self.autocomplete_provider) {
-            (Some(s), Some(p)) => (s, p),
-            _ => return false,
-        };
+        let (suggestions, provider) =
+            match (&self.autocomplete_suggestions, &self.autocomplete_provider) {
+                (Some(s), Some(p)) => (s, p),
+                _ => return false,
+            };
         if suggestions.items.is_empty() || self.autocomplete_selection >= suggestions.items.len() {
             return false;
         }
         let item = &suggestions.items[self.autocomplete_selection];
         let text_before = &self.buffer[..self.cursor];
         let text_after = &self.buffer[self.cursor..];
-        let (new_text, new_cursor) = provider.apply_completion(text_before, text_after, item, &suggestions.prefix);
+        let (new_text, new_cursor) =
+            provider.apply_completion(text_before, text_after, item, &suggestions.prefix);
         self.push_undo();
         self.buffer = new_text;
         self.cursor = new_cursor;
@@ -822,7 +866,10 @@ impl Editor {
 
     /// Dedent the current line (remove 4 spaces from start)
     pub fn dedent(&mut self) {
-        let line_start = self.buffer[..self.cursor].rfind('\n').map(|i| i + 1).unwrap_or(0);
+        let line_start = self.buffer[..self.cursor]
+            .rfind('\n')
+            .map(|i| i + 1)
+            .unwrap_or(0);
         let line_text = &self.buffer[line_start..];
         let spaces = line_text.chars().take_while(|c| *c == ' ').count();
         let remove = std::cmp::min(spaces, 4);
@@ -985,7 +1032,10 @@ impl Editor {
     /// Return (row, col) for current cursor, where row is 0-indexed line number
     /// and col is byte offset from start of that line
     pub fn cursor_row_col(&self) -> (usize, usize) {
-        let line_start = self.buffer[..self.cursor].rfind('\n').map(|i| i + 1).unwrap_or(0);
+        let line_start = self.buffer[..self.cursor]
+            .rfind('\n')
+            .map(|i| i + 1)
+            .unwrap_or(0);
         let row = self.buffer[..line_start].matches('\n').count();
         let col = self.cursor - line_start;
         (row, col)
@@ -1020,7 +1070,12 @@ impl Editor {
     }
 
     /// Compute byte offset from visual column position within a line
-    fn offset_from_visual_col(&self, line_start: usize, line_end: usize, target_visual_col: usize) -> usize {
+    fn offset_from_visual_col(
+        &self,
+        line_start: usize,
+        line_end: usize,
+        target_visual_col: usize,
+    ) -> usize {
         let mut visual = 0;
         let mut offset = line_start;
         for (i, c) in self.buffer[line_start..line_end].char_indices() {
@@ -1055,7 +1110,10 @@ impl Editor {
             if pos >= self.buffer.len() {
                 break;
             }
-            let nl = self.buffer[pos..].find('\n').map(|i| pos + i).unwrap_or(self.buffer.len());
+            let nl = self.buffer[pos..]
+                .find('\n')
+                .map(|i| pos + i)
+                .unwrap_or(self.buffer.len());
             let line = &self.buffer[pos..nl];
             if width > 0 {
                 let wrapped = wrap_by_display_width(line, width);
@@ -1178,7 +1236,10 @@ impl Editor {
         // Build visual lines from buffer
         let mut line_index = 0;
         let mut found_cursor = false;
-        let cursor_line_start = self.buffer[..self.cursor].rfind('\n').map(|i| i + 1).unwrap_or(0);
+        let cursor_line_start = self.buffer[..self.cursor]
+            .rfind('\n')
+            .map(|i| i + 1)
+            .unwrap_or(0);
         let cursor_col_in_line = self.buffer[cursor_line_start..self.cursor].width();
 
         // Helper to add a plain text line
@@ -1192,7 +1253,9 @@ impl Editor {
             if buf_pos >= self.buffer.len() {
                 // Add trailing empty line only if one doesn't already exist
                 if line_index >= visible_top && lines.len() < max_height {
-                    let last_empty = lines.last().map_or(true, |l| l.spans.is_empty() || l.spans.iter().all(|s| s.content.as_ref().is_empty()));
+                    let last_empty = lines.last().map_or(true, |l| {
+                        l.spans.is_empty() || l.spans.iter().all(|s| s.content.as_ref().is_empty())
+                    });
                     if !last_empty {
                         lines.push(Line::from(""));
                     }
@@ -1235,8 +1298,7 @@ impl Editor {
                 buf_pos += 1;
                 if buf_pos >= self.buffer.len() {
                     if line_index >= visible_top && lines.len() < max_height {
-                        let is_cursor_line =
-                            !found_cursor && self.cursor == buf_pos;
+                        let is_cursor_line = !found_cursor && self.cursor == buf_pos;
                         if is_cursor_line {
                             cursor_row = lines.len();
                             cursor_col = 0;
@@ -1262,8 +1324,14 @@ impl Editor {
         // Trim trailing empty lines
         if !self.buffer.ends_with('\n') {
             while lines.len() > 1 {
-                let is_empty = lines.last().map_or(true, |l| l.spans.is_empty() || l.spans.iter().all(|s| s.content.as_ref().is_empty()));
-                if is_empty { lines.pop(); } else { break; }
+                let is_empty = lines.last().map_or(true, |l| {
+                    l.spans.is_empty() || l.spans.iter().all(|s| s.content.as_ref().is_empty())
+                });
+                if is_empty {
+                    lines.pop();
+                } else {
+                    break;
+                }
             }
         }
 
@@ -1283,9 +1351,13 @@ impl Editor {
                 }
             } else {
                 if let Some(first) = lines.first_mut() {
-                    let old_content: String = first.spans.iter().map(|s| s.content.as_ref()).collect();
+                    let old_content: String =
+                        first.spans.iter().map(|s| s.content.as_ref()).collect();
                     *first = Line::from(vec![
-                        Span::styled(self.prompt.clone(), Style::default().add_modifier(Modifier::BOLD)),
+                        Span::styled(
+                            self.prompt.clone(),
+                            Style::default().add_modifier(Modifier::BOLD),
+                        ),
                         Span::raw(old_content),
                     ]);
                 }
@@ -1297,9 +1369,7 @@ impl Editor {
 
         // Apply dim + italic styling to paste placeholders
         if !self.pending_pastes.is_empty() {
-            let placeholder_style = Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::DIM);
+            let placeholder_style = Style::default().fg(Color::Cyan).add_modifier(Modifier::DIM);
             for line in &mut lines {
                 let mut new_spans = Vec::new();
                 for span in std::mem::take(&mut line.spans) {
@@ -1403,7 +1473,10 @@ impl Editor {
             }
             if result.len() < max_lines && !suggestions.items.is_empty() {
                 let current = self.autocomplete_selection + 1;
-                result.push(Line::from(Span::styled(format!("  ({}/{})", current, total_items), dim)));
+                result.push(Line::from(Span::styled(
+                    format!("  ({}/{})", current, total_items),
+                    dim,
+                )));
             }
         }
         result
@@ -1462,7 +1535,13 @@ mod tests {
         ed.cursor_line_start();
         let row = ed.cursor_row_col().0;
         assert_eq!(row, 1);
-        assert_eq!(ed.buffer[..ed.cursor].rfind('\n').map(|i| i + 1).unwrap_or(0), ed.cursor);
+        assert_eq!(
+            ed.buffer[..ed.cursor]
+                .rfind('\n')
+                .map(|i| i + 1)
+                .unwrap_or(0),
+            ed.cursor
+        );
     }
 
     #[test]
@@ -1565,9 +1644,16 @@ mod tests {
 
         let (lines, cursor_row, cursor_col) = ed.render(80, 5);
         assert!(!lines.is_empty(), "should produce at least one line");
-        assert_eq!(line_text(&lines[0]), "你好", "line content should be '你好'");
+        assert_eq!(
+            line_text(&lines[0]),
+            "你好",
+            "line content should be '你好'"
+        );
         assert_eq!(cursor_row, 0, "cursor row should be 0 for single line");
-        assert_eq!(cursor_col, 4, "cursor col should be 4 (2 CJK chars × 2 width), not 6 (byte offset)");
+        assert_eq!(
+            cursor_col, 4,
+            "cursor col should be 4 (2 CJK chars × 2 width), not 6 (byte offset)"
+        );
     }
 
     #[test]
@@ -1580,9 +1666,15 @@ mod tests {
         assert_eq!(ed.cursor, 4, "cursor should be after newline");
 
         let (lines, cursor_row, cursor_col) = ed.render(80, 10);
-        assert!(lines.len() >= 2, "should have at least 2 lines after newline");
+        assert!(
+            lines.len() >= 2,
+            "should have at least 2 lines after newline"
+        );
         assert_eq!(cursor_row, 1, "cursor should be on the second line");
-        assert_eq!(cursor_col, 0, "cursor should be at column 0 on the empty line");
+        assert_eq!(
+            cursor_col, 0,
+            "cursor should be at column 0 on the empty line"
+        );
     }
 
     #[test]
@@ -1621,26 +1713,58 @@ mod tests {
             },
         ];
         ed.set_autocomplete_provider(Box::new(
-            crate::autocomplete::CombinedAutocompleteProvider::new(commands, std::path::PathBuf::from("/tmp"))
+            crate::autocomplete::CombinedAutocompleteProvider::new(
+                commands,
+                std::path::PathBuf::from("/tmp"),
+            ),
         ));
 
         ed.insert_char('/');
-        assert!(ed.is_autocomplete_active(), "autocomplete should activate after typing /");
+        assert!(
+            ed.is_autocomplete_active(),
+            "autocomplete should activate after typing /"
+        );
 
         let (lines, _cursor_row, _cursor_col) = ed.render(80, 10);
-        assert_eq!(lines.len(), 1, "render() should only contain text line, got: {:?}", lines);
+        assert_eq!(
+            lines.len(),
+            1,
+            "render() should only contain text line, got: {:?}",
+            lines
+        );
         let text = line_text(&lines[0]);
         assert!(text.contains("/"), "first line should show the input text");
 
         let ac_lines = ed.render_autocomplete(80, 10);
-        assert!(ac_lines.len() >= 3, "should have 2 suggestions + counter, got {}: {:?}", ac_lines.len(), ac_lines);
+        assert!(
+            ac_lines.len() >= 3,
+            "should have 2 suggestions + counter, got {}: {:?}",
+            ac_lines.len(),
+            ac_lines
+        );
         let t0 = line_text(&ac_lines[0]);
-        assert!(t0.contains("→"), "first item should be selected with → marker, got: {:?}", t0);
-        assert!(t0.contains("settings"), "first line should show settings, got: {:?}", t0);
+        assert!(
+            t0.contains("→"),
+            "first item should be selected with → marker, got: {:?}",
+            t0
+        );
+        assert!(
+            t0.contains("settings"),
+            "first line should show settings, got: {:?}",
+            t0
+        );
         let t1 = line_text(&ac_lines[1]);
-        assert!(t1.contains("model"), "second line should show model, got: {:?}", t1);
+        assert!(
+            t1.contains("model"),
+            "second line should show model, got: {:?}",
+            t1
+        );
         let last = line_text(ac_lines.last().unwrap());
-        assert!(last.contains("(1/2)"), "counter should show (1/2), got: {:?}", last);
+        assert!(
+            last.contains("(1/2)"),
+            "counter should show (1/2), got: {:?}",
+            last
+        );
     }
 
     #[test]

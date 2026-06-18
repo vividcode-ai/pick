@@ -3,16 +3,20 @@ use std::sync::{Arc, Mutex, RwLock};
 use crate::args::Args;
 use crate::core::agent_mode::{AgentMode, PLAN_MODE_REMINDER};
 use crate::core::auth_storage::AuthStorage;
-use crate::core::compaction::compaction::{compact, prepare_compaction, should_compact, CompactionSettings};
+use crate::core::compaction::compaction::{
+    CompactionSettings, compact, prepare_compaction, should_compact,
+};
 use crate::core::resource_loader::{ResourceLoader, ResourceLoaderOptions};
 use crate::core::system_prompt::build_system_prompt_with_defaults_and_mode;
-use crate::core::tools::render_utils::{ToolRenderContext, ToolTheme};
 use crate::core::tools::render_tool_call;
+use crate::core::tools::render_utils::{ToolRenderContext, ToolTheme};
 use pick_agent::core::agent_loop::AgentLoopConfig;
 use pick_agent::core::events::AgentEvent;
 use pick_agent::core::state::{AgentTool, QuestionPrompt, ThinkingLevel};
 use pick_agent::extensions::runner::ExtensionRunner;
-use pick_agent::extensions::types::{ExtensionEvent, SessionBeforeCompactEvent, SessionCompactEvent};
+use pick_agent::extensions::types::{
+    ExtensionEvent, SessionBeforeCompactEvent, SessionCompactEvent,
+};
 use pick_agent::session::{CompactionEntry, SessionEntry, SessionEntryKind, SessionManager};
 use pick_ai::models::get_model;
 use pick_ai::types::{ContentBlock, Message, UserMessage};
@@ -42,7 +46,10 @@ pub async fn run_interactive_mode(
     let model = match model {
         Some(m) => m,
         None => {
-            eprintln!("Error: model '{}' not found for provider '{}'", model_id, provider);
+            eprintln!(
+                "Error: model '{}' not found for provider '{}'",
+                model_id, provider
+            );
             std::process::exit(1);
         }
     };
@@ -78,16 +85,28 @@ pub async fn run_interactive_mode(
     let cwd = std::env::current_dir().unwrap_or_default();
     let agent_dir = crate::config::get_agent_dir();
     let mut resource_loader = ResourceLoader::new(cwd.clone(), agent_dir);
-    resource_loader.reload_with_options(&args.extensions, &ResourceLoaderOptions {
-        no_skills: args.no_skills,
-        no_prompt_templates: args.no_prompt_templates,
-        no_themes: args.no_themes,
-        no_context_files: args.no_context_files,
-        prompt_template_paths: args.prompt_templates.iter().map(std::path::PathBuf::from).collect(),
-        theme_paths: args.themes.iter().map(std::path::PathBuf::from).collect(),
-    }).await;
+    resource_loader
+        .reload_with_options(
+            &args.extensions,
+            &ResourceLoaderOptions {
+                no_skills: args.no_skills,
+                no_prompt_templates: args.no_prompt_templates,
+                no_themes: args.no_themes,
+                no_context_files: args.no_context_files,
+                prompt_template_paths: args
+                    .prompt_templates
+                    .iter()
+                    .map(std::path::PathBuf::from)
+                    .collect(),
+                theme_paths: args.themes.iter().map(std::path::PathBuf::from).collect(),
+            },
+        )
+        .await;
 
-    let custom_prompt = args.system_prompt.as_deref().or_else(|| resource_loader.system_prompt());
+    let custom_prompt = args
+        .system_prompt
+        .as_deref()
+        .or_else(|| resource_loader.system_prompt());
     let loader_append = resource_loader.append_system_prompt().join("\n");
     let mut append_parts: Vec<String> = Vec::new();
     append_parts.extend(args.append_system_prompt.clone());
@@ -97,7 +116,12 @@ pub async fn run_interactive_mode(
     let append_text = if append_parts.is_empty() {
         format!("Provider: {}  Model: {}", provider, model_id)
     } else {
-        format!("{}\nProvider: {}  Model: {}", append_parts.join("\n"), provider, model_id)
+        format!(
+            "{}\nProvider: {}  Model: {}",
+            append_parts.join("\n"),
+            provider,
+            model_id
+        )
     };
     let mut system_prompt = build_system_prompt_with_defaults_and_mode(
         &tools,
@@ -203,11 +227,13 @@ pub async fn run_interactive_mode(
                         continue;
                     }
                     "/plan" | "/plan_enter" => {
-                        switch_agent_mode(&mut agent_mode, AgentMode::Plan, &mut session_manager).await;
+                        switch_agent_mode(&mut agent_mode, AgentMode::Plan, &mut session_manager)
+                            .await;
                         *mode_shared.lock().unwrap() = agent_mode;
                         tools = pick_agent::tools::filter_goal_tools(
                             pick_agent::permission::disabled::filter_tools(
-                                all_tools.read().unwrap().clone(), &[&agent_mode.ruleset()],
+                                all_tools.read().unwrap().clone(),
+                                &[&agent_mode.ruleset()],
                             ),
                             session_manager.goal_manager(),
                         );
@@ -225,11 +251,13 @@ pub async fn run_interactive_mode(
                     }
                     "/build" | "/plan_exit" => {
                         let was_plan = agent_mode == AgentMode::Plan;
-                        switch_agent_mode(&mut agent_mode, AgentMode::Build, &mut session_manager).await;
+                        switch_agent_mode(&mut agent_mode, AgentMode::Build, &mut session_manager)
+                            .await;
                         *mode_shared.lock().unwrap() = agent_mode;
                         tools = pick_agent::tools::filter_goal_tools(
                             pick_agent::permission::disabled::filter_tools(
-                                all_tools.read().unwrap().clone(), &[&agent_mode.ruleset()],
+                                all_tools.read().unwrap().clone(),
+                                &[&agent_mode.ruleset()],
                             ),
                             session_manager.goal_manager(),
                         );
@@ -252,7 +280,8 @@ pub async fn run_interactive_mode(
                     }
                     "/info" => {
                         let n = all_messages.len();
-                        let sid = session_manager.header()
+                        let sid = session_manager
+                            .header()
                             .map(|h| h.id.as_str())
                             .unwrap_or("(new)");
                         println!("Session ID: {}", sid);
@@ -268,11 +297,18 @@ pub async fn run_interactive_mode(
                         if args.is_empty() {
                             match goal_manager.get() {
                                 Some(goal) => {
-                                    let remaining = goal_manager.remaining_tokens()
+                                    let remaining = goal_manager
+                                        .remaining_tokens()
                                         .map(|r| format!(", remaining: {}", r))
                                         .unwrap_or_default();
-                                    println!("\x1b[1mGoal\x1b[0m  \x1b[36m{}\x1b[0m", goal.objective);
-                                    println!("  Status: {}  Tokens: {}{}", goal.status, goal.tokens_used, remaining);
+                                    println!(
+                                        "\x1b[1mGoal\x1b[0m  \x1b[36m{}\x1b[0m",
+                                        goal.objective
+                                    );
+                                    println!(
+                                        "  Status: {}  Tokens: {}{}",
+                                        goal.status, goal.tokens_used, remaining
+                                    );
                                 }
                                 None => {
                                     println!("Usage: \x1b[33m/goal <objective>\x1b[0m");
@@ -285,17 +321,25 @@ pub async fn run_interactive_mode(
                                     println!("\x1b[33mGoal cleared.\x1b[0m");
                                 }
                                 "pause" => match goal_manager.set_paused() {
-                                    Ok(g) => { session_manager.persist_goal().await.ok(); println!("\x1b[33mGoal paused.\x1b[0m  {}", g.objective); }
+                                    Ok(g) => {
+                                        session_manager.persist_goal().await.ok();
+                                        println!("\x1b[33mGoal paused.\x1b[0m  {}", g.objective);
+                                    }
                                     Err(e) => eprintln!("Error: {}", e),
                                 },
                                 "resume" => match goal_manager.set_active() {
-                                    Ok(g) => { session_manager.persist_goal().await.ok(); println!("\x1b[32mGoal resumed.\x1b[0m  {}", g.objective); }
+                                    Ok(g) => {
+                                        session_manager.persist_goal().await.ok();
+                                        println!("\x1b[32mGoal resumed.\x1b[0m  {}", g.objective);
+                                    }
                                     Err(e) => eprintln!("Error: {}", e),
                                 },
                                 _ => {
                                     if goal_manager.get().is_some() {
                                         println!("A goal already exists. Use /goal clear first.");
-                                    } else if let Err(e) = goal_manager.create(args.to_string(), None) {
+                                    } else if let Err(e) =
+                                        goal_manager.create(args.to_string(), None)
+                                    {
                                         eprintln!("Error: {}", e);
                                     } else {
                                         session_manager.persist_goal().await.ok();
@@ -311,7 +355,9 @@ pub async fn run_interactive_mode(
 
                 if input == "/session list" {
                     let dir = crate::core::session_manager::get_default_session_dir(
-                        &std::env::current_dir().unwrap_or_default().to_string_lossy(),
+                        &std::env::current_dir()
+                            .unwrap_or_default()
+                            .to_string_lossy(),
                         &crate::config::get_agent_dir().to_string_lossy(),
                     );
                     let sessions = crate::core::session_manager::list_sessions_from_dir(&dir).await;
@@ -321,7 +367,13 @@ pub async fn run_interactive_mode(
                         for (i, s) in sessions.iter().enumerate().take(10) {
                             let name = s.name.as_deref().unwrap_or("(unnamed)");
                             let modified = s.modified.format("%Y-%m-%d %H:%M");
-                            println!("  {}. {} [{} msgs] {}", i + 1, name, s.message_count, modified);
+                            println!(
+                                "  {}. {} [{} msgs] {}",
+                                i + 1,
+                                name,
+                                s.message_count,
+                                modified
+                            );
                         }
                     }
                     continue;
@@ -362,44 +414,67 @@ pub async fn run_interactive_mode(
                         }).collect();
 
                         if let Some(ref runner) = extension_runner {
-                            runner.emit(&ExtensionEvent::SessionBeforeCompact(SessionBeforeCompactEvent {
-                                preparation: serde_json::json!({}),
-                                branch_entries: path_entries.clone(),
-                                custom_instructions: custom_instructions.clone(),
-                            }));
+                            runner.emit(&ExtensionEvent::SessionBeforeCompact(
+                                SessionBeforeCompactEvent {
+                                    preparation: serde_json::json!({}),
+                                    branch_entries: path_entries.clone(),
+                                    custom_instructions: custom_instructions.clone(),
+                                },
+                            ));
                         }
 
                         let compact_settings = CompactionSettings::default();
                         match prepare_compaction(&path_entries, &compact_settings) {
                             Some(preparation) => {
-                                let api_key = auth.get_api_key(&provider, true).await.unwrap_or_default();
-                                match compact(&preparation, &model, &api_key, None, custom_instructions.as_deref(), None).await {
+                                let api_key =
+                                    auth.get_api_key(&provider, true).await.unwrap_or_default();
+                                match compact(
+                                    &preparation,
+                                    &model,
+                                    &api_key,
+                                    None,
+                                    custom_instructions.as_deref(),
+                                    None,
+                                )
+                                .await
+                                {
                                     Ok(result) => {
                                         let summary = result.summary;
-                                        all_messages = vec![Message::User(UserMessage::text(&format!(
-                                            "[Compacted conversation summary]\n\n{}", summary
-                                        )))];
-                                        println!("Compacted ({} msgs → 1, {} tokens before).", msg_count, result.tokens_before);
+                                        all_messages =
+                                            vec![Message::User(UserMessage::text(&format!(
+                                                "[Compacted conversation summary]\n\n{}",
+                                                summary
+                                            )))];
+                                        println!(
+                                            "Compacted ({} msgs → 1, {} tokens before).",
+                                            msg_count, result.tokens_before
+                                        );
                                         let compact_entry = SessionEntry {
                                             id: uuid::Uuid::now_v7().to_string(),
-        parent_id: None,
+                                            parent_id: None,
                                             timestamp: chrono::Utc::now().timestamp_millis(),
                                             kind: SessionEntryKind::Compaction(CompactionEntry {
                                                 summary: summary.clone(),
                                                 token_count: Some(result.tokens_before as u64),
                                             }),
                                         };
-                                        if let Err(e) = session_manager.append(compact_entry).await {
-                                            eprintln!("Warning: failed to persist compaction entry: {}", e);
+                                        if let Err(e) = session_manager.append(compact_entry).await
+                                        {
+                                            eprintln!(
+                                                "Warning: failed to persist compaction entry: {}",
+                                                e
+                                            );
                                         }
                                         if let Some(ref runner) = extension_runner {
-                                            runner.emit(&ExtensionEvent::SessionCompact(SessionCompactEvent {
-                                                compaction_entry: serde_json::json!({
-                                                    "summary": summary,
-                                                    "tokensBefore": result.tokens_before,
-                                                }),
-                                                from_extension: false,
-                                            }));
+                                            runner.emit(&ExtensionEvent::SessionCompact(
+                                                SessionCompactEvent {
+                                                    compaction_entry: serde_json::json!({
+                                                        "summary": summary,
+                                                        "tokensBefore": result.tokens_before,
+                                                    }),
+                                                    from_extension: false,
+                                                },
+                                            ));
                                         }
                                     }
                                     Err(e) => {
@@ -425,13 +500,18 @@ pub async fn run_interactive_mode(
                                 Ok(mut new_mgr) => {
                                     let fork_msgs: Vec<Message> = all_messages[..=idx].to_vec();
                                     for msg in &fork_msgs {
-                                        if let Err(e) = new_mgr.append(SessionEntry::from(msg)).await {
+                                        if let Err(e) =
+                                            new_mgr.append(SessionEntry::from(msg)).await
+                                        {
                                             eprintln!("Warning: fork persist failed: {}", e);
                                         }
                                     }
                                     all_messages = fork_msgs;
                                     session_manager = new_mgr;
-                                    println!("Forked new session with {} messages.", all_messages.len());
+                                    println!(
+                                        "Forked new session with {} messages.",
+                                        all_messages.len()
+                                    );
                                 }
                                 Err(e) => {
                                     println!("Fork failed: {}", e);
@@ -505,13 +585,18 @@ pub async fn run_interactive_mode(
                                     println!("{} connected MCP server(s):", info.len());
                                     for srv in &info {
                                         let names = srv.tool_names.join(", ");
-                                        println!("  {} [{}] — {} tool(s): {}", srv.name, srv.transport, srv.tool_count, names);
+                                        println!(
+                                            "  {} [{}] — {} tool(s): {}",
+                                            srv.name, srv.transport, srv.tool_count, names
+                                        );
                                     }
                                 }
                             }
                             "connect" => {
                                 if args.len() < 4 || args[2] != "--command" {
-                                    println!("Usage: /mcp connect <name> --command <cmd> [--args ...]");
+                                    println!(
+                                        "Usage: /mcp connect <name> --command <cmd> [--args ...]"
+                                    );
                                 } else {
                                     let server_name = args[1].to_string();
                                     let cmd = args[3].to_string();
@@ -559,7 +644,11 @@ pub async fn run_interactive_mode(
                                                     locked.retain(|t| t.name != *tool_name);
                                                 }
                                             }
-                                            println!("Disconnected MCP server '{}' ({} tool(s) removed)", name, removed_tools.len());
+                                            println!(
+                                                "Disconnected MCP server '{}' ({} tool(s) removed)",
+                                                name,
+                                                removed_tools.len()
+                                            );
                                         }
                                         Err(e) => {
                                             println!("Error: {}", e);
@@ -601,10 +690,21 @@ pub async fn run_interactive_mode(
                         println!("Skill commands are disabled. Enable them in settings.");
                         continue;
                     }
-                    let skill_name = input[7..].split_whitespace().next().unwrap_or("").to_string();
-                    match crate::utils::frontmatter::expand_skill_command(&input, resource_loader.skills()) {
+                    let skill_name = input[7..]
+                        .split_whitespace()
+                        .next()
+                        .unwrap_or("")
+                        .to_string();
+                    match crate::utils::frontmatter::expand_skill_command(
+                        &input,
+                        resource_loader.skills(),
+                    ) {
                         Some(expanded) => {
-                            if let Some(skill) = resource_loader.skills().iter().find(|s| s.name == skill_name) {
+                            if let Some(skill) = resource_loader
+                                .skills()
+                                .iter()
+                                .find(|s| s.name == skill_name)
+                            {
                                 println!("{}", crate::modes::interactive::components::skill_invocation_message::render_skill_invocation(
                                     &skill.name, Some(&skill.description)
                                 ));
@@ -612,7 +712,10 @@ pub async fn run_interactive_mode(
                             input = expanded;
                         }
                         None => {
-                            println!("Unknown skill: {}. Type /help to see available skills.", skill_name);
+                            println!(
+                                "Unknown skill: {}. Type /help to see available skills.",
+                                skill_name
+                            );
                             continue;
                         }
                     }
@@ -634,7 +737,8 @@ pub async fn run_interactive_mode(
 
                 tools = pick_agent::tools::filter_goal_tools(
                     pick_agent::permission::disabled::filter_tools(
-                        all_tools.read().unwrap().clone(), &[&agent_mode.ruleset()],
+                        all_tools.read().unwrap().clone(),
+                        &[&agent_mode.ruleset()],
                     ),
                     session_manager.goal_manager(),
                 );
@@ -662,9 +766,13 @@ pub async fn run_interactive_mode(
                     before_tool_call: Some(Arc::new({
                         let mode_rules = mode_rules_for_hook.clone();
                         move |tc: &pick_ai::types::ToolCall| -> Option<String> {
-                            let tool_args_str = if let Some(cmd) = tc.arguments.get("command").and_then(|c| c.as_str()) {
+                            let tool_args_str = if let Some(cmd) =
+                                tc.arguments.get("command").and_then(|c| c.as_str())
+                            {
                                 cmd.to_string()
-                            } else if let Some(path) = tc.arguments.get("path").and_then(|p| p.as_str()) {
+                            } else if let Some(path) =
+                                tc.arguments.get("path").and_then(|p| p.as_str())
+                            {
                                 path.to_string()
                             } else {
                                 tc.arguments.to_string()
@@ -694,7 +802,8 @@ pub async fn run_interactive_mode(
                             };
                             if let Some(goal) = goal_manager.get() {
                                 if goal.status == "active" {
-                                    let remaining = goal_manager.remaining_tokens()
+                                    let remaining = goal_manager
+                                        .remaining_tokens()
                                         .map(|r| format!("\nRemaining token budget: {}", r))
                                         .unwrap_or_default();
                                     msgs.push(Message::User(UserMessage::text(format!(
@@ -710,30 +819,42 @@ pub async fn run_interactive_mode(
                     provider_max_retries: None,
                     provider_max_retry_delay_ms: None,
                     approve: None,
-                    question: Some(std::sync::Arc::new(move |questions: Vec<QuestionPrompt>| {
-                        Box::pin(async move {
-                            let mut answers = Vec::new();
-                            for (i, q) in questions.iter().enumerate() {
-                                print!("\n\x1b[1m[{}/{}] {}\x1b[0m\n", i + 1, questions.len(), q.question);
-                                for (j, opt) in q.options.iter().enumerate() {
-                                    println!("  {}. {} — {}", j + 1, opt.label, opt.description);
-                                }
-                                print!("  > ");
-                                std::io::stdout().flush().ok();
-                                let mut input = String::new();
-                                std::io::stdin().read_line(&mut input).ok();
-                                let trimmed = input.trim().to_string();
-                                if let Ok(num) = trimmed.parse::<usize>() {
-                                    if num >= 1 && num <= q.options.len() {
-                                        answers.push(vec![q.options[num - 1].label.clone()]);
-                                        continue;
+                    question: Some(std::sync::Arc::new(
+                        move |questions: Vec<QuestionPrompt>| {
+                            Box::pin(async move {
+                                let mut answers = Vec::new();
+                                for (i, q) in questions.iter().enumerate() {
+                                    print!(
+                                        "\n\x1b[1m[{}/{}] {}\x1b[0m\n",
+                                        i + 1,
+                                        questions.len(),
+                                        q.question
+                                    );
+                                    for (j, opt) in q.options.iter().enumerate() {
+                                        println!(
+                                            "  {}. {} — {}",
+                                            j + 1,
+                                            opt.label,
+                                            opt.description
+                                        );
                                     }
+                                    print!("  > ");
+                                    std::io::stdout().flush().ok();
+                                    let mut input = String::new();
+                                    std::io::stdin().read_line(&mut input).ok();
+                                    let trimmed = input.trim().to_string();
+                                    if let Ok(num) = trimmed.parse::<usize>() {
+                                        if num >= 1 && num <= q.options.len() {
+                                            answers.push(vec![q.options[num - 1].label.clone()]);
+                                            continue;
+                                        }
+                                    }
+                                    answers.push(vec![trimmed]);
                                 }
-                                answers.push(vec![trimmed]);
-                            }
-                            Ok(answers)
-                        })
-                    })),
+                                Ok(answers)
+                            })
+                        },
+                    )),
                     agent_id: None,
                     agent_registry: Some(agent_registry.clone()),
                     on_turn_complete: None,
@@ -760,7 +881,11 @@ pub async fn run_interactive_mode(
                                     }
                                 }
                             }
-                            AgentEvent::ToolExecutionStart { ref tool_name, ref args, .. } => {
+                            AgentEvent::ToolExecutionStart {
+                                ref tool_name,
+                                ref args,
+                                ..
+                            } => {
                                 let render_ctx = ToolRenderContext {
                                     args: Some(args.clone()),
                                     cwd: String::new(),
@@ -768,22 +893,37 @@ pub async fn run_interactive_mode(
                                     show_images: false,
                                     is_error: false,
                                 };
-                                if let Some(output) = render_tool_call(tool_name, args, &render_ctx) {
+                                if let Some(output) = render_tool_call(tool_name, args, &render_ctx)
+                                {
                                     if !output.label.is_empty() {
                                         print!("\n{}", output.label);
                                     } else {
-                                        print!("\n{} {} ", ToolTheme::fg("toolTitle", tool_name), ToolTheme::fg("dim", "..."));
+                                        print!(
+                                            "\n{} {} ",
+                                            ToolTheme::fg("toolTitle", tool_name),
+                                            ToolTheme::fg("dim", "...")
+                                        );
                                     }
                                 } else {
-                                    print!("\n{} {} ", ToolTheme::fg("toolTitle", tool_name), ToolTheme::fg("dim", "..."));
+                                    print!(
+                                        "\n{} {} ",
+                                        ToolTheme::fg("toolTitle", tool_name),
+                                        ToolTheme::fg("dim", "...")
+                                    );
                                 }
                             }
-                            AgentEvent::ToolExecutionEnd { result, is_error, .. } => {
+                            AgentEvent::ToolExecutionEnd {
+                                result, is_error, ..
+                            } => {
                                 if is_error {
-                                    let error_text = result.get("error")
+                                    let error_text = result
+                                        .get("error")
                                         .and_then(|v| v.as_str())
                                         .unwrap_or("Unknown error");
-                                    print!(" {}", ToolTheme::fg("error", &format!("[Error: {}]", error_text)));
+                                    print!(
+                                        " {}",
+                                        ToolTheme::fg("error", &format!("[Error: {}]", error_text))
+                                    );
                                 } else if let Some(content) = result.get("content") {
                                     if let Some(texts) = content.as_array() {
                                         let mut has_output = false;
@@ -814,8 +954,13 @@ pub async fn run_interactive_mode(
                 };
 
                 match crate::core::agent_session::run_agent_loop_with_retry(
-                    config, all_messages.clone(), Default::default(), None,
-                ).await {
+                    config,
+                    all_messages.clone(),
+                    Default::default(),
+                    None,
+                )
+                .await
+                {
                     Ok(result) => {
                         for msg in &result.messages[prev_len..] {
                             if let Err(e) = session_manager.append(SessionEntry::from(msg)).await {
@@ -826,7 +971,9 @@ pub async fn run_interactive_mode(
                         let last_msg = result.messages.last();
                         let has_tool_calls = last_msg.map_or(false, |m| {
                             if let Message::Assistant(msg) = m {
-                                msg.content.iter().any(|c| matches!(c, ContentBlock::ToolCall(_)))
+                                msg.content
+                                    .iter()
+                                    .any(|c| matches!(c, ContentBlock::ToolCall(_)))
                             } else {
                                 false
                             }
@@ -850,7 +997,10 @@ pub async fn run_interactive_mode(
                             model.context_window as usize,
                             &compact_settings,
                         ) {
-                            println!("\x1b[2mAuto-compacting ({} tokens / {} window)...\x1b[0m", usage.total_tokens, model.context_window);
+                            println!(
+                                "\x1b[2mAuto-compacting ({} tokens / {} window)...\x1b[0m",
+                                usage.total_tokens, model.context_window
+                            );
                             let path_entries: Vec<serde_json::Value> = all_messages.iter().map(|msg| {
                                 let id = uuid::Uuid::now_v7().to_string();
                                 let message_val = match msg {
@@ -875,48 +1025,72 @@ pub async fn run_interactive_mode(
                             }).collect();
 
                             if let Some(ref runner) = extension_runner {
-                                runner.emit(&ExtensionEvent::SessionBeforeCompact(SessionBeforeCompactEvent {
-                                    preparation: serde_json::json!({}),
-                                    branch_entries: path_entries.clone(),
-                                    custom_instructions: None,
-                                }));
+                                runner.emit(&ExtensionEvent::SessionBeforeCompact(
+                                    SessionBeforeCompactEvent {
+                                        preparation: serde_json::json!({}),
+                                        branch_entries: path_entries.clone(),
+                                        custom_instructions: None,
+                                    },
+                                ));
                             }
 
-                            let api_key = auth.get_api_key(&provider, true).await.unwrap_or_default();
+                            let api_key =
+                                auth.get_api_key(&provider, true).await.unwrap_or_default();
                             match prepare_compaction(&path_entries, &compact_settings) {
                                 Some(preparation) => {
-                                    match compact(&preparation, &model, &api_key, None, None, None).await {
+                                    match compact(&preparation, &model, &api_key, None, None, None)
+                                        .await
+                                    {
                                         Ok(result) => {
                                             let summary = result.summary;
                                             let before = all_messages.len();
-                                            all_messages = vec![Message::User(UserMessage::text(&format!(
-                                                "[Compacted conversation summary]\n\n{}", summary
-                                            )))];
-                                            println!("\x1b[2mAuto-compacted ({} msgs → 1, {} tokens before).\x1b[0m", before, result.tokens_before);
+                                            all_messages =
+                                                vec![Message::User(UserMessage::text(&format!(
+                                                    "[Compacted conversation summary]\n\n{}",
+                                                    summary
+                                                )))];
+                                            println!(
+                                                "\x1b[2mAuto-compacted ({} msgs → 1, {} tokens before).\x1b[0m",
+                                                before, result.tokens_before
+                                            );
                                             let compact_entry = SessionEntry {
                                                 id: uuid::Uuid::now_v7().to_string(),
-        parent_id: None,
+                                                parent_id: None,
                                                 timestamp: chrono::Utc::now().timestamp_millis(),
-                                                kind: SessionEntryKind::Compaction(CompactionEntry {
-                                                    summary: summary.clone(),
-                                                    token_count: Some(result.tokens_before as u64),
-                                                }),
+                                                kind: SessionEntryKind::Compaction(
+                                                    CompactionEntry {
+                                                        summary: summary.clone(),
+                                                        token_count: Some(
+                                                            result.tokens_before as u64,
+                                                        ),
+                                                    },
+                                                ),
                                             };
-                                            if let Err(e) = session_manager.append(compact_entry).await {
-                                                eprintln!("Warning: failed to persist compaction entry: {}", e);
+                                            if let Err(e) =
+                                                session_manager.append(compact_entry).await
+                                            {
+                                                eprintln!(
+                                                    "Warning: failed to persist compaction entry: {}",
+                                                    e
+                                                );
                                             }
                                             if let Some(ref runner) = extension_runner {
-                                                runner.emit(&ExtensionEvent::SessionCompact(SessionCompactEvent {
-                                                    compaction_entry: serde_json::json!({
-                                                        "summary": summary,
-                                                        "tokensBefore": result.tokens_before,
-                                                    }),
-                                                    from_extension: false,
-                                                }));
+                                                runner.emit(&ExtensionEvent::SessionCompact(
+                                                    SessionCompactEvent {
+                                                        compaction_entry: serde_json::json!({
+                                                            "summary": summary,
+                                                            "tokensBefore": result.tokens_before,
+                                                        }),
+                                                        from_extension: false,
+                                                    },
+                                                ));
                                             }
                                         }
                                         Err(e) => {
-                                            eprintln!("\x1b[31mAuto-compaction failed: {}\x1b[0m", e.message);
+                                            eprintln!(
+                                                "\x1b[31mAuto-compaction failed: {}\x1b[0m",
+                                                e.message
+                                            );
                                         }
                                     }
                                 }
@@ -949,12 +1123,10 @@ async fn switch_agent_mode(
         id: uuid::Uuid::now_v7().to_string(),
         parent_id: None,
         timestamp: chrono::Utc::now().timestamp_millis(),
-        kind: SessionEntryKind::AgentModeChange(
-            pick_agent::session::AgentModeChangeEntry {
-                from: old.to_string(),
-                to: new_mode.to_string(),
-            }
-        ),
+        kind: SessionEntryKind::AgentModeChange(pick_agent::session::AgentModeChangeEntry {
+            from: old.to_string(),
+            to: new_mode.to_string(),
+        }),
     };
     if let Err(e) = session_manager.append(change_entry).await {
         eprintln!("Warning: failed to persist mode change: {}", e);
@@ -969,15 +1141,21 @@ async fn ensure_api_key(auth: &AuthStorage, provider: &str) -> Result<(), String
     }
 
     if let Some(key) = auth.get_api_key(provider, true).await {
-        unsafe { std::env::set_var(&env_var, key); }
+        unsafe {
+            std::env::set_var(&env_var, key);
+        }
         return Ok(());
     }
 
     eprint!("Enter API key for {}: ", provider);
     use std::io::Write;
-    std::io::stderr().flush().map_err(|_| "Failed to flush stderr".to_string())?;
+    std::io::stderr()
+        .flush()
+        .map_err(|_| "Failed to flush stderr".to_string())?;
     let mut key = String::new();
-    std::io::stdin().read_line(&mut key).map_err(|_| "Failed to read input".to_string())?;
+    std::io::stdin()
+        .read_line(&mut key)
+        .map_err(|_| "Failed to read input".to_string())?;
     let key = key.trim().to_string();
 
     if key.is_empty() {
@@ -986,7 +1164,9 @@ async fn ensure_api_key(auth: &AuthStorage, provider: &str) -> Result<(), String
             provider, env_var
         ))
     } else {
-        unsafe { std::env::set_var(&env_var, &key); }
+        unsafe {
+            std::env::set_var(&env_var, &key);
+        }
         Ok(())
     }
 }

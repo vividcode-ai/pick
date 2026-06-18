@@ -1,4 +1,4 @@
-﻿//! Version check utilities
+//! Version check utilities
 
 use super::user_agent::get_user_agent;
 
@@ -60,9 +60,7 @@ pub async fn get_latest_release(
     current_version: &str,
     timeout_ms: Option<u64>,
 ) -> Option<LatestRelease> {
-    if std::env::var("PICK_SKIP_VERSION_CHECK").is_ok()
-        || std::env::var("PICK_OFFLINE").is_ok()
-    {
+    if std::env::var("PICK_SKIP_VERSION_CHECK").is_ok() || std::env::var("PICK_OFFLINE").is_ok() {
         return None;
     }
 
@@ -108,19 +106,14 @@ pub async fn get_latest_release(
 }
 
 /// Get just the latest version string.
-pub async fn get_latest_version(
-    current_version: &str,
-    timeout_ms: Option<u64>,
-) -> Option<String> {
+pub async fn get_latest_version(current_version: &str, timeout_ms: Option<u64>) -> Option<String> {
     get_latest_release(current_version, timeout_ms)
         .await
         .map(|r| r.version)
 }
 
 /// Check if a newer version is available. Returns `None` on failure or if up-to-date.
-pub async fn check_for_new_version(
-    current_version: &str,
-) -> Option<LatestRelease> {
+pub async fn check_for_new_version(current_version: &str) -> Option<LatestRelease> {
     let latest = get_latest_release(current_version, None).await?;
     if is_newer_package_version(&latest.version, current_version) {
         Some(latest)

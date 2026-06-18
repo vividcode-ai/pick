@@ -1,4 +1,4 @@
-﻿//! Agent event types for UI updates
+//! Agent event types for UI updates
 
 use pick_ai::types::{Message, ToolResultMessage};
 
@@ -7,7 +7,9 @@ use pick_ai::types::{Message, ToolResultMessage};
 pub enum AgentEvent {
     // Agent lifecycle
     AgentStart,
-    AgentEnd { messages: Vec<Message> },
+    AgentEnd {
+        messages: Vec<Message>,
+    },
     // Turn lifecycle
     TurnStart,
     TurnEnd {
@@ -15,9 +17,16 @@ pub enum AgentEvent {
         tool_results: Vec<ToolResultMessage>,
     },
     // Message lifecycle
-    MessageStart { message: Message },
-    MessageUpdate { message: Message, assistant_message_event: Option<serde_json::Value> },
-    MessageEnd { message: Message },
+    MessageStart {
+        message: Message,
+    },
+    MessageUpdate {
+        message: Message,
+        assistant_message_event: Option<serde_json::Value>,
+    },
+    MessageEnd {
+        message: Message,
+    },
     // Tool execution lifecycle
     ToolExecutionStart {
         tool_call_id: String,
@@ -70,7 +79,10 @@ pub fn agent_event_to_json_value(event: &AgentEvent) -> serde_json::Value {
             "messages": messages,
         }),
         TurnStart => serde_json::json!({"type": "turn_start"}),
-        TurnEnd { message, tool_results } => serde_json::json!({
+        TurnEnd {
+            message,
+            tool_results,
+        } => serde_json::json!({
             "type": "turn_end",
             "message": message,
             "tool_results": tool_results,
@@ -79,7 +91,10 @@ pub fn agent_event_to_json_value(event: &AgentEvent) -> serde_json::Value {
             "type": "message_start",
             "message": message,
         }),
-        MessageUpdate { message, assistant_message_event } => serde_json::json!({
+        MessageUpdate {
+            message,
+            assistant_message_event,
+        } => serde_json::json!({
             "type": "message_update",
             "message": message,
             "assistant_message_event": assistant_message_event,
@@ -88,34 +103,57 @@ pub fn agent_event_to_json_value(event: &AgentEvent) -> serde_json::Value {
             "type": "message_end",
             "message": message,
         }),
-        ToolExecutionStart { tool_call_id, tool_name, args } => serde_json::json!({
+        ToolExecutionStart {
+            tool_call_id,
+            tool_name,
+            args,
+        } => serde_json::json!({
             "type": "tool_execution_start",
             "tool_call_id": tool_call_id,
             "tool_name": tool_name,
             "args": args,
         }),
-        ToolExecutionUpdate { tool_call_id, tool_name, args, partial_result } => serde_json::json!({
+        ToolExecutionUpdate {
+            tool_call_id,
+            tool_name,
+            args,
+            partial_result,
+        } => serde_json::json!({
             "type": "tool_execution_update",
             "tool_call_id": tool_call_id,
             "tool_name": tool_name,
             "args": args,
             "partial_result": partial_result,
         }),
-        ToolExecutionEnd { tool_call_id, tool_name, result, is_error } => serde_json::json!({
+        ToolExecutionEnd {
+            tool_call_id,
+            tool_name,
+            result,
+            is_error,
+        } => serde_json::json!({
             "type": "tool_execution_end",
             "tool_call_id": tool_call_id,
             "tool_name": tool_name,
             "result": result,
             "is_error": is_error,
         }),
-        AutoRetryStart { attempt, max_attempts, delay_ms, error_message } => serde_json::json!({
+        AutoRetryStart {
+            attempt,
+            max_attempts,
+            delay_ms,
+            error_message,
+        } => serde_json::json!({
             "type": "auto_retry_start",
             "attempt": attempt,
             "max_attempts": max_attempts,
             "delay_ms": delay_ms,
             "error_message": error_message,
         }),
-        AutoRetryEnd { success, attempt, final_error } => serde_json::json!({
+        AutoRetryEnd {
+            success,
+            attempt,
+            final_error,
+        } => serde_json::json!({
             "type": "auto_retry_end",
             "success": success,
             "attempt": attempt,

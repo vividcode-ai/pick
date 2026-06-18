@@ -1,4 +1,4 @@
-﻿//! CHANGELOG.md parser.
+//! CHANGELOG.md parser.
 
 use std::path::{Path, PathBuf};
 
@@ -157,9 +157,24 @@ mod tests {
 
     #[test]
     fn test_compare_versions() {
-        let v1 = ChangelogEntry { major: 1, minor: 0, patch: 0, content: String::new() };
-        let v2 = ChangelogEntry { major: 1, minor: 0, patch: 1, content: String::new() };
-        let v3 = ChangelogEntry { major: 2, minor: 0, patch: 0, content: String::new() };
+        let v1 = ChangelogEntry {
+            major: 1,
+            minor: 0,
+            patch: 0,
+            content: String::new(),
+        };
+        let v2 = ChangelogEntry {
+            major: 1,
+            minor: 0,
+            patch: 1,
+            content: String::new(),
+        };
+        let v3 = ChangelogEntry {
+            major: 2,
+            minor: 0,
+            patch: 0,
+            content: String::new(),
+        };
 
         assert_eq!(compare_versions(&v1, &v1), 0);
         assert_eq!(compare_versions(&v1, &v2), -1);
@@ -171,9 +186,24 @@ mod tests {
     #[test]
     fn test_get_new_entries() {
         let entries = vec![
-            ChangelogEntry { major: 1, minor: 0, patch: 0, content: "First".to_string() },
-            ChangelogEntry { major: 2, minor: 0, patch: 0, content: "Second".to_string() },
-            ChangelogEntry { major: 3, minor: 0, patch: 0, content: "Third".to_string() },
+            ChangelogEntry {
+                major: 1,
+                minor: 0,
+                patch: 0,
+                content: "First".to_string(),
+            },
+            ChangelogEntry {
+                major: 2,
+                minor: 0,
+                patch: 0,
+                content: "Second".to_string(),
+            },
+            ChangelogEntry {
+                major: 3,
+                minor: 0,
+                patch: 0,
+                content: "Third".to_string(),
+            },
         ];
 
         let new_entries = get_new_entries(&entries, "1.5.0");

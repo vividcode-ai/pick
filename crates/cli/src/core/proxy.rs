@@ -1,4 +1,4 @@
-﻿//! HTTP proxy configuration
+//! HTTP proxy configuration
 
 use std::env;
 
@@ -23,8 +23,12 @@ impl ProxyConfig {
     /// Create proxy configuration from environment variables
     pub fn from_env() -> Self {
         Self {
-            http_proxy: env::var("HTTP_PROXY").or_else(|_| env::var("http_proxy")).ok(),
-            https_proxy: env::var("HTTPS_PROXY").or_else(|_| env::var("https_proxy")).ok(),
+            http_proxy: env::var("HTTP_PROXY")
+                .or_else(|_| env::var("http_proxy"))
+                .ok(),
+            https_proxy: env::var("HTTPS_PROXY")
+                .or_else(|_| env::var("https_proxy"))
+                .ok(),
             no_proxy: env::var("NO_PROXY").or_else(|_| env::var("no_proxy")).ok(),
         }
     }
@@ -38,34 +42,32 @@ impl ProxyConfig {
         if no_proxy.trim() == "*" {
             return true;
         }
-        no_proxy.split(',')
-            .map(|s| s.trim())
-            .any(|pattern| {
-                if pattern.is_empty() {
-                    return false;
-                }
-                // Support host:port patterns
-                let (pattern_host, pattern_port) = match pattern.split_once(':') {
-                    Some((h, p)) => (h, p.parse::<u16>().ok()),
-                    None => (pattern, None),
-                };
+        no_proxy.split(',').map(|s| s.trim()).any(|pattern| {
+            if pattern.is_empty() {
+                return false;
+            }
+            // Support host:port patterns
+            let (pattern_host, pattern_port) = match pattern.split_once(':') {
+                Some((h, p)) => (h, p.parse::<u16>().ok()),
+                None => (pattern, None),
+            };
 
-                // Match hostname (with wildcard support)
-                let host_match = if pattern_host.starts_with('*') {
-                    host.ends_with(&pattern_host[1..])
-                } else if pattern_host.starts_with('.') {
-                    host.ends_with(pattern_host)
-                } else {
-                    host == pattern_host
-                };
+            // Match hostname (with wildcard support)
+            let host_match = if pattern_host.starts_with('*') {
+                host.ends_with(&pattern_host[1..])
+            } else if pattern_host.starts_with('.') {
+                host.ends_with(pattern_host)
+            } else {
+                host == pattern_host
+            };
 
-                if !host_match {
-                    return false;
-                }
+            if !host_match {
+                return false;
+            }
 
-                // If no port specified, match all ports for this host
-                pattern_port.is_none()
-            })
+            // If no port specified, match all ports for this host
+            pattern_port.is_none()
+        })
     }
 
     /// Get the proxy URL for a given protocol
@@ -98,7 +100,9 @@ impl ProxyConfig {
         }
 
         // Fall back to all_proxy env var
-        let all_proxy = env::var("ALL_PROXY").or_else(|_| env::var("all_proxy")).ok()?;
+        let all_proxy = env::var("ALL_PROXY")
+            .or_else(|_| env::var("all_proxy"))
+            .ok()?;
         if all_proxy.contains("://") {
             Some(all_proxy)
         } else {
@@ -130,13 +134,18 @@ fn parse_proxy_target_url(target_url: &str) -> Option<ParsedTargetUrl> {
     let protocol = url.scheme().to_string();
     let hostname = url.host_str()?.to_string();
     let port = url.port().unwrap_or_else(|| {
-        DEFAULT_PROXY_PORTS.iter()
+        DEFAULT_PROXY_PORTS
+            .iter()
             .find(|(p, _)| *p == protocol)
             .map(|(_, port)| *port)
             .unwrap_or(0)
     });
 
-    Some(ParsedTargetUrl { protocol, hostname, port })
+    Some(ParsedTargetUrl {
+        protocol,
+        hostname,
+        port,
+    })
 }
 
 fn should_proxy_hostname(hostname: &str, port: u16, no_proxy: &str) -> bool {
@@ -147,7 +156,8 @@ fn should_proxy_hostname(hostname: &str, port: u16, no_proxy: &str) -> bool {
         return false;
     }
 
-    no_proxy.split(|c| c == ',' || c == ' ')
+    no_proxy
+        .split(|c| c == ',' || c == ' ')
         .map(|s| s.trim())
         .filter(|s| !s.is_empty())
         .all(|proxy| {
@@ -183,8 +193,7 @@ pub fn resolve_http_proxy_url_for_target(target_url: &str) -> Option<String> {
 }
 
 /// Unsupported proxy protocol error message
-pub const UNSUPPORTED_PROXY_PROTOCOL_MESSAGE: &str =
-    "Unsupported proxy protocol. SOCKS and PAC proxy URLs are not supported; use an HTTP or HTTPS proxy URL.";
+pub const UNSUPPORTED_PROXY_PROTOCOL_MESSAGE: &str = "Unsupported proxy protocol. SOCKS and PAC proxy URLs are not supported; use an HTTP or HTTPS proxy URL.";
 
 #[cfg(test)]
 mod tests {

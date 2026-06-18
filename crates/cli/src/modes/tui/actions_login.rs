@@ -68,9 +68,7 @@ pub(crate) async fn handle_login_selection(ctx: &mut TuiContext, val: &str) {
             ctx.tui.finalize_turn();
         }
         _ => {
-            ctx.tui
-                .chat
-                .add_system_message("Unknown login method.");
+            ctx.tui.chat.add_system_message("Unknown login method.");
         }
     }
 }
@@ -80,12 +78,10 @@ pub(crate) async fn handle_oauth_login(ctx: &mut TuiContext, provider_id: &str) 
     let provider_id_display = provider_id.to_string();
     let auth_clone = Arc::clone(&ctx.auth);
 
-    ctx.tui
-        .chat
-        .add_system_message(&format!(
-            "Starting OAuth login for \x1b[1m{}\x1b[0m...",
-            provider_id_display
-        ));
+    ctx.tui.chat.add_system_message(&format!(
+        "Starting OAuth login for \x1b[1m{}\x1b[0m...",
+        provider_id_display
+    ));
 
     let (msg_tx, mut msg_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
     let (result_tx, mut result_rx) = oneshot::channel::<Result<(), String>>();
@@ -106,8 +102,10 @@ pub(crate) async fn handle_oauth_login(ctx: &mut TuiContext, provider_id: &str) 
 
         let callbacks = pick_ai::oauth::OAuthLoginCallbacks {
             on_auth_url: Box::new(move |url: &str| {
-                let _ = auth_url_tx
-                    .send(format!("Open this URL in your browser:\n\x1b[1m{}\x1b[0m", url));
+                let _ = auth_url_tx.send(format!(
+                    "Open this URL in your browser:\n\x1b[1m{}\x1b[0m",
+                    url
+                ));
             }),
             on_device_code: Box::new(move |code: &str, url: &str| {
                 let _ = device_code_tx.send(format!(
@@ -127,8 +125,8 @@ pub(crate) async fn handle_oauth_login(ctx: &mut TuiContext, provider_id: &str) 
                 let api_key = match provider.get_api_key(&credentials) {
                     Some(k) => k,
                     None => {
-                        let _ = result_tx
-                            .send(Err("No API key from OAuth credentials".to_string()));
+                        let _ =
+                            result_tx.send(Err("No API key from OAuth credentials".to_string()));
                         return;
                     }
                 };
@@ -167,7 +165,11 @@ pub(crate) async fn handle_oauth_login(ctx: &mut TuiContext, provider_id: &str) 
                 oauth_done = true;
             }
         }
-        if ctx.tui.render_with_terminal(&mut ctx.terminal_manager).is_err() {
+        if ctx
+            .tui
+            .render_with_terminal(&mut ctx.terminal_manager)
+            .is_err()
+        {
             oauth_done = true;
         }
     }
@@ -210,9 +212,10 @@ pub(crate) async fn handle_api_key_submit(ctx: &mut TuiContext, key: &str) {
             provider_id, ctx.model_id, ctx.provider
         ));
     } else {
-        ctx.tui
-            .chat
-            .add_system_message(&format!("Successfully saved API key for \x1b[1m{}\x1b[0m.", provider_id));
+        ctx.tui.chat.add_system_message(&format!(
+            "Successfully saved API key for \x1b[1m{}\x1b[0m.",
+            provider_id
+        ));
     }
 
     ctx.tui.state = pick_tui::app::AppState::Input;
@@ -226,8 +229,5 @@ pub(crate) fn handle_logout(ctx: &mut TuiContext, val: &str) {
     ctx.auth.remove(val);
     ctx.tui
         .chat
-        .add_system_message(&format!(
-            "Removed credentials for \x1b[1m{}\x1b[0m.",
-            val
-        ));
+        .add_system_message(&format!("Removed credentials for \x1b[1m{}\x1b[0m.", val));
 }

@@ -1,5 +1,4 @@
-﻿//! Scoped models selector for enabling/disabling models
-
+//! Scoped models selector for enabling/disabling models
 
 use crate::core::tools::render_utils::ToolTheme;
 
@@ -30,8 +29,14 @@ pub fn render_scoped_models_selector(
     lines.push(String::new());
 
     // Header
-    lines.push(ToolTheme::fg("accent", &format!("\x1b[1m{}\x1b[22m", "Model Configuration")));
-    lines.push(ToolTheme::fg("muted", "Session-only. Ctrl+S to save to settings."));
+    lines.push(ToolTheme::fg(
+        "accent",
+        &format!("\x1b[1m{}\x1b[22m", "Model Configuration"),
+    ));
+    lines.push(ToolTheme::fg(
+        "muted",
+        "Session-only. Ctrl+S to save to settings.",
+    ));
     lines.push(String::new());
 
     // Search input
@@ -82,19 +87,28 @@ pub fn render_scoped_models_selector(
                 ToolTheme::fg("dim", " ✗")
             };
 
-            lines.push(format!("{}{}{}{}", prefix, model_text, provider_badge, status));
+            lines.push(format!(
+                "{}{}{}{}",
+                prefix, model_text, provider_badge, status
+            ));
         }
     }
 
     if total > max_visible {
-        lines.push(ToolTheme::fg("muted", &format!("  ({}/{})", selected_index + 1, total)));
+        lines.push(ToolTheme::fg(
+            "muted",
+            &format!("  ({}/{})", selected_index + 1, total),
+        ));
     }
 
     // Model info
     if !items.is_empty() {
         if let Some(item) = items.get(selected_index) {
             lines.push(String::new());
-            lines.push(ToolTheme::fg("muted", &format!("  Model Name: {}", item.name)));
+            lines.push(ToolTheme::fg(
+                "muted",
+                &format!("  Model Name: {}", item.name),
+            ));
         }
     } else {
         lines.push(ToolTheme::fg("muted", "  No matching models"));
@@ -113,7 +127,11 @@ pub fn render_scoped_models_selector(
         count_text
     );
     if is_dirty {
-        lines.push(format!("{} {}", ToolTheme::fg("dim", &footer), ToolTheme::fg("warning", "(unsaved)")));
+        lines.push(format!(
+            "{} {}",
+            ToolTheme::fg("dim", &footer),
+            ToolTheme::fg("warning", "(unsaved)")
+        ));
     } else {
         lines.push(ToolTheme::fg("dim", &footer));
     }

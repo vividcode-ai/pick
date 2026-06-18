@@ -1,4 +1,4 @@
-﻿//! Audit mode — view permission audit trail from .pick/audit.jsonl
+//! Audit mode — view permission audit trail from .pick/audit.jsonl
 //!
 //! Usage: Pick audit [--recent N] [--tool NAME] [--decision TYPE] [--layer LAYER] [--json]
 
@@ -91,9 +91,7 @@ fn filter_events(events: &[AuditEvent], args: &Args) -> Vec<AuditEvent> {
 
     if let Some(ref layer) = args.audit_layer {
         let layer_lower = layer.to_lowercase();
-        filtered.retain(|e| {
-            format!("{}", e.layer) == layer_lower
-        });
+        filtered.retain(|e| format!("{}", e.layer) == layer_lower);
     }
 
     // Sort by timestamp descending (newest first)
@@ -123,10 +121,14 @@ fn display_paged(events: &[AuditEvent]) {
         print!("\x1B[2J\x1B[1;1H");
 
         // Header
-        println!(" {:<19} | {:<8} | {:<10} | {:<20} | {}", 
-            "Timestamp", "Tool", "Decision", "Layer", "Target");
-        println!(" {:-<19}-+-{:-<8}-+-{:-<10}-+-{:-<20}-+-{:-<60}", 
-            "", "", "", "", "");
+        println!(
+            " {:<19} | {:<8} | {:<10} | {:<20} | {}",
+            "Timestamp", "Tool", "Decision", "Layer", "Target"
+        );
+        println!(
+            " {:-<19}-+-{:-<8}-+-{:-<10}-+-{:-<20}-+-{:-<60}",
+            "", "", "", "", ""
+        );
         for e in page_events {
             let ts = format_timestamp(e.timestamp);
             let decision = match e.decision {
@@ -140,8 +142,10 @@ fn display_paged(events: &[AuditEvent]) {
             } else {
                 e.target.clone()
             };
-            println!(" {:<19} | {:<8} | {:<10} | {:<20} | {}",
-                ts, e.tool_name, decision, layer, target);
+            println!(
+                " {:<19} | {:<8} | {:<10} | {:<20} | {}",
+                ts, e.tool_name, decision, layer, target
+            );
         }
 
         if end >= total {
@@ -153,10 +157,14 @@ fn display_paged(events: &[AuditEvent]) {
         }
 
         println!();
-        println!(" Page {}/{} (showing {}-{}, {} total) — [Up] next  [Down] prev  [Esc/q] quit",
+        println!(
+            " Page {}/{} (showing {}-{}, {} total) — [Up] next  [Down] prev  [Esc/q] quit",
             (offset / page_size) + 1,
             (total + page_size - 1) / page_size,
-            offset + 1, end, total);
+            offset + 1,
+            end,
+            total
+        );
 
         // Read escape sequences (supports arrow keys which send 3-byte sequences)
         let mut buf = [0u8; 3];
@@ -167,26 +175,29 @@ fn display_paged(events: &[AuditEvent]) {
 
         if n >= 1 {
             match buf[0] {
-                b'q' | b'Q' => break,   // q to quit
-                0x1b => {                // ESC prefix
+                b'q' | b'Q' => break, // q to quit
+                0x1b => {
+                    // ESC prefix
                     if n >= 3 && buf[1] == 0x5b {
                         match buf[2] {
-                            0x41 => {    // Up arrow — next page
+                            0x41 => {
+                                // Up arrow — next page
                                 let next_offset = offset + page_size;
                                 if next_offset < total {
                                     offset = next_offset;
                                 }
                             }
-                            0x42 => {    // Down arrow — prev page
+                            0x42 => {
+                                // Down arrow — prev page
                                 offset = offset.saturating_sub(page_size);
                             }
                             _ => break,
                         }
                     } else {
-                        break;           // plain Esc — quit
+                        break; // plain Esc — quit
                     }
                 }
-                _ => break,              // any other key — quit
+                _ => break, // any other key — quit
             }
         }
     }

@@ -17,13 +17,11 @@ pub(crate) fn handle_model_command(ctx: &mut TuiContext, args: &[String]) {
             init::save_default_model(&ctx.provider, &ctx.model_id);
             ctx.tui.model_id = ctx.model_id.clone();
             ctx.tui.provider = ctx.provider.clone();
-            ctx.tui
-                .chat
-                .add_system_message(&format!(
-                    "Model set: \x1b[1m{}\x1b[0m (\x1b[2m{}\x1b[0m)",
-                    exact.id,
-                    exact.api.as_str()
-                ));
+            ctx.tui.chat.add_system_message(&format!(
+                "Model set: \x1b[1m{}\x1b[0m (\x1b[2m{}\x1b[0m)",
+                exact.id,
+                exact.api.as_str()
+            ));
         }
     }
 
@@ -32,8 +30,7 @@ pub(crate) fn handle_model_command(ctx: &mut TuiContext, args: &[String]) {
     let models = pick_ai::models::get_models(&ctx.provider);
     let items: Vec<SelectItem> = if models.is_empty() {
         vec![
-            SelectItem::new(ctx.model_id.clone(), ctx.model_id.clone())
-                .with_description("Current"),
+            SelectItem::new(ctx.model_id.clone(), ctx.model_id.clone()).with_description("Current"),
         ]
     } else {
         let filtered: Vec<_> = if search.is_empty() {
@@ -42,17 +39,13 @@ pub(crate) fn handle_model_command(ctx: &mut TuiContext, args: &[String]) {
             models
                 .iter()
                 .filter(|m| {
-                    m.id.to_lowercase().contains(&search)
-                        || m.name.to_lowercase().contains(&search)
+                    m.id.to_lowercase().contains(&search) || m.name.to_lowercase().contains(&search)
                 })
                 .collect()
         };
         filtered
             .iter()
-            .map(|m| {
-                SelectItem::new(m.id.clone(), m.id.clone())
-                    .with_description(m.name.clone())
-            })
+            .map(|m| SelectItem::new(m.id.clone(), m.id.clone()).with_description(m.name.clone()))
             .collect()
     };
     if items.is_empty() {
@@ -84,8 +77,11 @@ pub(crate) fn handle_scoped_models_command(ctx: &mut TuiContext) {
                 } else {
                     format!("[ ] {}", m.id)
                 };
-                SelectItem::new(label, m.id.clone())
-                    .with_description(if enabled { "enabled" } else { "disabled" })
+                SelectItem::new(label, m.id.clone()).with_description(if enabled {
+                    "enabled"
+                } else {
+                    "disabled"
+                })
             })
             .collect();
         let status = if ctx.scoped_models.is_empty() {
@@ -144,14 +140,10 @@ pub(crate) fn handle_settings_command(ctx: &mut TuiContext) {
             .with_description("Action on Esc twice with empty editor"),
         SelectItem::new("Tree filter mode", "tree-filter-mode")
             .with_description("Default filter when opening /tree"),
-        SelectItem::new("Warnings", "warnings")
-            .with_description("Configure individual warnings"),
-        SelectItem::new("Thinking level", "thinking")
-            .with_description("Change thinking level"),
-        SelectItem::new("Theme", "theme")
-            .with_description("Change color theme"),
-        SelectItem::new("Models", "models")
-            .with_description("Configure enabled models"),
+        SelectItem::new("Warnings", "warnings").with_description("Configure individual warnings"),
+        SelectItem::new("Thinking level", "thinking").with_description("Change thinking level"),
+        SelectItem::new("Theme", "theme").with_description("Change color theme"),
+        SelectItem::new("Models", "models").with_description("Configure enabled models"),
     ];
     let select = SelectList::new("Settings", items);
     ctx.tui.start_selection(select);
@@ -161,8 +153,7 @@ pub(crate) fn handle_settings_command(ctx: &mut TuiContext) {
 pub(crate) fn handle_login_command(ctx: &mut TuiContext) {
     ctx.pending_command = Some("login".to_string());
     let items = vec![
-        SelectItem::new("Use an API key", "apikey")
-            .with_description("Sign in using an API key"),
+        SelectItem::new("Use an API key", "apikey").with_description("Sign in using an API key"),
         SelectItem::new("Use a subscription", "subscription")
             .with_description("Sign in with a subscription"),
     ];
@@ -182,8 +173,7 @@ pub(crate) fn handle_logout_command(ctx: &mut TuiContext) {
         let items: Vec<SelectItem> = providers
             .iter()
             .map(|p| {
-                SelectItem::new(p.clone(), p.clone())
-                    .with_description("Remove stored credential")
+                SelectItem::new(p.clone(), p.clone()).with_description("Remove stored credential")
             })
             .collect();
         let select = SelectList::new("Select provider to log out from", items);

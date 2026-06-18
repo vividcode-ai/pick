@@ -1,5 +1,4 @@
-﻿//! Keybinding hint formatting utilities
-
+//! Keybinding hint formatting utilities
 
 use crate::core::tools::render_utils::ToolTheme;
 
@@ -35,7 +34,9 @@ pub fn format_key_text(key: &str) -> String {
                             } else {
                                 let mut chars = lower.chars();
                                 match chars.next() {
-                                    Some(c) => c.to_uppercase().collect::<String>() + chars.as_str(),
+                                    Some(c) => {
+                                        c.to_uppercase().collect::<String>() + chars.as_str()
+                                    }
                                     None => String::new(),
                                 }
                             }

@@ -1,4 +1,4 @@
-﻿//! Skills system - load, parse, and format skills for system prompts
+//! Skills system - load, parse, and format skills for system prompts
 
 use std::path::{Path, PathBuf};
 
@@ -52,7 +52,10 @@ pub fn validate_name(name: &str) -> Result<(), String> {
     if name.is_empty() {
         return Err("Skill name cannot be empty".to_string());
     }
-    if !name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-') {
+    if !name
+        .chars()
+        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+    {
         return Err("Skill name must be lowercase alphanumeric with hyphens only".to_string());
     }
     if name.starts_with('-') || name.ends_with('-') {
@@ -194,11 +197,7 @@ pub fn discover_skills_in_dir(dir: &Path, source: SkillSource) -> Vec<Skill> {
 }
 
 /// Load skills from multiple sources
-pub fn load_skills(
-    agent_dir: &Path,
-    cwd: &Path,
-    extra_paths: &[PathBuf],
-) -> LoadSkillsResult {
+pub fn load_skills(agent_dir: &Path, cwd: &Path, extra_paths: &[PathBuf]) -> LoadSkillsResult {
     let mut skills: Vec<Skill> = Vec::new();
     let mut diagnostics = Vec::new();
     let mut seen_names = std::collections::HashSet::new();
@@ -268,12 +267,16 @@ pub fn load_skills(
         }
     }
 
-    LoadSkillsResult { skills, diagnostics }
+    LoadSkillsResult {
+        skills,
+        diagnostics,
+    }
 }
 
 /// Format skills as XML for the system prompt
 pub fn format_skills_for_prompt(skills: &[Skill]) -> String {
-    let available: Vec<&Skill> = skills.iter()
+    let available: Vec<&Skill> = skills
+        .iter()
         .filter(|s| !s.disable_model_invocation)
         .collect();
 
@@ -288,8 +291,7 @@ pub fn format_skills_for_prompt(skills: &[Skill]) -> String {
 <description>{}</description>
 </skill>
 "#,
-            skill.name,
-            skill.description
+            skill.name, skill.description
         ));
     }
     result.push_str("</available_skills>");

@@ -1,4 +1,4 @@
-﻿//! Code syntax highlighting via syntect.
+//! Code syntax highlighting via syntect.
 
 use std::sync::OnceLock;
 use std::sync::RwLock;
@@ -8,11 +8,11 @@ use ratatui::style::Modifier;
 use ratatui::style::Style;
 use ratatui::text::Line;
 use ratatui::text::Span;
+use syntect::easy::HighlightLines;
 use syntect::highlighting::FontStyle;
 use syntect::highlighting::Theme;
 use syntect::highlighting::ThemeSet;
 use syntect::parsing::SyntaxSet;
-use syntect::easy::HighlightLines;
 
 // Guardrails
 const MAX_HIGHLIGHT_BYTES: usize = 512 * 1024;
@@ -132,5 +132,7 @@ pub fn highlight_code_to_lines(code: &str, lang: &str) -> Vec<Line<'static>> {
 }
 
 fn fallback_plain(code: &str) -> Vec<Line<'static>> {
-    code.lines().map(|l| Line::from(Span::raw(l.to_string()))).collect()
+    code.lines()
+        .map(|l| Line::from(Span::raw(l.to_string())))
+        .collect()
 }

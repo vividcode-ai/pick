@@ -1,7 +1,7 @@
-use pick_agent::session::{CompactionEntry, SessionEntry, SessionEntryKind};
 use pick_agent::extensions::types::{
     ExtensionEvent, SessionBeforeCompactEvent, SessionCompactEvent,
 };
+use pick_agent::session::{CompactionEntry, SessionEntry, SessionEntryKind};
 use pick_ai::types::{ContentBlock, Message, UserMessage};
 use pick_tui::app::TreeViewItem;
 use pick_tui::components::select::{SelectItem, SelectList};
@@ -55,8 +55,7 @@ pub(crate) fn handle_fork_selector(ctx: &mut TuiContext) {
                 } else {
                     text.clone()
                 };
-                SelectItem::new(display, i.to_string())
-                    .with_description("Fork from this message")
+                SelectItem::new(display, i.to_string()).with_description("Fork from this message")
             })
             .collect();
         let select = SelectList::new("Select message to fork from", items);
@@ -76,7 +75,10 @@ pub(crate) fn handle_tree_command(ctx: &mut TuiContext, args: &[String]) {
         return;
     }
 
-    let filter_arg = args.first().cloned().unwrap_or_else(|| "default".to_string());
+    let filter_arg = args
+        .first()
+        .cloned()
+        .unwrap_or_else(|| "default".to_string());
     let active_path: Vec<String> = ctx
         .session_manager
         .compute_active_path()
@@ -110,9 +112,7 @@ pub(crate) fn handle_tree_command(ctx: &mut TuiContext, args: &[String]) {
     }
 
     if items.is_empty() {
-        ctx.tui
-            .chat
-            .add_system_message("No entries to display.");
+        ctx.tui.chat.add_system_message("No entries to display.");
         ctx.tui.finalize_turn();
         return;
     }
@@ -122,7 +122,9 @@ pub(crate) fn handle_tree_command(ctx: &mut TuiContext, args: &[String]) {
     match filter_arg.as_str() {
         "no-tools" | "notools" => tree_view.set_filter_mode(pick_tui::app::TreeFilterMode::NoTools),
         "user-only" | "user" => tree_view.set_filter_mode(pick_tui::app::TreeFilterMode::UserOnly),
-        "labeled-only" | "labeled" => tree_view.set_filter_mode(pick_tui::app::TreeFilterMode::LabeledOnly),
+        "labeled-only" | "labeled" => {
+            tree_view.set_filter_mode(pick_tui::app::TreeFilterMode::LabeledOnly)
+        }
         "all" => tree_view.set_filter_mode(pick_tui::app::TreeFilterMode::All),
         _ => {}
     }
@@ -174,16 +176,13 @@ pub(crate) fn handle_resume_selector(ctx: &mut TuiContext) {
     }
 
     if session_files.is_empty() {
-        ctx.tui
-            .chat
-            .add_system_message("No saved sessions found.");
+        ctx.tui.chat.add_system_message("No saved sessions found.");
     } else {
         ctx.pending_command = Some("resume".to_string());
         let items: Vec<SelectItem> = session_files
             .iter()
             .map(|(name, _)| {
-                SelectItem::new(name.clone(), name.clone())
-                    .with_description("Resume this session")
+                SelectItem::new(name.clone(), name.clone()).with_description("Resume this session")
             })
             .collect();
         let select = SelectList::new("Select session to resume", items);
@@ -209,9 +208,10 @@ pub(crate) async fn handle_compact(ctx: &mut TuiContext, args: &[String]) {
         Some(args.join(" "))
     };
 
-    ctx.tui
-        .chat
-        .add_system_message(&format!("Compacting \x1b[1m{}\x1b[0m messages...", msg_count));
+    ctx.tui.chat.add_system_message(&format!(
+        "Compacting \x1b[1m{}\x1b[0m messages...",
+        msg_count
+    ));
     let _ = ctx.tui.render_with_terminal(&mut ctx.terminal_manager);
 
     let path_entries: Vec<serde_json::Value> = ctx
@@ -245,9 +245,7 @@ pub(crate) async fn handle_compact(ctx: &mut TuiContext, args: &[String]) {
         })
         .collect();
 
-    use crate::core::compaction::compaction::{
-        CompactionSettings, compact, prepare_compaction,
-    };
+    use crate::core::compaction::compaction::{CompactionSettings, compact, prepare_compaction};
     let compact_settings = CompactionSettings::default();
 
     if let Some(ref runner) = ctx.extension_runner {
@@ -260,7 +258,11 @@ pub(crate) async fn handle_compact(ctx: &mut TuiContext, args: &[String]) {
         ));
     }
 
-    let api_key = ctx.auth.get_api_key(&ctx.provider, true).await.unwrap_or_default();
+    let api_key = ctx
+        .auth
+        .get_api_key(&ctx.provider, true)
+        .await
+        .unwrap_or_default();
 
     match prepare_compaction(&path_entries, &compact_settings) {
         Some(preparation) => {
@@ -325,7 +327,14 @@ pub(crate) async fn handle_compact(ctx: &mut TuiContext, args: &[String]) {
                 .map(|m| serde_json::to_value(m).unwrap_or_default())
                 .collect();
             match generate_summary(
-                &message_values, &ctx.model, 16384, &api_key, None, None, None, None,
+                &message_values,
+                &ctx.model,
+                16384,
+                &api_key,
+                None,
+                None,
+                None,
+                None,
             )
             .await
             {
@@ -426,9 +435,10 @@ pub(crate) async fn handle_reload(ctx: &mut TuiContext) {
         ctx.tui.thinking_level = new_think_level.clone();
     }
     if let Some(new_theme) = &settings.theme {
-        ctx.tui
-            .chat
-            .add_system_message(&format!("Theme changed to \x1b[1m{}\x1b[0m (requires restart).", new_theme));
+        ctx.tui.chat.add_system_message(&format!(
+            "Theme changed to \x1b[1m{}\x1b[0m (requires restart).",
+            new_theme
+        ));
     }
     if let Some(auto_compact) = settings.compaction.as_ref().and_then(|c| c.enabled) {
         ctx.tui.auto_compact = auto_compact;
@@ -449,9 +459,10 @@ pub(crate) async fn handle_reload(ctx: &mut TuiContext) {
         .chat
         .add_system_message("Reloaded keybindings, extensions, skills, prompts, and themes.");
     if !context_files.is_empty() {
-        ctx.tui
-            .chat
-            .add_system_message(&format!("Context files: \x1b[2m{}\x1b[0m", context_files.join(", ")));
+        ctx.tui.chat.add_system_message(&format!(
+            "Context files: \x1b[2m{}\x1b[0m",
+            context_files.join(", ")
+        ));
     }
     if !skills.is_empty() {
         ctx.tui
@@ -464,5 +475,3 @@ pub(crate) async fn handle_reload(ctx: &mut TuiContext) {
         ctx.provider, ctx.model_id, think_display
     ));
 }
-
-

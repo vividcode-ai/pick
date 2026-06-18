@@ -35,6 +35,9 @@ pub trait OAuthProvider: Send + Sync {
     fn id(&self) -> &str;
     fn name(&self) -> &str;
     async fn login(&self, callbacks: &OAuthLoginCallbacks) -> Result<OAuthCredentials, String>;
-    async fn refresh_token(&self, credentials: &OAuthCredentials) -> Result<OAuthCredentials, String>;
+    async fn refresh_token(
+        &self,
+        credentials: &OAuthCredentials,
+    ) -> Result<OAuthCredentials, String>;
     fn get_api_key(&self, credentials: &OAuthCredentials) -> Option<String>;
 }

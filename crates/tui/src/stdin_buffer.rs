@@ -1,4 +1,4 @@
-﻿//! Stdin buffering for terminal input
+//! Stdin buffering for terminal input
 
 /// Status of an escape sequence
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -84,15 +84,15 @@ fn is_complete_csi(data: &str) -> SequenceStatus {
     if (0x40..=0x7e).contains(&last_code) {
         // Special: SGR mouse ESC[<B;X;Ym
         if payload.starts_with('<') {
-            let mouse_match =
-                regex::Regex::new(r"^<\d+;\d+;\d+[Mm]$").unwrap().is_match(payload);
+            let mouse_match = regex::Regex::new(r"^<\d+;\d+;\d+[Mm]$")
+                .unwrap()
+                .is_match(payload);
             if mouse_match {
                 return SequenceStatus::Complete;
             }
             if last == 'M' || last == 'm' {
                 let parts: Vec<&str> = payload[1..payload.len() - 1].split(';').collect();
-                if parts.len() == 3 && parts.iter().all(|p| p.chars().all(|c| c.is_ascii_digit()))
-                {
+                if parts.len() == 3 && parts.iter().all(|p| p.chars().all(|c| c.is_ascii_digit())) {
                     return SequenceStatus::Complete;
                 }
             }
@@ -221,7 +221,8 @@ impl StdinBuffer {
 
             if let Some(end_idx) = self.paste_buffer.find(BRACKETED_PASTE_END) {
                 let pasted = self.paste_buffer[..end_idx].to_string();
-                let remaining = self.paste_buffer[end_idx + BRACKETED_PASTE_END.len()..].to_string();
+                let remaining =
+                    self.paste_buffer[end_idx + BRACKETED_PASTE_END.len()..].to_string();
 
                 self.paste_mode = false;
                 self.paste_buffer.clear();
@@ -255,7 +256,8 @@ impl StdinBuffer {
 
             if let Some(end_idx) = self.paste_buffer.find(BRACKETED_PASTE_END) {
                 let pasted = self.paste_buffer[..end_idx].to_string();
-                let remaining = self.paste_buffer[end_idx + BRACKETED_PASTE_END.len()..].to_string();
+                let remaining =
+                    self.paste_buffer[end_idx + BRACKETED_PASTE_END.len()..].to_string();
 
                 self.paste_mode = false;
                 self.paste_buffer.clear();
@@ -317,5 +319,9 @@ fn parse_kitty_printable_codepoint(sequence: &str) -> Option<u32> {
     let re = regex::Regex::new(r"^\x1b\[(\d+)(?::\d*)?(?::\d+)?u$").ok()?;
     let caps = re.captures(sequence)?;
     let codepoint: u32 = caps.get(1)?.as_str().parse().ok()?;
-    if codepoint >= 32 { Some(codepoint) } else { None }
+    if codepoint >= 32 {
+        Some(codepoint)
+    } else {
+        None
+    }
 }

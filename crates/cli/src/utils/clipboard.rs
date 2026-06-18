@@ -1,4 +1,4 @@
-﻿//! Clipboard utilities
+//! Clipboard utilities
 
 /// Read text from clipboard
 pub fn read_clipboard_text() -> Option<String> {
@@ -8,8 +8,11 @@ pub fn read_clipboard_text() -> Option<String> {
 
 /// Write text to clipboard
 pub fn write_clipboard_text(text: &str) -> Result<(), String> {
-    let mut clipboard = arboard::Clipboard::new().map_err(|e| format!("Failed to open clipboard: {}", e))?;
-    clipboard.set_text(text).map_err(|e| format!("Failed to set clipboard text: {}", e))
+    let mut clipboard =
+        arboard::Clipboard::new().map_err(|e| format!("Failed to open clipboard: {}", e))?;
+    clipboard
+        .set_text(text)
+        .map_err(|e| format!("Failed to set clipboard text: {}", e))
 }
 
 /// Read image from clipboard (returns PNG bytes)
@@ -29,18 +32,21 @@ pub fn read_clipboard_image() -> Option<Vec<u8>> {
 
 /// Write image to clipboard from PNG bytes
 pub fn write_clipboard_image(png_bytes: &[u8]) -> Result<(), String> {
-    let img = image::load_from_memory(png_bytes)
-        .map_err(|e| format!("Failed to decode image: {}", e))?;
+    let img =
+        image::load_from_memory(png_bytes).map_err(|e| format!("Failed to decode image: {}", e))?;
     let rgba = img.to_rgba8();
     let (width, height) = rgba.dimensions();
 
-    let mut clipboard = arboard::Clipboard::new().map_err(|e| format!("Failed to open clipboard: {}", e))?;
+    let mut clipboard =
+        arboard::Clipboard::new().map_err(|e| format!("Failed to open clipboard: {}", e))?;
     let image_data = arboard::ImageData {
         width: width as usize,
         height: height as usize,
         bytes: std::borrow::Cow::Owned(rgba.into_raw()),
     };
-    clipboard.set_image(image_data).map_err(|e| format!("Failed to set clipboard image: {}", e))
+    clipboard
+        .set_image(image_data)
+        .map_err(|e| format!("Failed to set clipboard image: {}", e))
 }
 
 /// Check if the current session is a Wayland session (Linux only)

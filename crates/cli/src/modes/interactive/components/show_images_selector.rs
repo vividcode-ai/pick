@@ -1,5 +1,4 @@
-﻿//! Show images selector component
-
+//! Show images selector component
 
 use crate::core::tools::render_utils::ToolTheme;
 
@@ -13,7 +12,10 @@ pub fn render_show_images_selector(
     let border = "─".repeat(std::cmp::max(1, width));
 
     let options = ["yes", "no"];
-    let descriptions = ["Show images inline in terminal", "Show text placeholder instead"];
+    let descriptions = [
+        "Show images inline in terminal",
+        "Show text placeholder instead",
+    ];
 
     lines.push(ToolTheme::fg("accent", &border));
     lines.push(String::new());

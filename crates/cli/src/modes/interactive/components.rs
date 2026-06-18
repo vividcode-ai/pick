@@ -1,5 +1,4 @@
-﻿//! Interactive mode UI components
-
+//! Interactive mode UI components
 
 pub mod armin;
 pub mod assistant_message;

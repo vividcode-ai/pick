@@ -1,4 +1,4 @@
-﻿use std::collections::HashMap;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -72,17 +72,10 @@ pub trait Sandbox: Send + Sync {
     }
     /// Transform the command: return (program, args) wrapped in sandbox.
     /// For platforms where sandbox wraps via argv (Linux bwrap, macOS seatbelt).
-    fn transform(
-        &self,
-        req: &SandboxRequest,
-    ) -> Result<(String, Vec<String>), String>;
+    fn transform(&self, req: &SandboxRequest) -> Result<(String, Vec<String>), String>;
     /// Apply sandbox at spawn time (Windows restricted token, job objects).
     /// This modifies the command's creation flags and env vars before spawn.
-    fn spawn(
-        &self,
-        cmd: &mut std::process::Command,
-        req: &SandboxRequest,
-    ) -> Result<(), String> {
+    fn spawn(&self, cmd: &mut std::process::Command, req: &SandboxRequest) -> Result<(), String> {
         let _ = (cmd, req);
         Ok(())
     }
@@ -116,10 +109,7 @@ impl Sandbox for NoSandbox {
         false
     }
 
-    fn transform(
-        &self,
-        _req: &SandboxRequest,
-    ) -> Result<(String, Vec<String>), String> {
+    fn transform(&self, _req: &SandboxRequest) -> Result<(String, Vec<String>), String> {
         Err("No sandbox available".into())
     }
 }
@@ -155,22 +145,17 @@ impl Sandbox for WindowsJobSandbox {
         true
     }
 
-    fn transform(
-        &self,
-        req: &SandboxRequest,
-    ) -> Result<(String, Vec<String>), String> {
+    fn transform(&self, req: &SandboxRequest) -> Result<(String, Vec<String>), String> {
         Ok((req.program.clone(), req.args.clone()))
     }
 
-    fn spawn(
-        &self,
-        cmd: &mut std::process::Command,
-        req: &SandboxRequest,
-    ) -> Result<(), String> {
+    fn spawn(&self, cmd: &mut std::process::Command, req: &SandboxRequest) -> Result<(), String> {
         Self::apply_job_object(cmd)?;
 
         if let Some(ref fp) = req.fs_policy {
-            let writable: Vec<String> = fp.writable_roots.iter()
+            let writable: Vec<String> = fp
+                .writable_roots
+                .iter()
                 .map(|r| r.path.to_string_lossy().to_string())
                 .collect();
             if !writable.is_empty() {

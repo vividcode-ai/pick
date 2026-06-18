@@ -1,4 +1,4 @@
-﻿//! Azure OpenAI Responses API provider with SSE streaming
+//! Azure OpenAI Responses API provider with SSE streaming
 //! Uses Azure's OpenAI-compatible Responses API with api-key header
 
 use crate::types::{
@@ -14,17 +14,29 @@ pub fn stream_azure_openai_responses(
     let (tx, rx) = tokio::sync::mpsc::channel(64);
 
     let max_retries = options.as_ref().and_then(|o| o.max_retries).unwrap_or(3);
-    let max_delay = options.as_ref().and_then(|o| o.max_retry_delay_ms).unwrap_or(60000);
+    let max_delay = options
+        .as_ref()
+        .and_then(|o| o.max_retry_delay_ms)
+        .unwrap_or(60000);
 
     tokio::spawn(async move {
         let api_key = std::env::var("AZURE_OPENAI_API_KEY").unwrap_or_default();
         if api_key.is_empty() {
             let mut msg = AssistantMessage::new(
-                vec![], "azure-openai-responses".to_string(), "azure-openai-responses".to_string(),
-                model.id.clone(), Usage::zero(), StopReason::Error,
+                vec![],
+                "azure-openai-responses".to_string(),
+                "azure-openai-responses".to_string(),
+                model.id.clone(),
+                Usage::zero(),
+                StopReason::Error,
             );
             msg.error_message = Some("AZURE_OPENAI_API_KEY is not set.".to_string());
-            let _ = tx.send(StreamEvent::Error { reason: StopReason::Error, error: msg }).await;
+            let _ = tx
+                .send(StreamEvent::Error {
+                    reason: StopReason::Error,
+                    error: msg,
+                })
+                .await;
             return;
         }
 
@@ -87,10 +99,15 @@ pub fn stream_azure_openai_responses(
                     }
                 }
                 crate::types::Message::ToolResult(tr) => {
-                    let text_content: Vec<String> = tr.content.iter()
+                    let text_content: Vec<String> = tr
+                        .content
+                        .iter()
                         .filter_map(|c| {
-                            if let ContentBlock::Text(t) = c { Some(t.text.clone()) }
-                            else { None }
+                            if let ContentBlock::Text(t) = c {
+                                Some(t.text.clone())
+                            } else {
+                                None
+                            }
                         })
                         .collect();
                     input_items.push(serde_json::json!({
@@ -111,14 +128,17 @@ pub fn stream_azure_openai_responses(
             body["instructions"] = serde_json::json!(system);
         }
         if let Some(tools) = &context.tools {
-            let tools_json: Vec<serde_json::Value> = tools.iter().map(|t| {
-                serde_json::json!({
-                    "type": "function",
-                    "name": t.name,
-                    "description": t.description,
-                    "parameters": t.parameters,
+            let tools_json: Vec<serde_json::Value> = tools
+                .iter()
+                .map(|t| {
+                    serde_json::json!({
+                        "type": "function",
+                        "name": t.name,
+                        "description": t.description,
+                        "parameters": t.parameters,
+                    })
                 })
-            }).collect();
+                .collect();
             body["tools"] = serde_json::json!(tools_json);
         }
 
@@ -138,18 +158,20 @@ pub fn stream_azure_openai_responses(
             );
 
             // Emit start
-            let _ = tx.send(StreamEvent::Start {
-                partial: crate::types::PartialAssistantMessage {
-                    content: vec![],
-                    api: Some("azure-openai-responses".to_string()),
-                    provider: Some("azure-openai-responses".to_string()),
-                    model: Some(model.id.clone()),
-                    usage: Some(Usage::zero()),
-                    stop_reason: None,
-                    error_message: None,
-                    timestamp: chrono::Utc::now().timestamp_millis(),
-                },
-            }).await;
+            let _ = tx
+                .send(StreamEvent::Start {
+                    partial: crate::types::PartialAssistantMessage {
+                        content: vec![],
+                        api: Some("azure-openai-responses".to_string()),
+                        provider: Some("azure-openai-responses".to_string()),
+                        model: Some(model.id.clone()),
+                        usage: Some(Usage::zero()),
+                        stop_reason: None,
+                        error_message: None,
+                        timestamp: chrono::Utc::now().timestamp_millis(),
+                    },
+                })
+                .await;
 
             let client = reqwest::Client::new();
             match client
@@ -172,10 +194,12 @@ pub fn stream_azure_openai_responses(
                         }
                         output.stop_reason = StopReason::Error;
                         output.error_message = Some(err_msg);
-                        let _ = tx.send(StreamEvent::Error {
-                            reason: StopReason::Error,
-                            error: output,
-                        }).await;
+                        let _ = tx
+                            .send(StreamEvent::Error {
+                                reason: StopReason::Error,
+                                error: output,
+                            })
+                            .await;
                         return;
                     }
 
@@ -191,27 +215,35 @@ pub fn stream_azure_openai_responses(
                                 let events = parser.feed(&chunk);
                                 for sse in events {
                                     process_azure_event(
-                                        &tx, &sse, &mut output,
-                                        &mut text_block_idx, &mut response_id,
-                                    ).await;
+                                        &tx,
+                                        &sse,
+                                        &mut output,
+                                        &mut text_block_idx,
+                                        &mut response_id,
+                                    )
+                                    .await;
                                 }
                             }
                             Err(e) => {
                                 output.stop_reason = StopReason::Error;
                                 output.error_message = Some(format!("Stream error: {}", e));
-                                let _ = tx.send(StreamEvent::Error {
-                                    reason: StopReason::Error,
-                                    error: output,
-                                }).await;
+                                let _ = tx
+                                    .send(StreamEvent::Error {
+                                        reason: StopReason::Error,
+                                        error: output,
+                                    })
+                                    .await;
                                 return;
                             }
                         }
                     }
 
-                    let _ = tx.send(StreamEvent::Done {
-                        reason: output.stop_reason.clone(),
-                        message: output,
-                    }).await;
+                    let _ = tx
+                        .send(StreamEvent::Done {
+                            reason: output.stop_reason.clone(),
+                            message: output,
+                        })
+                        .await;
                     return;
                 }
                 Err(e) => {
@@ -222,10 +254,12 @@ pub fn stream_azure_openai_responses(
                     }
                     output.stop_reason = StopReason::Error;
                     output.error_message = Some(format!("Request failed: {}", e));
-                    let _ = tx.send(StreamEvent::Error {
-                        reason: StopReason::Error,
-                        error: output,
-                    }).await;
+                    let _ = tx
+                        .send(StreamEvent::Error {
+                            reason: StopReason::Error,
+                            error: output,
+                        })
+                        .await;
                     return;
                 }
             }
@@ -233,11 +267,20 @@ pub fn stream_azure_openai_responses(
 
         // Exhausted all retries
         let mut msg = AssistantMessage::new(
-            vec![], "azure-openai-responses".to_string(), "azure-openai-responses".to_string(),
-            model.id.clone(), Usage::zero(), StopReason::Error,
+            vec![],
+            "azure-openai-responses".to_string(),
+            "azure-openai-responses".to_string(),
+            model.id.clone(),
+            Usage::zero(),
+            StopReason::Error,
         );
         msg.error_message = Some("Max retries exceeded".to_string());
-        let _ = tx.send(StreamEvent::Error { reason: StopReason::Error, error: msg }).await;
+        let _ = tx
+            .send(StreamEvent::Error {
+                reason: StopReason::Error,
+                error: msg,
+            })
+            .await;
     });
 
     rx
@@ -262,7 +305,11 @@ async fn process_azure_event(
 
     match event_type {
         "response.created" => {
-            if let Some(id) = data.get("response").and_then(|r| r.get("id")).and_then(|v| v.as_str()) {
+            if let Some(id) = data
+                .get("response")
+                .and_then(|r| r.get("id"))
+                .and_then(|v| v.as_str())
+            {
                 output.response_id = Some(id.to_string());
             }
         }
@@ -270,10 +317,12 @@ async fn process_azure_event(
             let idx = output.content.len();
             output.content.push(ContentBlock::text(""));
             *text_block_idx = Some(idx);
-            let _ = tx.send(StreamEvent::TextStart {
-                content_index: idx,
-                partial: partial_from_output(output),
-            }).await;
+            let _ = tx
+                .send(StreamEvent::TextStart {
+                    content_index: idx,
+                    partial: partial_from_output(output),
+                })
+                .await;
         }
         "response.output_text.delta" => {
             if let Some(delta) = data.get("delta").and_then(|v| v.as_str()) {
@@ -282,11 +331,13 @@ async fn process_azure_event(
                         if let ContentBlock::Text(ref mut tc) = output.content[idx] {
                             tc.text.push_str(delta);
                         }
-                        let _ = tx.send(StreamEvent::TextDelta {
-                            content_index: idx,
-                            delta: delta.to_string(),
-                            partial: partial_from_output(output),
-                        }).await;
+                        let _ = tx
+                            .send(StreamEvent::TextDelta {
+                                content_index: idx,
+                                delta: delta.to_string(),
+                                partial: partial_from_output(output),
+                            })
+                            .await;
                     }
                 }
             }
@@ -315,7 +366,11 @@ async fn process_azure_event(
             output.stop_reason = StopReason::Error;
             if let Some(error) = data.get("error") {
                 output.error_message = Some(
-                    error.get("message").and_then(|v| v.as_str()).unwrap_or("Unknown error").to_string()
+                    error
+                        .get("message")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("Unknown error")
+                        .to_string(),
                 );
             }
         }

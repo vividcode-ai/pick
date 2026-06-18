@@ -1,6 +1,7 @@
-﻿use super::output_accumulator::OutputAccumulator;
-use super::render_utils::{ToolRenderContext, ToolRenderOptions, ToolRenderOutput, ToolTheme,
-    invalid_arg_text};
+use super::output_accumulator::OutputAccumulator;
+use super::render_utils::{
+    ToolRenderContext, ToolRenderOptions, ToolRenderOutput, ToolTheme, invalid_arg_text,
+};
 
 /// Tool definition for the bash tool
 pub fn create_bash_tool_definition() -> BashToolDefinition {
@@ -67,7 +68,10 @@ impl BashExecution<'_> {
         use tokio::io::AsyncReadExt;
         loop {
             buf.clear();
-            let n = stdout_reader.read_buf(&mut buf).await.map_err(|e| format!("Read error: {}", e))?;
+            let n = stdout_reader
+                .read_buf(&mut buf)
+                .await
+                .map_err(|e| format!("Read error: {}", e))?;
             if n == 0 {
                 break;
             }
@@ -75,14 +79,20 @@ impl BashExecution<'_> {
         }
         loop {
             buf.clear();
-            let n = stderr_reader.read_buf(&mut buf).await.map_err(|e| format!("Read error: {}", e))?;
+            let n = stderr_reader
+                .read_buf(&mut buf)
+                .await
+                .map_err(|e| format!("Read error: {}", e))?;
             if n == 0 {
                 break;
             }
             output.append(&buf);
         }
 
-        let status = child.wait().await.map_err(|e| format!("Wait error: {}", e))?;
+        let status = child
+            .wait()
+            .await
+            .map_err(|e| format!("Wait error: {}", e))?;
         output.finish();
         let snapshot = output.snapshot(false);
         output.close_temp_file();
@@ -126,12 +136,19 @@ pub fn render_bash_call(args: &serde_json::Value, _ctx: &ToolRenderContext) -> T
         None => invalid_arg_text(&|s| ToolTheme::fg("error", s)),
     };
 
-    let label = format!("{}{}",
-        ToolTheme::fg("toolTitle", &ToolTheme::bold(&format!("$ {}", command_display))),
+    let label = format!(
+        "{}{}",
+        ToolTheme::fg(
+            "toolTitle",
+            &ToolTheme::bold(&format!("$ {}", command_display))
+        ),
         timeout_suffix,
     );
 
-    ToolRenderOutput { label, formatted: String::new() }
+    ToolRenderOutput {
+        label,
+        formatted: String::new(),
+    }
 }
 
 /// Render a bash tool result — output with exit code and duration
@@ -143,7 +160,8 @@ pub fn render_bash_result(
     let mut formatted = String::new();
 
     if !output.content.is_empty() {
-        let styled: String = output.content
+        let styled: String = output
+            .content
             .split('\n')
             .map(|line| ToolTheme::fg("toolOutput", line))
             .collect::<Vec<_>>()
@@ -156,8 +174,13 @@ pub fn render_bash_result(
             let total = styled.split('\n').count();
             let skipped = total.saturating_sub(5);
             if skipped > 0 {
-                formatted = format!("\n{}",
-                    ToolTheme::fg("muted", &format!("... ({} earlier lines, use expand to expand)", skipped)));
+                formatted = format!(
+                    "\n{}",
+                    ToolTheme::fg(
+                        "muted",
+                        &format!("... ({} earlier lines, use expand to expand)", skipped)
+                    )
+                );
                 if !preview_lines.is_empty() {
                     formatted.push('\n');
                     formatted.push_str(&preview_lines.join("\n"));
@@ -174,15 +197,22 @@ pub fn render_bash_result(
             warnings.push(format!("Full output: {}", path));
         }
         if !warnings.is_empty() {
-            formatted.push_str(&format!("\n{}",
-                ToolTheme::fg("warning", &format!("[{}]", warnings.join(". ")))));
+            formatted.push_str(&format!(
+                "\n{}",
+                ToolTheme::fg("warning", &format!("[{}]", warnings.join(". ")))
+            ));
         }
     }
 
     if let Some(code) = output.exit_code {
-        formatted.push_str(&format!("\n{}",
-            ToolTheme::fg("muted", &format!("Exit code {}", code))));
+        formatted.push_str(&format!(
+            "\n{}",
+            ToolTheme::fg("muted", &format!("Exit code {}", code))
+        ));
     }
 
-    ToolRenderOutput { label: String::new(), formatted }
+    ToolRenderOutput {
+        label: String::new(),
+        formatted,
+    }
 }

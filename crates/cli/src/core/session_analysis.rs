@@ -1,4 +1,4 @@
-﻿//! Session analysis utilities
+//! Session analysis utilities
 //! Provides cost analysis, token statistics, and tool usage analysis
 //! for session data.
 
@@ -33,7 +33,20 @@ pub struct UsageStats {
 }
 
 /// Token bucket boundaries for histogram display
-pub const TOKEN_BUCKETS: &[u64] = &[0, 50, 100, 250, 500, 1000, 2000, 4000, 8000, 16000, 32000, u64::MAX];
+pub const TOKEN_BUCKETS: &[u64] = &[
+    0,
+    50,
+    100,
+    250,
+    500,
+    1000,
+    2000,
+    4000,
+    8000,
+    16000,
+    32000,
+    u64::MAX,
+];
 
 /// Format a number with locale-style separators
 pub fn format_int(value: u64) -> String {
@@ -177,8 +190,7 @@ pub fn encode_session_dir(cwd: &str) -> String {
 /// Get a local date key string (YYYY-MM-DD) from a timestamp
 pub fn local_day_key(timestamp_millis: i64) -> String {
     let secs = timestamp_millis / 1000;
-    let datetime = chrono::DateTime::from_timestamp(secs, 0)
-        .unwrap_or_default();
+    let datetime = chrono::DateTime::from_timestamp(secs, 0).unwrap_or_default();
     datetime.format("%Y-%m-%d").to_string()
 }
 
@@ -231,8 +243,14 @@ pub fn extract_message_cost(entry: &serde_json::Value) -> Option<(String, DayCos
             total: cost.get("total").and_then(|v| v.as_f64()).unwrap_or(0.0),
             input: cost.get("input").and_then(|v| v.as_f64()).unwrap_or(0.0),
             output: cost.get("output").and_then(|v| v.as_f64()).unwrap_or(0.0),
-            cache_read: cost.get("cacheRead").and_then(|v| v.as_f64()).unwrap_or(0.0),
-            cache_write: cost.get("cacheWrite").and_then(|v| v.as_f64()).unwrap_or(0.0),
+            cache_read: cost
+                .get("cacheRead")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0),
+            cache_write: cost
+                .get("cacheWrite")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0),
             requests: 1,
         },
     ))
@@ -264,7 +282,10 @@ pub fn extract_message_usage(entry: &serde_json::Value) -> Option<(String, Usage
     let input_tokens = usage.get("input").and_then(|v| v.as_u64()).unwrap_or(0);
     let output_tokens = usage.get("output").and_then(|v| v.as_u64()).unwrap_or(0);
     let cache_read = usage.get("cacheRead").and_then(|v| v.as_u64()).unwrap_or(0);
-    let cache_write = usage.get("cacheWrite").and_then(|v| v.as_u64()).unwrap_or(0);
+    let cache_write = usage
+        .get("cacheWrite")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
 
     Some((
         provider,
@@ -274,11 +295,26 @@ pub fn extract_message_usage(entry: &serde_json::Value) -> Option<(String, Usage
             cache_read_tokens: cache_read,
             cache_write_tokens: cache_write,
             total_tokens: input_tokens + output_tokens + cache_read + cache_write,
-            cost_input: cost.and_then(|c| c.get("input")).and_then(|v| v.as_f64()).unwrap_or(0.0),
-            cost_output: cost.and_then(|c| c.get("output")).and_then(|v| v.as_f64()).unwrap_or(0.0),
-            cost_cache_read: cost.and_then(|c| c.get("cacheRead")).and_then(|v| v.as_f64()).unwrap_or(0.0),
-            cost_cache_write: cost.and_then(|c| c.get("cacheWrite")).and_then(|v| v.as_f64()).unwrap_or(0.0),
-            cost_total: cost.and_then(|c| c.get("total")).and_then(|v| v.as_f64()).unwrap_or(0.0),
+            cost_input: cost
+                .and_then(|c| c.get("input"))
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0),
+            cost_output: cost
+                .and_then(|c| c.get("output"))
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0),
+            cost_cache_read: cost
+                .and_then(|c| c.get("cacheRead"))
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0),
+            cost_cache_write: cost
+                .and_then(|c| c.get("cacheWrite"))
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0),
+            cost_total: cost
+                .and_then(|c| c.get("total"))
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.0),
             assistant_messages: 1,
         },
     ))
@@ -290,11 +326,14 @@ pub fn analyze_session_costs(
     cutoff_days: usize,
 ) -> Result<HashMap<String, HashMap<String, DayCost>>, String> {
     if !sessions_dir.exists() {
-        return Err(format!("Sessions directory not found: {}", sessions_dir.display()));
+        return Err(format!(
+            "Sessions directory not found: {}",
+            sessions_dir.display()
+        ));
     }
 
-    let cutoff = std::time::SystemTime::now()
-        - std::time::Duration::from_secs(cutoff_days as u64 * 86400);
+    let cutoff =
+        std::time::SystemTime::now() - std::time::Duration::from_secs(cutoff_days as u64 * 86400);
 
     let mut stats: HashMap<String, HashMap<String, DayCost>> = HashMap::new();
 
@@ -309,9 +348,7 @@ pub fn analyze_session_costs(
         }
 
         // Extract timestamp from filename: <timestamp>_<uuid>.jsonl
-        let filename = path.file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("");
+        let filename = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
         let ts_part = filename.split('_').next().unwrap_or("");
 
         // Parse ISO timestamp format: 2025-12-17T08-25-07-381Z
@@ -370,9 +407,9 @@ mod tests {
 
     #[test]
     fn test_estimate_token_count() {
-        assert_eq!(estimate_token_count("hello"), 2);  // 5/4 = 1.25 -> 2
-        assert_eq!(estimate_token_count("a"), 1);      // 1/4 = 0.25 -> 1
-        assert_eq!(estimate_token_count(""), 0);       // 0/4 = 0 -> 0
+        assert_eq!(estimate_token_count("hello"), 2); // 5/4 = 1.25 -> 2
+        assert_eq!(estimate_token_count("a"), 1); // 1/4 = 0.25 -> 1
+        assert_eq!(estimate_token_count(""), 0); // 0/4 = 0 -> 0
         assert_eq!(estimate_token_count("abcdefgh"), 2); // 8/4 = 2 -> 2
     }
 

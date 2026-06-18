@@ -1,9 +1,11 @@
-﻿use std::sync::Arc;
+use std::sync::Arc;
 use std::time::Duration;
 
 use tokio::sync::watch;
 
-use pick_agent::core::agent_loop::{run_agent_loop, run_agent_loop_continue, AgentLoopConfig, AgentRunResult};
+use pick_agent::core::agent_loop::{
+    AgentLoopConfig, AgentRunResult, run_agent_loop, run_agent_loop_continue,
+};
 use pick_agent::core::events::AgentEvent;
 use pick_ai::types::Message;
 
@@ -69,9 +71,9 @@ pub fn is_retryable_error_message(err: &str) -> bool {
         "stream error",
         "retry delay",
     ];
-    patterns.iter().any(|p| {
-        regex::Regex::new(p).map_or(false, |re| re.is_match(&lower))
-    })
+    patterns
+        .iter()
+        .any(|p| regex::Regex::new(p).map_or(false, |re| re.is_match(&lower)))
 }
 
 /// Run the agent loop with automatic retry on transient errors.
@@ -257,19 +259,27 @@ pub async fn run_agent_loop_with_retry_and_continuation(
 ) -> Result<AgentRunResult, String> {
     // First segment
     let result = run_agent_loop_with_retry(
-        config.clone(), initial_messages, retry_config.clone(), cancel_signal.clone(),
-    ).await?;
+        config.clone(),
+        initial_messages,
+        retry_config.clone(),
+        cancel_signal.clone(),
+    )
+    .await?;
 
     let mut all_messages = result.messages;
     let mut total_usage = result.usage;
 
     // Continuation segments
     loop {
-        let follow_up = config.get_follow_up_messages.as_ref()
-            .map(|f| f(&AgentRunResult {
-                messages: all_messages.clone(),
-                usage: total_usage.clone(),
-            }))
+        let follow_up = config
+            .get_follow_up_messages
+            .as_ref()
+            .map(|f| {
+                f(&AgentRunResult {
+                    messages: all_messages.clone(),
+                    usage: total_usage.clone(),
+                })
+            })
             .unwrap_or_default();
 
         if follow_up.is_empty() {
@@ -279,8 +289,12 @@ pub async fn run_agent_loop_with_retry_and_continuation(
         all_messages.extend(follow_up);
 
         let result = run_agent_loop_continue_with_retry(
-            config.clone(), all_messages, retry_config.clone(), cancel_signal.clone(),
-        ).await?;
+            config.clone(),
+            all_messages,
+            retry_config.clone(),
+            cancel_signal.clone(),
+        )
+        .await?;
 
         all_messages = result.messages;
         total_usage.input += result.usage.input;

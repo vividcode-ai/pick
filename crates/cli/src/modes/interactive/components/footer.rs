@@ -1,5 +1,4 @@
-﻿//! Footer status bar component
-
+//! Footer status bar component
 
 use crate::core::tools::render_utils::ToolTheme;
 
@@ -74,7 +73,12 @@ pub fn render_footer(
     let auto_indicator = if auto_compact { " (auto)" } else { "" };
     let context_display = match context_percent {
         Some(pct) => {
-            let display = format!("{:.1}%/{}{}", pct, format_tokens(context_window), auto_indicator);
+            let display = format!(
+                "{:.1}%/{}{}",
+                pct,
+                format_tokens(context_window),
+                auto_indicator
+            );
             if pct > 90.0 {
                 ToolTheme::fg("error", &display)
             } else if pct > 70.0 {
@@ -111,7 +115,11 @@ pub fn render_footer(
     let pwd_line = format!("{}", ToolTheme::fg("dim", &pwd_display));
 
     // Stats line with left/right alignment
-    let stats_line = format!("{}{}", ToolTheme::fg("dim", &stats_left), ToolTheme::fg("dim", &right_side));
+    let stats_line = format!(
+        "{}{}",
+        ToolTheme::fg("dim", &stats_left),
+        ToolTheme::fg("dim", &right_side)
+    );
 
     vec![pwd_line, stats_line]
 }

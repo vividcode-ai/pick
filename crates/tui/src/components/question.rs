@@ -1,4 +1,4 @@
-﻿//! Question dialog component for user input
+//! Question dialog component for user input
 //! Maps to opencode's question tool design
 
 /// Represents a question being asked to the user
@@ -23,9 +23,7 @@ pub struct QuestionOptionState {
 }
 
 impl QuestionDialog {
-    pub fn new(
-        questions: Vec<(String, String, Vec<(String, String)>, bool)>,
-    ) -> Self {
+    pub fn new(questions: Vec<(String, String, Vec<(String, String)>, bool)>) -> Self {
         let questions: Vec<QuestionState> = questions
             .into_iter()
             .map(|(q, h, opts, multi)| QuestionState {
@@ -74,7 +72,9 @@ impl QuestionDialog {
 
         let dim = Style::default().add_modifier(Modifier::DIM);
         let _accent = Style::default().fg(Color::Cyan);
-        let selected_style = Style::default().bg(Color::Rgb(50, 80, 120)).fg(Color::White);
+        let selected_style = Style::default()
+            .bg(Color::Rgb(50, 80, 120))
+            .fg(Color::White);
 
         // Top separator
         let sep = "\u{2500}".repeat(width);

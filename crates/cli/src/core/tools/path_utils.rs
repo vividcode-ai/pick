@@ -1,4 +1,4 @@
-﻿use std::path::Path;
+use std::path::Path;
 
 /// Check if a path exists (sync)
 pub fn path_exists_sync(file_path: &str) -> bool {
@@ -26,10 +26,16 @@ pub fn resolve_to_cwd(file_path: &str, cwd: &str) -> String {
     let path = Path::new(&expanded);
     if path.is_absolute() {
         // Still normalize
-        dunce::canonicalize(path).unwrap_or(path.to_path_buf()).to_string_lossy().to_string()
+        dunce::canonicalize(path)
+            .unwrap_or(path.to_path_buf())
+            .to_string_lossy()
+            .to_string()
     } else {
         let joined = Path::new(cwd).join(&expanded);
-        dunce::canonicalize(&joined).unwrap_or(joined).to_string_lossy().to_string()
+        dunce::canonicalize(&joined)
+            .unwrap_or(joined)
+            .to_string_lossy()
+            .to_string()
     }
 }
 

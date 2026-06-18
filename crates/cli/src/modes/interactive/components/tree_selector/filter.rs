@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use super::{FlatTreeDisplayNode, TreeNodeInfo, TreeFilterMode};
+use super::{FlatTreeDisplayNode, TreeFilterMode, TreeNodeInfo};
 
 pub fn filter_tree_nodes(
     flat_nodes: &[FlatTreeDisplayNode],
@@ -15,64 +15,78 @@ pub fn filter_tree_nodes(
         .filter(|t| !t.is_empty())
         .collect();
 
-    let filtered: Vec<&FlatTreeDisplayNode> = flat_nodes.iter().filter(|fnode| {
-        let node = &nodes[fnode.node_idx];
-        let is_current = current_leaf_id.map_or(false, |id| id == node.entry_id);
+    let filtered: Vec<&FlatTreeDisplayNode> = flat_nodes
+        .iter()
+        .filter(|fnode| {
+            let node = &nodes[fnode.node_idx];
+            let is_current = current_leaf_id.map_or(false, |id| id == node.entry_id);
 
-        if node.entry_type == "message" && node.role.as_deref() == Some("assistant") && !is_current {
-            if !has_text_content(node.content_text.as_deref()) {
-                let is_error = node.stop_reason.as_deref().map_or(false, |r| r != "stop" && r != "toolUse");
-                if !is_error {
-                    return false;
+            if node.entry_type == "message"
+                && node.role.as_deref() == Some("assistant")
+                && !is_current
+            {
+                if !has_text_content(node.content_text.as_deref()) {
+                    let is_error = node
+                        .stop_reason
+                        .as_deref()
+                        .map_or(false, |r| r != "stop" && r != "toolUse");
+                    if !is_error {
+                        return false;
+                    }
                 }
             }
-        }
 
-        match filter_mode {
-            TreeFilterMode::UserOnly => {
-                if !(node.entry_type == "message" && node.role.as_deref() == Some("user")) {
-                    return false;
+            match filter_mode {
+                TreeFilterMode::UserOnly => {
+                    if !(node.entry_type == "message" && node.role.as_deref() == Some("user")) {
+                        return false;
+                    }
+                }
+                TreeFilterMode::NoTools => {
+                    if is_settings_entry(&node.entry_type) {
+                        return false;
+                    }
+                    if node.entry_type == "message" && node.role.as_deref() == Some("toolResult") {
+                        return false;
+                    }
+                }
+                TreeFilterMode::LabeledOnly => {
+                    if node.label.is_none() {
+                        return false;
+                    }
+                }
+                TreeFilterMode::All => {}
+                TreeFilterMode::Default => {
+                    if is_settings_entry(&node.entry_type) {
+                        return false;
+                    }
                 }
             }
-            TreeFilterMode::NoTools => {
-                if is_settings_entry(&node.entry_type) {
-                    return false;
-                }
-                if node.entry_type == "message" && node.role.as_deref() == Some("toolResult") {
-                    return false;
-                }
-            }
-            TreeFilterMode::LabeledOnly => {
-                if node.label.is_none() {
-                    return false;
-                }
-            }
-            TreeFilterMode::All => {}
-            TreeFilterMode::Default => {
-                if is_settings_entry(&node.entry_type) {
-                    return false;
-                }
-            }
-        }
 
-        if !search_tokens.is_empty() {
-            let searchable = get_searchable_text(node).to_lowercase();
-            for token in &search_tokens {
-                if !searchable.contains(token) {
-                    return false;
+            if !search_tokens.is_empty() {
+                let searchable = get_searchable_text(node).to_lowercase();
+                for token in &search_tokens {
+                    if !searchable.contains(token) {
+                        return false;
+                    }
                 }
             }
-        }
 
-        true
-    }).collect();
+            true
+        })
+        .collect();
 
     let skip_set: HashSet<String> = if folded_nodes.is_empty() {
         HashSet::new()
     } else {
         let mut skip = HashSet::new();
-        let parent_map: std::collections::HashMap<&str, &str> = nodes.iter()
-            .filter_map(|n| n.parent_id.as_ref().map(|p| (n.entry_id.as_str(), p.as_str())))
+        let parent_map: std::collections::HashMap<&str, &str> = nodes
+            .iter()
+            .filter_map(|n| {
+                n.parent_id
+                    .as_ref()
+                    .map(|p| (n.entry_id.as_str(), p.as_str()))
+            })
             .collect();
 
         for fnode in flat_nodes {
@@ -103,7 +117,10 @@ fn has_text_content(content_text: Option<&str>) -> bool {
 }
 
 fn is_settings_entry(entry_type: &str) -> bool {
-    matches!(entry_type, "label" | "custom" | "model_change" | "thinking_level_change" | "session_info")
+    matches!(
+        entry_type,
+        "label" | "custom" | "model_change" | "thinking_level_change" | "session_info"
+    )
 }
 
 fn get_searchable_text(node: &TreeNodeInfo) -> String {
@@ -184,22 +201,34 @@ fn recalculate_visual_structure(flat_nodes: &mut Vec<FlatTreeDisplayNode>, nodes
         .collect();
 
     let find_visible_ancestor = |node_id: &str| -> Option<String> {
-        let mut current = nodes.iter().find(|n| n.entry_id == node_id)?.parent_id.clone()?;
+        let mut current = nodes
+            .iter()
+            .find(|n| n.entry_id == node_id)?
+            .parent_id
+            .clone()?;
         loop {
             if visible_ids.contains(&current) {
                 return Some(current);
             }
-            current = nodes.iter().find(|n| n.entry_id == current)?.parent_id.clone()?;
+            current = nodes
+                .iter()
+                .find(|n| n.entry_id == current)?
+                .parent_id
+                .clone()?;
         }
     };
 
-    let mut visible_children: std::collections::HashMap<Option<String>, Vec<String>> = std::collections::HashMap::new();
+    let mut visible_children: std::collections::HashMap<Option<String>, Vec<String>> =
+        std::collections::HashMap::new();
     visible_children.entry(None).or_default();
 
     for fnode in flat_nodes.iter() {
         let id = &nodes[fnode.node_idx].entry_id;
         let ancestor = find_visible_ancestor(id);
-        visible_children.entry(ancestor.clone()).or_default().push(id.clone());
+        visible_children
+            .entry(ancestor.clone())
+            .or_default()
+            .push(id.clone());
 
         if ancestor.is_none() {
             visible_children.get_mut(&None).unwrap().push(id.clone());

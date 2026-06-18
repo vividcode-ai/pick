@@ -1,19 +1,30 @@
-﻿use std::sync::Arc;
+use std::sync::Arc;
 
-use rmcp::{RoleClient, ServiceExt, model::CallToolRequestParams};
-use rmcp::transport::{TokioChildProcess, StreamableHttpClientTransport};
-use rmcp::transport::streamable_http_client::StreamableHttpClientTransportConfig;
-use tokio::sync::Mutex;
 use pick_agent::core::state::{AgentTool, AgentToolResult, ToolContext, ToolExecutionMode};
+use rmcp::transport::streamable_http_client::StreamableHttpClientTransportConfig;
+use rmcp::transport::{StreamableHttpClientTransport, TokioChildProcess};
+use rmcp::{RoleClient, ServiceExt, model::CallToolRequestParams};
+use tokio::sync::Mutex;
 
 use crate::config::{McpAuthConfig, McpServerConfig};
 use crate::conversion;
 
 /// Built-in tool names that conflict with MCP tools would cause API errors.
 const BUILTIN_TOOL_NAMES: &[&str] = &[
-    "read", "write", "edit", "bash", "grep", "find", "ls",
-    "subagent", "webfetch", "todo_plan", "question",
-    "get_goal", "create_goal", "update_goal",
+    "read",
+    "write",
+    "edit",
+    "bash",
+    "grep",
+    "find",
+    "ls",
+    "subagent",
+    "webfetch",
+    "todo_plan",
+    "question",
+    "get_goal",
+    "create_goal",
+    "update_goal",
 ];
 
 /// Type alias for the rmcp client handle
@@ -44,7 +55,9 @@ pub struct McpToolExecutor {
 
 impl McpToolExecutor {
     pub fn new() -> Self {
-        Self { clients: Vec::new() }
+        Self {
+            clients: Vec::new(),
+        }
     }
 
     /// Add a connected client and its tools to the executor
@@ -73,9 +86,12 @@ impl McpToolExecutor {
         prefixed_name: &str,
         args: serde_json::Value,
     ) -> Result<AgentToolResult, String> {
-        let (client, entry) = self
-            .find_tool(prefixed_name)
-            .ok_or_else(|| format!("MCP tool '{}' not found on any connected server", prefixed_name))?;
+        let (client, entry) = self.find_tool(prefixed_name).ok_or_else(|| {
+            format!(
+                "MCP tool '{}' not found on any connected server",
+                prefixed_name
+            )
+        })?;
 
         let args_map = match args {
             serde_json::Value::Object(map) => map,
@@ -86,15 +102,20 @@ impl McpToolExecutor {
             }
         };
 
-        let params = CallToolRequestParams::new(entry.original_name.clone())
-            .with_arguments(args_map);
+        let params =
+            CallToolRequestParams::new(entry.original_name.clone()).with_arguments(args_map);
 
         let client = client.lock().await;
-        let result = client.call_tool(params).await
+        let result = client
+            .call_tool(params)
+            .await
             .map_err(|e| format!("MCP call_tool '{}' failed: {}", prefixed_name, e))?;
 
         let is_error = result.is_error.unwrap_or(false);
-        Ok(conversion::mcp_result_to_agent_result(is_error, &result.content))
+        Ok(conversion::mcp_result_to_agent_result(
+            is_error,
+            &result.content,
+        ))
     }
 
     fn find_tool(&self, prefixed_name: &str) -> Option<(&Arc<Mutex<McpClient>>, &ToolEntry)> {
@@ -115,39 +136,41 @@ pub fn build_agent_tools(
     executor: &Arc<Mutex<McpToolExecutor>>,
 ) -> Vec<AgentTool> {
     let executor_ref = executor.clone();
-    entries.into_iter().map(|entry| {
-        let prefixed_name = entry.prefixed_name.clone();
-        let description = entry.description.clone();
-        let prompt_snippet = conversion::generate_prompt_snippet(&prefixed_name, &entry.input_schema);
-        let parameters = conversion::json_schema_from_mcp(&entry.input_schema);
-        let ex = executor_ref.clone();
-        let name_for_closure = prefixed_name.clone();
+    entries
+        .into_iter()
+        .map(|entry| {
+            let prefixed_name = entry.prefixed_name.clone();
+            let description = entry.description.clone();
+            let prompt_snippet =
+                conversion::generate_prompt_snippet(&prefixed_name, &entry.input_schema);
+            let parameters = conversion::json_schema_from_mcp(&entry.input_schema);
+            let ex = executor_ref.clone();
+            let name_for_closure = prefixed_name.clone();
 
-        AgentTool {
-            name: prefixed_name,
-            description,
-            prompt_snippet: Some(prompt_snippet),
-            prompt_guidelines: Vec::new(),
-            label: name_for_closure.clone(),
-            parameters,
-            execute: Arc::new(move |_tool_call_id, args, _ctx: ToolContext| {
-                let ex = ex.clone();
-                let name = name_for_closure.clone();
-                Box::pin(async move {
-                    let ex = ex.lock().await;
-                    ex.call_tool(&name, args).await
-                })
-            }),
-            execution_mode: ToolExecutionMode::Sequential,
-        }
-    }).collect()
+            AgentTool {
+                name: prefixed_name,
+                description,
+                prompt_snippet: Some(prompt_snippet),
+                prompt_guidelines: Vec::new(),
+                label: name_for_closure.clone(),
+                parameters,
+                execute: Arc::new(move |_tool_call_id, args, _ctx: ToolContext| {
+                    let ex = ex.clone();
+                    let name = name_for_closure.clone();
+                    Box::pin(async move {
+                        let ex = ex.lock().await;
+                        ex.call_tool(&name, args).await
+                    })
+                }),
+                execution_mode: ToolExecutionMode::Sequential,
+            }
+        })
+        .collect()
 }
 
 /// Connect to an MCP server via stdio or HTTP, discover tools,
 /// and return a ConnectedClient.
-pub async fn connect_and_discover(
-    config: &McpServerConfig,
-) -> Result<ConnectedClient, String> {
+pub async fn connect_and_discover(config: &McpServerConfig) -> Result<ConnectedClient, String> {
     let client = if config.url.is_some() {
         connect_http(config).await?
     } else {
@@ -162,7 +185,8 @@ pub async fn connect_and_discover(
 
     // Auto-detect tool name conflicts and apply prefix if needed
     let prefix = config.tool_name_prefix.clone().unwrap_or_else(|| {
-        let has_conflict = tools.iter()
+        let has_conflict = tools
+            .iter()
             .any(|t| BUILTIN_TOOL_NAMES.contains(&t.name.as_ref()));
         if has_conflict {
             let default_prefix = format!("{}_", config.name);
@@ -173,16 +197,19 @@ pub async fn connect_and_discover(
     });
     let server_name = config.name.clone();
 
-    let entries: Vec<ToolEntry> = tools.into_iter().map(|tool| {
-        let prefixed_name = format!("{}{}", prefix, tool.name);
-        ToolEntry {
-            prefixed_name,
-            original_name: tool.name.to_string(),
-            description: tool.description.as_deref().unwrap_or("").to_string(),
-            input_schema: (*tool.input_schema).clone(),
-            server_name: server_name.clone(),
-        }
-    }).collect();
+    let entries: Vec<ToolEntry> = tools
+        .into_iter()
+        .map(|tool| {
+            let prefixed_name = format!("{}{}", prefix, tool.name);
+            ToolEntry {
+                prefixed_name,
+                original_name: tool.name.to_string(),
+                description: tool.description.as_deref().unwrap_or("").to_string(),
+                input_schema: (*tool.input_schema).clone(),
+                server_name: server_name.clone(),
+            }
+        })
+        .collect();
 
     Ok(ConnectedClient {
         client: Arc::new(Mutex::new(client)),
@@ -193,7 +220,9 @@ pub async fn connect_and_discover(
 
 /// Connect via stdio transport
 async fn connect_stdio(config: &McpServerConfig) -> Result<McpClient, String> {
-    let command = config.command.as_ref()
+    let command = config
+        .command
+        .as_ref()
         .ok_or_else(|| format!("No command for server '{}'", config.name))?;
 
     let mk_cmd = |cmd_name: &str, original_cmd: &str, original_args: &[String]| {
@@ -238,7 +267,10 @@ async fn connect_stdio(config: &McpServerConfig) -> Result<McpClient, String> {
                 spawn_mcp(mk_cmd("cmd", command, &args_owned))
                     .map_err(|e2| format!("Failed to spawn MCP server '{}': {}", config.name, e2))?
             } else {
-                return Err(format!("Failed to spawn MCP server '{}': {}", config.name, e));
+                return Err(format!(
+                    "Failed to spawn MCP server '{}': {}",
+                    config.name, e
+                ));
             }
         }
     };
@@ -257,23 +289,22 @@ async fn connect_http(config: &McpServerConfig) -> Result<McpClient, String> {
 
     let cfg = match &config.auth {
         Some(McpAuthConfig::Bearer { token }) => {
-            StreamableHttpClientTransportConfig::with_uri(url.as_str())
-                .auth_header(token.clone())
+            StreamableHttpClientTransportConfig::with_uri(url.as_str()).auth_header(token.clone())
         }
         Some(McpAuthConfig::OAuth2 { .. }) => {
             return Err("OAuth2 not yet implemented for HTTP MCP transport".to_string());
         }
-        None => {
-            StreamableHttpClientTransportConfig::with_uri(url.as_str())
-        }
+        None => StreamableHttpClientTransportConfig::with_uri(url.as_str()),
     };
 
     let transport = StreamableHttpClientTransport::from_config(cfg);
 
-    let client = ()
-        .serve(transport)
-        .await
-        .map_err(|e| format!("Failed to connect to MCP HTTP server '{}': {}", config.name, e))?;
+    let client = ().serve(transport).await.map_err(|e| {
+        format!(
+            "Failed to connect to MCP HTTP server '{}': {}",
+            config.name, e
+        )
+    })?;
 
     Ok(client)
 }

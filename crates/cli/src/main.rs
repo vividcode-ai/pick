@@ -1,4 +1,4 @@
-﻿//! Pick CLI - Main entry point
+//! Pick CLI - Main entry point
 
 // Allow dead code - many module items are pub for cross-module use but reported as
 // dead in a binary crate. Remove this if refactoring to a lib+bin split.
@@ -7,32 +7,30 @@
 mod args;
 mod cli;
 mod config;
-mod modes;
 mod core;
+mod modes;
 mod utils;
 
 use pick_agent::permission::sandbox::Sandbox as _;
 
-
-
 use args::{parse_args, print_help};
 use config::VERSION;
-use modes::{run_audit_command, run_interactive_mode, run_print_mode, run_rpc_mode, run_tui_mode};
 use core::auth_storage::AuthStorage;
 use core::migrations::run_migrations;
 use core::session::create_session_manager;
 use core::settings::{Settings, SettingsManager};
-use core::update_action::{get_update_action, UpdateAction};
+use core::update_action::{UpdateAction, get_update_action};
+use modes::{run_audit_command, run_interactive_mode, run_print_mode, run_rpc_mode, run_tui_mode};
 
-use std::sync::{Arc, RwLock};
 use pick_agent::agent_registry::AgentRegistry;
-use pick_agent::extensions::runner::ExtensionRunner;
 use pick_agent::extensions::discover_and_load_extensions;
+use pick_agent::extensions::runner::ExtensionRunner;
 use pick_agent::permission::manager::PermissionManager;
 use pick_agent::tools::{create_coding_tools_with_goal_manager, create_extension_tools};
 use pick_ai::providers::register::register_builtins;
 use pick_ai::types::{Message, UserMessage};
 use pick_mcp::McpManager;
+use std::sync::{Arc, RwLock};
 
 async fn run_update_command() -> anyhow::Result<()> {
     #[cfg(debug_assertions)]
@@ -102,8 +100,9 @@ async fn main() {
     // Initialize tracing
     tracing_subscriber::fmt()
         .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info,rmcp=warn,pick_mcp=warn"))
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+                tracing_subscriber::EnvFilter::new("info,rmcp=warn,pick_mcp=warn")
+            }),
         )
         .init();
 
@@ -195,10 +194,13 @@ async fn main() {
     // Handle --export: export session to HTML and exit
     if let Some(ref export_path) = args.export_html {
         if let Some(ref session_id) = args.session {
-            use crate::core::export_html::export_html::{export_from_data, ExportOptions};
+            use crate::core::export_html::export_html::{ExportOptions, export_from_data};
             // Resolve session file path
             let session_file = {
-                let project_path = cwd.join(".pick").join("sessions").join(format!("{}.jsonl", session_id));
+                let project_path = cwd
+                    .join(".pick")
+                    .join("sessions")
+                    .join(format!("{}.jsonl", session_id));
                 if project_path.exists() {
                     project_path
                 } else {
@@ -211,11 +213,14 @@ async fn main() {
             }
             match std::fs::read_to_string(&session_file) {
                 Ok(content) => {
-                    let lines: Vec<&str> = content.lines().filter(|l| !l.trim().is_empty()).collect();
-                    let header: serde_json::Value = lines.first()
+                    let lines: Vec<&str> =
+                        content.lines().filter(|l| !l.trim().is_empty()).collect();
+                    let header: serde_json::Value = lines
+                        .first()
                         .and_then(|l| serde_json::from_str(l).ok())
                         .unwrap_or(serde_json::json!({}));
-                    let entries: Vec<serde_json::Value> = lines[1..].iter()
+                    let entries: Vec<serde_json::Value> = lines[1..]
+                        .iter()
                         .filter_map(|l| serde_json::from_str(l).ok())
                         .collect();
                     let options = ExportOptions {
@@ -280,7 +285,10 @@ async fn main() {
 
     // Report extension load errors (non-fatal)
     for err in &load_result.errors {
-        eprintln!("Warning: failed to load extension '{}': {}", err.path, err.error);
+        eprintln!(
+            "Warning: failed to load extension '{}': {}",
+            err.path, err.error
+        );
     }
 
     // Create extension runner for registered extensions
@@ -294,7 +302,9 @@ async fn main() {
 
     // Determine agent mode (default: build)
     use crate::core::agent_mode::AgentMode;
-    let agent_mode = args.agent_mode.as_deref()
+    let agent_mode = args
+        .agent_mode
+        .as_deref()
         .and_then(|m| m.parse::<AgentMode>().ok())
         .unwrap_or(AgentMode::Build);
 
@@ -302,7 +312,10 @@ async fn main() {
     let mcp_manager = Arc::new(McpManager::new());
 
     // Parse MCP server configs (fast, no I/O)
-    let mcp_configs = settings.get().mcp_servers.clone()
+    let mcp_configs = settings
+        .get()
+        .mcp_servers
+        .clone()
         .map(|servers| pick_mcp::parse_mcp_configs_from_value(&serde_json::json!(servers)))
         .unwrap_or_default();
 
@@ -344,7 +357,8 @@ async fn main() {
     };
 
     // Shared tool list (allows runtime modification for dynamic MCP connect/disconnect)
-    let all_tools: Arc<RwLock<Vec<pick_agent::core::state::AgentTool>>> = Arc::new(RwLock::new(tools));
+    let all_tools: Arc<RwLock<Vec<pick_agent::core::state::AgentTool>>> =
+        Arc::new(RwLock::new(tools));
 
     // Background MCP connection: spawn task and pass notification channel to mode
     let (mcp_done_tx, mcp_done_rx) = tokio::sync::watch::channel(false);
@@ -383,9 +397,14 @@ async fn main() {
     let permission_config = settings.get_permission();
     let profile_str = &permission_config.permission_profile;
     let rules_files: Vec<String> = vec![
-        cwd.join(".pick").join("rules").join("default.rules").to_string_lossy().to_string(),
+        cwd.join(".pick")
+            .join("rules")
+            .join("default.rules")
+            .to_string_lossy()
+            .to_string(),
     ];
-    let permission_manager = PermissionManager::new(profile_str, &cwd, Some(&permission_config), &rules_files);
+    let permission_manager =
+        PermissionManager::new(profile_str, &cwd, Some(&permission_config), &rules_files);
 
     // Initialize theme system with the configured theme name and file watcher
     crate::core::theme::init_theme(settings.theme(), true);
@@ -398,7 +417,10 @@ async fn main() {
 
     // Initialize platform sandbox
     let default_sandbox_config = pick_agent::permission::sandbox::SandboxConfig::default();
-    let sandbox_config = permission_manager.sandbox_config.as_ref().unwrap_or(&default_sandbox_config);
+    let sandbox_config = permission_manager
+        .sandbox_config
+        .as_ref()
+        .unwrap_or(&default_sandbox_config);
 
     // Try to create and activate a platform sandbox
     let platform_sandbox: Option<std::sync::Arc<dyn pick_agent::permission::sandbox::Sandbox>> = {
@@ -407,24 +429,33 @@ async fn main() {
             let s = pick_sandbox::platforms::windows_restricted_token::WindowsRestrictedTokenSandbox::new(sandbox_config);
             if s.is_available() {
                 Some(std::sync::Arc::new(s))
-            } else { None }
+            } else {
+                None
+            }
         }
         #[cfg(target_os = "linux")]
         {
             let s = pick_sandbox::platforms::linux_bwrap::LinuxBwrapSandbox::new(sandbox_config);
             if s.is_available() {
                 Some(std::sync::Arc::new(s))
-            } else { None }
+            } else {
+                None
+            }
         }
         #[cfg(target_os = "macos")]
         {
-            let s = pick_sandbox::platforms::macos_seatbelt::MacosSeatbeltSandbox::new(sandbox_config);
+            let s =
+                pick_sandbox::platforms::macos_seatbelt::MacosSeatbeltSandbox::new(sandbox_config);
             if s.is_available() {
                 Some(std::sync::Arc::new(s))
-            } else { None }
+            } else {
+                None
+            }
         }
         #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
-        { None }
+        {
+            None
+        }
     };
 
     // Determine mode and run
@@ -432,22 +463,90 @@ async fn main() {
     let platform_sandbox = platform_sandbox; // shadow for clarity
     let update_action = match args.mode.as_str() {
         "rpc" => {
-            run_rpc_mode(args, tools_snapshot, auth, session_manager, extension_runner, agent_mode, agent_registry, pm, platform_sandbox).await;
+            run_rpc_mode(
+                args,
+                tools_snapshot,
+                auth,
+                session_manager,
+                extension_runner,
+                agent_mode,
+                agent_registry,
+                pm,
+                platform_sandbox,
+            )
+            .await;
             None
         }
         "json" | "print" => {
-            run_print_mode(args, tools_snapshot, auth, session_manager, initial_messages, extension_runner, agent_mode, agent_registry, pm, platform_sandbox).await;
+            run_print_mode(
+                args,
+                tools_snapshot,
+                auth,
+                session_manager,
+                initial_messages,
+                extension_runner,
+                agent_mode,
+                agent_registry,
+                pm,
+                platform_sandbox,
+            )
+            .await;
             None
         }
         "tui" => {
-            run_tui_mode(args, all_tools, auth, session_manager, initial_messages, extension_runner, agent_mode, agent_registry, mcp_manager, mcp_done_rx, mcp_cancelled, pm, platform_sandbox).await
+            run_tui_mode(
+                args,
+                all_tools,
+                auth,
+                session_manager,
+                initial_messages,
+                extension_runner,
+                agent_mode,
+                agent_registry,
+                mcp_manager,
+                mcp_done_rx,
+                mcp_cancelled,
+                pm,
+                platform_sandbox,
+            )
+            .await
         }
         "interactive" => {
-            run_interactive_mode(args, all_tools, auth, session_manager, initial_messages, extension_runner, agent_mode, agent_registry, mcp_manager, mcp_done_rx, mcp_cancelled, pm, platform_sandbox).await;
+            run_interactive_mode(
+                args,
+                all_tools,
+                auth,
+                session_manager,
+                initial_messages,
+                extension_runner,
+                agent_mode,
+                agent_registry,
+                mcp_manager,
+                mcp_done_rx,
+                mcp_cancelled,
+                pm,
+                platform_sandbox,
+            )
+            .await;
             None
         }
         _ => {
-            run_tui_mode(args, all_tools, auth, session_manager, initial_messages, extension_runner, agent_mode, agent_registry, mcp_manager, mcp_done_rx, mcp_cancelled, pm, platform_sandbox).await
+            run_tui_mode(
+                args,
+                all_tools,
+                auth,
+                session_manager,
+                initial_messages,
+                extension_runner,
+                agent_mode,
+                agent_registry,
+                mcp_manager,
+                mcp_done_rx,
+                mcp_cancelled,
+                pm,
+                platform_sandbox,
+            )
+            .await
         }
     };
 

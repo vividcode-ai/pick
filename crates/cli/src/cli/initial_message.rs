@@ -1,5 +1,4 @@
-﻿//! Build initial message for non-interactive mode
-
+//! Build initial message for non-interactive mode
 
 use crate::args::Args;
 
@@ -41,7 +40,11 @@ pub fn build_initial_message(input: InitialMessageInput) -> InitialMessageResult
     }
 
     InitialMessageResult {
-        initial_message: if parts.is_empty() { None } else { Some(parts.join("")) },
+        initial_message: if parts.is_empty() {
+            None
+        } else {
+            Some(parts.join(""))
+        },
         initial_images: input.file_images.filter(|v| !v.is_empty()),
     }
 }

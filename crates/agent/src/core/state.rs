@@ -1,10 +1,10 @@
-﻿//! Agent state management
+//! Agent state management
 
 use std::future::Future;
 use std::sync::Arc;
 
-use tokio::sync::mpsc;
 use pick_ai::types::{ContentBlock, Message, Model};
+use tokio::sync::mpsc;
 
 use crate::agent_registry::AgentRegistry;
 use crate::permission::fs_policy::FileSystemPolicy;
@@ -52,18 +52,23 @@ pub struct AgentTool {
     pub label: String,
     pub parameters: pick_ai::types::JsonSchema,
     pub execute: std::sync::Arc<
-        dyn Send + Sync + Fn(String, serde_json::Value, ToolContext) -> std::pin::Pin<
-            Box<dyn Send + Future<Output = Result<AgentToolResult, String>>>,
-        >,
+        dyn Send
+            + Sync
+            + Fn(
+                String,
+                serde_json::Value,
+                ToolContext,
+            )
+                -> std::pin::Pin<Box<dyn Send + Future<Output = Result<AgentToolResult, String>>>>,
     >,
     pub execution_mode: ToolExecutionMode,
 }
 
 /// Async approval callback: given a title and message, returns true if approved
 pub type ApproveFn = std::sync::Arc<
-    dyn Send + Sync + Fn(String, String) -> std::pin::Pin<
-        Box<dyn Send + std::future::Future<Output = bool>>
-    >
+    dyn Send
+        + Sync
+        + Fn(String, String) -> std::pin::Pin<Box<dyn Send + std::future::Future<Output = bool>>>,
 >;
 
 /// A question option presented to the user
@@ -85,9 +90,13 @@ pub struct QuestionPrompt {
 
 /// Async question callback: takes questions, returns answers (one Vec<String> per question)
 pub type QuestionFn = std::sync::Arc<
-    dyn Send + Sync + Fn(Vec<QuestionPrompt>) -> std::pin::Pin<
-        Box<dyn Send + std::future::Future<Output = Result<Vec<Vec<String>>, String>>>
-    >
+    dyn Send
+        + Sync
+        + Fn(
+            Vec<QuestionPrompt>,
+        ) -> std::pin::Pin<
+            Box<dyn Send + std::future::Future<Output = Result<Vec<Vec<String>>, String>>>,
+        >,
 >;
 
 /// Context passed to tool execute functions, including cancellation and progress reporting.
@@ -131,7 +140,10 @@ impl std::fmt::Debug for ToolContext {
             .field("approve", &self.approve.as_ref().map(|_| "ApproveFn"))
             .field("question", &self.question.as_ref().map(|_| "QuestionFn"))
             .field("agent_id", &self.agent_id)
-            .field("agent_registry", &self.agent_registry.as_ref().map(|_| "AgentRegistry"))
+            .field(
+                "agent_registry",
+                &self.agent_registry.as_ref().map(|_| "AgentRegistry"),
+            )
             .field("default_model", &self.default_model.as_ref().map(|m| &m.id))
             .finish()
     }

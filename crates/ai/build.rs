@@ -1,4 +1,4 @@
-﻿//! Build script for model registry code generation.
+//! Build script for model registry code generation.
 //! Reads models/providers/*.json and generates:
 //!   1. models_data.json — serialized model registry (loaded at runtime)
 //!   2. models_generated.rs — thin wrapper that deserializes the JSON
@@ -66,7 +66,8 @@ fn main() {
 
         let models = provider_json["models"].as_array().unwrap();
 
-        let mut provider_models: serde_json::Map<String, serde_json::Value> = serde_json::Map::new();
+        let mut provider_models: serde_json::Map<String, serde_json::Value> =
+            serde_json::Map::new();
 
         for model_val in models {
             let id = model_val["id"].as_str().unwrap_or("unknown");
@@ -104,7 +105,10 @@ fn main() {
                         if v.is_null() {
                             tlm_map.insert(k.clone(), serde_json::Value::Null);
                         } else {
-                            tlm_map.insert(k.clone(), serde_json::Value::String(v.as_str().unwrap_or("").to_string()));
+                            tlm_map.insert(
+                                k.clone(),
+                                serde_json::Value::String(v.as_str().unwrap_or("").to_string()),
+                            );
                         }
                     }
                     serde_json::Value::Object(tlm_map)
@@ -120,7 +124,10 @@ fn main() {
                 if let Some(obj) = h.as_object() {
                     let mut h_map = serde_json::Map::new();
                     for (k, v) in obj {
-                        h_map.insert(k.clone(), serde_json::Value::String(v.as_str().unwrap_or("").to_string()));
+                        h_map.insert(
+                            k.clone(),
+                            serde_json::Value::String(v.as_str().unwrap_or("").to_string()),
+                        );
                     }
                     serde_json::Value::Object(h_map)
                 } else {
@@ -153,13 +160,17 @@ fn main() {
             provider_models.insert(id.to_string(), model_entry);
         }
 
-        registry.insert(provider_id.to_string(), serde_json::Value::Object(provider_models));
+        registry.insert(
+            provider_id.to_string(),
+            serde_json::Value::Object(provider_models),
+        );
     }
 
     // Write JSON data file
-    let json_data = serde_json::to_string(&serde_json::Value::Object(registry)).unwrap_or_else(|e| {
-        panic!("failed to serialize model registry: {e}");
-    });
+    let json_data =
+        serde_json::to_string(&serde_json::Value::Object(registry)).unwrap_or_else(|e| {
+            panic!("failed to serialize model registry: {e}");
+        });
     fs::write(&output_json, &json_data).unwrap_or_else(|e| {
         panic!("failed to write {}: {e}", output_json.display());
     });
@@ -178,13 +189,20 @@ pub static MODEL_REGISTRY: LazyLock<HashMap<String, HashMap<String, Model>>> = L
         panic!("failed to write {}: {e}", output_rs.display());
     });
 
-    let total = json_files.iter().filter_map(|p| {
-        let content = fs::read_to_string(p).ok()?;
-        let val: serde_json::Value = serde_json::from_str(&content).ok()?;
-        val["models"].as_array().map(|a| a.len())
-    }).sum::<usize>();
+    let total = json_files
+        .iter()
+        .filter_map(|p| {
+            let content = fs::read_to_string(p).ok()?;
+            let val: serde_json::Value = serde_json::from_str(&content).ok()?;
+            val["models"].as_array().map(|a| a.len())
+        })
+        .sum::<usize>();
 
-    eprintln!("Generated model registry ({} providers, {} models)", json_files.len(), total);
+    eprintln!(
+        "Generated model registry ({} providers, {} models)",
+        json_files.len(),
+        total
+    );
 }
 
 fn write_empty(rs_path: &PathBuf, json_path: &PathBuf) {

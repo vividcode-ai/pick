@@ -1,6 +1,8 @@
-use ratatui::text::Line;
+use crate::wrapping::helpers::{
+    IntoLineInput, flatten_line, push_owned_lines, slice_line_spans, wrap_ranges_trim,
+};
 use crate::wrapping::options::RtOptions;
-use crate::wrapping::helpers::{push_owned_lines, flatten_line, slice_line_spans, wrap_ranges_trim, IntoLineInput};
+use ratatui::text::Line;
 
 #[must_use]
 pub(crate) fn word_wrap_line<'a, O>(line: &'a Line<'a>, width_or_options: O) -> Vec<Line<'a>>
@@ -19,7 +21,10 @@ where
 
     let mut out: Vec<Line<'a>> = Vec::new();
 
-    let initial_width_available = opts.width.saturating_sub(rt_opts.initial_indent.width()).max(1);
+    let initial_width_available = opts
+        .width
+        .saturating_sub(rt_opts.initial_indent.width())
+        .max(1);
     let initial_wrapped = wrap_ranges_trim(&flat, opts.clone().width(initial_width_available));
     let Some(first_line_range) = initial_wrapped.first() else {
         return vec![rt_opts.initial_indent.clone()];
@@ -43,7 +48,10 @@ where
     let base = first_line_range.end;
     let skip_leading_spaces = flat[base..].chars().take_while(|c| *c == ' ').count();
     let base = base + skip_leading_spaces;
-    let subsequent_width_available = opts.width.saturating_sub(rt_opts.subsequent_indent.width()).max(1);
+    let subsequent_width_available = opts
+        .width
+        .saturating_sub(rt_opts.subsequent_indent.width())
+        .max(1);
     let remaining_wrapped = wrap_ranges_trim(&flat[base..], opts.width(subsequent_width_available));
     for r in &remaining_wrapped {
         if r.is_empty() {

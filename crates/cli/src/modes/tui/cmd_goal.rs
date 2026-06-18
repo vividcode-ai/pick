@@ -30,16 +30,17 @@ pub(crate) async fn handle_goal(ctx: &mut TuiContext, args: &[String]) -> bool {
                         format!("{}h {}m", secs / 3600, (secs % 3600) / 60)
                     }
                 };
-                ctx.tui
-                    .chat
-                    .add_system_message(&format!("\x1b[1mGoal\x1b[0m  \x1b[36m{}\x1b[0m", goal.objective));
+                ctx.tui.chat.add_system_message(&format!(
+                    "\x1b[1mGoal\x1b[0m  \x1b[36m{}\x1b[0m",
+                    goal.objective
+                ));
                 ctx.tui.chat.add_system_message(&format!(
                     "  Status: {}  Tokens: {}  Time: {}{}",
                     label, goal.tokens_used, elapsed, remaining
                 ));
-                ctx.tui.chat.add_system_message(
-                    "/goal edit  /goal pause  /goal resume  /goal clear",
-                );
+                ctx.tui
+                    .chat
+                    .add_system_message("/goal edit  /goal pause  /goal resume  /goal clear");
             }
             None => {
                 ctx.tui.chat.add_system_message(
@@ -55,26 +56,28 @@ pub(crate) async fn handle_goal(ctx: &mut TuiContext, args: &[String]) -> bool {
     match args_str.to_ascii_lowercase().as_str() {
         "clear" => {
             ctx.session_manager.clear_goal().await.ok();
-            ctx.tui.chat.add_system_message("\x1b[33mGoal cleared.\x1b[0m");
-            let _ = ctx
-                .cmd_tx
-                .send(super::types::TuiCommand::ClearStatus);
+            ctx.tui
+                .chat
+                .add_system_message("\x1b[33mGoal cleared.\x1b[0m");
+            let _ = ctx.cmd_tx.send(super::types::TuiCommand::ClearStatus);
         }
         "pause" => match goal_manager.set_paused() {
             Ok(goal) => {
                 ctx.session_manager.persist_goal().await.ok();
-                ctx.tui
-                    .chat
-                    .add_system_message(&format!("\x1b[33mGoal paused.\x1b[0m  {}", goal.objective));
+                ctx.tui.chat.add_system_message(&format!(
+                    "\x1b[33mGoal paused.\x1b[0m  {}",
+                    goal.objective
+                ));
             }
             Err(e) => ctx.tui.show_error(&e),
         },
         "resume" => match goal_manager.set_active() {
             Ok(goal) => {
                 ctx.session_manager.persist_goal().await.ok();
-                ctx.tui
-                    .chat
-                    .add_system_message(&format!("\x1b[32mGoal resumed.\x1b[0m  {}", goal.objective));
+                ctx.tui.chat.add_system_message(&format!(
+                    "\x1b[32mGoal resumed.\x1b[0m  {}",
+                    goal.objective
+                ));
             }
             Err(e) => ctx.tui.show_error(&e),
         },

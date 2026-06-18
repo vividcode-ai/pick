@@ -1,7 +1,9 @@
-﻿use super::truncate::*;
 use super::path_utils::resolve_to_cwd;
-use super::render_utils::{ToolRenderContext, ToolRenderOptions, ToolRenderOutput, ToolTheme,
-    shorten_path, invalid_arg_text, get_text_output, normalize_display_text};
+use super::render_utils::{
+    ToolRenderContext, ToolRenderOptions, ToolRenderOutput, ToolTheme, get_text_output,
+    invalid_arg_text, normalize_display_text, shorten_path,
+};
+use super::truncate::*;
 
 /// Create a read tool definition
 pub fn create_read_tool_definition() -> ReadToolDefinition {
@@ -29,13 +31,21 @@ impl ReadToolDefinition {
         let absolute_path = resolve_to_cwd(path, cwd);
 
         // Check if file exists
-        if !tokio::fs::try_exists(&absolute_path).await.map_err(|e| e.to_string())? {
+        if !tokio::fs::try_exists(&absolute_path)
+            .await
+            .map_err(|e| e.to_string())?
+        {
             return Err(format!("File not found: {}", path));
         }
 
         // Check if it's an image (by extension)
         let is_image = matches!(
-            absolute_path.rsplit('.').next().unwrap_or("").to_lowercase().as_str(),
+            absolute_path
+                .rsplit('.')
+                .next()
+                .unwrap_or("")
+                .to_lowercase()
+                .as_str(),
             "png" | "jpg" | "jpeg" | "gif" | "webp"
         );
 
@@ -93,12 +103,19 @@ impl ReadToolDefinition {
             if truncation.truncated_by == Some(TruncationType::Lines) {
                 output_text.push_str(&format!(
                     "\n\n[Showing lines {}-{} of {}. Use offset={} to continue.]",
-                    start_line + 1, end_line_display, total_file_lines, next_offset
+                    start_line + 1,
+                    end_line_display,
+                    total_file_lines,
+                    next_offset
                 ));
             } else {
                 output_text.push_str(&format!(
                     "\n\n[Showing lines {}-{} of {} ({} limit). Use offset={} to continue.]",
-                    start_line + 1, end_line_display, total_file_lines, format_size(DEFAULT_MAX_BYTES), next_offset
+                    start_line + 1,
+                    end_line_display,
+                    total_file_lines,
+                    format_size(DEFAULT_MAX_BYTES),
+                    next_offset
                 ));
             }
             details = Some(ReadToolDetails {
@@ -123,7 +140,13 @@ pub struct ReadToolDetails {
 }
 
 fn get_mime_type(path: &str) -> &str {
-    match path.rsplit('.').next().unwrap_or("").to_lowercase().as_str() {
+    match path
+        .rsplit('.')
+        .next()
+        .unwrap_or("")
+        .to_lowercase()
+        .as_str()
+    {
         "png" => "image/png",
         "jpg" | "jpeg" => "image/jpeg",
         "gif" => "image/gif",
@@ -155,7 +178,9 @@ fn trim_trailing_empty_lines(lines: Vec<&str>) -> Vec<&str> {
 
 /// Render a read tool call — one-line summary like `read /path/to/file:1-50`
 pub fn render_read_call(args: &serde_json::Value, _ctx: &ToolRenderContext) -> ToolRenderOutput {
-    let path = args.get("path").and_then(|v| v.as_str())
+    let path = args
+        .get("path")
+        .and_then(|v| v.as_str())
         .or_else(|| args.get("file_path").and_then(|v| v.as_str()));
     let offset = args.get("offset").and_then(|v| v.as_u64());
     let limit = args.get("limit").and_then(|v| v.as_u64());
@@ -167,12 +192,12 @@ pub fn render_read_call(args: &serde_json::Value, _ctx: &ToolRenderContext) -> T
 
     let range = format_read_line_range(offset, limit);
 
-    let label = ToolTheme::fg("toolTitle", &ToolTheme::bold("read"))
-        + " "
-        + &path_display
-        + &range;
+    let label = ToolTheme::fg("toolTitle", &ToolTheme::bold("read")) + " " + &path_display + &range;
 
-    ToolRenderOutput { label, formatted: String::new() }
+    ToolRenderOutput {
+        label,
+        formatted: String::new(),
+    }
 }
 
 /// Render a read tool result — file content with line display
@@ -182,7 +207,10 @@ pub fn render_read_result(
     ctx: &ToolRenderContext,
 ) -> ToolRenderOutput {
     if !options.expanded && !ctx.is_error {
-        return ToolRenderOutput { label: String::new(), formatted: String::new() };
+        return ToolRenderOutput {
+            label: String::new(),
+            formatted: String::new(),
+        };
     }
 
     let raw = get_text_output(&output.content, ctx.show_images);
@@ -196,37 +224,66 @@ pub fn render_read_result(
 
     let mut formatted = "\n".to_string();
     formatted.push_str(
-        &display_lines.iter()
+        &display_lines
+            .iter()
             .map(|line| ToolTheme::fg("toolOutput", line))
             .collect::<Vec<_>>()
             .join("\n"),
     );
 
     if remaining > 0 {
-        formatted.push_str(
-            &ToolTheme::fg("muted", &format!("\n... ({} more lines, use expand to expand)", remaining)),
-        );
+        formatted.push_str(&ToolTheme::fg(
+            "muted",
+            &format!("\n... ({} more lines, use expand to expand)", remaining),
+        ));
     }
 
     if let Some(ref details) = output.details {
         if let Some(ref truncation) = details.truncation {
             if truncation.truncated {
                 if truncation.first_line_exceeds_limit {
-                    formatted.push_str(&format!("\n{}",
-                        ToolTheme::fg("warning", &format!("[First line exceeds {} limit]",
-                            format_size(truncation.max_bytes)))));
+                    formatted.push_str(&format!(
+                        "\n{}",
+                        ToolTheme::fg(
+                            "warning",
+                            &format!(
+                                "[First line exceeds {} limit]",
+                                format_size(truncation.max_bytes)
+                            )
+                        )
+                    ));
                 } else if truncation.truncated_by == Some(TruncationType::Lines) {
-                    formatted.push_str(&format!("\n{}",
-                        ToolTheme::fg("warning", &format!("[Truncated: showing {} of {} lines ({} line limit)]",
-                            truncation.output_lines, truncation.total_lines, truncation.max_lines))));
+                    formatted.push_str(&format!(
+                        "\n{}",
+                        ToolTheme::fg(
+                            "warning",
+                            &format!(
+                                "[Truncated: showing {} of {} lines ({} line limit)]",
+                                truncation.output_lines,
+                                truncation.total_lines,
+                                truncation.max_lines
+                            )
+                        )
+                    ));
                 } else {
-                    formatted.push_str(&format!("\n{}",
-                        ToolTheme::fg("warning", &format!("[Truncated: {} lines shown ({} limit)]",
-                            truncation.output_lines, format_size(truncation.max_bytes)))));
+                    formatted.push_str(&format!(
+                        "\n{}",
+                        ToolTheme::fg(
+                            "warning",
+                            &format!(
+                                "[Truncated: {} lines shown ({} limit)]",
+                                truncation.output_lines,
+                                format_size(truncation.max_bytes)
+                            )
+                        )
+                    ));
                 }
             }
         }
     }
 
-    ToolRenderOutput { label: String::new(), formatted }
+    ToolRenderOutput {
+        label: String::new(),
+        formatted,
+    }
 }

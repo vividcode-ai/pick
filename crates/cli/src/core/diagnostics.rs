@@ -1,5 +1,4 @@
-﻿//! Resource diagnostics types
-
+//! Resource diagnostics types
 
 /// A collision between two resources of the same type
 #[derive(Debug, Clone)]
@@ -43,9 +42,7 @@ impl ResourceDiagnostic {
     pub fn collision(collision: ResourceCollision) -> Self {
         let message = format!(
             "Collision on '{}': {} wins over {}",
-            collision.name,
-            collision.winner_path,
-            collision.loser_path
+            collision.name, collision.winner_path, collision.loser_path
         );
         Self {
             type_: "collision".to_string(),

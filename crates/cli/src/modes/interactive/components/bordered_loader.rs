@@ -1,5 +1,4 @@
-﻿//! Loader wrapped with borders for extension UI
-
+//! Loader wrapped with borders for extension UI
 
 use crate::core::tools::render_utils::ToolTheme;
 
@@ -8,9 +7,17 @@ pub fn render_bordered_loader(message: &str, cancellable: bool, width: usize) ->
     let mut lines = Vec::new();
     let border = "─".repeat(std::cmp::max(1, width));
     lines.push(ToolTheme::fg("dim", &border));
-    lines.push(format!(" {} {}", ToolTheme::fg("accent", "\u{25D0}"), message));
+    lines.push(format!(
+        " {} {}",
+        ToolTheme::fg("accent", "\u{25D0}"),
+        message
+    ));
     if cancellable {
-        lines.push(format!(" {} {}", ToolTheme::fg("muted", ""), ToolTheme::fg("dim", "(Esc to cancel)")));
+        lines.push(format!(
+            " {} {}",
+            ToolTheme::fg("muted", ""),
+            ToolTheme::fg("dim", "(Esc to cancel)")
+        ));
     }
     lines.push(ToolTheme::fg("dim", &border));
     lines

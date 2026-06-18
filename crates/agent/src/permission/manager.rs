@@ -1,8 +1,8 @@
-﻿use std::path::Path;
+use std::path::Path;
 use std::sync::Arc;
 
 use super::approval::{ApprovalPolicy, PermissionConfig};
-use super::audit::{AuditTrail, AuditDecision, AuditLayer};
+use super::audit::{AuditDecision, AuditLayer, AuditTrail};
 use super::exec_policy::ExecPolicy;
 use super::external_dir::ExternalDirectoryAuth;
 use super::guardian::{Guardian, GuardianConfig};
@@ -45,7 +45,11 @@ impl PermissionManager {
                 let p = std::path::Path::new(path);
                 if p.exists() {
                     if let Err(e) = ep.load_rules_from_file(p) {
-                        eprintln!("[Pick] Warning: failed to load rules file '{}': {}", p.display(), e);
+                        eprintln!(
+                            "[Pick] Warning: failed to load rules file '{}': {}",
+                            p.display(),
+                            e
+                        );
                     }
                 }
             }
@@ -147,7 +151,10 @@ impl PermissionManager {
             ApprovalPolicy::UnlessTrusted => {
                 if let Some(ref ep) = self.exec_policy {
                     // Only prompt for commands that aren't explicitly allowed
-                    matches!(ep.evaluate(command), super::exec_policy::ExecDecision::Prompt)
+                    matches!(
+                        ep.evaluate(command),
+                        super::exec_policy::ExecDecision::Prompt
+                    )
                 } else {
                     // No exec policy = no trust info = prompt
                     true
@@ -204,7 +211,9 @@ impl PermissionManager {
     }
 
     pub fn guardian_circuit_message(&self) -> Option<&'static str> {
-        self.guardian.as_ref().and_then(|g| g.circuit_breaker_message())
+        self.guardian
+            .as_ref()
+            .and_then(|g| g.circuit_breaker_message())
     }
 
     /// Record a permission decision in the audit trail.
@@ -218,6 +227,14 @@ impl PermissionManager {
         reason: &str,
         matched_rule: Option<&str>,
     ) {
-        self.audit_trail.record(tool_name, permission_key, target, decision, layer, reason, matched_rule);
+        self.audit_trail.record(
+            tool_name,
+            permission_key,
+            target,
+            decision,
+            layer,
+            reason,
+            matched_rule,
+        );
     }
 }

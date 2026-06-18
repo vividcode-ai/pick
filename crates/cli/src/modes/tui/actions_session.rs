@@ -49,20 +49,14 @@ pub(crate) async fn handle_open_tree(ctx: &mut TuiContext) {
         });
     }
 
-    let current_leaf = ctx
-        .session_manager
-        .get_leaf_id()
-        .map(|s| s.to_string());
+    let current_leaf = ctx.session_manager.get_leaf_id().map(|s| s.to_string());
     let tree_view = TreeView::new(items, current_leaf, active_path);
     ctx.tui.start_tree_view(tree_view);
     ctx.tui.finalize_turn();
 }
 
 /// Handle tree selection result (navigation, labeling)
-pub(crate) async fn handle_tree_selection(
-    ctx: &mut TuiContext,
-    val: &str,
-) -> Option<String> {
+pub(crate) async fn handle_tree_selection(ctx: &mut TuiContext, val: &str) -> Option<String> {
     // Label change
     if let Some(rest) = val.strip_prefix("__label__") {
         if let Some(delim) = rest.find(':') {
@@ -78,8 +72,7 @@ pub(crate) async fn handle_tree_selection(
                 .append_label_change(entry_id, label_opt.as_deref())
                 .await
             {
-                ctx.tui
-                    .show_error(&format!("Failed to save label: {}", e));
+                ctx.tui.show_error(&format!("Failed to save label: {}", e));
             } else {
                 ctx.tui.chat.add_system_message(&format!(
                     "Label {} for entry.",
@@ -98,9 +91,7 @@ pub(crate) async fn handle_tree_selection(
     let target_id = val.to_string();
     let current_leaf = ctx.session_manager.get_leaf_id();
     if current_leaf == Some(target_id.as_str()) {
-        ctx.tui
-            .chat
-            .add_system_message("Already at this point.");
+        ctx.tui.chat.add_system_message("Already at this point.");
         return Some(String::new());
     }
 
@@ -167,13 +158,11 @@ pub(crate) async fn handle_fork(ctx: &mut TuiContext, idx: usize) {
 
     match SessionManager::create(cwd.clone(), Some(session_dir)).await {
         Ok(mut new_mgr) => {
-            let fork_msgs: Vec<Message> = ctx.all_messages
-                [..=idx.min(ctx.all_messages.len().saturating_sub(1))]
-                .to_vec();
+            let fork_msgs: Vec<Message> =
+                ctx.all_messages[..=idx.min(ctx.all_messages.len().saturating_sub(1))].to_vec();
             for msg in &fork_msgs {
                 if let Err(e) = new_mgr.append(SessionEntry::from(msg)).await {
-                    ctx.tui
-                        .show_error(&format!("Fork persist failed: {}", e));
+                    ctx.tui.show_error(&format!("Fork persist failed: {}", e));
                 }
             }
             ctx.all_messages = fork_msgs;
@@ -187,9 +176,7 @@ pub(crate) async fn handle_fork(ctx: &mut TuiContext, idx: usize) {
 
             // Fire session_tree extension event
             if let Some(ref runner) = ctx.extension_runner {
-                use pick_agent::extensions::types::{
-                    ExtensionEvent, SessionTreeEvent,
-                };
+                use pick_agent::extensions::types::{ExtensionEvent, SessionTreeEvent};
                 runner.emit(&ExtensionEvent::SessionTree(SessionTreeEvent {
                     new_leaf_id: Some(uuid::Uuid::now_v7().to_string()),
                     old_leaf_id: None,
@@ -198,9 +185,7 @@ pub(crate) async fn handle_fork(ctx: &mut TuiContext, idx: usize) {
                 }));
             }
         }
-        Err(e) => ctx
-            .tui
-            .show_error(&format!("Fork failed: {}", e)),
+        Err(e) => ctx.tui.show_error(&format!("Fork failed: {}", e)),
     }
 }
 
@@ -246,9 +231,7 @@ pub(crate) async fn handle_resume(ctx: &mut TuiContext, session_id: &str) {
 /// Handle clone session
 pub(crate) async fn handle_clone(ctx: &mut TuiContext) {
     if ctx.all_messages.is_empty() {
-        ctx.tui
-            .chat
-            .add_system_message("Nothing to clone yet.");
+        ctx.tui.chat.add_system_message("Nothing to clone yet.");
         return;
     }
 
@@ -259,8 +242,7 @@ pub(crate) async fn handle_clone(ctx: &mut TuiContext) {
             let msg_count = ctx.all_messages.len();
             for msg in &ctx.all_messages {
                 if let Err(e) = new_mgr.append(SessionEntry::from(msg)).await {
-                    ctx.tui
-                        .show_error(&format!("Clone persist failed: {}", e));
+                    ctx.tui.show_error(&format!("Clone persist failed: {}", e));
                 }
             }
             ctx.session_manager = new_mgr;
@@ -271,9 +253,7 @@ pub(crate) async fn handle_clone(ctx: &mut TuiContext) {
                 msg_count
             ));
         }
-        Err(e) => ctx
-            .tui
-            .show_error(&format!("Clone failed: {}", e)),
+        Err(e) => ctx.tui.show_error(&format!("Clone failed: {}", e)),
     }
 }
 
@@ -310,8 +290,7 @@ pub(crate) async fn handle_new_session(ctx: &mut TuiContext) {
                 .clear_scrollback_and_visible_screen_ansi();
             let _ = ctx.terminal_manager.reset_for_new_session();
             ctx.tui.show_startup_header(width);
-            ctx.tui
-                .show_error(&format!("Session create failed: {}", e));
+            ctx.tui.show_error(&format!("Session create failed: {}", e));
             ctx.tui.session_name = None;
             ctx.tui.update_terminal_title();
         }
@@ -322,7 +301,11 @@ fn rebuild_session_after_navigation(ctx: &mut TuiContext, _target_id: &str) {
     // This is called from handle_tree_selection when navigating directly.
     // navigate_to does all the work including the async leaf change.
     // But since we handle async separately, we call the sync parts directly.
-    let tid = ctx.session_manager.get_leaf_id().unwrap_or_default().to_string();
+    let tid = ctx
+        .session_manager
+        .get_leaf_id()
+        .unwrap_or_default()
+        .to_string();
 
     let path = ctx.session_manager.get_path_to_root(&tid);
     let new_messages: Vec<Message> = path
@@ -331,12 +314,10 @@ fn rebuild_session_after_navigation(ctx: &mut TuiContext, _target_id: &str) {
         .collect();
     ctx.all_messages = new_messages;
     ctx.tui.chat.clear();
-    ctx.tui
-        .chat
-        .add_system_message(&format!(
-            "Navigated. Context rebuilt with {} messages.",
-            ctx.all_messages.len()
-        ));
+    ctx.tui.chat.add_system_message(&format!(
+        "Navigated. Context rebuilt with {} messages.",
+        ctx.all_messages.len()
+    ));
     for msg in &ctx.all_messages {
         if let Message::User(u) = msg {
             for block in &u.content {

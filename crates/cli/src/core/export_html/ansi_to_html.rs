@@ -1,5 +1,4 @@
-﻿//! ANSI escape code to HTML converter
-
+//! ANSI escape code to HTML converter
 
 /// Standard ANSI color palette (0-15)
 const ANSI_COLORS: [&str; 16] = [
@@ -36,7 +35,12 @@ fn color256_to_hex(index: u8) -> String {
         let g = (cube_index % 36) / 6;
         let b = cube_index % 6;
         let to_component = |n: usize| if n == 0 { 0 } else { 55 + n * 40 };
-        format!("#{:02x}{:02x}{:02x}", to_component(r), to_component(g), to_component(b))
+        format!(
+            "#{:02x}{:02x}{:02x}",
+            to_component(r),
+            to_component(g),
+            to_component(b)
+        )
     } else {
         // Grayscale (232-255): 24 shades
         let gray = 8 + (idx - 232) * 10;
@@ -92,7 +96,12 @@ fn style_to_inline_css(style: &TextStyle) -> String {
 }
 
 fn has_style(style: &TextStyle) -> bool {
-    style.fg.is_some() || style.bg.is_some() || style.bold || style.dim || style.italic || style.underline
+    style.fg.is_some()
+        || style.bg.is_some()
+        || style.bold
+        || style.dim
+        || style.italic
+        || style.underline
 }
 
 /// Parse ANSI SGR (Select Graphic Rendition) codes and update style
@@ -140,7 +149,7 @@ fn apply_sgr_code(params: &[u16], style: &mut TextStyle) {
                     i += 4;
                 }
             }
-            39 => style.fg = None,   // Default foreground
+            39 => style.fg = None, // Default foreground
             40..=47 => {
                 // Standard background
                 style.bg = Some(ANSI_COLORS[(code - 40) as usize].to_string());
@@ -160,7 +169,7 @@ fn apply_sgr_code(params: &[u16], style: &mut TextStyle) {
                     i += 4;
                 }
             }
-            49 => style.bg = None,   // Default background
+            49 => style.bg = None, // Default background
             90..=97 => {
                 // Bright foreground
                 style.fg = Some(ANSI_COLORS[(code - 90 + 8) as usize].to_string());
@@ -195,7 +204,8 @@ fn parse_ansi_sequences(text: &str) -> Vec<(usize, usize, Vec<u16>)> {
                 let params: Vec<u16> = if param_str.is_empty() {
                     vec![0]
                 } else {
-                    param_str.split(';')
+                    param_str
+                        .split(';')
                         .filter_map(|s| s.parse::<u16>().ok())
                         .collect()
                 };

@@ -1,5 +1,4 @@
-﻿//! User message selector component for session branching
-
+//! User message selector component for session branching
 
 use crate::core::tools::render_utils::ToolTheme;
 
@@ -24,7 +23,10 @@ pub fn render_user_message_selector(
     // Header
     lines.push(String::new());
     lines.push(ToolTheme::bold("Fork from Message"));
-    lines.push(ToolTheme::fg("muted", "Select a user message to copy the active path up to that point into a new session"));
+    lines.push(ToolTheme::fg(
+        "muted",
+        "Select a user message to copy the active path up to that point into a new session",
+    ));
     lines.push(String::new());
     lines.push(ToolTheme::fg("accent", &border));
     lines.push(String::new());
@@ -82,7 +84,10 @@ pub fn render_user_message_selector(
     }
 
     if total > max_visible {
-        lines.push(ToolTheme::fg("muted", &format!("  ({}/{})", selected_index + 1, total)));
+        lines.push(ToolTheme::fg(
+            "muted",
+            &format!("  ({}/{})", selected_index + 1, total),
+        ));
     }
 
     lines.push(String::new());

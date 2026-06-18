@@ -1,4 +1,4 @@
-﻿//! Image processing utilities
+//! Image processing utilities
 
 use std::io::Cursor;
 use std::path::Path;
@@ -54,7 +54,10 @@ pub fn read_exif_orientation(path: &Path) -> Option<ImageOrientation> {
     let exif = exif_reader.read_from_container(&mut reader).ok()?;
 
     let orientation = exif.get_field(exif::Tag::Orientation, exif::In::PRIMARY)?;
-    let value = orientation.value.display_as(exif::Tag::Orientation).to_string();
+    let value = orientation
+        .value
+        .display_as(exif::Tag::Orientation)
+        .to_string();
     match value.as_str() {
         "1" => Some(ImageOrientation::Normal),
         "2" => Some(ImageOrientation::FlipHorizontal),
@@ -83,7 +86,8 @@ pub fn apply_orientation(bytes: &[u8], orientation: ImageOrientation) -> Result<
     };
 
     let mut output = Cursor::new(Vec::new());
-    rotated.write_to(&mut output, image::ImageFormat::Png)
+    rotated
+        .write_to(&mut output, image::ImageFormat::Png)
         .map_err(|e| format!("Failed to encode image: {}", e))?;
     Ok(output.into_inner())
 }
@@ -111,7 +115,8 @@ pub fn resize_image(
 
     let resized = img.resize_exact(new_width, new_height, image::imageops::FilterType::Lanczos3);
     let mut output = Cursor::new(Vec::new());
-    resized.write_to(&mut output, image::ImageFormat::Png)
+    resized
+        .write_to(&mut output, image::ImageFormat::Png)
         .map_err(|e| format!("Failed to encode resized image: {}", e))?;
     Ok(output.into_inner())
 }

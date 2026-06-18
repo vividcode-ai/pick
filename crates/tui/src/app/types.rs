@@ -135,7 +135,8 @@ pub struct TuiApp {
     pub pending_from_flush: bool,
     pub pending_submitted_count: usize,
     pub question_dialog: Option<crate::components::QuestionDialog>,
-    pub question_response_tx: Option<tokio::sync::oneshot::Sender<Result<Vec<Vec<String>>, String>>>,
+    pub question_response_tx:
+        Option<tokio::sync::oneshot::Sender<Result<Vec<Vec<String>>, String>>>,
     pub update_prompt: Option<crate::components::UpdatePromptState>,
     pub todo_items: Vec<serde_json::Value>,
     pub todo_scroll_offset: usize,
@@ -180,7 +181,11 @@ pub fn format_cwd_for_footer(cwd: &str, home: Option<&str>) -> String {
 pub fn ansi_to_styled_line(s: &str) -> ratatui::text::Line<'static> {
     use ansi_to_tui::IntoText as _;
     match s.as_bytes().into_text() {
-        Ok(text) => text.lines.into_iter().next().unwrap_or(ratatui::text::Line::from("")),
+        Ok(text) => text
+            .lines
+            .into_iter()
+            .next()
+            .unwrap_or(ratatui::text::Line::from("")),
         Err(_) => ratatui::text::Line::from(s.to_string()),
     }
 }

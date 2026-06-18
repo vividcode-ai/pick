@@ -1,8 +1,8 @@
+use super::context::TuiContext;
 use crate::core::settings::{
     CompactionSettings, ImageSettings, Settings, SettingsManager, TerminalSettings,
     WarningsSettings,
 };
-use super::context::TuiContext;
 
 macro_rules! toggle_bool_setting {
     ($sm:expr, $ctx:expr, $field:ident, $label:expr) => {{
@@ -49,7 +49,12 @@ pub(crate) fn toggle_enable_install_telemetry(sm: &mut SettingsManager, ctx: &mu
 }
 
 pub(crate) async fn toggle_compact(sm: &mut SettingsManager, ctx: &mut TuiContext) {
-    let current = sm.get().compaction.as_ref().and_then(|c| c.enabled).unwrap_or(true);
+    let current = sm
+        .get()
+        .compaction
+        .as_ref()
+        .and_then(|c| c.enabled)
+        .unwrap_or(true);
     let new_enabled = !current;
     let mut update = Settings::default();
     update.compaction = Some(CompactionSettings {
@@ -65,79 +70,140 @@ pub(crate) async fn toggle_compact(sm: &mut SettingsManager, ctx: &mut TuiContex
                 if new_enabled { "enabled" } else { "disabled" }
             ));
         }
-        Err(e) => ctx.tui.show_error(&format!("Failed to save setting: {}", e)),
+        Err(e) => ctx
+            .tui
+            .show_error(&format!("Failed to save setting: {}", e)),
     }
 }
 
 pub(crate) async fn toggle_show_images(sm: &mut SettingsManager, ctx: &mut TuiContext) {
-    let current = sm.get().terminal.as_ref().and_then(|t| t.show_images).unwrap_or(true);
+    let current = sm
+        .get()
+        .terminal
+        .as_ref()
+        .and_then(|t| t.show_images)
+        .unwrap_or(true);
     let mut update = Settings::default();
     update.terminal = Some(TerminalSettings {
-        show_images: Some(!current), image_width_cells: None, clear_on_shrink: None, show_terminal_progress: None,
+        show_images: Some(!current),
+        image_width_cells: None,
+        clear_on_shrink: None,
+        show_terminal_progress: None,
     });
     match sm.set_global(update) {
         Ok(()) => ctx.tui.chat.add_system_message(&format!(
-            "Show images \x1b[1m{}\x1b[0m.", if !current { "enabled" } else { "disabled" }
+            "Show images \x1b[1m{}\x1b[0m.",
+            if !current { "enabled" } else { "disabled" }
         )),
-        Err(e) => ctx.tui.show_error(&format!("Failed to save setting: {}", e)),
+        Err(e) => ctx
+            .tui
+            .show_error(&format!("Failed to save setting: {}", e)),
     }
 }
 
 pub(crate) async fn toggle_auto_resize_images(sm: &mut SettingsManager, ctx: &mut TuiContext) {
-    let current = sm.get().images.as_ref().and_then(|i| i.auto_resize).unwrap_or(true);
+    let current = sm
+        .get()
+        .images
+        .as_ref()
+        .and_then(|i| i.auto_resize)
+        .unwrap_or(true);
     let mut update = Settings::default();
-    update.images = Some(ImageSettings { auto_resize: Some(!current), block_images: None });
+    update.images = Some(ImageSettings {
+        auto_resize: Some(!current),
+        block_images: None,
+    });
     match sm.set_global(update) {
         Ok(()) => ctx.tui.chat.add_system_message(&format!(
-            "Auto-resize images \x1b[1m{}\x1b[0m.", if !current { "enabled" } else { "disabled" }
+            "Auto-resize images \x1b[1m{}\x1b[0m.",
+            if !current { "enabled" } else { "disabled" }
         )),
-        Err(e) => ctx.tui.show_error(&format!("Failed to save setting: {}", e)),
+        Err(e) => ctx
+            .tui
+            .show_error(&format!("Failed to save setting: {}", e)),
     }
 }
 
 pub(crate) async fn toggle_block_images(sm: &mut SettingsManager, ctx: &mut TuiContext) {
-    let current = sm.get().images.as_ref().and_then(|i| i.block_images).unwrap_or(false);
+    let current = sm
+        .get()
+        .images
+        .as_ref()
+        .and_then(|i| i.block_images)
+        .unwrap_or(false);
     let mut update = Settings::default();
-    update.images = Some(ImageSettings { auto_resize: None, block_images: Some(!current) });
+    update.images = Some(ImageSettings {
+        auto_resize: None,
+        block_images: Some(!current),
+    });
     match sm.set_global(update) {
         Ok(()) => ctx.tui.chat.add_system_message(&format!(
-            "Block images \x1b[1m{}\x1b[0m.", if !current { "enabled" } else { "disabled" }
+            "Block images \x1b[1m{}\x1b[0m.",
+            if !current { "enabled" } else { "disabled" }
         )),
-        Err(e) => ctx.tui.show_error(&format!("Failed to save setting: {}", e)),
+        Err(e) => ctx
+            .tui
+            .show_error(&format!("Failed to save setting: {}", e)),
     }
 }
 
 pub(crate) async fn toggle_clear_on_shrink(sm: &mut SettingsManager, ctx: &mut TuiContext) {
-    let current = sm.get().terminal.as_ref().and_then(|t| t.clear_on_shrink).unwrap_or(false);
+    let current = sm
+        .get()
+        .terminal
+        .as_ref()
+        .and_then(|t| t.clear_on_shrink)
+        .unwrap_or(false);
     let mut update = Settings::default();
     update.terminal = Some(TerminalSettings {
-        show_images: None, image_width_cells: None, clear_on_shrink: Some(!current), show_terminal_progress: None,
+        show_images: None,
+        image_width_cells: None,
+        clear_on_shrink: Some(!current),
+        show_terminal_progress: None,
     });
     match sm.set_global(update) {
         Ok(()) => ctx.tui.chat.add_system_message(&format!(
-            "Clear on shrink \x1b[1m{}\x1b[0m.", if !current { "enabled" } else { "disabled" }
+            "Clear on shrink \x1b[1m{}\x1b[0m.",
+            if !current { "enabled" } else { "disabled" }
         )),
-        Err(e) => ctx.tui.show_error(&format!("Failed to save setting: {}", e)),
+        Err(e) => ctx
+            .tui
+            .show_error(&format!("Failed to save setting: {}", e)),
     }
 }
 
 pub(crate) async fn toggle_terminal_progress(sm: &mut SettingsManager, ctx: &mut TuiContext) {
-    let current = sm.get().terminal.as_ref().and_then(|t| t.show_terminal_progress).unwrap_or(false);
+    let current = sm
+        .get()
+        .terminal
+        .as_ref()
+        .and_then(|t| t.show_terminal_progress)
+        .unwrap_or(false);
     let mut update = Settings::default();
     update.terminal = Some(TerminalSettings {
-        show_images: None, image_width_cells: None, clear_on_shrink: None, show_terminal_progress: Some(!current),
+        show_images: None,
+        image_width_cells: None,
+        clear_on_shrink: None,
+        show_terminal_progress: Some(!current),
     });
     match sm.set_global(update) {
         Ok(()) => ctx.tui.chat.add_system_message(&format!(
-            "Terminal progress \x1b[1m{}\x1b[0m.", if !current { "enabled" } else { "disabled" }
+            "Terminal progress \x1b[1m{}\x1b[0m.",
+            if !current { "enabled" } else { "disabled" }
         )),
-        Err(e) => ctx.tui.show_error(&format!("Failed to save setting: {}", e)),
+        Err(e) => ctx
+            .tui
+            .show_error(&format!("Failed to save setting: {}", e)),
     }
 }
 
 // ---- Apply setting values ----
 
-pub(crate) async fn apply_thinking_level(sm: &mut SettingsManager, ctx: &mut TuiContext, val: &str) {
+pub(crate) async fn apply_thinking_level(
+    sm: &mut SettingsManager,
+    ctx: &mut TuiContext,
+    val: &str,
+) {
     let level = val.trim_start_matches("thinking-");
     let mut update = Settings::default();
     update.default_thinking_level = Some(level.to_string());
@@ -150,9 +216,13 @@ pub(crate) async fn apply_thinking_level(sm: &mut SettingsManager, ctx: &mut Tui
                 _ => pick_agent::core::state::ThinkingLevel::Off,
             };
             ctx.tui.thinking_level = level.to_string();
-            ctx.tui.chat.add_system_message(&format!("Thinking level set to \x1b[1m{}\x1b[0m.", level));
+            ctx.tui
+                .chat
+                .add_system_message(&format!("Thinking level set to \x1b[1m{}\x1b[0m.", level));
         }
-        Err(e) => ctx.tui.show_error(&format!("Failed to save setting: {}", e)),
+        Err(e) => ctx
+            .tui
+            .show_error(&format!("Failed to save setting: {}", e)),
     }
 }
 
@@ -161,8 +231,13 @@ pub(crate) async fn apply_theme(sm: &mut SettingsManager, ctx: &mut TuiContext, 
     let mut update = Settings::default();
     update.theme = Some(theme.to_string());
     match sm.set_global(update) {
-        Ok(()) => ctx.tui.chat.add_system_message(&format!("Theme set to \x1b[1m{}\x1b[0m (requires restart).", theme)),
-        Err(e) => ctx.tui.show_error(&format!("Failed to save setting: {}", e)),
+        Ok(()) => ctx.tui.chat.add_system_message(&format!(
+            "Theme set to \x1b[1m{}\x1b[0m (requires restart).",
+            theme
+        )),
+        Err(e) => ctx
+            .tui
+            .show_error(&format!("Failed to save setting: {}", e)),
     }
 }
 
@@ -171,23 +246,40 @@ pub(crate) async fn apply_image_width(sm: &mut SettingsManager, ctx: &mut TuiCon
     if let Ok(width) = width_str.parse::<u32>() {
         let mut update = Settings::default();
         update.terminal = Some(TerminalSettings {
-            show_images: None, image_width_cells: Some(width), clear_on_shrink: None, show_terminal_progress: None,
+            show_images: None,
+            image_width_cells: Some(width),
+            clear_on_shrink: None,
+            show_terminal_progress: None,
         });
         match sm.set_global(update) {
-            Ok(()) => ctx.tui.chat.add_system_message(&format!("Image width set to \x1b[1m{}\x1b[0m cells.", width)),
-            Err(e) => ctx.tui.show_error(&format!("Failed to save setting: {}", e)),
+            Ok(()) => ctx.tui.chat.add_system_message(&format!(
+                "Image width set to \x1b[1m{}\x1b[0m cells.",
+                width
+            )),
+            Err(e) => ctx
+                .tui
+                .show_error(&format!("Failed to save setting: {}", e)),
         }
     }
 }
 
-pub(crate) async fn apply_editor_padding(sm: &mut SettingsManager, ctx: &mut TuiContext, val: &str) {
+pub(crate) async fn apply_editor_padding(
+    sm: &mut SettingsManager,
+    ctx: &mut TuiContext,
+    val: &str,
+) {
     let pad_str = val.trim_start_matches("editor-padding-");
     if let Ok(pad) = pad_str.parse::<u32>() {
         let mut update = Settings::default();
         update.editor_padding_x = Some(pad);
         match sm.set_global(update) {
-            Ok(()) => ctx.tui.chat.add_system_message(&format!("Editor padding set to \x1b[1m{}\x1b[0m.", pad)),
-            Err(e) => ctx.tui.show_error(&format!("Failed to save setting: {}", e)),
+            Ok(()) => ctx
+                .tui
+                .chat
+                .add_system_message(&format!("Editor padding set to \x1b[1m{}\x1b[0m.", pad)),
+            Err(e) => ctx
+                .tui
+                .show_error(&format!("Failed to save setting: {}", e)),
         }
     }
 }
@@ -198,8 +290,13 @@ pub(crate) async fn apply_ac_max(sm: &mut SettingsManager, ctx: &mut TuiContext,
         let mut update = Settings::default();
         update.autocomplete_max_visible = Some(n);
         match sm.set_global(update) {
-            Ok(()) => ctx.tui.chat.add_system_message(&format!("Autocomplete max items set to \x1b[1m{}\x1b[0m.", n)),
-            Err(e) => ctx.tui.show_error(&format!("Failed to save setting: {}", e)),
+            Ok(()) => ctx.tui.chat.add_system_message(&format!(
+                "Autocomplete max items set to \x1b[1m{}\x1b[0m.",
+                n
+            )),
+            Err(e) => ctx
+                .tui
+                .show_error(&format!("Failed to save setting: {}", e)),
         }
     }
 }
@@ -209,18 +306,32 @@ pub(crate) async fn apply_steering_mode(sm: &mut SettingsManager, ctx: &mut TuiC
     let mut update = Settings::default();
     update.steering_mode = Some(mode.to_string());
     match sm.set_global(update) {
-        Ok(()) => ctx.tui.chat.add_system_message(&format!("Steering mode set to \x1b[1m{}\x1b[0m.", mode)),
-        Err(e) => ctx.tui.show_error(&format!("Failed to save setting: {}", e)),
+        Ok(()) => ctx
+            .tui
+            .chat
+            .add_system_message(&format!("Steering mode set to \x1b[1m{}\x1b[0m.", mode)),
+        Err(e) => ctx
+            .tui
+            .show_error(&format!("Failed to save setting: {}", e)),
     }
 }
 
-pub(crate) async fn apply_follow_up_mode(sm: &mut SettingsManager, ctx: &mut TuiContext, val: &str) {
+pub(crate) async fn apply_follow_up_mode(
+    sm: &mut SettingsManager,
+    ctx: &mut TuiContext,
+    val: &str,
+) {
     let mode = val.trim_start_matches("followup-");
     let mut update = Settings::default();
     update.follow_up_mode = Some(mode.to_string());
     match sm.set_global(update) {
-        Ok(()) => ctx.tui.chat.add_system_message(&format!("Follow-up mode set to \x1b[1m{}\x1b[0m.", mode)),
-        Err(e) => ctx.tui.show_error(&format!("Failed to save setting: {}", e)),
+        Ok(()) => ctx
+            .tui
+            .chat
+            .add_system_message(&format!("Follow-up mode set to \x1b[1m{}\x1b[0m.", mode)),
+        Err(e) => ctx
+            .tui
+            .show_error(&format!("Failed to save setting: {}", e)),
     }
 }
 
@@ -229,8 +340,13 @@ pub(crate) async fn apply_transport(sm: &mut SettingsManager, ctx: &mut TuiConte
     let mut update = Settings::default();
     update.transport = Some(transport.to_string());
     match sm.set_global(update) {
-        Ok(()) => ctx.tui.chat.add_system_message(&format!("Transport set to \x1b[1m{}\x1b[0m.", transport)),
-        Err(e) => ctx.tui.show_error(&format!("Failed to save setting: {}", e)),
+        Ok(()) => ctx
+            .tui
+            .chat
+            .add_system_message(&format!("Transport set to \x1b[1m{}\x1b[0m.", transport)),
+        Err(e) => ctx
+            .tui
+            .show_error(&format!("Failed to save setting: {}", e)),
     }
 }
 
@@ -242,12 +358,19 @@ pub(crate) async fn apply_http_timeout(sm: &mut SettingsManager, ctx: &mut TuiCo
         match sm.set_global(update) {
             Ok(()) => {
                 if ms == 0 {
-                    ctx.tui.chat.add_system_message("HTTP idle timeout \x1b[1mdisabled\x1b[0m.");
+                    ctx.tui
+                        .chat
+                        .add_system_message("HTTP idle timeout \x1b[1mdisabled\x1b[0m.");
                 } else {
-                    ctx.tui.chat.add_system_message(&format!("HTTP idle timeout set to \x1b[1m{}ms\x1b[0m.", ms));
+                    ctx.tui.chat.add_system_message(&format!(
+                        "HTTP idle timeout set to \x1b[1m{}ms\x1b[0m.",
+                        ms
+                    ));
                 }
             }
-            Err(e) => ctx.tui.show_error(&format!("Failed to save setting: {}", e)),
+            Err(e) => ctx
+                .tui
+                .show_error(&format!("Failed to save setting: {}", e)),
         }
     }
 }
@@ -257,8 +380,13 @@ pub(crate) async fn apply_de_action(sm: &mut SettingsManager, ctx: &mut TuiConte
     let mut update = Settings::default();
     update.double_escape_action = Some(action.to_string());
     match sm.set_global(update) {
-        Ok(()) => ctx.tui.chat.add_system_message(&format!("Double-escape action set to \x1b[1m{}\x1b[0m.", action)),
-        Err(e) => ctx.tui.show_error(&format!("Failed to save setting: {}", e)),
+        Ok(()) => ctx.tui.chat.add_system_message(&format!(
+            "Double-escape action set to \x1b[1m{}\x1b[0m.",
+            action
+        )),
+        Err(e) => ctx
+            .tui
+            .show_error(&format!("Failed to save setting: {}", e)),
     }
 }
 
@@ -267,28 +395,43 @@ pub(crate) async fn apply_tree_filter(sm: &mut SettingsManager, ctx: &mut TuiCon
     let mut update = Settings::default();
     update.tree_filter_mode = Some(mode.to_string());
     match sm.set_global(update) {
-        Ok(()) => ctx.tui.chat.add_system_message(&format!("Tree filter mode set to \x1b[1m{}\x1b[0m.", mode)),
-        Err(e) => ctx.tui.show_error(&format!("Failed to save setting: {}", e)),
+        Ok(()) => ctx
+            .tui
+            .chat
+            .add_system_message(&format!("Tree filter mode set to \x1b[1m{}\x1b[0m.", mode)),
+        Err(e) => ctx
+            .tui
+            .show_error(&format!("Failed to save setting: {}", e)),
     }
 }
 
 pub(crate) async fn apply_warning(sm: &mut SettingsManager, ctx: &mut TuiContext, val: &str) {
     let rest = val.trim_start_matches("warnings-");
-    if let Some(warning_id) = rest.strip_suffix("-true").or_else(|| rest.strip_suffix("-false")) {
+    if let Some(warning_id) = rest
+        .strip_suffix("-true")
+        .or_else(|| rest.strip_suffix("-false"))
+    {
         let bool_val = rest.ends_with("-true");
         match warning_id {
             "anthropic-extra-usage" => {
                 let mut update = Settings::default();
-                update.warnings = Some(WarningsSettings { anthropic_extra_usage: Some(bool_val) });
+                update.warnings = Some(WarningsSettings {
+                    anthropic_extra_usage: Some(bool_val),
+                });
                 match sm.set_global(update) {
                     Ok(()) => ctx.tui.chat.add_system_message(&format!(
                         "Anthropic extra usage warning \x1b[1m{}\x1b[0m.",
                         if bool_val { "enabled" } else { "disabled" }
                     )),
-                    Err(e) => ctx.tui.show_error(&format!("Failed to save setting: {}", e)),
+                    Err(e) => ctx
+                        .tui
+                        .show_error(&format!("Failed to save setting: {}", e)),
                 }
             }
-            _ => ctx.tui.chat.add_system_message(&format!("Unknown warning: {}", warning_id)),
+            _ => ctx
+                .tui
+                .chat
+                .add_system_message(&format!("Unknown warning: {}", warning_id)),
         }
     }
 }

@@ -1,14 +1,13 @@
-﻿//! Extension runner - manages extension lifecycle and event dispatch
+//! Extension runner - manages extension lifecycle and event dispatch
 
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 use super::types::{
-    BeforeAgentStartEvent, Extension, ExtensionEvent,
-    ExtensionShortcut, InputEvent, InputEventResult,
-    MessageEndEvent, RegisteredTool, ResolvedCommand, ResourcesDiscoverEvent,
-    ResourcesDiscoverResult, ToolCallEvent, ToolCallEventResult, ToolResultEvent,
-    UserBashEvent, UserBashEventResult,
+    BeforeAgentStartEvent, Extension, ExtensionEvent, ExtensionShortcut, InputEvent,
+    InputEventResult, MessageEndEvent, RegisteredTool, ResolvedCommand, ResourcesDiscoverEvent,
+    ResourcesDiscoverResult, ToolCallEvent, ToolCallEventResult, ToolResultEvent, UserBashEvent,
+    UserBashEventResult,
 };
 
 /// Combined result from before_agent_start handlers
@@ -87,7 +86,10 @@ impl ExtensionRunner {
     }
 
     /// Get a tool definition by name
-    pub fn get_tool_definition(&self, tool_name: &str) -> Option<crate::extensions::types::ToolDefinition> {
+    pub fn get_tool_definition(
+        &self,
+        tool_name: &str,
+    ) -> Option<crate::extensions::types::ToolDefinition> {
         if let Ok(extensions) = self.extensions.read() {
             for ext in extensions.iter() {
                 if let Some(tool) = ext.tools.get(tool_name) {
@@ -205,7 +207,11 @@ impl ExtensionRunner {
             }
         }
 
-        if modified { Some(current_message) } else { None }
+        if modified {
+            Some(current_message)
+        } else {
+            None
+        }
     }
 
     /// Emit tool_result event with result modification support
@@ -220,10 +226,13 @@ impl ExtensionRunner {
                         match handler(&wrapper_event) {
                             Ok(Some(result)) => {
                                 if let Some(content) = result.get("content") {
-                                    current_event.content = serde_json::from_value(content.clone()).unwrap_or_default();
+                                    current_event.content =
+                                        serde_json::from_value(content.clone()).unwrap_or_default();
                                     modified = true;
                                 }
-                                if let Some(is_error) = result.get("is_error").and_then(|v| v.as_bool()) {
+                                if let Some(is_error) =
+                                    result.get("is_error").and_then(|v| v.as_bool())
+                                {
                                     current_event.is_error = is_error;
                                     modified = true;
                                 }
@@ -258,11 +267,17 @@ impl ExtensionRunner {
                         let wrapper_event = ExtensionEvent::ToolCall(event.clone());
                         match handler(&wrapper_event) {
                             Ok(Some(result)) => {
-                                let block = result.get("block").and_then(|v| v.as_bool()).unwrap_or(false);
+                                let block = result
+                                    .get("block")
+                                    .and_then(|v| v.as_bool())
+                                    .unwrap_or(false);
                                 if block {
                                     return ToolCallEventResult {
                                         block: true,
-                                        reason: result.get("reason").and_then(|v| v.as_str()).map(String::from),
+                                        reason: result
+                                            .get("reason")
+                                            .and_then(|v| v.as_str())
+                                            .map(String::from),
                                     };
                                 }
                             }
@@ -280,7 +295,10 @@ impl ExtensionRunner {
             }
         }
 
-        ToolCallEventResult { block: false, reason: None }
+        ToolCallEventResult {
+            block: false,
+            reason: None,
+        }
     }
 
     /// Execute a tool through an extension's tool_call handler.
@@ -360,7 +378,9 @@ impl ExtensionRunner {
                                 match action {
                                     Some("handled") => return InputEventResult::Handled,
                                     Some("transform") => {
-                                        if let Some(text) = result.get("text").and_then(|v| v.as_str()) {
+                                        if let Some(text) =
+                                            result.get("text").and_then(|v| v.as_str())
+                                        {
                                             current_text = text.to_string();
                                         }
                                     }
@@ -406,7 +426,9 @@ impl ExtensionRunner {
                         let wrapper_event = ExtensionEvent::BeforeAgentStart(current_event);
                         match handler(&wrapper_event) {
                             Ok(Some(result)) => {
-                                if let Some(sp) = result.get("systemPrompt").or(result.get("system_prompt"))
+                                if let Some(sp) = result
+                                    .get("systemPrompt")
+                                    .or(result.get("system_prompt"))
                                     .and_then(|v| v.as_str())
                                 {
                                     current_system_prompt = sp.to_string();
@@ -437,11 +459,7 @@ impl ExtensionRunner {
     }
 
     /// Emit resources_discover event
-    pub fn emit_resources_discover(
-        &self,
-        cwd: &str,
-        reason: &str,
-    ) -> ResourcesDiscoverResult {
+    pub fn emit_resources_discover(&self, cwd: &str, reason: &str) -> ResourcesDiscoverResult {
         let mut result = ResourcesDiscoverResult::default();
         let reason_enum = match reason {
             "reload" => super::types::ResourcesDiscoverReason::Reload,
@@ -458,21 +476,25 @@ impl ExtensionRunner {
                         let wrapper_event = ExtensionEvent::ResourcesDiscover(event);
                         match handler(&wrapper_event) {
                             Ok(Some(r)) => {
-                                if let Some(paths) = r.get("skill_paths").and_then(|v| v.as_array()) {
+                                if let Some(paths) = r.get("skill_paths").and_then(|v| v.as_array())
+                                {
                                     for p in paths {
                                         if let Some(s) = p.as_str() {
                                             result.skill_paths.push(s.to_string());
                                         }
                                     }
                                 }
-                                if let Some(paths) = r.get("prompt_paths").and_then(|v| v.as_array()) {
+                                if let Some(paths) =
+                                    r.get("prompt_paths").and_then(|v| v.as_array())
+                                {
                                     for p in paths {
                                         if let Some(s) = p.as_str() {
                                             result.prompt_paths.push(s.to_string());
                                         }
                                     }
                                 }
-                                if let Some(paths) = r.get("theme_paths").and_then(|v| v.as_array()) {
+                                if let Some(paths) = r.get("theme_paths").and_then(|v| v.as_array())
+                                {
                                     for p in paths {
                                         if let Some(s) = p.as_str() {
                                             result.theme_paths.push(s.to_string());

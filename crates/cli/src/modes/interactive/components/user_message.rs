@@ -1,5 +1,4 @@
-﻿//! User message display
-
+//! User message display
 
 use crate::core::tools::render_utils::ToolTheme;
 

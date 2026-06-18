@@ -1,5 +1,4 @@
-﻿//! Session working directory utilities
-
+//! Session working directory utilities
 
 use std::path::Path;
 

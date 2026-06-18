@@ -1,11 +1,11 @@
-﻿//! Tool HTML renderer for custom tools in HTML export.
+//! Tool HTML renderer for custom tools in HTML export.
 
 //!
 //! Renders custom tool calls and results to HTML by invoking tool render functions
 //! and converting the ANSI output to HTML.
 
 use super::ansi_to_html;
-use crate::core::tools::{render_tool_call, ToolRenderContext};
+use crate::core::tools::{ToolRenderContext, render_tool_call};
 
 /// Pre-rendered HTML for a tool call and result
 #[derive(Debug, Clone)]
@@ -17,10 +17,7 @@ pub struct RenderedToolHtml {
 
 /// Render a tool call to HTML.
 /// Returns Some(HTML) if the tool has a render function, None otherwise.
-pub fn render_tool_call_to_html(
-    tool_name: &str,
-    args: &serde_json::Value,
-) -> Option<String> {
+pub fn render_tool_call_to_html(tool_name: &str, args: &serde_json::Value) -> Option<String> {
     let ctx = ToolRenderContext {
         args: Some(args.clone()),
         cwd: String::new(),
@@ -84,6 +81,9 @@ fn html_line(text: &str) -> String {
     if text.is_empty() {
         r#"<div class="ansi-line">&nbsp;</div>"#.to_string()
     } else {
-        format!("<div class=\"ansi-line\">{}</div>", ansi_to_html::ansi_to_html(text))
+        format!(
+            "<div class=\"ansi-line\">{}</div>",
+            ansi_to_html::ansi_to_html(text)
+        )
     }
 }

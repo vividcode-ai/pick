@@ -1,6 +1,6 @@
-﻿//! TUI config selector for `Pick config` command
+//! TUI config selector for `Pick config` command
 
-use crate::utils::tui_wrapper::{run_list_selector, SelectResult};
+use crate::utils::tui_wrapper::{SelectResult, run_list_selector};
 
 /// Options for the config selector
 pub struct ConfigSelectorOptions {

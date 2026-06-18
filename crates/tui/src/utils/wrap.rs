@@ -36,22 +36,34 @@ fn wrap_words(text: &str, max_width: usize) -> Vec<String> {
     for c in text.chars() {
         if in_escape {
             buf.push(c);
-            if c == 'm' { in_escape = false; }
+            if c == 'm' {
+                in_escape = false;
+            }
             continue;
         }
-        if c == '\x1b' { buf.push(c); in_escape = true; continue; }
+        if c == '\x1b' {
+            buf.push(c);
+            in_escape = true;
+            continue;
+        }
         if c == '\n' {
-            if !buf.is_empty() { words.push(std::mem::take(&mut buf)); }
+            if !buf.is_empty() {
+                words.push(std::mem::take(&mut buf));
+            }
             words.push("\n".to_string());
             continue;
         }
         if c == ' ' {
-            if !buf.is_empty() { words.push(std::mem::take(&mut buf)); }
+            if !buf.is_empty() {
+                words.push(std::mem::take(&mut buf));
+            }
             continue;
         }
         buf.push(c);
     }
-    if !buf.is_empty() { words.push(buf); }
+    if !buf.is_empty() {
+        words.push(buf);
+    }
 
     for w in &words {
         if w == "\n" {
@@ -85,7 +97,11 @@ fn wrap_words(text: &str, max_width: usize) -> Vec<String> {
     lines
 }
 
-pub fn apply_background_to_line(line: &str, width: usize, bg_fn: &dyn Fn(&str) -> String) -> String {
+pub fn apply_background_to_line(
+    line: &str,
+    width: usize,
+    bg_fn: &dyn Fn(&str) -> String,
+) -> String {
     let visible_len = visible_width(line);
     let padding_needed = width.saturating_sub(visible_len);
     let padding = " ".repeat(padding_needed);

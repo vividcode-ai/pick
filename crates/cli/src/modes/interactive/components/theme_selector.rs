@@ -1,5 +1,4 @@
-﻿//! Theme selector component
-
+//! Theme selector component
 
 use crate::core::tools::render_utils::ToolTheme;
 
@@ -37,7 +36,11 @@ pub fn render_theme_selector(
             let cursor = if is_selected { "→" } else { " " };
             let check = if is_current { " (current)" } else { "" };
             let line = if is_selected {
-                format!("  {} {}", ToolTheme::fg("accent", &format!("{}", cursor)), ToolTheme::fg("accent", theme))
+                format!(
+                    "  {} {}",
+                    ToolTheme::fg("accent", &format!("{}", cursor)),
+                    ToolTheme::fg("accent", theme)
+                )
             } else {
                 format!("    {} {}", cursor, theme)
             };
@@ -46,7 +49,10 @@ pub fn render_theme_selector(
     }
 
     if total > max_visible {
-        lines.push(ToolTheme::fg("muted", &format!("  ({}/{})", selected_index + 1, total)));
+        lines.push(ToolTheme::fg(
+            "muted",
+            &format!("  ({}/{})", selected_index + 1, total),
+        ));
     }
 
     lines.push(String::new());

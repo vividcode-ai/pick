@@ -74,7 +74,15 @@ pub fn get_available_themes_with_paths() -> Vec<ThemeInfo> {
     };
 
     for name in get_builtin_themes().keys() {
-        add_theme(name.clone(), Some(themes_dir.join(format!("{}.json", name)).to_string_lossy().to_string()));
+        add_theme(
+            name.clone(),
+            Some(
+                themes_dir
+                    .join(format!("{}.json", name))
+                    .to_string_lossy()
+                    .to_string(),
+            ),
+        );
     }
 
     result.sort_by(|a, b| a.name.cmp(&b.name));
@@ -115,8 +123,7 @@ fn load_theme_json(name: &str) -> Result<ThemeJson, String> {
     if theme_path.exists() {
         let content = std::fs::read_to_string(&theme_path)
             .map_err(|e| format!("Failed to read theme: {}", e))?;
-        return serde_json::from_str(&content)
-            .map_err(|e| format!("Failed to parse theme: {}", e));
+        return serde_json::from_str(&content).map_err(|e| format!("Failed to parse theme: {}", e));
     }
 
     Err(format!("Theme not found: {}", name))
@@ -124,19 +131,14 @@ fn load_theme_json(name: &str) -> Result<ThemeJson, String> {
 
 pub fn create_theme_from_json(theme_json: &ThemeJson, mode: Option<ColorMode>) -> Theme {
     let color_mode = mode.unwrap_or(ColorMode::TrueColor);
-    Theme::new(
-        Some(theme_json.name.clone()),
-        None,
-        theme_json,
-        color_mode,
-    )
+    Theme::new(Some(theme_json.name.clone()), None, theme_json, color_mode)
 }
 
 pub fn load_theme_from_path(theme_path: &str, mode: Option<ColorMode>) -> Result<Theme, String> {
     let content = std::fs::read_to_string(theme_path)
         .map_err(|e| format!("Failed to read theme file: {}", e))?;
-    let theme_json: ThemeJson = serde_json::from_str(&content)
-        .map_err(|e| format!("Failed to parse theme JSON: {}", e))?;
+    let theme_json: ThemeJson =
+        serde_json::from_str(&content).map_err(|e| format!("Failed to parse theme JSON: {}", e))?;
     let color_mode = mode.unwrap_or(ColorMode::TrueColor);
     Ok(Theme::new(
         Some(theme_json.name.clone()),
@@ -190,7 +192,11 @@ pub fn detect_terminal_background() -> TerminalThemeDetection {
             if let Ok(bg) = last.trim().parse::<u8>() {
                 let luminance = ansi256_luminance(bg);
                 return TerminalThemeDetection {
-                    theme: if luminance >= 0.5 { TerminalTheme::Light } else { TerminalTheme::Dark },
+                    theme: if luminance >= 0.5 {
+                        TerminalTheme::Light
+                    } else {
+                        TerminalTheme::Dark
+                    },
                     source: "COLORFGBG".to_string(),
                     detail: format!("background color index {}", bg),
                     confidence: "high".to_string(),
@@ -227,12 +233,9 @@ use std::sync::OnceLock;
 
 static GLOBAL_THEME: OnceLock<Arc<Mutex<Theme>>> = OnceLock::new();
 static THEME_INITIALIZED: AtomicBool = AtomicBool::new(false);
-static CURRENT_THEME_NAME: OnceLock<Mutex<String>> =
-    OnceLock::new();
-static THEME_WATCHER: OnceLock<Mutex<Option<crate::utils::fs_watch::FsWatcher>>> =
-    OnceLock::new();
-static ON_THEME_CHANGE: OnceLock<Mutex<Option<Box<dyn Fn() + Send>>>> =
-    OnceLock::new();
+static CURRENT_THEME_NAME: OnceLock<Mutex<String>> = OnceLock::new();
+static THEME_WATCHER: OnceLock<Mutex<Option<crate::utils::fs_watch::FsWatcher>>> = OnceLock::new();
+static ON_THEME_CHANGE: OnceLock<Mutex<Option<Box<dyn Fn() + Send>>>> = OnceLock::new();
 
 fn get_current_theme_name_lock() -> &'static Mutex<String> {
     CURRENT_THEME_NAME.get_or_init(|| Mutex::new("dark".to_string()))
@@ -255,7 +258,8 @@ pub fn on_theme_change(callback: Box<dyn Fn() + Send>) {
 fn start_theme_watcher() {
     stop_theme_watcher();
 
-    let current_name = get_current_theme_name_lock().lock()
+    let current_name = get_current_theme_name_lock()
+        .lock()
         .map(|n| n.clone())
         .unwrap_or_else(|_| "dark".to_string());
 
@@ -274,7 +278,8 @@ fn start_theme_watcher() {
     let watched_name = current_name.clone();
 
     let callback = move |_path: String| {
-        let current = get_current_theme_name_lock().lock()
+        let current = get_current_theme_name_lock()
+            .lock()
             .map(|n| n.clone())
             .unwrap_or_default();
         if current != watched_name {
@@ -309,11 +314,9 @@ fn start_theme_watcher() {
         stop_theme_watcher();
     });
 
-    if let Some(watcher) = crate::utils::fs_watch::watch_with_error_handler(
-        &theme_file,
-        callback,
-        on_error,
-    ) {
+    if let Some(watcher) =
+        crate::utils::fs_watch::watch_with_error_handler(&theme_file, callback, on_error)
+    {
         if let Ok(mut guard) = get_theme_watcher_lock().lock() {
             *guard = Some(watcher);
         }
@@ -329,33 +332,49 @@ fn stop_theme_watcher() {
 }
 
 pub fn global_theme() -> Arc<Mutex<Theme>> {
-    GLOBAL_THEME.get_or_init(|| -> Arc<Mutex<Theme>> {
-        let name = get_default_theme();
-        let theme = load_theme(&name, None).unwrap_or_else(|_| {
-            let dark_json = get_builtin_themes().get("dark").cloned()
-                .unwrap_or_else(|| {
-                    serde_json::from_str(r#"{"name":"dark","colors":{}}"#).unwrap()
-                });
-            Theme::new(Some("dark".to_string()), None, &dark_json, ColorMode::TrueColor)
-        });
-        Arc::new(Mutex::new(theme))
-    }).clone()
+    GLOBAL_THEME
+        .get_or_init(|| -> Arc<Mutex<Theme>> {
+            let name = get_default_theme();
+            let theme = load_theme(&name, None).unwrap_or_else(|_| {
+                let dark_json = get_builtin_themes()
+                    .get("dark")
+                    .cloned()
+                    .unwrap_or_else(|| {
+                        serde_json::from_str(r#"{"name":"dark","colors":{}}"#).unwrap()
+                    });
+                Theme::new(
+                    Some("dark".to_string()),
+                    None,
+                    &dark_json,
+                    ColorMode::TrueColor,
+                )
+            });
+            Arc::new(Mutex::new(theme))
+        })
+        .clone()
 }
 
 pub fn init_theme(theme_name: Option<&str>, enable_watcher: bool) {
     stop_theme_watcher();
 
-    let name = theme_name.map(|s| s.to_string()).unwrap_or_else(get_default_theme);
+    let name = theme_name
+        .map(|s| s.to_string())
+        .unwrap_or_else(get_default_theme);
     if let Ok(mut current) = get_current_theme_name_lock().lock() {
         *current = name.clone();
     }
 
     let theme = load_theme(&name, None).unwrap_or_else(|_| {
-        let dark_json = get_builtin_themes().get("dark").cloned()
-            .unwrap_or_else(|| {
-                serde_json::from_str(r#"{"name":"dark","colors":{}}"#).unwrap()
-            });
-        Theme::new(Some("dark".to_string()), None, &dark_json, ColorMode::TrueColor)
+        let dark_json = get_builtin_themes()
+            .get("dark")
+            .cloned()
+            .unwrap_or_else(|| serde_json::from_str(r#"{"name":"dark","colors":{}}"#).unwrap());
+        Theme::new(
+            Some("dark".to_string()),
+            None,
+            &dark_json,
+            ColorMode::TrueColor,
+        )
     });
 
     let _ = GLOBAL_THEME.set(Arc::new(Mutex::new(theme)));
@@ -387,18 +406,20 @@ pub fn set_theme(name: &str, enable_watcher: bool) -> Result<(), String> {
 }
 
 pub fn get_resolved_theme_colors(theme_name: Option<&str>) -> HashMap<String, String> {
-    let name = theme_name.map(|s| s.to_string())
-        .unwrap_or_else(|| {
-            get_current_theme_name_lock().lock().map(|n| n.clone()).unwrap_or_else(|_| "dark".to_string())
-        });
+    let name = theme_name.map(|s| s.to_string()).unwrap_or_else(|| {
+        get_current_theme_name_lock()
+            .lock()
+            .map(|n| n.clone())
+            .unwrap_or_else(|_| "dark".to_string())
+    });
     let is_light = name == "light";
     let default_text = if is_light { "#000000" } else { "#e5e5e7" };
 
     let theme_json = load_theme_json(&name).unwrap_or_else(|_| {
-        get_builtin_themes().get("dark").cloned()
-            .unwrap_or_else(|| {
-                serde_json::from_str(r#"{"name":"dark","colors":{}}"#).unwrap()
-            })
+        get_builtin_themes()
+            .get("dark")
+            .cloned()
+            .unwrap_or_else(|| serde_json::from_str(r#"{"name":"dark","colors":{}}"#).unwrap())
     });
 
     let resolved = resolve_theme_colors(&theme_json);
@@ -437,7 +458,10 @@ fn resolve_theme_colors(theme_json: &ThemeJson) -> HashMap<String, ResolvedColor
         ("userMessageText", &theme_json.colors.user_message_text),
         ("customMessageBg", &theme_json.colors.custom_message_bg),
         ("customMessageText", &theme_json.colors.custom_message_text),
-        ("customMessageLabel", &theme_json.colors.custom_message_label),
+        (
+            "customMessageLabel",
+            &theme_json.colors.custom_message_label,
+        ),
         ("toolPendingBg", &theme_json.colors.tool_pending_bg),
         ("toolSuccessBg", &theme_json.colors.tool_success_bg),
         ("toolErrorBg", &theme_json.colors.tool_error_bg),

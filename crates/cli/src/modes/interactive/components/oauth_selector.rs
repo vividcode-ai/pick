@@ -1,5 +1,4 @@
-﻿//! OAuth provider selector component
-
+//! OAuth provider selector component
 
 use crate::core::tools::render_utils::ToolTheme;
 
@@ -32,7 +31,10 @@ pub fn render_oauth_selector(
     } else {
         "Select provider to logout:"
     };
-    lines.push(ToolTheme::fg("accent", &format!("\x1b[1m{}\x1b[22m", title)));
+    lines.push(ToolTheme::fg(
+        "accent",
+        &format!("\x1b[1m{}\x1b[22m", title),
+    ));
     lines.push(String::new());
 
     // Search input
@@ -84,7 +86,10 @@ pub fn render_oauth_selector(
     }
 
     if total > max_visible {
-        lines.push(ToolTheme::fg("muted", &format!("  ({}/{})", selected_index + 1, total)));
+        lines.push(ToolTheme::fg(
+            "muted",
+            &format!("  ({}/{})", selected_index + 1, total),
+        ));
     }
 
     // Empty messages

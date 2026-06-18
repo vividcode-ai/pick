@@ -176,8 +176,11 @@ fn handle_scoped_models_selection(ctx: &mut TuiContext, val: &str) {
                 } else {
                     format!("[ ] {}", m.id)
                 };
-                SelectItem::new(label, m.id.clone())
-                    .with_description(if enabled { "enabled" } else { "disabled" })
+                SelectItem::new(label, m.id.clone()).with_description(if enabled {
+                    "enabled"
+                } else {
+                    "disabled"
+                })
             })
             .collect();
         let status = if ctx.scoped_models.is_empty() {
@@ -305,7 +308,10 @@ async fn handle_submit(
         } else {
             user_text.clone()
         };
-        let api_key = ctx.auth.get_api_key(&ctx.model.provider.as_str(), true).await;
+        let api_key = ctx
+            .auth
+            .get_api_key(&ctx.model.provider.as_str(), true)
+            .await;
         agent_exec::spawn_title_generation(
             title_text,
             ctx.cmd_tx.clone(),
@@ -320,8 +326,7 @@ async fn handle_submit(
     let _ = ctx.tui.render_with_terminal(&mut ctx.terminal_manager);
 
     // Refresh tools and build agent config
-    ctx.tools =
-        init::refilter_tools(&ctx.all_tools, &ctx.agent_mode, &ctx.session_manager);
+    ctx.tools = init::refilter_tools(&ctx.all_tools, &ctx.agent_mode, &ctx.session_manager);
     let config = agent_exec::build_agent_config(ctx, ctx.cmd_tx.clone());
 
     // Register TUI approval hook
@@ -334,7 +339,10 @@ async fn handle_submit(
     let msgs = ctx.all_messages.clone();
     let mut agent_handle = tokio::spawn(async move {
         crate::core::agent_session::run_agent_loop_with_retry_and_continuation(
-            config, msgs, Default::default(), None,
+            config,
+            msgs,
+            Default::default(),
+            None,
         )
         .await
     });
@@ -351,7 +359,11 @@ async fn handle_submit(
 
     loop {
         if needs_render {
-            if ctx.tui.render_with_terminal(&mut ctx.terminal_manager).is_err() {
+            if ctx
+                .tui
+                .render_with_terminal(&mut ctx.terminal_manager)
+                .is_err()
+            {
                 should_quit = true;
                 agent_handle.abort();
                 break;
@@ -451,8 +463,10 @@ async fn handle_submit(
             }
             ctx.all_messages = result.messages;
             ctx.tui.show_usage(result.usage.input, result.usage.output);
-            let pct = (result.usage.total_tokens as f64) / (ctx.model.context_window as f64) * 100.0;
-            ctx.tui.set_context_info(Some(pct), ctx.model.context_window);
+            let pct =
+                (result.usage.total_tokens as f64) / (ctx.model.context_window as f64) * 100.0;
+            ctx.tui
+                .set_context_info(Some(pct), ctx.model.context_window);
             agent_exec::auto_compact_session(ctx).await;
         }
         Some(Err(e)) => {

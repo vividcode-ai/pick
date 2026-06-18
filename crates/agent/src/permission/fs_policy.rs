@@ -1,4 +1,4 @@
-﻿use std::path::{Path, PathBuf};
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum AccessMode {
@@ -106,7 +106,9 @@ impl FileSystemPolicy {
 
         // Check default access mode first (affects full_access profile with empty roots)
         // Write implies read access, so both modes allow reads.
-        if self.default_access_mode == AccessMode::Read || self.default_access_mode == AccessMode::Write {
+        if self.default_access_mode == AccessMode::Read
+            || self.default_access_mode == AccessMode::Write
+        {
             return Ok(());
         }
 
@@ -128,9 +130,10 @@ impl FileSystemPolicy {
             ))
         } else {
             // Check readable roots
-            let readable = self.readable_roots.iter().any(|root| {
-                resolved.starts_with(root)
-            });
+            let readable = self
+                .readable_roots
+                .iter()
+                .any(|root| resolved.starts_with(root));
             if readable {
                 Ok(())
             } else {
@@ -164,9 +167,10 @@ impl FileSystemPolicy {
             ));
         }
 
-        let allowed = self.writable_roots.iter().any(|root| {
-            root.mode == AccessMode::Write && resolved.starts_with(&root.path)
-        });
+        let allowed = self
+            .writable_roots
+            .iter()
+            .any(|root| root.mode == AccessMode::Write && resolved.starts_with(&root.path));
 
         if allowed {
             Ok(())
@@ -297,7 +301,8 @@ impl FileSystemPolicy {
 
 /// Extract tokens from a command string that look like absolute file paths
 pub fn extract_absolute_path_args(command: &str) -> Vec<String> {
-    command.split_whitespace()
+    command
+        .split_whitespace()
         .filter(|token| {
             let cleaned = token.trim_matches(|c: char| c == '"' || c == '\'' || c == '`');
             if cleaned.len() < 2 {
@@ -316,16 +321,24 @@ pub fn extract_absolute_path_args(command: &str) -> Vec<String> {
             // UNC: \\server\share
             || cleaned.starts_with("\\\\")
         })
-        .map(|t| t.trim_matches(|c: char| c == '"' || c == '\'' || c == '`').to_string())
+        .map(|t| {
+            t.trim_matches(|c: char| c == '"' || c == '\'' || c == '`')
+                .to_string()
+        })
         .collect()
 }
 
 /// Check if a command string contains shell expansions that make path analysis unreliable.
 pub fn contains_shell_expansion(command: &str) -> bool {
-    command.contains('$') || command.contains('`') || command.contains('~')
-        || command.contains('*') || command.contains('?')
-        || command.contains('[') || command.contains(']')
-        || command.contains('{') || command.contains('}')
+    command.contains('$')
+        || command.contains('`')
+        || command.contains('~')
+        || command.contains('*')
+        || command.contains('?')
+        || command.contains('[')
+        || command.contains(']')
+        || command.contains('{')
+        || command.contains('}')
 }
 
 fn normalize_path(path: &Path) -> PathBuf {
@@ -493,9 +506,17 @@ mod tests {
         let result = policy.can_write(&writable_path, &tmp);
         assert!(result.is_ok(), "can_write failed: {:?}", result);
 
-        let abs = PathBuf::from(if cfg!(windows) { "C:/test.txt" } else { "/tmp/test.txt" });
+        let abs = PathBuf::from(if cfg!(windows) {
+            "C:/test.txt"
+        } else {
+            "/tmp/test.txt"
+        });
         let result2 = policy.can_write(&abs, &tmp);
-        assert!(result2.is_ok(), "absolute path should work with full access: {:?}", result2);
+        assert!(
+            result2.is_ok(),
+            "absolute path should work with full access: {:?}",
+            result2
+        );
     }
 
     #[test]
@@ -523,9 +544,17 @@ mod tests {
         let result = policy.can_write(Path::new("test.txt"), &canonical_tmp);
         assert!(result.is_ok(), "relative write should work: {:?}", result);
 
-        let abs_path = PathBuf::from(if cfg!(windows) { "C:/Windows/test.txt" } else { "/etc/test.txt" });
+        let abs_path = PathBuf::from(if cfg!(windows) {
+            "C:/Windows/test.txt"
+        } else {
+            "/etc/test.txt"
+        });
         let result2 = policy.can_write(&abs_path, &canonical_tmp);
-        assert!(result2.is_err(), "absolute path should be denied with workspace default: {:?}", result2);
+        assert!(
+            result2.is_err(),
+            "absolute path should be denied with workspace default: {:?}",
+            result2
+        );
 
         let _ = std::fs::remove_dir_all(&tmp);
     }

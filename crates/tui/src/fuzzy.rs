@@ -1,4 +1,4 @@
-﻿//! Fuzzy matching utilities
+//! Fuzzy matching utilities
 
 /// Result of a fuzzy match
 #[derive(Debug, Clone, Copy)]
@@ -37,10 +37,16 @@ pub fn fuzzy_match(query: &str, text: &str) -> FuzzyMatch {
 
 fn match_query(query: &str, text: &str) -> FuzzyMatch {
     if query.is_empty() {
-        return FuzzyMatch { matches: true, score: 0.0 };
+        return FuzzyMatch {
+            matches: true,
+            score: 0.0,
+        };
     }
     if query.len() > text.len() {
-        return FuzzyMatch { matches: false, score: 0.0 };
+        return FuzzyMatch {
+            matches: false,
+            score: 0.0,
+        };
     }
 
     let mut query_idx = 0;
@@ -82,14 +88,20 @@ fn match_query(query: &str, text: &str) -> FuzzyMatch {
     }
 
     if query_idx < query_chars.len() {
-        return FuzzyMatch { matches: false, score: 0.0 };
+        return FuzzyMatch {
+            matches: false,
+            score: 0.0,
+        };
     }
 
     if query == text {
         score -= 100.0;
     }
 
-    FuzzyMatch { matches: true, score }
+    FuzzyMatch {
+        matches: true,
+        score,
+    }
 }
 
 fn try_swap_query(query: &str) -> Option<String> {
@@ -139,11 +151,7 @@ fn try_swap_query(query: &str) -> Option<String> {
 
 /// Filter and sort items by fuzzy match quality (best matches first).
 /// Supports space-separated tokens: all tokens must match.
-pub fn fuzzy_filter<T>(
-    items: &[T],
-    query: &str,
-    get_text: impl Fn(&T) -> &str,
-) -> Vec<T>
+pub fn fuzzy_filter<T>(items: &[T], query: &str, get_text: impl Fn(&T) -> &str) -> Vec<T>
 where
     T: Clone,
 {

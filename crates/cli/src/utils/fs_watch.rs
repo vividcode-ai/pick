@@ -1,4 +1,4 @@
-﻿//! File system watching utilities
+//! File system watching utilities
 
 use std::path::Path;
 use std::sync::mpsc;
@@ -22,8 +22,11 @@ pub fn close_watcher(watcher: Option<FsWatcher>) {
 
 /// Watch a file or directory with an error handler
 /// Uses polling-based watching as a simple cross-platform approach
-pub fn watch_with_error_handler<F>(path: &Path, callback: F, on_error: Box<dyn Fn() + Send>)
-    -> Option<FsWatcher>
+pub fn watch_with_error_handler<F>(
+    path: &Path,
+    callback: F,
+    on_error: Box<dyn Fn() + Send>,
+) -> Option<FsWatcher>
 where
     F: Fn(String) + Send + 'static,
 {
@@ -59,5 +62,8 @@ where
         }
     });
 
-    Some(FsWatcher { _thread: handle, shutdown: shutdown_tx })
+    Some(FsWatcher {
+        _thread: handle,
+        shutdown: shutdown_tx,
+    })
 }

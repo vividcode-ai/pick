@@ -267,11 +267,7 @@ fn format_tool_write(
         let lang = crate::utils::syntax_highlight::detect_language_from_path(path);
         let body = if let Some(lang) = lang {
             let h = crate::utils::syntax_highlight::highlight_to_ansi(content, Some(lang));
-            if h.is_empty() {
-                content.clone()
-            } else {
-                h
-            }
+            if h.is_empty() { content.clone() } else { h }
         } else {
             content.clone()
         };

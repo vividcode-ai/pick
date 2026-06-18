@@ -1,7 +1,6 @@
-﻿//! Autocomplete system for slash commands and file paths
+//! Autocomplete system for slash commands and file paths
 
 use std::path::PathBuf;
-
 
 /// An autocomplete item
 #[derive(Debug, Clone)]
@@ -53,7 +52,10 @@ pub struct CombinedAutocompleteProvider {
 
 impl CombinedAutocompleteProvider {
     pub fn new(commands: Vec<SlashCommand>, base_path: PathBuf) -> Self {
-        Self { commands, base_path }
+        Self {
+            commands,
+            base_path,
+        }
     }
 
     fn extract_path_prefix(&self, text: &str, force: bool) -> Option<String> {
@@ -71,7 +73,8 @@ impl CombinedAutocompleteProvider {
             return Some(String::new());
         }
 
-        let has_path_like = token.contains('/') || token.starts_with('.') || token.starts_with("~/");
+        let has_path_like =
+            token.contains('/') || token.starts_with('.') || token.starts_with("~/");
         let after_at = token.strip_prefix('@').unwrap_or(token);
 
         if force || has_path_like || after_at.contains('/') || after_at.starts_with('.') {
@@ -175,7 +178,10 @@ impl CombinedAutocompleteProvider {
 
         for entry in dir.flatten() {
             let name = entry.file_name().to_string_lossy().to_string();
-            if !name.to_lowercase().starts_with(&search_prefix.to_lowercase()) {
+            if !name
+                .to_lowercase()
+                .starts_with(&search_prefix.to_lowercase())
+            {
                 continue;
             }
 
@@ -202,7 +208,11 @@ impl CombinedAutocompleteProvider {
             suggestions.push(AutocompleteItem {
                 value: prefixed,
                 label: display_name,
-                description: if is_dir { Some("[dir]".to_string()) } else { None },
+                description: if is_dir {
+                    Some("[dir]".to_string())
+                } else {
+                    None
+                },
             });
         }
 
@@ -288,7 +298,8 @@ impl AutocompleteProvider for CombinedAutocompleteProvider {
         item: &AutocompleteItem,
         prefix: &str,
     ) -> (String, usize) {
-        let before_prefix = &text_before_cursor[..text_before_cursor.len().saturating_sub(prefix.len())];
+        let before_prefix =
+            &text_before_cursor[..text_before_cursor.len().saturating_sub(prefix.len())];
 
         // Slash command
         if prefix.starts_with('/') {

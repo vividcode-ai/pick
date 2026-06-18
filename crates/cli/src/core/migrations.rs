@@ -1,5 +1,4 @@
-﻿//! One-time migrations that run on startup.
-
+//! One-time migrations that run on startup.
 
 use std::path::Path;
 
@@ -10,7 +9,10 @@ pub fn run_migrations(cwd: &Path) -> RunMigrationsResult {
     migrate_tools_to_bin();
     migrate_keybindings_config_file();
     let deprecation_warnings = migrate_extension_system(cwd);
-    RunMigrationsResult { migrated_auth_providers, deprecation_warnings }
+    RunMigrationsResult {
+        migrated_auth_providers,
+        deprecation_warnings,
+    }
 }
 
 pub struct RunMigrationsResult {
@@ -43,7 +45,8 @@ fn migrate_auth_to_auth_json() -> Vec<String> {
                         migrated.insert(provider.clone(), entry);
                         providers.push(provider.clone());
                     }
-                    let _ = std::fs::rename(&oauth_path, oauth_path.with_extension("json.migrated"));
+                    let _ =
+                        std::fs::rename(&oauth_path, oauth_path.with_extension("json.migrated"));
                 }
             }
         }
@@ -82,7 +85,10 @@ fn migrate_auth_to_auth_json() -> Vec<String> {
                 use std::os::unix::fs::PermissionsExt;
                 if let Ok(content) = serde_json::to_string_pretty(&migrated) {
                     if let Ok(_) = std::fs::write(&auth_path, &content) {
-                        let _ = std::fs::set_permissions(&auth_path, std::fs::Permissions::from_mode(0o600));
+                        let _ = std::fs::set_permissions(
+                            &auth_path,
+                            std::fs::Permissions::from_mode(0o600),
+                        );
                     }
                 }
             }
@@ -141,7 +147,8 @@ fn migrate_sessions_from_agent_root() {
         // Compute safe directory path (same encoding as session-manager)
         let safe_path = format!(
             "--{}--",
-            cwd.trim_start_matches('/').trim_start_matches('\\')
+            cwd.trim_start_matches('/')
+                .trim_start_matches('\\')
                 .replace('/', "-")
                 .replace('\\', "-")
                 .replace(':', "-")
@@ -173,7 +180,11 @@ fn migrate_tools_to_bin() {
         return;
     }
 
-    let binaries = if cfg!(windows) { ["fd.exe", "rg.exe"] } else { ["fd", "rg"] };
+    let binaries = if cfg!(windows) {
+        ["fd.exe", "rg.exe"]
+    } else {
+        ["fd", "rg"]
+    };
     let mut moved_any = false;
 
     for binary in &binaries {
@@ -220,8 +231,8 @@ fn migrate_keybindings_config_file() {
         return;
     }
 
-    let raw: std::collections::HashMap<String, serde_json::Value> = serde_json::from_value(parsed)
-        .unwrap_or_default();
+    let raw: std::collections::HashMap<String, serde_json::Value> =
+        serde_json::from_value(parsed).unwrap_or_default();
     let result = crate::core::keybindings::migrate_keybindings_config(raw);
 
     if result.migrated {
@@ -243,7 +254,10 @@ fn migrate_commands_to_prompts(base_dir: &Path, label: &str) -> bool {
                 true
             }
             Err(e) => {
-                eprintln!("Warning: Could not migrate {} commands/ to prompts/: {}", label, e);
+                eprintln!(
+                    "Warning: Could not migrate {} commands/ to prompts/: {}",
+                    label, e
+                );
                 false
             }
         }
@@ -258,7 +272,10 @@ fn check_deprecated_extension_dirs(base_dir: &Path, label: &str) -> Vec<String> 
 
     let hooks_dir = base_dir.join("hooks");
     if hooks_dir.exists() {
-        warnings.push(format!("{} hooks/ directory found. Hooks have been renamed to extensions.", label));
+        warnings.push(format!(
+            "{} hooks/ directory found. Hooks have been renamed to extensions.",
+            label
+        ));
     }
 
     let tools_dir = base_dir.join("tools");
@@ -268,7 +285,10 @@ fn check_deprecated_extension_dirs(base_dir: &Path, label: &str) -> Vec<String> 
                 .flatten()
                 .filter(|e| {
                     let lower = e.file_name().to_string_lossy().to_lowercase();
-                    lower != "fd" && lower != "rg" && lower != "fd.exe" && lower != "rg.exe"
+                    lower != "fd"
+                        && lower != "rg"
+                        && lower != "fd.exe"
+                        && lower != "rg.exe"
                         && !e.file_name().to_string_lossy().starts_with('.')
                 })
                 .collect();

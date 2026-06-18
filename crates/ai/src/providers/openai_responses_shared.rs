@@ -1,4 +1,4 @@
-﻿//! OpenAI Responses API shared utilities
+//! OpenAI Responses API shared utilities
 
 use crate::types::ToolDefinition;
 use serde::{Deserialize, Serialize};
@@ -43,21 +43,31 @@ pub fn parse_text_signature(signature: Option<&str>) -> Option<TextSignatureV1> 
 /// Convert tool definitions to OpenAI Responses API format.
 pub fn convert_responses_tools(tools: &[ToolDefinition], strict: Option<bool>) -> Vec<Value> {
     let strict = strict.unwrap_or(false);
-    tools.iter().map(|tool| {
-        serde_json::json!({
-            "type": "function",
-            "name": tool.name,
-            "description": tool.description,
-            "parameters": tool.parameters,
-            "strict": strict,
+    tools
+        .iter()
+        .map(|tool| {
+            serde_json::json!({
+                "type": "function",
+                "name": tool.name,
+                "description": tool.description,
+                "parameters": tool.parameters,
+                "strict": strict,
+            })
         })
-    }).collect()
+        .collect()
 }
 
 /// Normalize a tool call ID part for the Responses API (max 64 chars, alphanumeric/underscore/hyphen).
 pub fn normalize_id_part(part: &str) -> String {
-    let sanitized: String = part.chars()
-        .map(|c| if c.is_alphanumeric() || c == '_' || c == '-' { c } else { '_' })
+    let sanitized: String = part
+        .chars()
+        .map(|c| {
+            if c.is_alphanumeric() || c == '_' || c == '-' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect();
     let truncated: String = sanitized.chars().take(64).collect();
     truncated.trim_end_matches('_').to_string()

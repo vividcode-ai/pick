@@ -1,4 +1,4 @@
-﻿//! Keyboard input handling for terminal applications
+//! Keyboard input handling for terminal applications
 //!
 //! In Rust + crossterm, raw escape sequences are already parsed by crossterm
 //! into structured KeyEvent events. This module maps crossterm events to our
@@ -108,8 +108,7 @@ pub fn matches_key(event: &KeyEvent, key_id: &str) -> bool {
 
     // Check modifier match (only check if any modifiers are specified)
     let mods_match = if expected_mods.is_empty() {
-        actual_mods.is_empty()
-            || actual_mods == KeyModifiers::NONE
+        actual_mods.is_empty() || actual_mods == KeyModifiers::NONE
     } else {
         let shift = expected_mods.contains(KeyModifiers::SHIFT);
         let ctrl = expected_mods.contains(KeyModifiers::CONTROL);

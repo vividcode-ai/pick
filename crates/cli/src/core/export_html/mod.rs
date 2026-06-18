@@ -1,5 +1,4 @@
-﻿//! Export HTML module
-
+//! Export HTML module
 
 pub mod ansi_to_html;
 pub mod export_html;

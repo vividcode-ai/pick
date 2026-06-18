@@ -1,5 +1,4 @@
-﻿//! Bash command execution with streaming support and cancellation
-
+//! Bash command execution with streaming support and cancellation
 
 use std::io::Write;
 
@@ -44,7 +43,7 @@ pub async fn execute_bash(
     cwd: &str,
     options: BashExecutorOptions<'_>,
 ) -> Result<BashResult, String> {
-    use crate::core::exec::{exec_command, ExecOptions};
+    use crate::core::exec::{ExecOptions, exec_command};
 
     let mut output_chunks: Vec<String> = Vec::new();
     let mut output_bytes: usize = 0;
@@ -65,12 +64,17 @@ pub async fn execute_bash(
 
     let stdout = result.stdout;
     let stderr = result.stderr;
-    let combined = if stderr.is_empty() { stdout.clone() } else { format!("{}\n{}", stdout, stderr) };
+    let combined = if stderr.is_empty() {
+        stdout.clone()
+    } else {
+        format!("{}\n{}", stdout, stderr)
+    };
 
     if !combined.is_empty() {
         total_bytes += combined.len();
         if total_bytes > DEFAULT_MAX_BYTES && temp_file.is_none() {
-            let id = uuid::Uuid::new_v7(uuid::Timestamp::now(uuid::NoContext)).to_string()[..16].to_string();
+            let id = uuid::Uuid::new_v7(uuid::Timestamp::now(uuid::NoContext)).to_string()[..16]
+                .to_string();
             let tmp_path = std::env::temp_dir().join(format!("Pick-bash-{}.log", id));
             if let Ok(file) = std::fs::File::create(&tmp_path) {
                 temp_file_path = Some(tmp_path.to_string_lossy().to_string());
@@ -103,7 +107,8 @@ pub async fn execute_bash(
 
     let truncation_result = truncate_tail(&output_text);
     if truncation_result.truncated && temp_file.is_none() {
-        let id = uuid::Uuid::new_v7(uuid::Timestamp::now(uuid::NoContext)).to_string()[..16].to_string();
+        let id =
+            uuid::Uuid::new_v7(uuid::Timestamp::now(uuid::NoContext)).to_string()[..16].to_string();
         let tmp_path = std::env::temp_dir().join(format!("Pick-bash-{}.log", id));
         if let Ok(mut file) = std::fs::File::create(&tmp_path) {
             let _ = file.write_all(output_text.as_bytes());

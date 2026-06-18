@@ -38,7 +38,9 @@ impl Default for MarkdownStyles {
             code_block_border: Style::default().add_modifier(Modifier::DIM),
             quote: Style::default().fg(Color::Green),
             quote_border: Style::default().fg(Color::Green),
-            link: Style::default().fg(Color::Cyan).add_modifier(Modifier::UNDERLINED),
+            link: Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::UNDERLINED),
             link_url: Style::default().fg(Color::Cyan),
             list_bullet: Style::default(),
             hr: Style::default(),

@@ -1,4 +1,4 @@
-﻿//! Model registry - manages built-in and custom models, provides API key resolution
+//! Model registry - manages built-in and custom models, provides API key resolution
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -6,7 +6,7 @@ use std::sync::Mutex;
 
 use crate::config::get_agent_dir;
 use crate::core::auth_storage::{AuthStatus, AuthStorage};
-use crate::core::resolve_config_value::{resolve_headers_or_throw, resolve_config_value_or_throw};
+use crate::core::resolve_config_value::{resolve_config_value_or_throw, resolve_headers_or_throw};
 
 // ============================================================================
 // Model types
@@ -36,7 +36,12 @@ pub struct ModelCost {
 
 impl Default for ModelCost {
     fn default() -> Self {
-        Self { input: 0.0, output: 0.0, cache_read: 0.0, cache_write: 0.0 }
+        Self {
+            input: 0.0,
+            output: 0.0,
+            cache_read: 0.0,
+            cache_write: 0.0,
+        }
     }
 }
 
@@ -165,7 +170,9 @@ impl ModelRegistry {
     }
 
     fn load_models(&self) {
-        let custom_result = self.models_json_path.as_ref()
+        let custom_result = self
+            .models_json_path
+            .as_ref()
             .and_then(|p| self.load_custom_models(p));
 
         if let Some(ref result) = custom_result {
@@ -201,7 +208,12 @@ impl ModelRegistry {
                 base_url: "https://api.anthropic.com".to_string(),
                 reasoning: true,
                 input: vec!["text".to_string(), "image".to_string()],
-                cost: ModelCost { input: 15.0, output: 75.0, cache_read: 1.5, cache_write: 7.5 },
+                cost: ModelCost {
+                    input: 15.0,
+                    output: 75.0,
+                    cache_read: 1.5,
+                    cache_write: 7.5,
+                },
                 context_window: 200000,
                 max_tokens: 8192,
             },
@@ -213,7 +225,12 @@ impl ModelRegistry {
                 base_url: "https://api.anthropic.com".to_string(),
                 reasoning: true,
                 input: vec!["text".to_string(), "image".to_string()],
-                cost: ModelCost { input: 3.0, output: 15.0, cache_read: 0.3, cache_write: 1.5 },
+                cost: ModelCost {
+                    input: 3.0,
+                    output: 15.0,
+                    cache_read: 0.3,
+                    cache_write: 1.5,
+                },
                 context_window: 200000,
                 max_tokens: 8192,
             },
@@ -237,12 +254,16 @@ impl ModelRegistry {
 
             if let Some(ref model_defs) = provider_config.models {
                 for model_def in model_defs {
-                    let api = model_def.api.as_ref()
+                    let api = model_def
+                        .api
+                        .as_ref()
                         .or(provider_config.api.as_ref())
                         .map(|s| s.clone())
                         .unwrap_or_else(|| "openai-completions".to_string());
 
-                    let base_url = model_def.base_url.as_ref()
+                    let base_url = model_def
+                        .base_url
+                        .as_ref()
                         .or(provider_config.base_url.as_ref())
                         .map(|s| s.clone())
                         .unwrap_or_default();
@@ -251,12 +272,18 @@ impl ModelRegistry {
 
                     models.push(Model {
                         id: model_def.id.clone(),
-                        name: model_def.name.clone().unwrap_or_else(|| model_def.id.clone()),
+                        name: model_def
+                            .name
+                            .clone()
+                            .unwrap_or_else(|| model_def.id.clone()),
                         api,
                         provider: provider_name.clone(),
                         base_url,
                         reasoning: model_def.reasoning.unwrap_or(false),
-                        input: model_def.input.clone().unwrap_or_else(|| vec!["text".to_string()]),
+                        input: model_def
+                            .input
+                            .clone()
+                            .unwrap_or_else(|| vec!["text".to_string()]),
                         cost: ModelCost {
                             input: raw_cost.and_then(|c| c.input).unwrap_or(0.0),
                             output: raw_cost.and_then(|c| c.output).unwrap_or(0.0),
@@ -275,7 +302,10 @@ impl ModelRegistry {
             }
         }
 
-        Some(CustomModelsResult { models, error: None })
+        Some(CustomModelsResult {
+            models,
+            error: None,
+        })
     }
 
     fn store_provider_request_config(&self, provider_name: &str, config: &RawProviderConfig) {
@@ -301,14 +331,20 @@ impl ModelRegistry {
     }
 
     pub fn get_available(&self) -> Vec<Model> {
-        self.models.lock().unwrap().iter()
+        self.models
+            .lock()
+            .unwrap()
+            .iter()
             .filter(|m| self.has_configured_auth(m))
             .cloned()
             .collect()
     }
 
     pub fn find(&self, provider: &str, model_id: &str) -> Option<Model> {
-        self.models.lock().unwrap().iter()
+        self.models
+            .lock()
+            .unwrap()
+            .iter()
             .find(|m| m.provider == provider && m.id == model_id)
             .cloned()
     }
@@ -317,14 +353,19 @@ impl ModelRegistry {
         if self.auth_storage.has_auth(&model.provider) {
             return true;
         }
-        self.provider_request_configs.lock().unwrap()
+        self.provider_request_configs
+            .lock()
+            .unwrap()
             .get(&model.provider)
             .and_then(|c| c.api_key.as_ref())
             .is_some()
     }
 
     pub async fn get_api_key_and_headers(&self, model: &Model) -> ResolvedRequestAuth {
-        let provider_config = self.provider_request_configs.lock().unwrap()
+        let provider_config = self
+            .provider_request_configs
+            .lock()
+            .unwrap()
             .get(&model.provider)
             .cloned();
 
@@ -332,12 +373,19 @@ impl ModelRegistry {
 
         let api_key = api_key_from_storage.or_else(|| {
             provider_config.as_ref().and_then(|c| {
-                c.api_key.as_ref().and_then(|k| resolve_config_value_or_throw(k, &format!("API key for provider \"{}\"", model.provider)).ok())
+                c.api_key.as_ref().and_then(|k| {
+                    resolve_config_value_or_throw(
+                        k,
+                        &format!("API key for provider \"{}\"", model.provider),
+                    )
+                    .ok()
+                })
             })
         });
 
         let headers = {
-            let provider_headers = provider_config.as_ref()
+            let provider_headers = provider_config
+                .as_ref()
                 .and_then(|c| c.headers.as_ref())
                 .and_then(|h| {
                     let desc = format!("provider \"{}\"", model.provider);
@@ -345,7 +393,10 @@ impl ModelRegistry {
                 });
 
             let model_key = format!("{}:{}", model.provider, model.id);
-            let model_headers = self.model_request_headers.lock().unwrap()
+            let model_headers = self
+                .model_request_headers
+                .lock()
+                .unwrap()
                 .get(&model_key)
                 .cloned()
                 .and_then(|h| {
@@ -378,20 +429,33 @@ impl ModelRegistry {
             return auth_status;
         }
 
-        let provider_api_key = self.provider_request_configs.lock().unwrap()
+        let provider_api_key = self
+            .provider_request_configs
+            .lock()
+            .unwrap()
             .get(provider)
             .and_then(|c| c.api_key.as_ref())
             .cloned();
 
         match provider_api_key {
-            Some(key) if key.starts_with('!') => {
-                AuthStatus { configured: true, source: Some("models_json_command".to_string()), label: None }
-            }
+            Some(key) if key.starts_with('!') => AuthStatus {
+                configured: true,
+                source: Some("models_json_command".to_string()),
+                label: None,
+            },
             Some(key) => {
                 if std::env::var(&key).is_ok() {
-                    AuthStatus { configured: true, source: Some("environment".to_string()), label: Some(key) }
+                    AuthStatus {
+                        configured: true,
+                        source: Some("environment".to_string()),
+                        label: Some(key),
+                    }
                 } else {
-                    AuthStatus { configured: true, source: Some("models_json_key".to_string()), label: None }
+                    AuthStatus {
+                        configured: true,
+                        source: Some("models_json_key".to_string()),
+                        label: None,
+                    }
                 }
             }
             None => auth_status,

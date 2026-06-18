@@ -1,4 +1,4 @@
-﻿/// Wrap a tool definition into a generic tool interface for the core runtime
+/// Wrap a tool definition into a generic tool interface for the core runtime
 pub fn wrap_tool_definition(
     definition: crate::core::extensions::types::ToolDefinition,
 ) -> ToolWrapper {
@@ -11,7 +11,9 @@ pub struct ToolWrapper {
 }
 
 /// Synthesize a minimal ToolDefinition from a plain tool
-pub fn create_tool_definition_from_tool(tool: &ToolWrapper) -> crate::core::extensions::types::ToolDefinition {
+pub fn create_tool_definition_from_tool(
+    tool: &ToolWrapper,
+) -> crate::core::extensions::types::ToolDefinition {
     crate::core::extensions::types::ToolDefinition {
         name: tool.definition.name.clone(),
         label: tool.definition.label.clone(),

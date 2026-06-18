@@ -74,10 +74,7 @@ pub(crate) fn apply_tui_command(tui: &mut TuiApp, cmd: TuiCommand) {
             response_tx,
         } => {
             let qdata = vec![(
-                format!(
-                    "Tool '{}' requires permission ({})",
-                    tool_name, permission
-                ),
+                format!("Tool '{}' requires permission ({})", tool_name, permission),
                 "Permission Request".to_string(),
                 vec![
                     (
@@ -164,7 +161,10 @@ pub(crate) fn show_question_dialog(
 
 /// Drain all pending TuiCommands from cmd_rx (sync variant, no persist).
 /// Returns true if the channel is closed (should quit).
-pub(crate) fn drain_commands(tui: &mut TuiApp, cmd_rx: &mut tokio::sync::mpsc::UnboundedReceiver<TuiCommand>) -> bool {
+pub(crate) fn drain_commands(
+    tui: &mut TuiApp,
+    cmd_rx: &mut tokio::sync::mpsc::UnboundedReceiver<TuiCommand>,
+) -> bool {
     loop {
         match cmd_rx.try_recv() {
             Ok(cmd) => apply_tui_command(tui, cmd),

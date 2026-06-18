@@ -82,7 +82,20 @@ fn trim_url_token(token: &str) -> &str {
     token.trim_matches(|c: char| {
         matches!(
             c,
-            '(' | ')' | '[' | ']' | '{' | '}' | '<' | '>' | ',' | '.' | ';' | ':' | '!' | '\'' | '"'
+            '(' | ')'
+                | '['
+                | ']'
+                | '{'
+                | '}'
+                | '<'
+                | '>'
+                | ','
+                | '.'
+                | ';'
+                | ':'
+                | '!'
+                | '\''
+                | '"'
         )
     })
 }
@@ -93,7 +106,10 @@ fn is_absolute_url_like(token: &str) -> bool {
     }
     if let Ok(url) = url::Url::parse(token) {
         let scheme = url.scheme().to_ascii_lowercase();
-        if matches!(scheme.as_str(), "http" | "https" | "ftp" | "ftps" | "ws" | "wss") {
+        if matches!(
+            scheme.as_str(),
+            "http" | "https" | "ftp" | "ftps" | "ws" | "wss"
+        ) {
             return url.host_str().is_some();
         }
         return true;
@@ -170,7 +186,9 @@ fn is_ipv4(host: &str) -> bool {
     if parts.len() != 4 {
         return false;
     }
-    parts.iter().all(|part| !part.is_empty() && part.parse::<u8>().is_ok())
+    parts
+        .iter()
+        .all(|part| !part.is_empty() && part.parse::<u8>().is_ok())
 }
 
 fn is_domain_name(host: &str) -> bool {

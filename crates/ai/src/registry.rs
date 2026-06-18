@@ -1,4 +1,4 @@
-﻿//! API Provider Registry
+//! API Provider Registry
 
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
@@ -7,7 +7,13 @@ use crate::types::{Context, Model, StreamEvent, StreamOptions};
 
 /// A provider function that streams responses
 pub type StreamFn = Arc<
-    dyn Send + Sync + for<'a> Fn(Model, Context, Option<StreamOptions>) -> tokio::sync::mpsc::Receiver<StreamEvent>,
+    dyn Send
+        + Sync
+        + for<'a> Fn(
+            Model,
+            Context,
+            Option<StreamOptions>,
+        ) -> tokio::sync::mpsc::Receiver<StreamEvent>,
 >;
 
 /// A registered API provider

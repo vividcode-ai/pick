@@ -1,4 +1,4 @@
-﻿use pick_agent::permission::sandbox::{SandboxConfig, SandboxRequest, Sandbox, SandboxType};
+use pick_agent::permission::sandbox::{Sandbox, SandboxConfig, SandboxRequest, SandboxType};
 
 pub struct NullSandbox;
 
@@ -21,10 +21,7 @@ impl Sandbox for NullSandbox {
         false
     }
 
-    fn transform(
-        &self,
-        _req: &SandboxRequest,
-    ) -> Result<(String, Vec<String>), String> {
+    fn transform(&self, _req: &SandboxRequest) -> Result<(String, Vec<String>), String> {
         Err("No sandbox available on this platform".into())
     }
 }

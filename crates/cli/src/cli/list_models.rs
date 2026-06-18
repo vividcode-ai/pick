@@ -1,5 +1,4 @@
-﻿//! List available models with optional fuzzy search
-
+//! List available models with optional fuzzy search
 
 /// Format a number as human-readable (e.g., 200000 -> "200K", 1000000 -> "1M")
 fn format_token_count(count: u64) -> String {
@@ -37,8 +36,11 @@ pub async fn list_models(
     // Filter by search pattern if provided (simple substring match)
     let filtered: Vec<_> = if let Some(pattern) = search_pattern {
         let lower = pattern.to_lowercase();
-        models.iter()
-            .filter(|m| m.id.to_lowercase().contains(&lower) || m.provider.to_lowercase().contains(&lower))
+        models
+            .iter()
+            .filter(|m| {
+                m.id.to_lowercase().contains(&lower) || m.provider.to_lowercase().contains(&lower)
+            })
             .collect()
     } else {
         models.iter().collect()
@@ -53,10 +55,7 @@ pub async fn list_models(
 
     // Sort by provider, then by model id
     let mut sorted = filtered.clone();
-    sorted.sort_by(|a, b| {
-        a.provider.cmp(&b.provider)
-            .then_with(|| a.id.cmp(&b.id))
-    });
+    sorted.sort_by(|a, b| a.provider.cmp(&b.provider).then_with(|| a.id.cmp(&b.id)));
 
     // Build rows
     struct Row {
@@ -68,20 +67,27 @@ pub async fn list_models(
         images: String,
     }
 
-    let rows: Vec<Row> = sorted.iter().map(|m| {
-        let context = format_token_count(m.context_window);
-        let max_out = format_token_count(m.max_tokens);
-        let thinking = if m.reasoning { "yes" } else { "no" };
-        let images = if m.input.iter().any(|i| i.contains("image")) { "yes" } else { "no" };
-        Row {
-            provider: m.provider.clone(),
-            model: m.id.clone(),
-            context,
-            max_out,
-            thinking: thinking.to_string(),
-            images: images.to_string(),
-        }
-    }).collect();
+    let rows: Vec<Row> = sorted
+        .iter()
+        .map(|m| {
+            let context = format_token_count(m.context_window);
+            let max_out = format_token_count(m.max_tokens);
+            let thinking = if m.reasoning { "yes" } else { "no" };
+            let images = if m.input.iter().any(|i| i.contains("image")) {
+                "yes"
+            } else {
+                "no"
+            };
+            Row {
+                provider: m.provider.clone(),
+                model: m.id.clone(),
+                context,
+                max_out,
+                thinking: thinking.to_string(),
+                images: images.to_string(),
+            }
+        })
+        .collect();
 
     // Calculate column widths
     let provider_w = std::cmp::max(8, rows.iter().map(|r| r.provider.len()).max().unwrap_or(0));
@@ -94,16 +100,36 @@ pub async fn list_models(
     // Print header
     println!(
         "{:<pw$}  {:<mw$}  {:<cw$}  {:<ow$}  {:<tw$}  {:<iw$}",
-        "provider", "model", "context", "max-out", "thinking", "images",
-        pw = provider_w, mw = model_w, cw = context_w, ow = max_out_w, tw = thinking_w, iw = images_w
+        "provider",
+        "model",
+        "context",
+        "max-out",
+        "thinking",
+        "images",
+        pw = provider_w,
+        mw = model_w,
+        cw = context_w,
+        ow = max_out_w,
+        tw = thinking_w,
+        iw = images_w
     );
 
     // Print rows
     for row in &rows {
         println!(
             "{:<pw$}  {:<mw$}  {:<cw$}  {:<ow$}  {:<tw$}  {:<iw$}",
-            row.provider, row.model, row.context, row.max_out, row.thinking, row.images,
-            pw = provider_w, mw = model_w, cw = context_w, ow = max_out_w, tw = thinking_w, iw = images_w
+            row.provider,
+            row.model,
+            row.context,
+            row.max_out,
+            row.thinking,
+            row.images,
+            pw = provider_w,
+            mw = model_w,
+            cw = context_w,
+            ow = max_out_w,
+            tw = thinking_w,
+            iw = images_w
         );
     }
 }

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use serde::{Deserialize, Serialize};
 use pick_agent::permission::approval::PermissionConfig;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CompactionSettings {

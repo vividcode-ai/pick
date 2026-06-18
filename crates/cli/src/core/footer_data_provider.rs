@@ -1,5 +1,4 @@
-﻿//! Provides git branch and extension statuses for footer display
-
+//! Provides git branch and extension statuses for footer display
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -40,10 +39,7 @@ fn find_git_paths(cwd: &str) -> Option<GitPaths> {
                                 if Path::new(rel).is_absolute() {
                                     rel.to_string()
                                 } else {
-                                    Path::new(&git_dir)
-                                        .join(rel)
-                                        .to_string_lossy()
-                                        .to_string()
+                                    Path::new(&git_dir).join(rel).to_string_lossy().to_string()
                                 }
                             } else {
                                 git_dir.clone()
@@ -82,7 +78,13 @@ fn find_git_paths(cwd: &str) -> Option<GitPaths> {
 /// Resolve git branch synchronously
 fn resolve_branch_with_git_sync(repo_dir: &str) -> Option<String> {
     let output = std::process::Command::new("git")
-        .args(["--no-optional-locks", "symbolic-ref", "--quiet", "--short", "HEAD"])
+        .args([
+            "--no-optional-locks",
+            "symbolic-ref",
+            "--quiet",
+            "--short",
+            "HEAD",
+        ])
         .current_dir(repo_dir)
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
@@ -91,7 +93,11 @@ fn resolve_branch_with_git_sync(repo_dir: &str) -> Option<String> {
         .ok()?;
     if output.status.success() {
         let branch = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        if branch.is_empty() { None } else { Some(branch) }
+        if branch.is_empty() {
+            None
+        } else {
+            Some(branch)
+        }
     } else {
         None
     }
@@ -100,7 +106,13 @@ fn resolve_branch_with_git_sync(repo_dir: &str) -> Option<String> {
 /// Resolve git branch asynchronously
 async fn resolve_branch_with_git_async(repo_dir: &str) -> Option<String> {
     let output = tokio::process::Command::new("git")
-        .args(["--no-optional-locks", "symbolic-ref", "--quiet", "--short", "HEAD"])
+        .args([
+            "--no-optional-locks",
+            "symbolic-ref",
+            "--quiet",
+            "--short",
+            "HEAD",
+        ])
         .current_dir(repo_dir)
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
@@ -110,7 +122,11 @@ async fn resolve_branch_with_git_async(repo_dir: &str) -> Option<String> {
         .ok()?;
     if output.status.success() {
         let branch = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        if branch.is_empty() { None } else { Some(branch) }
+        if branch.is_empty() {
+            None
+        } else {
+            Some(branch)
+        }
     } else {
         None
     }
@@ -132,7 +148,11 @@ impl FooterDataProvider {
         Self {
             cwd: Mutex::new(cwd),
             extension_statuses: Mutex::new(HashMap::new()),
-            cached_branch: Mutex::new(Some(git_paths.as_ref().and_then(|gp| resolve_branch_from_head(&gp.head_path)))),
+            cached_branch: Mutex::new(Some(
+                git_paths
+                    .as_ref()
+                    .and_then(|gp| resolve_branch_from_head(&gp.head_path)),
+            )),
             git_paths: Mutex::new(git_paths),
             branch_change_callbacks: Mutex::new(Vec::new()),
             available_provider_count: Mutex::new(0),
@@ -144,7 +164,11 @@ impl FooterDataProvider {
         let mut cache = self.cached_branch.lock().unwrap();
         if cache.is_none() {
             let git_paths = self.git_paths.lock().unwrap();
-            *cache = Some(git_paths.as_ref().and_then(|gp| resolve_branch_from_head(&gp.head_path)));
+            *cache = Some(
+                git_paths
+                    .as_ref()
+                    .and_then(|gp| resolve_branch_from_head(&gp.head_path)),
+            );
         }
         cache.clone().flatten()
     }
@@ -175,8 +199,12 @@ impl FooterDataProvider {
     pub fn set_extension_status(&self, key: &str, text: Option<&str>) {
         let mut statuses = self.extension_statuses.lock().unwrap();
         match text {
-            Some(t) => { statuses.insert(key.to_string(), t.to_string()); }
-            None => { statuses.remove(key); }
+            Some(t) => {
+                statuses.insert(key.to_string(), t.to_string());
+            }
+            None => {
+                statuses.remove(key);
+            }
         }
     }
 
@@ -238,8 +266,14 @@ fn resolve_branch_from_head(head_path: &str) -> Option<String> {
     let trimmed = content.trim();
     if let Some(branch) = trimmed.strip_prefix("ref: refs/heads/") {
         if branch == ".invalid" {
-            resolve_branch_with_git_sync(Path::new(head_path).parent()?.parent()?.to_string_lossy().as_ref())
-                .or(Some("detached".to_string()))
+            resolve_branch_with_git_sync(
+                Path::new(head_path)
+                    .parent()?
+                    .parent()?
+                    .to_string_lossy()
+                    .as_ref(),
+            )
+            .or(Some("detached".to_string()))
         } else {
             Some(branch.to_string())
         }
@@ -253,7 +287,11 @@ async fn resolve_branch_from_head_async(head_path: &str) -> Option<String> {
     let trimmed = content.trim();
     if let Some(branch) = trimmed.strip_prefix("ref: refs/heads/") {
         if branch == ".invalid" {
-            let repo_dir = Path::new(head_path).parent()?.parent()?.to_string_lossy().to_string();
+            let repo_dir = Path::new(head_path)
+                .parent()?
+                .parent()?
+                .to_string_lossy()
+                .to_string();
             resolve_branch_with_git_async(&repo_dir)
                 .await
                 .or(Some("detached".to_string()))

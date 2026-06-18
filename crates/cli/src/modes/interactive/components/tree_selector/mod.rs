@@ -1,8 +1,7 @@
 //! Tree selector component for session tree navigation
 
-
-pub mod render;
 pub mod filter;
+pub mod render;
 
 use crate::core::tools::render_utils::ToolTheme;
 
@@ -79,7 +78,10 @@ pub struct ToolCallInfo {
     pub args: String,
 }
 
-pub fn build_active_path(nodes: &[TreeNodeInfo], leaf_id: Option<&str>) -> std::collections::HashSet<String> {
+pub fn build_active_path(
+    nodes: &[TreeNodeInfo],
+    leaf_id: Option<&str>,
+) -> std::collections::HashSet<String> {
     let mut path = std::collections::HashSet::new();
 
     if let Some(leaf) = leaf_id {
@@ -103,7 +105,9 @@ pub fn build_active_path(nodes: &[TreeNodeInfo], leaf_id: Option<&str>) -> std::
     path
 }
 
-pub fn build_tool_call_map(_nodes: &[TreeNodeInfo]) -> std::collections::HashMap<String, ToolCallInfo> {
+pub fn build_tool_call_map(
+    _nodes: &[TreeNodeInfo],
+) -> std::collections::HashMap<String, ToolCallInfo> {
     let map = std::collections::HashMap::new();
     map
 }
@@ -145,7 +149,10 @@ pub fn has_text_content(content_text: Option<&str>) -> bool {
 }
 
 pub fn is_settings_entry(entry_type: &str) -> bool {
-    matches!(entry_type, "label" | "custom" | "model_change" | "thinking_level_change" | "session_info")
+    matches!(
+        entry_type,
+        "label" | "custom" | "model_change" | "thinking_level_change" | "session_info"
+    )
 }
 
 pub fn get_searchable_text(node: &TreeNodeInfo) -> String {
@@ -274,22 +281,28 @@ pub fn render_tree_search_line(query: &str, _width: usize) -> Vec<String> {
     if query.is_empty() {
         vec![format!("  {}", ToolTheme::fg("muted", "Type to search:"))]
     } else {
-        vec![format!("  {}Type to search: {}",
+        vec![format!(
+            "  {}Type to search: {}",
             ToolTheme::fg("muted", ""),
             ToolTheme::fg("accent", query),
         )]
     }
 }
 
-pub fn render_label_input(
-    current_label: Option<&str>,
-    _width: usize,
-) -> Vec<String> {
+pub fn render_label_input(current_label: Option<&str>, _width: usize) -> Vec<String> {
     let indent = "  ";
     let lines = vec![
-        format!("{}{}", indent, ToolTheme::fg("muted", "Label (empty to remove):")),
+        format!(
+            "{}{}",
+            indent,
+            ToolTheme::fg("muted", "Label (empty to remove):")
+        ),
         format!("{}{}", indent, current_label.unwrap_or("")),
-        format!("{}{}", indent, ToolTheme::fg("muted", "Enter: save · Esc: cancel")),
+        format!(
+            "{}{}",
+            indent,
+            ToolTheme::fg("muted", "Enter: save · Esc: cancel")
+        ),
     ];
     lines
 }
@@ -315,7 +328,11 @@ pub fn render_tree_selector(
     lines.push(ToolTheme::fg("accent", &border));
     lines.push(String::new());
 
-    lines.extend(render_tree_selector_header(filter_mode, show_label_timestamps, width));
+    lines.extend(render_tree_selector_header(
+        filter_mode,
+        show_label_timestamps,
+        width,
+    ));
     lines.push(String::new());
 
     lines.extend(render_tree_search_line(search_query, width));
@@ -327,9 +344,16 @@ pub fn render_tree_selector(
         lines.extend(render_label_input(label_edit_value, width));
     } else {
         lines.extend(render_tree_list(
-            flat_nodes, nodes, selected_index, filter_mode,
-            show_label_timestamps, active_path_ids, folded_nodes, tool_calls,
-            width, max_visible,
+            flat_nodes,
+            nodes,
+            selected_index,
+            filter_mode,
+            show_label_timestamps,
+            active_path_ids,
+            folded_nodes,
+            tool_calls,
+            width,
+            max_visible,
         ));
     }
 

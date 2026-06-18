@@ -1,4 +1,4 @@
-﻿//! Settings list component with keyboard navigation and submenus
+//! Settings list component with keyboard navigation and submenus
 
 use crate::fuzzy::fuzzy_filter;
 use crate::utils::{truncate_to_width, visible_width};
@@ -126,7 +126,10 @@ impl SettingsList {
         let start = if total > self.max_visible {
             let half = self.max_visible / 2;
             if self.selected_index > half {
-                std::cmp::min(self.selected_index.saturating_sub(half), total - self.max_visible)
+                std::cmp::min(
+                    self.selected_index.saturating_sub(half),
+                    total - self.max_visible,
+                )
             } else {
                 0
             }
@@ -138,7 +141,11 @@ impl SettingsList {
         // Calculate max label width
         let max_label_width = std::cmp::min(
             30,
-            self.items.iter().map(|item| visible_width(&item.label)).max().unwrap_or(0),
+            self.items
+                .iter()
+                .map(|item| visible_width(&item.label))
+                .max()
+                .unwrap_or(0),
         );
 
         for i in start..end {

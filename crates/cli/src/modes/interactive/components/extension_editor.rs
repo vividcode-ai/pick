@@ -1,5 +1,4 @@
-﻿//! Extension editor component with external editor support
-
+//! Extension editor component with external editor support
 
 use crate::core::tools::render_utils::ToolTheme;
 
@@ -14,7 +13,10 @@ pub fn render_extension_editor(
     let border = "─".repeat(std::cmp::max(1, width));
     lines.push(ToolTheme::fg("accent", &border));
     lines.push(String::new());
-    lines.push(ToolTheme::fg("accent", &format!("\x1b[1m{}\x1b[22m", title)));
+    lines.push(ToolTheme::fg(
+        "accent",
+        &format!("\x1b[1m{}\x1b[22m", title),
+    ));
     lines.push(String::new());
 
     // Content

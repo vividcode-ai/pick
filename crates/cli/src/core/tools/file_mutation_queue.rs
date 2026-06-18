@@ -1,4 +1,4 @@
-﻿use std::collections::HashMap;
+use std::collections::HashMap;
 use std::future::Future;
 use std::path::Path;
 use std::pin::Pin;
@@ -51,10 +51,13 @@ where
 
     {
         let mut queues = FILE_MUTATION_QUEUES.lock().unwrap();
-        queues.insert(key.clone(), QueueState {
-            current: Some(next_fut),
-            waker: None,
-        });
+        queues.insert(
+            key.clone(),
+            QueueState {
+                current: Some(next_fut),
+                waker: None,
+            },
+        );
     }
 
     // Run the operation
@@ -85,9 +88,7 @@ async fn resolve_key(file_path: &str) -> String {
         let resolved = if path.is_absolute() {
             path.to_path_buf()
         } else {
-            std::env::current_dir()
-                .unwrap_or_default()
-                .join(path)
+            std::env::current_dir().unwrap_or_default().join(path)
         };
         resolved.to_string_lossy().to_string()
     }

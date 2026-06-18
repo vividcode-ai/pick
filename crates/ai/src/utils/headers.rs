@@ -1,4 +1,4 @@
-﻿//! HTTP headers utilities
+//! HTTP headers utilities
 
 use std::collections::HashMap;
 
@@ -46,7 +46,10 @@ impl Headers {
 
     /// Get all headers as (name, value) pairs
     pub fn all(&self) -> Vec<(&str, &str)> {
-        self.headers.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect()
+        self.headers
+            .iter()
+            .map(|(k, v)| (k.as_str(), v.as_str()))
+            .collect()
     }
 
     /// Number of headers

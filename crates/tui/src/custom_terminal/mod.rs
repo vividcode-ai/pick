@@ -22,7 +22,7 @@ use ratatui::style::Modifier;
 use ratatui::widgets::WidgetRef;
 use unicode_width::UnicodeWidthStr;
 
-use crate::custom_terminal::diff::{diff_buffers, DrawCommand};
+use crate::custom_terminal::diff::{DrawCommand, diff_buffers};
 
 mod diff;
 

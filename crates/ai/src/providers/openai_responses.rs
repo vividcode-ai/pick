@@ -1,4 +1,4 @@
-﻿//! OpenAI Responses API provider with SSE streaming
+//! OpenAI Responses API provider with SSE streaming
 
 use crate::providers::cloudflare;
 use crate::sse::SseEvent;
@@ -15,17 +15,29 @@ pub fn stream_openai_responses(
     let (tx, rx) = tokio::sync::mpsc::channel(64);
 
     let max_retries = options.as_ref().and_then(|o| o.max_retries).unwrap_or(3);
-    let max_delay = options.as_ref().and_then(|o| o.max_retry_delay_ms).unwrap_or(60000);
+    let max_delay = options
+        .as_ref()
+        .and_then(|o| o.max_retry_delay_ms)
+        .unwrap_or(60000);
 
     tokio::spawn(async move {
         let api_key = std::env::var("OPENAI_API_KEY").unwrap_or_default();
         if api_key.is_empty() {
             let mut msg = AssistantMessage::new(
-                vec![], "openai-responses".to_string(), "openai".to_string(),
-                model.id.clone(), Usage::zero(), StopReason::Error,
+                vec![],
+                "openai-responses".to_string(),
+                "openai".to_string(),
+                model.id.clone(),
+                Usage::zero(),
+                StopReason::Error,
             );
             msg.error_message = Some("OPENAI_API_KEY is not set.".to_string());
-            let _ = tx.send(StreamEvent::Error { reason: StopReason::Error, error: msg }).await;
+            let _ = tx
+                .send(StreamEvent::Error {
+                    reason: StopReason::Error,
+                    error: msg,
+                })
+                .await;
             return;
         }
 
@@ -34,10 +46,19 @@ pub fn stream_openai_responses(
                 Ok(url) => url,
                 Err(_) => {
                     let msg = AssistantMessage::new(
-                        vec![], "openai-responses".to_string(), "openai".to_string(),
-                        model.id.clone(), Usage::zero(), StopReason::Error,
+                        vec![],
+                        "openai-responses".to_string(),
+                        "openai".to_string(),
+                        model.id.clone(),
+                        Usage::zero(),
+                        StopReason::Error,
                     );
-                    let _ = tx.send(StreamEvent::Error { reason: StopReason::Error, error: msg }).await;
+                    let _ = tx
+                        .send(StreamEvent::Error {
+                            reason: StopReason::Error,
+                            error: msg,
+                        })
+                        .await;
                     return;
                 }
             }
@@ -103,10 +124,15 @@ pub fn stream_openai_responses(
                     }
                 }
                 crate::types::Message::ToolResult(tr) => {
-                    let text_content: Vec<String> = tr.content.iter()
+                    let text_content: Vec<String> = tr
+                        .content
+                        .iter()
                         .filter_map(|c| {
-                            if let ContentBlock::Text(t) = c { Some(t.text.clone()) }
-                            else { None }
+                            if let ContentBlock::Text(t) = c {
+                                Some(t.text.clone())
+                            } else {
+                                None
+                            }
                         })
                         .collect();
                     let output_text = text_content.join("\n");
@@ -128,14 +154,17 @@ pub fn stream_openai_responses(
             body["instructions"] = serde_json::json!(system);
         }
         if let Some(tools) = &context.tools {
-            let tools_json: Vec<serde_json::Value> = tools.iter().map(|t| {
-                serde_json::json!({
-                    "type": "function",
-                    "name": t.name,
-                    "description": t.description,
-                    "parameters": t.parameters,
+            let tools_json: Vec<serde_json::Value> = tools
+                .iter()
+                .map(|t| {
+                    serde_json::json!({
+                        "type": "function",
+                        "name": t.name,
+                        "description": t.description,
+                        "parameters": t.parameters,
+                    })
                 })
-            }).collect();
+                .collect();
             body["tools"] = serde_json::json!(tools_json);
         }
 
@@ -157,38 +186,35 @@ pub fn stream_openai_responses(
             );
 
             // Emit start
-            let _ = tx.send(StreamEvent::Start {
-                partial: crate::types::PartialAssistantMessage {
-                    content: vec![],
-                    api: Some("openai-responses".to_string()),
-                    provider: Some("openai".to_string()),
-                    model: Some(model.id.clone()),
-                    usage: Some(Usage::zero()),
-                    stop_reason: None,
-                    error_message: None,
-                    timestamp: chrono::Utc::now().timestamp_millis(),
-                },
-            }).await;
+            let _ = tx
+                .send(StreamEvent::Start {
+                    partial: crate::types::PartialAssistantMessage {
+                        content: vec![],
+                        api: Some("openai-responses".to_string()),
+                        provider: Some("openai".to_string()),
+                        model: Some(model.id.clone()),
+                        usage: Some(Usage::zero()),
+                        stop_reason: None,
+                        error_message: None,
+                        timestamp: chrono::Utc::now().timestamp_millis(),
+                    },
+                })
+                .await;
 
             let client = reqwest::Client::new();
-            let request_builder = client
-                .post(&url)
-                .header("content-type", "application/json");
+            let request_builder = client.post(&url).header("content-type", "application/json");
             let request_builder = if is_cloudflare_gateway {
                 request_builder.header("cf-aig-authorization", format!("Bearer {}", api_key))
             } else {
                 request_builder.header("Authorization", format!("Bearer {}", api_key))
             };
-            match request_builder
-                .json(&body)
-                .send()
-                .await
-            {
+            match request_builder.json(&body).send().await {
                 Ok(resp) => {
                     if !resp.status().is_success() {
                         let status = resp.status();
                         let body_text = resp.text().await.unwrap_or_default();
-                        let err_msg = format!("OpenAI Responses API error ({}): {}", status, body_text);
+                        let err_msg =
+                            format!("OpenAI Responses API error ({}): {}", status, body_text);
                         if crate::retry::is_retryable_http_status(status.as_u16())
                             && crate::retry::should_retry(attempt, max_retries)
                         {
@@ -196,10 +222,12 @@ pub fn stream_openai_responses(
                         }
                         output.stop_reason = StopReason::Error;
                         output.error_message = Some(err_msg);
-                        let _ = tx.send(StreamEvent::Error {
-                            reason: StopReason::Error,
-                            error: output,
-                        }).await;
+                        let _ = tx
+                            .send(StreamEvent::Error {
+                                reason: StopReason::Error,
+                                error: output,
+                            })
+                            .await;
                         return;
                     }
 
@@ -215,27 +243,35 @@ pub fn stream_openai_responses(
                                 let events = parser.feed(&chunk);
                                 for sse in events {
                                     process_responses_event(
-                                        &tx, &sse, &mut output,
-                                        &mut text_block_idx, &mut response_id,
-                                    ).await;
+                                        &tx,
+                                        &sse,
+                                        &mut output,
+                                        &mut text_block_idx,
+                                        &mut response_id,
+                                    )
+                                    .await;
                                 }
                             }
                             Err(e) => {
                                 output.stop_reason = StopReason::Error;
                                 output.error_message = Some(format!("Stream error: {}", e));
-                                let _ = tx.send(StreamEvent::Error {
-                                    reason: StopReason::Error,
-                                    error: output,
-                                }).await;
+                                let _ = tx
+                                    .send(StreamEvent::Error {
+                                        reason: StopReason::Error,
+                                        error: output,
+                                    })
+                                    .await;
                                 return;
                             }
                         }
                     }
 
-                    let _ = tx.send(StreamEvent::Done {
-                        reason: output.stop_reason.clone(),
-                        message: output,
-                    }).await;
+                    let _ = tx
+                        .send(StreamEvent::Done {
+                            reason: output.stop_reason.clone(),
+                            message: output,
+                        })
+                        .await;
                     return;
                 }
                 Err(e) => {
@@ -246,10 +282,12 @@ pub fn stream_openai_responses(
                     }
                     output.stop_reason = StopReason::Error;
                     output.error_message = Some(format!("Request failed: {}", e));
-                    let _ = tx.send(StreamEvent::Error {
-                        reason: StopReason::Error,
-                        error: output,
-                    }).await;
+                    let _ = tx
+                        .send(StreamEvent::Error {
+                            reason: StopReason::Error,
+                            error: output,
+                        })
+                        .await;
                     return;
                 }
             }
@@ -257,11 +295,20 @@ pub fn stream_openai_responses(
 
         // Exhausted all retries
         let mut msg = AssistantMessage::new(
-            vec![], "openai-responses".to_string(), "openai".to_string(),
-            model.id.clone(), Usage::zero(), StopReason::Error,
+            vec![],
+            "openai-responses".to_string(),
+            "openai".to_string(),
+            model.id.clone(),
+            Usage::zero(),
+            StopReason::Error,
         );
         msg.error_message = Some("Max retries exceeded".to_string());
-        let _ = tx.send(StreamEvent::Error { reason: StopReason::Error, error: msg }).await;
+        let _ = tx
+            .send(StreamEvent::Error {
+                reason: StopReason::Error,
+                error: msg,
+            })
+            .await;
     });
 
     rx
@@ -286,7 +333,11 @@ async fn process_responses_event(
 
     match event_type {
         "response.created" => {
-            if let Some(id) = data.get("response").and_then(|r| r.get("id")).and_then(|v| v.as_str()) {
+            if let Some(id) = data
+                .get("response")
+                .and_then(|r| r.get("id"))
+                .and_then(|v| v.as_str())
+            {
                 output.response_id = Some(id.to_string());
             }
         }
@@ -295,10 +346,12 @@ async fn process_responses_event(
             let idx = output.content.len();
             output.content.push(ContentBlock::text(""));
             *text_block_idx = Some(idx);
-            let _ = tx.send(StreamEvent::TextStart {
-                content_index: idx,
-                partial: partial_from_output(output),
-            }).await;
+            let _ = tx
+                .send(StreamEvent::TextStart {
+                    content_index: idx,
+                    partial: partial_from_output(output),
+                })
+                .await;
         }
         "response.output_text.delta" => {
             if let Some(delta) = data.get("delta").and_then(|v| v.as_str()) {
@@ -307,11 +360,13 @@ async fn process_responses_event(
                         if let ContentBlock::Text(ref mut tc) = output.content[idx] {
                             tc.text.push_str(delta);
                         }
-                        let _ = tx.send(StreamEvent::TextDelta {
-                            content_index: idx,
-                            delta: delta.to_string(),
-                            partial: partial_from_output(output),
-                        }).await;
+                        let _ = tx
+                            .send(StreamEvent::TextDelta {
+                                content_index: idx,
+                                delta: delta.to_string(),
+                                partial: partial_from_output(output),
+                            })
+                            .await;
                     }
                 }
             }
@@ -319,7 +374,10 @@ async fn process_responses_event(
         "response.function_call_arguments.delta" => {
             if let Some(delta) = data.get("delta").and_then(|v| v.as_str()) {
                 // Find or create tool call block
-                let idx = output.content.iter().position(|c| matches!(c, ContentBlock::ToolCall(_)));
+                let idx = output
+                    .content
+                    .iter()
+                    .position(|c| matches!(c, ContentBlock::ToolCall(_)));
                 if let Some(idx) = idx {
                     if let ContentBlock::ToolCall(ref mut tc) = output.content[idx] {
                         // Try to merge the delta into arguments
@@ -334,14 +392,17 @@ async fn process_responses_event(
                             }
                             tc.arguments = serde_json::Value::Object(merged);
                         } else if tc.arguments.is_null() {
-                            tc.arguments = serde_json::from_str(delta).unwrap_or(serde_json::Value::Null);
+                            tc.arguments =
+                                serde_json::from_str(delta).unwrap_or(serde_json::Value::Null);
                         }
                     }
-                    let _ = tx.send(StreamEvent::ToolCallDelta {
-                        content_index: idx,
-                        delta: delta.to_string(),
-                        partial: partial_from_output(output),
-                    }).await;
+                    let _ = tx
+                        .send(StreamEvent::ToolCallDelta {
+                            content_index: idx,
+                            delta: delta.to_string(),
+                            partial: partial_from_output(output),
+                        })
+                        .await;
                 }
             }
         }
@@ -383,7 +444,11 @@ async fn process_responses_event(
             output.stop_reason = StopReason::Error;
             if let Some(error) = data.get("error") {
                 output.error_message = Some(
-                    error.get("message").and_then(|v| v.as_str()).unwrap_or("Unknown error").to_string()
+                    error
+                        .get("message")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("Unknown error")
+                        .to_string(),
                 );
             }
         }

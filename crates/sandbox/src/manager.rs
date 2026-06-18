@@ -1,4 +1,4 @@
-﻿use std::sync::Arc;
+use std::sync::Arc;
 
 use pick_agent::permission::fs_policy::FileSystemPolicy;
 use pick_agent::permission::sandbox::{Sandbox, SandboxConfig};
@@ -12,10 +12,7 @@ pub struct SandboxManager {
 }
 
 impl SandboxManager {
-    pub fn new(
-        _fs_policy: Option<Arc<FileSystemPolicy>>,
-        config: &SandboxConfig,
-    ) -> Self {
+    pub fn new(_fs_policy: Option<Arc<FileSystemPolicy>>, config: &SandboxConfig) -> Self {
         let sandbox = create_platform_sandbox(config);
         Self {
             platform_sandbox: sandbox,

@@ -1,12 +1,10 @@
-﻿//! Register built-in API providers
+//! Register built-in API providers
 
-use crate::registry::{ApiProviderRegistry, RegisteredProvider};
 use super::{
-    anthropic, openai, faux,
-    mistral, google, google_vertex,
-    openai_responses, azure_openai_responses, openai_codex_responses,
-    bedrock,
+    anthropic, azure_openai_responses, bedrock, faux, google, google_vertex, mistral, openai,
+    openai_codex_responses, openai_responses,
 };
+use crate::registry::{ApiProviderRegistry, RegisteredProvider};
 
 /// Register all built-in API providers (internal, called from registry init)
 pub fn register_builtins_internal(registry: &ApiProviderRegistry) {

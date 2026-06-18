@@ -2,11 +2,11 @@ use std::io;
 
 use crossterm::queue;
 use crossterm::style::SetAttribute;
+use derive_more::IsVariant;
 use ratatui::buffer::Buffer;
 use ratatui::buffer::Cell;
 use ratatui::style::Color;
 use ratatui::style::Modifier;
-use derive_more::IsVariant;
 
 use crate::custom_terminal::display_width;
 

@@ -1,7 +1,7 @@
-﻿//! Bash tool - executes shell commands with streaming output
+//! Bash tool - executes shell commands with streaming output
 
-use tokio::io::{AsyncRead, AsyncReadExt};
 use pick_ai::types::ContentBlock;
+use tokio::io::{AsyncRead, AsyncReadExt};
 
 use crate::core::state::{AgentTool, AgentToolResult, ToolContext, ToolExecutionMode};
 use crate::utils::get_shell_config;
@@ -68,14 +68,20 @@ pub fn create_bash_tool() -> AgentTool {
             .collect(),
         ),
         required: Some(vec!["command".to_string()]),
-        description: Some(format!("Execute a command on the local system. Returns stdout and stderr. {}. Example: bash(command: \"ls -la\", timeout: 30)", plat)),
+        description: Some(format!(
+            "Execute a command on the local system. Returns stdout and stderr. {}. Example: bash(command: \"ls -la\", timeout: 30)",
+            plat
+        )),
         items: None,
         additional_properties: Some(false),
     };
 
     AgentTool {
         name: "bash".to_string(),
-        description: format!("Execute a command on the local system. Returns stdout and stderr. {}. Example: bash(command: \"ls -la\", timeout: 30)", plat),
+        description: format!(
+            "Execute a command on the local system. Returns stdout and stderr. {}. Example: bash(command: \"ls -la\", timeout: 30)",
+            plat
+        ),
         prompt_snippet: Some("Execute bash commands (ls, grep, find, etc.)".to_string()),
         prompt_guidelines: vec![],
         label: "bash".to_string(),
@@ -99,18 +105,23 @@ pub fn create_bash_tool() -> AgentTool {
                     }
                     // If the exec policy returned Prompt (not a hard deny), ask the user
                     if let Some(ref ep) = pm.exec_policy {
-                        if matches!(ep.evaluate(command), crate::permission::exec_policy::ExecDecision::Prompt) {
+                        if matches!(
+                            ep.evaluate(command),
+                            crate::permission::exec_policy::ExecDecision::Prompt
+                        ) {
                             if let Some(ref approve) = ctx.approve {
                                 let approved = approve(
                                     "Exec Policy".to_string(),
                                     format!("Command '{}' may be dangerous.", command),
-                                ).await;
+                                )
+                                .await;
                                 if !approved {
                                     return Ok(AgentToolResult {
                                         content: vec![ContentBlock::text(
-                                            "Error: Command blocked by user — exec policy required approval"
+                                            "Error: Command blocked by user — exec policy required approval",
                                         )],
-                                        is_error: true, terminate: false,
+                                        is_error: true,
+                                        terminate: false,
                                     });
                                 }
                             }
@@ -128,8 +139,11 @@ pub fn create_bash_tool() -> AgentTool {
                         let mut shell_args = shell_config.args.clone();
                         shell_args.push(command.to_string());
                         let mut req = crate::permission::sandbox::SandboxRequest::new(
-                            &shell_config.shell, &shell_args, cwd,
-                            ctx.fs_policy.clone(), 0,
+                            &shell_config.shell,
+                            &shell_args,
+                            cwd,
+                            ctx.fs_policy.clone(),
+                            0,
                         );
                         if let Some(ref pm) = ctx.permission_manager {
                             if let Some(ref sc) = pm.sandbox_config {
@@ -142,11 +156,16 @@ pub fn create_bash_tool() -> AgentTool {
                                     Ok((exit_code, stdout, stderr)) => {
                                         let mut output = stdout;
                                         if !stderr.is_empty() {
-                                            if !output.is_empty() { output.push('\n'); }
+                                            if !output.is_empty() {
+                                                output.push('\n');
+                                            }
                                             output.push_str(&stderr);
                                         }
                                         if output.is_empty() {
-                                            output = format!("Command completed with exit code: {}", exit_code);
+                                            output = format!(
+                                                "Command completed with exit code: {}",
+                                                exit_code
+                                            );
                                         }
                                         return Ok(AgentToolResult {
                                             content: vec![ContentBlock::text(output)],
@@ -156,7 +175,10 @@ pub fn create_bash_tool() -> AgentTool {
                                     }
                                     Err(e) => {
                                         return Ok(AgentToolResult {
-                                            content: vec![ContentBlock::text(format!("Error: {}", e))],
+                                            content: vec![ContentBlock::text(format!(
+                                                "Error: {}",
+                                                e
+                                            ))],
                                             is_error: true,
                                             terminate: false,
                                         });
@@ -176,8 +198,11 @@ pub fn create_bash_tool() -> AgentTool {
                             let mut shell_args = shell_config.args.clone();
                             shell_args.push(command.to_string());
                             let req = crate::permission::sandbox::SandboxRequest::new(
-                                &shell_config.shell, &shell_args, cwd,
-                                ctx.fs_policy.clone(), 0,
+                                &shell_config.shell,
+                                &shell_args,
+                                cwd,
+                                ctx.fs_policy.clone(),
+                                0,
                             );
                             if sandbox.is_available() {
                                 match sandbox.transform(&req) {
@@ -186,7 +211,9 @@ pub fn create_bash_tool() -> AgentTool {
                                         sandbox_args = Some(args);
                                         break 'sandbox true;
                                     }
-                                    Err(e) => { return Err(e); }
+                                    Err(e) => {
+                                        return Err(e);
+                                    }
                                 }
                             }
                         }
@@ -199,31 +226,42 @@ pub fn create_bash_tool() -> AgentTool {
                 // Pre-check: absolute path access control + external directory authorization
                 if let (Some(ref fp), Some(ref cwd)) = (ctx.fs_policy, ctx.cwd) {
                     if !fp.allow_absolute_paths() {
-                        let abs_paths = crate::permission::fs_policy::extract_absolute_path_args(command);
+                        let abs_paths =
+                            crate::permission::fs_policy::extract_absolute_path_args(command);
                         for path_str in &abs_paths {
                             let p = std::path::Path::new(path_str);
-                            if !p.is_absolute() { continue; }
+                            if !p.is_absolute() {
+                                continue;
+                            }
                             let is_denied = match fp.resolve_access(p, cwd) {
                                 Ok(crate::permission::fs_policy::AccessMode::Deny) | Err(_) => true,
                                 _ => false,
                             };
-                            if !is_denied { continue; }
+                            if !is_denied {
+                                continue;
+                            }
 
                             // Protected paths (e.g. .git/**) are hard denied, not authorizable
                             if fp.is_path_protected(p, cwd).unwrap_or(false) {
                                 return Ok(AgentToolResult {
                                     content: vec![ContentBlock::text(format!(
-                                        "Error: Path access denied: '{}' is a protected path", path_str
+                                        "Error: Path access denied: '{}' is a protected path",
+                                        path_str
                                     ))],
-                                    is_error: true, terminate: false,
+                                    is_error: true,
+                                    terminate: false,
                                 });
                             }
 
                             // Path is outside workspace — check authorization
                             let authorized = if let Some(ref pm) = ctx.permission_manager {
                                 crate::permission::external_dir::check_authorization(
-                                    "Bash", path_str, pm, ctx.question.as_ref(),
-                                ).await?
+                                    "Bash",
+                                    path_str,
+                                    pm,
+                                    ctx.question.as_ref(),
+                                )
+                                .await?
                             } else {
                                 false
                             };
@@ -234,7 +272,8 @@ pub fn create_bash_tool() -> AgentTool {
                                         "Error: Path access denied: '{}' is outside the allowed workspace",
                                         path_str
                                     ))],
-                                    is_error: true, terminate: false,
+                                    is_error: true,
+                                    terminate: false,
                                 });
                             }
                         }
@@ -257,7 +296,9 @@ pub fn create_bash_tool() -> AgentTool {
                 let timeout_secs = args.get("timeout").and_then(|v| v.as_u64());
 
                 // Spawn child process with piped stdio for streaming
-                let mut child = cmd.spawn().map_err(|e| format!("{} Failed to spawn command: {}", plat, e))?;
+                let mut child = cmd
+                    .spawn()
+                    .map_err(|e| format!("{} Failed to spawn command: {}", plat, e))?;
 
                 let stdout = child.stdout.take().expect("stdout not configured");
                 let stderr = child.stderr.take().expect("stderr not configured");
@@ -275,12 +316,15 @@ pub fn create_bash_tool() -> AgentTool {
                     let dur = std::time::Duration::from_secs(secs);
                     match tokio::time::timeout(dur, child.wait()).await {
                         Ok(Ok(s)) => s,
-                        Ok(Err(e)) => return Err(format!("{} Failed to wait for command: {}", plat, e)),
+                        Ok(Err(e)) => {
+                            return Err(format!("{} Failed to wait for command: {}", plat, e));
+                        }
                         Err(_) => {
                             let _ = child.kill().await;
                             return Ok(AgentToolResult {
                                 content: vec![ContentBlock::text(format!(
-                                    "{} Command timed out after {} seconds", plat, secs
+                                    "{} Command timed out after {} seconds",
+                                    plat, secs
                                 ))],
                                 is_error: true,
                                 terminate: false,
@@ -288,7 +332,10 @@ pub fn create_bash_tool() -> AgentTool {
                         }
                     }
                 } else {
-                    child.wait().await.map_err(|e| format!("{} Failed to wait for command: {}", plat, e))?
+                    child
+                        .wait()
+                        .await
+                        .map_err(|e| format!("{} Failed to wait for command: {}", plat, e))?
                 };
 
                 let mut result_text = stdout_result;
@@ -301,7 +348,10 @@ pub fn create_bash_tool() -> AgentTool {
                 }
 
                 if result_text.is_empty() {
-                    result_text = format!("Command completed with exit code: {}", status.code().unwrap_or(-1));
+                    result_text = format!(
+                        "Command completed with exit code: {}",
+                        status.code().unwrap_or(-1)
+                    );
                 }
 
                 let is_error = !status.success();

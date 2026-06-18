@@ -1,4 +1,4 @@
-﻿use unicode_width::UnicodeWidthChar;
+use unicode_width::UnicodeWidthChar;
 use unicode_width::UnicodeWidthStr;
 
 /// A single visual row produced by RowBuilder.
@@ -192,7 +192,6 @@ pub fn take_prefix_by_width(text: &str, max_cols: usize) -> (String, &str, usize
 mod tests {
     use super::*;
 
-
     #[test]
     fn rows_do_not_exceed_width_ascii() {
         let mut rb = RowBuilder::new(10);
@@ -201,8 +200,14 @@ mod tests {
         assert_eq!(
             rows,
             vec![
-                Row { text: "hello whir".to_string(), explicit_break: false },
-                Row { text: "l this is ".to_string(), explicit_break: false },
+                Row {
+                    text: "hello whir".to_string(),
+                    explicit_break: false
+                },
+                Row {
+                    text: "l this is ".to_string(),
+                    explicit_break: false
+                },
             ]
         );
     }
@@ -214,7 +219,10 @@ mod tests {
         let rows = rb.rows().to_vec();
         assert_eq!(
             rows,
-            vec![Row { text: "😀😀 ".to_string(), explicit_break: false }]
+            vec![Row {
+                text: "😀😀 ".to_string(),
+                explicit_break: false
+            }]
         );
     }
 

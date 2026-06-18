@@ -1,9 +1,9 @@
 use crossterm::cursor::Show;
 use crossterm::queue;
-use crossterm::terminal::{disable_raw_mode, enable_raw_mode, size, Clear, ClearType};
+use crossterm::terminal::{Clear, ClearType, disable_raw_mode, enable_raw_mode, size};
 use std::io::Write;
 
-use super::{Key, SelectResult, ExtendedSelectResult, read_key};
+use super::{ExtendedSelectResult, Key, SelectResult, read_key};
 
 pub fn run_list_selector<T>(
     title: &str,
@@ -47,17 +47,34 @@ fn run_selector_loop<T>(
         if needs_render {
             let (width, height) = size().unwrap_or((80, 24));
             term_height = height as usize;
-            let _ = render_selector(stdout, title, items, render_item, *selected, &search_query, width, height as u16);
+            let _ = render_selector(
+                stdout,
+                title,
+                items,
+                render_item,
+                *selected,
+                &search_query,
+                width,
+                height as u16,
+            );
             needs_render = false;
         }
 
         match read_key() {
             Some(Key::Up) => {
-                *selected = if *selected > 0 { *selected - 1 } else { items.len() - 1 };
+                *selected = if *selected > 0 {
+                    *selected - 1
+                } else {
+                    items.len() - 1
+                };
                 needs_render = true;
             }
             Some(Key::Down) => {
-                *selected = if *selected + 1 < items.len() { *selected + 1 } else { 0 };
+                *selected = if *selected + 1 < items.len() {
+                    *selected + 1
+                } else {
+                    0
+                };
                 needs_render = true;
             }
             Some(Key::PageUp) => {
@@ -96,9 +113,10 @@ fn run_selector_loop<T>(
                 needs_render = true;
                 if !search_query.is_empty() {
                     let lower = search_query.to_lowercase();
-                    if let Some(idx) = items.iter().position(|item| {
-                        render_item(item).to_lowercase().contains(&lower)
-                    }) {
+                    if let Some(idx) = items
+                        .iter()
+                        .position(|item| render_item(item).to_lowercase().contains(&lower))
+                    {
                         *selected = idx;
                     }
                 }
@@ -147,14 +165,24 @@ fn render_selector<T>(
     for i in start..end {
         let item_text = render_item(&items[i]);
         let is_selected = i == selected;
-        let cursor = if is_selected { "\x1b[32m›\x1b[0m " } else { "  " };
+        let cursor = if is_selected {
+            "\x1b[32m›\x1b[0m "
+        } else {
+            "  "
+        };
         let styled = if is_selected {
             format!("\x1b[48;5;236m{}{}\x1b[0m", cursor, item_text)
         } else {
             format!("{}{}", cursor, item_text)
         };
         let styled = if styled.chars().count() > width as usize {
-            format!("{}…\x1b[0m", &styled.chars().take(width.saturating_sub(4) as usize).collect::<String>())
+            format!(
+                "{}…\x1b[0m",
+                &styled
+                    .chars()
+                    .take(width.saturating_sub(4) as usize)
+                    .collect::<String>()
+            )
         } else {
             styled
         };
@@ -165,11 +193,7 @@ fn render_selector<T>(
     lines.push(String::new());
     lines.push(hint);
 
-    let output = format!(
-        "{}{}",
-        crossterm::cursor::MoveTo(0, 0),
-        lines.join("\r\n")
-    );
+    let output = format!("{}{}", crossterm::cursor::MoveTo(0, 0), lines.join("\r\n"));
 
     queue!(stdout, Clear(ClearType::All))?;
     queue!(stdout, crossterm::style::Print(output))?;
@@ -205,7 +229,9 @@ fn visible_width(s: &str) -> usize {
     let mut esc = false;
     for c in s.chars() {
         if esc {
-            if c == 'm' { esc = false; }
+            if c == 'm' {
+                esc = false;
+            }
         } else if c == '\x1b' {
             esc = true;
         } else {
@@ -228,7 +254,9 @@ fn visible_range<T>(
     } else {
         (0..items.len())
             .filter(|&i| {
-                render_item(i, &items[i]).iter().any(|l| l.to_lowercase().contains(&lower))
+                render_item(i, &items[i])
+                    .iter()
+                    .any(|l| l.to_lowercase().contains(&lower))
             })
             .collect()
     };
@@ -270,7 +298,13 @@ fn render_selector_frame<T>(
     let max_list_height = (height as usize).max(9) / 3;
     let available_height = max_list_height.saturating_sub(6).max(3);
 
-    let (vcount, filt) = visible_range(items, render_item, *scroll_offset, available_height, search_query);
+    let (vcount, filt) = visible_range(
+        items,
+        render_item,
+        *scroll_offset,
+        available_height,
+        search_query,
+    );
     *visible_count = vcount.max(1);
     *filtered_indices = filt;
 
@@ -285,8 +319,17 @@ fn render_selector_frame<T>(
     }
 
     render_extended_selector(
-        stdout, title, items, render_item,
-        selected, search_query, scope_name, width, *scroll_offset, available_height, confirm_exit,
+        stdout,
+        title,
+        items,
+        render_item,
+        selected,
+        search_query,
+        scope_name,
+        width,
+        *scroll_offset,
+        available_height,
+        confirm_exit,
     );
 }
 
@@ -322,11 +365,16 @@ fn handle_selector_key_event<T>(
                 let (_, height) = size().unwrap_or((80, 24));
                 let max_list_height = (height as usize).max(9) / 3;
                 let available_height = max_list_height.saturating_sub(6).max(3);
-                let (vcount, filt) = visible_range(items, render_item, 0, available_height, search_query);
+                let (vcount, filt) =
+                    visible_range(items, render_item, 0, available_height, search_query);
                 *filtered_indices = filt;
                 *visible_count = vcount.max(1);
                 let total = filtered_indices.len();
-                *scroll_offset = if *visible_count >= total { 0 } else { total.saturating_sub(*visible_count) };
+                *scroll_offset = if *visible_count >= total {
+                    0
+                } else {
+                    total.saturating_sub(*visible_count)
+                };
             }
             if *selected < *scroll_offset {
                 *scroll_offset = scroll_offset.saturating_sub(1);
@@ -345,7 +393,13 @@ fn handle_selector_key_event<T>(
             let (_, height) = size().unwrap_or((80, 24));
             let max_list_height = (height as usize).max(9) / 3;
             let available_height = max_list_height.saturating_sub(6).max(3);
-            let (vcount, _) = visible_range(items, render_item, *scroll_offset, available_height, search_query);
+            let (vcount, _) = visible_range(
+                items,
+                render_item,
+                *scroll_offset,
+                available_height,
+                search_query,
+            );
             *visible_count = vcount.max(1);
             if *selected >= *scroll_offset + *visible_count {
                 loop {
@@ -353,7 +407,13 @@ fn handle_selector_key_event<T>(
                     if *scroll_offset >= *selected {
                         break;
                     }
-                    let (v2, _) = visible_range(items, render_item, *scroll_offset, available_height, search_query);
+                    let (v2, _) = visible_range(
+                        items,
+                        render_item,
+                        *scroll_offset,
+                        available_height,
+                        search_query,
+                    );
                     *visible_count = v2.max(1);
                     if *selected < *scroll_offset + *visible_count {
                         break;
@@ -366,7 +426,13 @@ fn handle_selector_key_event<T>(
             let (_, height) = size().unwrap_or((80, 24));
             let max_list_height = (height as usize).max(9) / 3;
             let available_height = max_list_height.saturating_sub(6).max(3);
-            let (vcount, _) = visible_range(items, render_item, *scroll_offset, available_height, search_query);
+            let (vcount, _) = visible_range(
+                items,
+                render_item,
+                *scroll_offset,
+                available_height,
+                search_query,
+            );
             *visible_count = vcount.max(1);
             if *selected >= *visible_count {
                 *selected = selected.saturating_sub(*visible_count);
@@ -382,7 +448,13 @@ fn handle_selector_key_event<T>(
             let (_, height) = size().unwrap_or((80, 24));
             let max_list_height = (height as usize).max(9) / 3;
             let available_height = max_list_height.saturating_sub(6).max(3);
-            let (vcount, _) = visible_range(items, render_item, *scroll_offset, available_height, search_query);
+            let (vcount, _) = visible_range(
+                items,
+                render_item,
+                *scroll_offset,
+                available_height,
+                search_query,
+            );
             *visible_count = vcount.max(1);
             *selected = std::cmp::min(*selected + *visible_count, items.len().saturating_sub(1));
             if *selected >= *scroll_offset + *visible_count {
@@ -391,7 +463,13 @@ fn handle_selector_key_event<T>(
                     if *scroll_offset >= *selected {
                         break;
                     }
-                    let (v2, _) = visible_range(items, render_item, *scroll_offset, available_height, search_query);
+                    let (v2, _) = visible_range(
+                        items,
+                        render_item,
+                        *scroll_offset,
+                        available_height,
+                        search_query,
+                    );
                     *visible_count = v2.max(1);
                     if *selected < *scroll_offset + *visible_count {
                         break;
@@ -400,26 +478,50 @@ fn handle_selector_key_event<T>(
             }
             *needs_render = true;
         }
-        Some(Key::Home) => { *selected = 0; *scroll_offset = 0; *needs_render = true; }
+        Some(Key::Home) => {
+            *selected = 0;
+            *scroll_offset = 0;
+            *needs_render = true;
+        }
         Some(Key::End) => {
             *selected = items.len() - 1;
             let (_, height) = size().unwrap_or((80, 24));
             let max_list_height = (height as usize).max(9) / 3;
             let available_height = max_list_height.saturating_sub(6).max(3);
-            let (vcount, filt) = visible_range(items, render_item, 0, available_height, search_query);
+            let (vcount, filt) =
+                visible_range(items, render_item, 0, available_height, search_query);
             *filtered_indices = filt;
             *visible_count = vcount.max(1);
             let total = filtered_indices.len();
-            *scroll_offset = if *visible_count >= total { 0 } else { total.saturating_sub(*visible_count) };
+            *scroll_offset = if *visible_count >= total {
+                0
+            } else {
+                total.saturating_sub(*visible_count)
+            };
             *needs_render = true;
         }
-        Some(Key::Enter) => { return Some(ExtendedSelectResult::Selected(*selected)); }
-        Some(Key::Esc) => { return Some(ExtendedSelectResult::Cancelled); }
-        Some(Key::Backspace) => { search_query.pop(); *needs_render = true; }
-        Some(Key::Tab) => { return Some(ExtendedSelectResult::ToggleScope); }
-        Some(Key::Delete) => { return Some(ExtendedSelectResult::Delete(*selected)); }
-        Some(Key::CtrlD) => { return Some(ExtendedSelectResult::Delete(*selected)); }
-        Some(Key::CtrlE) => { return Some(ExtendedSelectResult::Preview(*selected)); }
+        Some(Key::Enter) => {
+            return Some(ExtendedSelectResult::Selected(*selected));
+        }
+        Some(Key::Esc) => {
+            return Some(ExtendedSelectResult::Cancelled);
+        }
+        Some(Key::Backspace) => {
+            search_query.pop();
+            *needs_render = true;
+        }
+        Some(Key::Tab) => {
+            return Some(ExtendedSelectResult::ToggleScope);
+        }
+        Some(Key::Delete) => {
+            return Some(ExtendedSelectResult::Delete(*selected));
+        }
+        Some(Key::CtrlD) => {
+            return Some(ExtendedSelectResult::Delete(*selected));
+        }
+        Some(Key::CtrlE) => {
+            return Some(ExtendedSelectResult::Preview(*selected));
+        }
         Some(Key::Left) | Some(Key::Right) => {}
         Some(Key::Char(c)) => {
             search_query.push(c);
@@ -434,10 +536,20 @@ fn handle_selector_key_event<T>(
                     let (_, height) = size().unwrap_or((80, 24));
                     let max_list_height = (height as usize).max(9) / 3;
                     let available_height = max_list_height.saturating_sub(6).max(3);
-                    let (vcount, _) = visible_range(items, render_item, *scroll_offset, available_height, search_query);
+                    let (vcount, _) = visible_range(
+                        items,
+                        render_item,
+                        *scroll_offset,
+                        available_height,
+                        search_query,
+                    );
                     *visible_count = vcount.max(1);
                     if *selected < *scroll_offset || *selected >= *scroll_offset + *visible_count {
-                        *scroll_offset = if *selected >= *visible_count / 2 { *selected - *visible_count / 2 } else { 0 };
+                        *scroll_offset = if *selected >= *visible_count / 2 {
+                            *selected - *visible_count / 2
+                        } else {
+                            0
+                        };
                     }
                 }
             }
@@ -476,10 +588,17 @@ pub fn run_extended_selector<T>(
     let result = loop {
         if needs_render {
             render_selector_frame(
-                &mut stdout, title, items, render_item,
-                selected, &search_query, scope_name,
-                &mut scroll_offset, confirm_exit,
-                &mut visible_count, &mut filtered_indices,
+                &mut stdout,
+                title,
+                items,
+                render_item,
+                selected,
+                &search_query,
+                scope_name,
+                &mut scroll_offset,
+                confirm_exit,
+                &mut visible_count,
+                &mut filtered_indices,
             );
             needs_render = false;
         }
@@ -487,10 +606,16 @@ pub fn run_extended_selector<T>(
         let key = read_key();
 
         if let Some(result) = handle_selector_key_event(
-            key, items, render_item,
-            &mut selected, &mut scroll_offset, &mut search_query,
-            &mut visible_count, &mut filtered_indices,
-            &mut confirm_exit, &mut needs_render,
+            key,
+            items,
+            render_item,
+            &mut selected,
+            &mut scroll_offset,
+            &mut search_query,
+            &mut visible_count,
+            &mut filtered_indices,
+            &mut confirm_exit,
+            &mut needs_render,
         ) {
             break result;
         }
@@ -517,7 +642,10 @@ fn render_extended_selector<T>(
 ) {
     let mut lines: Vec<String> = Vec::new();
 
-    lines.push(format!("\x1b[1m{}\x1b[0m  \x1b[2m[{}]\x1b[0m", title, scope_name));
+    lines.push(format!(
+        "\x1b[1m{}\x1b[0m  \x1b[2m[{}]\x1b[0m",
+        title, scope_name
+    ));
     lines.push(String::new());
 
     if search_query.is_empty() {
@@ -533,13 +661,18 @@ fn render_extended_selector<T>(
     } else {
         (0..items.len())
             .filter(|&i| {
-                render_item(i, &items[i]).iter().any(|l| l.to_lowercase().contains(&lower_query))
+                render_item(i, &items[i])
+                    .iter()
+                    .any(|l| l.to_lowercase().contains(&lower_query))
             })
             .collect()
     };
 
     if filtered_indices.is_empty() {
-        lines.push(format!("\x1b[2m  No sessions match \"{}\"\x1b[0m", search_query));
+        lines.push(format!(
+            "\x1b[2m  No sessions match \"{}\"\x1b[0m",
+            search_query
+        ));
     } else {
         let total_filtered = filtered_indices.len();
         let safe_offset = std::cmp::min(scroll_offset, total_filtered.saturating_sub(1));
@@ -560,8 +693,10 @@ fn render_extended_selector<T>(
             let actual_idx = filtered_indices[page_idx];
             let rendered_lines = render_item(actual_idx, &items[actual_idx]);
             let is_selected = actual_idx == selected;
-            let first_content_idx = rendered_lines.iter()
-                .position(|l| !l.trim().is_empty()).unwrap_or(0);
+            let first_content_idx = rendered_lines
+                .iter()
+                .position(|l| !l.trim().is_empty())
+                .unwrap_or(0);
             for (li, item_line) in rendered_lines.iter().enumerate() {
                 if item_line.trim().is_empty() {
                     lines.push(item_line.clone());
@@ -584,8 +719,13 @@ fn render_extended_selector<T>(
                 } else {
                     let text = format!("  {}", item_line);
                     let truncated = if visible_width(&text) > width as usize {
-                        format!("{}\u{2026}",
-                            &text.chars().take(width.saturating_sub(4) as usize).collect::<String>())
+                        format!(
+                            "{}\u{2026}",
+                            &text
+                                .chars()
+                                .take(width.saturating_sub(4) as usize)
+                                .collect::<String>()
+                        )
                     } else {
                         text
                     };
@@ -614,11 +754,7 @@ fn render_extended_selector<T>(
     );
     lines.push(hint);
 
-    let output = format!(
-        "{}{}",
-        crossterm::cursor::MoveTo(0, 0),
-        lines.join("\r\n")
-    );
+    let output = format!("{}{}", crossterm::cursor::MoveTo(0, 0), lines.join("\r\n"));
 
     let _ = queue!(stdout, Clear(ClearType::All));
     let _ = queue!(stdout, crossterm::style::Print(output));

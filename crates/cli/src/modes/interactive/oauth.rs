@@ -1,5 +1,5 @@
 use crate::core::auth_storage::AuthStorage;
-use pick_ai::oauth::{get_oauth_provider, list_oauth_providers, OAuthLoginCallbacks};
+use pick_ai::oauth::{OAuthLoginCallbacks, get_oauth_provider, list_oauth_providers};
 
 pub async fn handle_oauth_login(auth: &AuthStorage) {
     let providers = list_oauth_providers();
@@ -39,7 +39,10 @@ pub async fn handle_oauth_login(auth: &AuthStorage) {
     }
 
     let provider_id = &providers[selection - 1];
-    println!("\nStarting OAuth login for \x1b[1m{}\x1b[0m...", provider_id);
+    println!(
+        "\nStarting OAuth login for \x1b[1m{}\x1b[0m...",
+        provider_id
+    );
 
     let oauth_provider = match get_oauth_provider(provider_id) {
         Some(p) => p,
@@ -66,7 +69,11 @@ pub async fn handle_oauth_login(auth: &AuthStorage) {
         match std::io::stdin().read_line(&mut line) {
             Ok(_) => {
                 let trimmed = line.trim().to_string();
-                if trimmed.is_empty() { None } else { Some(trimmed) }
+                if trimmed.is_empty() {
+                    None
+                } else {
+                    Some(trimmed)
+                }
             }
             Err(_) => None,
         }
@@ -78,7 +85,11 @@ pub async fn handle_oauth_login(auth: &AuthStorage) {
         match std::io::stdin().read_line(&mut line) {
             Ok(_) => {
                 let trimmed = line.trim().to_string();
-                if trimmed.is_empty() { None } else { Some(trimmed) }
+                if trimmed.is_empty() {
+                    None
+                } else {
+                    Some(trimmed)
+                }
             }
             Err(_) => None,
         }
@@ -98,7 +109,10 @@ pub async fn handle_oauth_login(auth: &AuthStorage) {
         Ok(credentials) => {
             if let Some(api_key) = oauth_provider.get_api_key(&credentials) {
                 auth.set_api_key(provider_id, &api_key);
-                println!("\n\x1b[32mSuccessfully logged in to {}!\x1b[0m", provider_id);
+                println!(
+                    "\n\x1b[32mSuccessfully logged in to {}!\x1b[0m",
+                    provider_id
+                );
                 println!("Credentials saved to auth file.");
             } else {
                 println!("\n\x1b[31mError: No API key in OAuth credentials.\x1b[0m");

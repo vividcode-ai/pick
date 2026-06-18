@@ -1,5 +1,4 @@
-﻿//! Login dialog component for OAuth login flow
-
+//! Login dialog component for OAuth login flow
 
 use crate::core::tools::render_utils::ToolTheme;
 
@@ -20,11 +19,17 @@ pub fn render_login_dialog(
     lines.push(ToolTheme::fg("accent", &border));
 
     // Title
-    lines.push(ToolTheme::fg("accent", &format!("\x1b[1m{}\x1b[22m", title)));
+    lines.push(ToolTheme::fg(
+        "accent",
+        &format!("\x1b[1m{}\x1b[22m", title),
+    ));
     lines.push(String::new());
 
     // Provider name
-    lines.push(ToolTheme::fg("accent", &format!("Provider: {}", provider_name)));
+    lines.push(ToolTheme::fg(
+        "accent",
+        &format!("Provider: {}", provider_name),
+    ));
     lines.push(String::new());
 
     // Auth URL

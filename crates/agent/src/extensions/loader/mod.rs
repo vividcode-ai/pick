@@ -11,9 +11,8 @@ use std::sync::{Arc, Mutex};
 use serde::{Deserialize, Serialize};
 
 use super::types::{
-    EventHandler, Extension, ExtensionAPI, ExtensionFactory, ExtensionFlag,
-    ExtensionShortcut, FlagType, FlagValue, LoadExtensionsResult,
-    RegisteredCommand, RegisteredTool, ToolDefinition,
+    EventHandler, Extension, ExtensionAPI, ExtensionFactory, ExtensionFlag, ExtensionShortcut,
+    FlagType, FlagValue, LoadExtensionsResult, RegisteredCommand, RegisteredTool, ToolDefinition,
 };
 
 // ============================================================================
@@ -42,49 +41,58 @@ impl ExtensionAPIImpl {
     }
 
     fn into_extension(self) -> Extension {
-        let mut ext = Extension::new(
-            self.extension_path.clone(),
-            self.extension_path,
-        );
+        let mut ext = Extension::new(self.extension_path.clone(), self.extension_path);
 
         if let Ok(handlers) = self.handlers.into_inner() {
             ext.handlers = handlers;
         }
         if let Ok(tools) = self.tools.into_inner() {
             for tool in tools {
-                ext.tools.insert(tool.name.clone(), RegisteredTool {
-                    definition: tool,
-                    extension_path: ext.path.clone(),
-                });
+                ext.tools.insert(
+                    tool.name.clone(),
+                    RegisteredTool {
+                        definition: tool,
+                        extension_path: ext.path.clone(),
+                    },
+                );
             }
         }
         if let Ok(commands) = self.commands.into_inner() {
             for (name, description) in commands {
-                ext.commands.insert(name.clone(), RegisteredCommand {
-                    name,
-                    description,
-                    extension_path: ext.path.clone(),
-                });
+                ext.commands.insert(
+                    name.clone(),
+                    RegisteredCommand {
+                        name,
+                        description,
+                        extension_path: ext.path.clone(),
+                    },
+                );
             }
         }
         if let Ok(shortcuts) = self.shortcuts.into_inner() {
             for (shortcut, description) in shortcuts {
-                ext.shortcuts.insert(shortcut.clone(), ExtensionShortcut {
-                    shortcut,
-                    description,
-                    extension_path: ext.path.clone(),
-                });
+                ext.shortcuts.insert(
+                    shortcut.clone(),
+                    ExtensionShortcut {
+                        shortcut,
+                        description,
+                        extension_path: ext.path.clone(),
+                    },
+                );
             }
         }
         if let Ok(flags) = self.flags.into_inner() {
             for (name, description, flag_type, default) in flags {
-                ext.flags.insert(name.clone(), ExtensionFlag {
-                    name,
-                    description,
-                    flag_type,
-                    default,
-                    extension_path: ext.path.clone(),
-                });
+                ext.flags.insert(
+                    name.clone(),
+                    ExtensionFlag {
+                        name,
+                        description,
+                        flag_type,
+                        default,
+                        extension_path: ext.path.clone(),
+                    },
+                );
             }
         }
 
@@ -120,7 +128,13 @@ impl ExtensionAPI for ExtensionAPIImpl {
         }
     }
 
-    fn register_flag(&self, name: &str, description: Option<String>, flag_type: FlagType, default: Option<FlagValue>) {
+    fn register_flag(
+        &self,
+        name: &str,
+        description: Option<String>,
+        flag_type: FlagType,
+        default: Option<FlagValue>,
+    ) {
         if let Ok(mut flags) = self.flags.lock() {
             flags.push((name.to_string(), description, flag_type, default));
         }
@@ -132,9 +146,7 @@ impl ExtensionAPI for ExtensionAPIImpl {
 // ============================================================================
 
 /// Load an extension from a factory
-pub async fn load_extension_from_factory(
-    factory: &dyn ExtensionFactory,
-) -> Extension {
+pub async fn load_extension_from_factory(factory: &dyn ExtensionFactory) -> Extension {
     let api = ExtensionAPIImpl::new(format!("<factory:{}>", factory.name()));
     if let Err(e) = factory.init(&api).await {
         tracing::warn!("Extension {} init error: {}", factory.name(), e);
@@ -201,8 +213,12 @@ fn load_extension_symbols(
 ) -> Result<(String, Option<String>), String> {
     // Load metadata symbol
     let metadata_fn: libloading::Symbol<unsafe extern "C" fn() -> *const std::ffi::c_char> = unsafe {
-        lib.get(b"pick_ext_metadata\0")
-            .map_err(|_| format!("Extension '{}' missing 'pick_ext_metadata' symbol", path_str))?
+        lib.get(b"pick_ext_metadata\0").map_err(|_| {
+            format!(
+                "Extension '{}' missing 'pick_ext_metadata' symbol",
+                path_str
+            )
+        })?
     };
 
     let metadata_cstr = unsafe { metadata_fn() };
@@ -247,29 +263,35 @@ fn load_extension_symbols(
 }
 
 /// Validate and apply extension registration data to an Extension struct.
-fn validate_extension_factory(
-    ext: &mut Extension,
-    registration: DynamicExtensionRegistration,
-) {
+fn validate_extension_factory(ext: &mut Extension, registration: DynamicExtensionRegistration) {
     for tool in registration.tools {
-        ext.tools.insert(tool.name.clone(), RegisteredTool {
-            definition: tool,
-            extension_path: ext.path.clone(),
-        });
+        ext.tools.insert(
+            tool.name.clone(),
+            RegisteredTool {
+                definition: tool,
+                extension_path: ext.path.clone(),
+            },
+        );
     }
     for cmd in registration.commands {
-        ext.commands.insert(cmd.name.clone(), RegisteredCommand {
-            name: cmd.name,
-            description: cmd.description,
-            extension_path: ext.path.clone(),
-        });
+        ext.commands.insert(
+            cmd.name.clone(),
+            RegisteredCommand {
+                name: cmd.name,
+                description: cmd.description,
+                extension_path: ext.path.clone(),
+            },
+        );
     }
     for shortcut in registration.shortcuts {
-        ext.shortcuts.insert(shortcut.shortcut.clone(), ExtensionShortcut {
-            shortcut: shortcut.shortcut,
-            description: shortcut.description,
-            extension_path: ext.path.clone(),
-        });
+        ext.shortcuts.insert(
+            shortcut.shortcut.clone(),
+            ExtensionShortcut {
+                shortcut: shortcut.shortcut,
+                description: shortcut.description,
+                extension_path: ext.path.clone(),
+            },
+        );
     }
     for flag in registration.flags {
         let flag_type = match flag.flag_type.as_str() {
@@ -282,13 +304,16 @@ fn validate_extension_factory(
             serde_json::Value::String(s) => FlagValue::Str(s.clone()),
             _ => FlagValue::Str(v.to_string()),
         });
-        ext.flags.insert(flag.name.clone(), ExtensionFlag {
-            name: flag.name,
-            description: flag.description,
-            flag_type,
-            default,
-            extension_path: ext.path.clone(),
-        });
+        ext.flags.insert(
+            flag.name.clone(),
+            ExtensionFlag {
+                name: flag.name,
+                description: flag.description,
+                flag_type,
+                default,
+                extension_path: ext.path.clone(),
+            },
+        );
     }
 }
 
@@ -304,10 +329,7 @@ fn load_extension_from_library(path: &Path) -> Result<Extension, String> {
 
     let (ext_name, reg_str) = load_extension_symbols(&lib, &path_str)?;
 
-    let mut ext = Extension::new(
-        format!("dynamic:{}", ext_name),
-        path_str,
-    );
+    let mut ext = Extension::new(format!("dynamic:{}", ext_name), path_str);
 
     if let Some(ref reg_str) = reg_str {
         if !reg_str.is_empty() {
@@ -316,7 +338,10 @@ fn load_extension_from_library(path: &Path) -> Result<Extension, String> {
                     validate_extension_factory(&mut ext, registration);
                 }
                 Err(_) => {
-                    tracing::warn!("Extension '{}' returned unparseable registration JSON", ext_name);
+                    tracing::warn!(
+                        "Extension '{}' returned unparseable registration JSON",
+                        ext_name
+                    );
                 }
             }
         }
@@ -333,8 +358,12 @@ fn load_extension_from_library(path: &Path) -> Result<Extension, String> {
 // ============================================================================
 
 fn is_extension_file(name: &str) -> bool {
-    name.ends_with(".cjs") || name.ends_with(".mjs") || name.ends_with(".js")
-        || name.ends_with(".so") || name.ends_with(".dll") || name.ends_with(".wasm")
+    name.ends_with(".cjs")
+        || name.ends_with(".mjs")
+        || name.ends_with(".js")
+        || name.ends_with(".so")
+        || name.ends_with(".dll")
+        || name.ends_with(".wasm")
 }
 
 /// Discover extension files in a directory
@@ -425,24 +454,33 @@ fn load_extension_from_manifest(path: &Path) -> Option<Extension> {
     let mut ext = Extension::new(format!("manifest:{}", name), path_str);
 
     for tool in manifest.tools {
-        ext.tools.insert(tool.name.clone(), RegisteredTool {
-            definition: tool,
-            extension_path: ext.path.clone(),
-        });
+        ext.tools.insert(
+            tool.name.clone(),
+            RegisteredTool {
+                definition: tool,
+                extension_path: ext.path.clone(),
+            },
+        );
     }
     for cmd in manifest.commands {
-        ext.commands.insert(cmd.name.clone(), RegisteredCommand {
-            name: cmd.name,
-            description: cmd.description,
-            extension_path: ext.path.clone(),
-        });
+        ext.commands.insert(
+            cmd.name.clone(),
+            RegisteredCommand {
+                name: cmd.name,
+                description: cmd.description,
+                extension_path: ext.path.clone(),
+            },
+        );
     }
     for shortcut in manifest.shortcuts {
-        ext.shortcuts.insert(shortcut.shortcut.clone(), ExtensionShortcut {
-            shortcut: shortcut.shortcut,
-            description: shortcut.description,
-            extension_path: ext.path.clone(),
-        });
+        ext.shortcuts.insert(
+            shortcut.shortcut.clone(),
+            ExtensionShortcut {
+                shortcut: shortcut.shortcut,
+                description: shortcut.description,
+                extension_path: ext.path.clone(),
+            },
+        );
     }
     for flag in manifest.flags {
         let flag_type = match flag.flag_type.as_str() {
@@ -455,13 +493,16 @@ fn load_extension_from_manifest(path: &Path) -> Option<Extension> {
             serde_json::Value::String(s) => FlagValue::Str(s.clone()),
             _ => FlagValue::Str(v.to_string()),
         });
-        ext.flags.insert(flag.name.clone(), ExtensionFlag {
-            name: flag.name,
-            description: flag.description,
-            flag_type,
-            default,
-            extension_path: ext.path.clone(),
-        });
+        ext.flags.insert(
+            flag.name.clone(),
+            ExtensionFlag {
+                name: flag.name,
+                description: flag.description,
+                flag_type,
+                default,
+                extension_path: ext.path.clone(),
+            },
+        );
     }
 
     Some(ext)
@@ -608,15 +649,13 @@ pub async fn discover_and_load_extensions(
                         });
                     }
                 }
-                _ => {
-                    match load_extension_from_library(&canonical) {
-                        Ok(ext) => all_extensions.push(ext),
-                        Err(e) => errors.push(super::types::ExtensionLoadError {
-                            path: canonical_str,
-                            error: e,
-                        }),
-                    }
-                }
+                _ => match load_extension_from_library(&canonical) {
+                    Ok(ext) => all_extensions.push(ext),
+                    Err(e) => errors.push(super::types::ExtensionLoadError {
+                        path: canonical_str,
+                        error: e,
+                    }),
+                },
             }
         }
     }

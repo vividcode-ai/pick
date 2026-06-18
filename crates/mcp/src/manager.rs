@@ -1,8 +1,8 @@
-﻿use std::sync::Arc;
+use std::sync::Arc;
 
 use futures::future::join_all;
-use tokio::sync::Mutex;
 use pick_agent::core::state::AgentTool;
+use tokio::sync::Mutex;
 
 use crate::client::{McpToolExecutor, build_agent_tools, connect_and_discover};
 use crate::config::McpServerConfig;
@@ -37,26 +37,32 @@ impl McpManager {
     /// Connect all servers from config in parallel.
     /// Returns the list of discovered AgentTools to add to the global tool list.
     pub async fn connect_from_config(&self, configs: &[McpServerConfig]) -> Vec<AgentTool> {
-        let handles: Vec<_> = configs.iter().map(|config| {
-            let config = config.clone();
-            let executor = self.executor.clone();
-            tokio::spawn(async move {
-                match connect_and_discover(&config).await {
-                    Ok(client) => {
-                        let entries = client.tools.clone();
-                        let tools = build_agent_tools(entries, &executor);
-                        let mut ex = executor.lock().await;
-                        ex.add_client(client);
-                        tools
+        let handles: Vec<_> = configs
+            .iter()
+            .map(|config| {
+                let config = config.clone();
+                let executor = self.executor.clone();
+                tokio::spawn(async move {
+                    match connect_and_discover(&config).await {
+                        Ok(client) => {
+                            let entries = client.tools.clone();
+                            let tools = build_agent_tools(entries, &executor);
+                            let mut ex = executor.lock().await;
+                            ex.add_client(client);
+                            tools
+                        }
+                        Err(_) => Vec::new(),
                     }
-                    Err(_) => {
-                        Vec::new()
-                    }
-                }
+                })
             })
-        }).collect();
+            .collect();
 
-        join_all(handles).await.into_iter().filter_map(|r| r.ok()).flatten().collect()
+        join_all(handles)
+            .await
+            .into_iter()
+            .filter_map(|r| r.ok())
+            .flatten()
+            .collect()
     }
 
     /// Gracefully shut down all MCP connections.
@@ -97,7 +103,11 @@ impl McpManager {
         };
 
         let removed = ex.remove_client(pos);
-        let tool_names: Vec<String> = removed.tools.iter().map(|t| t.prefixed_name.clone()).collect();
+        let tool_names: Vec<String> = removed
+            .tools
+            .iter()
+            .map(|t| t.prefixed_name.clone())
+            .collect();
 
         Ok(tool_names)
     }
@@ -105,15 +115,19 @@ impl McpManager {
     /// List all connected servers
     pub async fn list_connections(&self) -> Vec<ConnectedServerInfo> {
         let ex = self.executor.lock().await;
-        ex.clients().iter().map(|c| {
-            let tool_names: Vec<String> = c.tools.iter().map(|t| t.prefixed_name.clone()).collect();
-            ConnectedServerInfo {
-                name: c.config.name.clone(),
-                transport: c.config.transport_type().to_string(),
-                tool_count: c.tools.len(),
-                tool_names,
-            }
-        }).collect()
+        ex.clients()
+            .iter()
+            .map(|c| {
+                let tool_names: Vec<String> =
+                    c.tools.iter().map(|t| t.prefixed_name.clone()).collect();
+                ConnectedServerInfo {
+                    name: c.config.name.clone(),
+                    transport: c.config.transport_type().to_string(),
+                    tool_count: c.tools.len(),
+                    tool_names,
+                }
+            })
+            .collect()
     }
 }
 
@@ -122,7 +136,9 @@ pub fn describe_config(config: &McpServerConfig) -> String {
     if let Some(url) = &config.url {
         format!("{} (http)", url)
     } else if let Some(cmd) = &config.command {
-        let args_str = config.args.as_ref()
+        let args_str = config
+            .args
+            .as_ref()
             .map(|a| a.join(" "))
             .unwrap_or_default();
         format!("{} {} (stdio)", cmd, args_str)

@@ -1,4 +1,4 @@
-﻿//! Frontmatter parsing
+//! Frontmatter parsing
 
 /// Parsed frontmatter result
 pub struct ParsedFrontmatter<T> {
@@ -24,7 +24,9 @@ fn extract_frontmatter(content: &str) -> (Option<String>, String) {
 }
 
 /// Parse frontmatter from content
-pub fn parse_frontmatter(content: &str) -> ParsedFrontmatter<std::collections::HashMap<String, String>> {
+pub fn parse_frontmatter(
+    content: &str,
+) -> ParsedFrontmatter<std::collections::HashMap<String, String>> {
     let (yaml_string, body) = extract_frontmatter(content);
     let frontmatter = match yaml_string {
         Some(yaml) => parse_simple_yaml(&yaml),
@@ -65,7 +67,10 @@ References are relative to {}.
 
 {}
 </skill>"#,
-            skill.name, skill.file_path.display(), base_dir, body
+            skill.name,
+            skill.file_path.display(),
+            base_dir,
+            body
         )
     } else {
         format!(
@@ -76,7 +81,11 @@ References are relative to {}.
 </skill>
 
 {}"#,
-            skill.name, skill.file_path.display(), base_dir, body, args
+            skill.name,
+            skill.file_path.display(),
+            base_dir,
+            body,
+            args
         )
     };
     Some(expanded)

@@ -1,4 +1,4 @@
-﻿//! Terminal manager — wraps custom_terminal::Terminal with viewport management,
+//! Terminal manager — wraps custom_terminal::Terminal with viewport management,
 //! history insertion, and synchronized rendering.
 
 use std::io::Write;
@@ -121,7 +121,8 @@ where
         self.has_drawn = false;
         self.has_reached_bottom = false;
         let screen_size = self.terminal.size()?;
-        self.terminal.set_viewport_area(Rect::new(0, 0, screen_size.width, 0));
+        self.terminal
+            .set_viewport_area(Rect::new(0, 0, screen_size.width, 0));
         Ok(())
     }
 
@@ -337,7 +338,10 @@ where
             crossterm::style::SetAttribute(crossterm::style::Attribute::Reset),
         )?;
         if bottom < screen_size.height {
-            queue!(self.terminal.backend_mut(), Clear(ClearType::FromCursorDown))?;
+            queue!(
+                self.terminal.backend_mut(),
+                Clear(ClearType::FromCursorDown)
+            )?;
         }
         self.terminal.show_cursor()?;
         self.terminal.reset_cursor_style()?;

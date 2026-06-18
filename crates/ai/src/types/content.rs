@@ -1,4 +1,4 @@
-﻿//! Content types for AI messages.
+//! Content types for AI messages.
 
 use serde::{Deserialize, Serialize};
 
@@ -67,7 +67,11 @@ impl ContentBlock {
         })
     }
 
-    pub fn tool_call(id: impl Into<String>, name: impl Into<String>, arguments: serde_json::Value) -> Self {
+    pub fn tool_call(
+        id: impl Into<String>,
+        name: impl Into<String>,
+        arguments: serde_json::Value,
+    ) -> Self {
         ContentBlock::ToolCall(ToolCall {
             id: id.into(),
             name: name.into(),

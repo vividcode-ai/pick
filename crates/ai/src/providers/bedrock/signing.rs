@@ -105,7 +105,10 @@ pub(crate) fn build_aws_auth_header(
 
     let canonical_request_hash = sha256_hex(canonical_request.as_bytes());
 
-    let credential_scope = format!("{}/{}/{}/{}", date_stamp, region, AWS_SERVICE, AWS_REQUEST_TYPE);
+    let credential_scope = format!(
+        "{}/{}/{}/{}",
+        date_stamp, region, AWS_SERVICE, AWS_REQUEST_TYPE
+    );
 
     let string_to_sign = format!(
         "{}\n{}\n{}\n{}",

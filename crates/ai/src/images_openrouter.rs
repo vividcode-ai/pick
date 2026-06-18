@@ -1,8 +1,9 @@
-﻿//! OpenRouter image generation provider.
+//! OpenRouter image generation provider.
 
 use crate::images::{
     AssistantImages, ImagesContext, ImagesImageContent, ImagesModel, ImagesOptions,
-    ImagesOutputContent, ImagesStopReason, ImagesTextContent, ProviderResponse, KNOWN_IMAGES_API_OPENROUTER,
+    ImagesOutputContent, ImagesStopReason, ImagesTextContent, KNOWN_IMAGES_API_OPENROUTER,
+    ProviderResponse,
 };
 use crate::utils::sanitize_unicode::sanitize_unicode;
 
@@ -89,7 +90,8 @@ pub async fn generate_images_openrouter(
 
     // Build HTTP client and request
     let client = reqwest::Client::new();
-    let mut req_builder = client.post(&url)
+    let mut req_builder = client
+        .post(&url)
         .header("Authorization", format!("Bearer {}", api_key))
         .header("Content-Type", "application/json")
         .json(&request_body);
@@ -106,15 +108,22 @@ pub async fn generate_images_openrouter(
 
     let on_response = options.as_ref().and_then(|o| o.on_response.clone());
 
-    let response = req_builder.send().await.map_err(|e| format!("Request failed: {}", e))?;
+    let response = req_builder
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
     let status = response.status().as_u16();
     let response_headers = response.headers().clone();
-    let response_text = response.text().await.map_err(|e| format!("Failed to read response: {}", e))?;
+    let response_text = response
+        .text()
+        .await
+        .map_err(|e| format!("Failed to read response: {}", e))?;
 
     // Build ProviderResponse for callback
     let provider_response = ProviderResponse {
         status,
-        headers: response_headers.iter()
+        headers: response_headers
+            .iter()
             .map(|(k, v)| (k.to_string(), v.to_str().unwrap_or("").to_string()))
             .collect(),
     };
@@ -157,31 +166,33 @@ pub async fn generate_images_openrouter(
             // Extract text content
             if let Some(content) = message.get("content").and_then(|c| c.as_str()) {
                 if !content.is_empty() {
-                    output.output.push(ImagesOutputContent::Text(ImagesTextContent {
-                        text: content.to_string(),
-                    }));
+                    output
+                        .output
+                        .push(ImagesOutputContent::Text(ImagesTextContent {
+                            text: content.to_string(),
+                        }));
                 }
             }
 
             // Extract images from the OpenRouter-specific images field
             if let Some(images) = message.get("images").and_then(|v| v.as_array()) {
                 for image_val in images {
-                    let image_url = image_val.get("image_url")
-                        .and_then(|iu| {
-                            if let Some(s) = iu.as_str() {
-                                Some(s.to_string())
-                            } else {
-                                iu.get("url").and_then(|u| u.as_str()).map(|s| s.to_string())
-                            }
-                        });
+                    let image_url = image_val.get("image_url").and_then(|iu| {
+                        if let Some(s) = iu.as_str() {
+                            Some(s.to_string())
+                        } else {
+                            iu.get("url")
+                                .and_then(|u| u.as_str())
+                                .map(|s| s.to_string())
+                        }
+                    });
 
                     if let Some(url) = image_url {
                         if url.starts_with("data:") {
                             if let Some((mime_type, data)) = parse_data_url(&url) {
-                                output.output.push(ImagesOutputContent::Image(ImagesImageContent {
-                                    mime_type,
-                                    data,
-                                }));
+                                output.output.push(ImagesOutputContent::Image(
+                                    ImagesImageContent { mime_type, data },
+                                ));
                             }
                         }
                     }
@@ -203,8 +214,14 @@ fn parse_data_url(url: &str) -> Option<(String, String)> {
 }
 
 fn parse_usage(raw: &serde_json::Value, model: &ImagesModel) -> crate::types::Usage {
-    let prompt_tokens = raw.get("prompt_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
-    let completion_tokens = raw.get("completion_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+    let prompt_tokens = raw
+        .get("prompt_tokens")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
+    let completion_tokens = raw
+        .get("completion_tokens")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
 
     let prompt_details = raw.get("prompt_tokens_details");
     let reported_cached = prompt_details

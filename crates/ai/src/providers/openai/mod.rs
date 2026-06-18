@@ -3,14 +3,13 @@
 pub mod stream;
 pub use stream::*;
 
-use crate::types::{
-    ContentBlock, Message,
-};
+use crate::types::{ContentBlock, Message};
 
 /// Convert Pick internal messages to OpenAI Chat Completions API format.
 pub fn convert_to_openai_messages(messages: &[Message]) -> Vec<serde_json::Value> {
-    messages.iter().map(|msg| {
-        match msg {
+    messages
+        .iter()
+        .map(|msg| match msg {
             Message::Assistant(a) => {
                 let mut text_parts: Vec<String> = Vec::new();
                 let mut tool_calls: Vec<serde_json::Value> = Vec::new();
@@ -53,15 +52,19 @@ pub fn convert_to_openai_messages(messages: &[Message]) -> Vec<serde_json::Value
                 msg_json
             }
             Message::ToolResult(tr) => {
-                let content_text: String = tr.content.iter()
-                    .filter_map(|c| {
-                        match c {
-                            ContentBlock::Text(t) => Some(t.text.clone()),
-                            ContentBlock::Thinking(t) => {
-                                if t.thinking.is_empty() { None } else { Some(t.thinking.clone()) }
+                let content_text: String = tr
+                    .content
+                    .iter()
+                    .filter_map(|c| match c {
+                        ContentBlock::Text(t) => Some(t.text.clone()),
+                        ContentBlock::Thinking(t) => {
+                            if t.thinking.is_empty() {
+                                None
+                            } else {
+                                Some(t.thinking.clone())
                             }
-                            _ => None,
                         }
+                        _ => None,
                     })
                     .collect::<Vec<_>>()
                     .join("\n");
@@ -114,8 +117,8 @@ pub fn convert_to_openai_messages(messages: &[Message]) -> Vec<serde_json::Value
                     })
                 }
             }
-        }
-    }).collect()
+        })
+        .collect()
 }
 
 /// Simple streaming version

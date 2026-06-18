@@ -1,5 +1,4 @@
-﻿//! Bash command execution display component
-
+//! Bash command execution display component
 
 use crate::core::tools::render_utils::ToolTheme;
 
@@ -20,7 +19,10 @@ pub fn render_bash_execution(
     lines.push(border.clone());
 
     // Command header
-    lines.push(ToolTheme::fg("accent", &format!("\x1b[1m$ {}\x1b[22m", command)));
+    lines.push(ToolTheme::fg(
+        "accent",
+        &format!("\x1b[1m$ {}\x1b[22m", command),
+    ));
 
     // Output
     if !output_lines.is_empty() {
@@ -41,7 +43,10 @@ pub fn render_bash_execution(
         }
 
         if hidden_count > 0 && !expanded {
-            lines.push(ToolTheme::fg("muted", &format!("... {} more lines", hidden_count)));
+            lines.push(ToolTheme::fg(
+                "muted",
+                &format!("... {} more lines", hidden_count),
+            ));
         }
     }
 
@@ -60,7 +65,10 @@ pub fn render_bash_execution(
     // Truncation info
     if truncated {
         if let Some(path) = full_output_path {
-            lines.push(ToolTheme::fg("warning", &format!("Output truncated. Full output: {}", path)));
+            lines.push(ToolTheme::fg(
+                "warning",
+                &format!("Output truncated. Full output: {}", path),
+            ));
         } else {
             lines.push(ToolTheme::fg("warning", "Output truncated."));
         }

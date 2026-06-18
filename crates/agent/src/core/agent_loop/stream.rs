@@ -2,8 +2,7 @@
 
 use pick_ai::registry::global_registry;
 use pick_ai::types::{
-    AssistantMessage, Context, Message, Model, StopReason,
-    StreamEvent, StreamOptions, Usage,
+    AssistantMessage, Context, Message, Model, StopReason, StreamEvent, StreamOptions, Usage,
 };
 
 use super::super::events::{AgentEvent, AgentEventHandler};
@@ -36,9 +35,9 @@ pub async fn call_llm(
     let api_key = model.api.as_str();
 
     // Find the registered provider
-    let provider = registry.get(api_key).ok_or_else(|| {
-        format!("No provider registered for API: {}", api_key)
-    })?;
+    let provider = registry
+        .get(api_key)
+        .ok_or_else(|| format!("No provider registered for API: {}", api_key))?;
 
     let thinking_budget = thinking_budget_from_level(thinking_level);
     // When thinking is enabled, max_tokens must include room for both thinking and visible output
@@ -82,13 +81,18 @@ pub async fn call_llm(
                 break;
             }
             StreamEvent::Error { reason, error } => {
-                return Err(error.error_message.unwrap_or_else(|| format!("{:?}", reason)));
+                return Err(error
+                    .error_message
+                    .unwrap_or_else(|| format!("{:?}", reason)));
             }
             other => {
                 // Forward intermediate stream events as MessageUpdate for UI streaming
                 if let Some(ref handler) = on_event {
                     if let Some(msg) = partial_event_to_message(&other) {
-                        handler(AgentEvent::MessageUpdate { message: msg, assistant_message_event: None });
+                        handler(AgentEvent::MessageUpdate {
+                            message: msg,
+                            assistant_message_event: None,
+                        });
                     }
                 }
             }

@@ -21,9 +21,10 @@ pub(crate) fn handle_help(ctx: &mut TuiContext) {
             ctx.tui.chat.add_system_message("");
             ctx.tui.chat.add_system_message("Skills:");
             for skill in skills {
-                ctx.tui
-                    .chat
-                    .add_system_message(&format!("  /skill:{:<14} {}", skill.name, skill.description));
+                ctx.tui.chat.add_system_message(&format!(
+                    "  /skill:{:<14} {}",
+                    skill.name, skill.description
+                ));
             }
         }
     }
@@ -35,19 +36,23 @@ pub(crate) fn handle_skill_list(ctx: &mut TuiContext) {
     if sm.get_enable_skill_commands() {
         let skills = ctx.resource_loader.skills();
         if skills.is_empty() {
-            ctx.tui.chat.add_system_message("No skills loaded. Place SKILL.md files in:");
             ctx.tui
                 .chat
-                .add_system_message(&format!("  {}/skills/", crate::config::get_agent_dir().display()));
+                .add_system_message("No skills loaded. Place SKILL.md files in:");
+            ctx.tui.chat.add_system_message(&format!(
+                "  {}/skills/",
+                crate::config::get_agent_dir().display()
+            ));
             ctx.tui.chat.add_system_message("  .pick/skills/");
         } else {
             ctx.tui
                 .chat
                 .add_system_message(&format!("Available skills ({}):", skills.len()));
             for skill in skills {
-                ctx.tui
-                    .chat
-                    .add_system_message(&format!("  /skill:{:<14} {}", skill.name, skill.description));
+                ctx.tui.chat.add_system_message(&format!(
+                    "  /skill:{:<14} {}",
+                    skill.name, skill.description
+                ));
             }
         }
     } else {
@@ -98,17 +103,23 @@ pub(crate) fn handle_session_info(ctx: &mut TuiContext) {
     }
     let total_tokens = total_input + total_output + total_cache_read + total_cache_write;
 
-    ctx.tui.chat.add_system_message(&format!("\x1b[1mSession Info\x1b[0m"));
     ctx.tui
         .chat
-        .add_system_message(&format!("  \x1b[2mName:\x1b[0m    \x1b[1m{}\x1b[0m", name_display));
+        .add_system_message(&format!("\x1b[1mSession Info\x1b[0m"));
+    ctx.tui.chat.add_system_message(&format!(
+        "  \x1b[2mName:\x1b[0m    \x1b[1m{}\x1b[0m",
+        name_display
+    ));
     ctx.tui
         .chat
         .add_system_message(&format!("  \x1b[2mID:\x1b[0m      {}", id));
+    ctx.tui.chat.add_system_message(&format!(
+        "  \x1b[2mModel:\x1b[0m   {} ({})",
+        ctx.model_id, ctx.provider
+    ));
     ctx.tui
         .chat
-        .add_system_message(&format!("  \x1b[2mModel:\x1b[0m   {} ({})", ctx.model_id, ctx.provider));
-    ctx.tui.chat.add_system_message(&format!("\x1b[1mMessages\x1b[0m"));
+        .add_system_message(&format!("\x1b[1mMessages\x1b[0m"));
     ctx.tui
         .chat
         .add_system_message(&format!("  \x1b[2mUser:\x1b[0m      {}", user_msgs));
@@ -121,7 +132,9 @@ pub(crate) fn handle_session_info(ctx: &mut TuiContext) {
     ctx.tui
         .chat
         .add_system_message(&format!("  \x1b[2mTotal:\x1b[0m      {}", msg_count));
-    ctx.tui.chat.add_system_message(&format!("\x1b[1mTokens\x1b[0m"));
+    ctx.tui
+        .chat
+        .add_system_message(&format!("\x1b[1mTokens\x1b[0m"));
     ctx.tui
         .chat
         .add_system_message(&format!("  \x1b[2mInput:\x1b[0m       {}", total_input));
@@ -129,20 +142,24 @@ pub(crate) fn handle_session_info(ctx: &mut TuiContext) {
         .chat
         .add_system_message(&format!("  \x1b[2mOutput:\x1b[0m      {}", total_output));
     if total_cache_read > 0 {
-        ctx.tui
-            .chat
-            .add_system_message(&format!("  \x1b[2mCache Read:\x1b[0m  {}", total_cache_read));
+        ctx.tui.chat.add_system_message(&format!(
+            "  \x1b[2mCache Read:\x1b[0m  {}",
+            total_cache_read
+        ));
     }
     if total_cache_write > 0 {
-        ctx.tui
-            .chat
-            .add_system_message(&format!("  \x1b[2mCache Write:\x1b[0m {}", total_cache_write));
+        ctx.tui.chat.add_system_message(&format!(
+            "  \x1b[2mCache Write:\x1b[0m {}",
+            total_cache_write
+        ));
     }
     ctx.tui
         .chat
         .add_system_message(&format!("  \x1b[2mTotal:\x1b[0m       {}", total_tokens));
     if total_cost > 0.0 {
-        ctx.tui.chat.add_system_message(&format!("\x1b[1mCost\x1b[0m"));
+        ctx.tui
+            .chat
+            .add_system_message(&format!("\x1b[1mCost\x1b[0m"));
         ctx.tui
             .chat
             .add_system_message(&format!("  \x1b[2mTotal:\x1b[0m       ${:.4}", total_cost));
@@ -162,7 +179,9 @@ pub(crate) async fn handle_session_name(ctx: &mut TuiContext, name: &str) {
                 .chat
                 .add_system_message(&format!("Session name: \x1b[1m{}\x1b[0m", persisted));
         } else {
-            ctx.tui.chat.add_system_message("Usage: /name <session name>");
+            ctx.tui
+                .chat
+                .add_system_message("Usage: /name <session name>");
         }
     } else {
         ctx.tui.set_session_name(name.to_string());
@@ -293,36 +312,75 @@ pub(crate) fn handle_changelog(ctx: &mut TuiContext) {
 
 /// Handle /hotkeys slash command
 pub(crate) fn handle_hotkeys(ctx: &mut TuiContext) {
-    ctx.tui.chat.add_system_message("\x1b[1mKeyboard Shortcuts\x1b[0m");
+    ctx.tui
+        .chat
+        .add_system_message("\x1b[1mKeyboard Shortcuts\x1b[0m");
     ctx.tui.chat.add_system_message("");
     ctx.tui.chat.add_system_message("\x1b[1mNavigation\x1b[0m");
-    ctx.tui.chat.add_system_message("  \x1b[2m↑/↓\x1b[0m            Move cursor / browse history");
-    ctx.tui.chat.add_system_message("  \x1b[2m←/→\x1b[0m            Move cursor left/right");
-    ctx.tui.chat.add_system_message("  \x1b[2mCtrl+←/→\x1b[0m       Move by word");
-    ctx.tui.chat.add_system_message("  \x1b[2mHome/End\x1b[0m        Start/end of line");
-    ctx.tui.chat.add_system_message("  \x1b[2mPageUp/Down\x1b[0m    Scroll chat");
+    ctx.tui
+        .chat
+        .add_system_message("  \x1b[2m↑/↓\x1b[0m            Move cursor / browse history");
+    ctx.tui
+        .chat
+        .add_system_message("  \x1b[2m←/→\x1b[0m            Move cursor left/right");
+    ctx.tui
+        .chat
+        .add_system_message("  \x1b[2mCtrl+←/→\x1b[0m       Move by word");
+    ctx.tui
+        .chat
+        .add_system_message("  \x1b[2mHome/End\x1b[0m        Start/end of line");
+    ctx.tui
+        .chat
+        .add_system_message("  \x1b[2mPageUp/Down\x1b[0m    Scroll chat");
     ctx.tui.chat.add_system_message("");
     ctx.tui.chat.add_system_message("\x1b[1mEditing\x1b[0m");
-    ctx.tui.chat.add_system_message("  \x1b[2mEnter\x1b[0m            Send message");
-    ctx.tui.chat.add_system_message("  \x1b[2mShift+Enter\x1b[0m     New line");
-    ctx.tui.chat.add_system_message("  \x1b[2mTab\x1b[0m              Autocomplete / next suggestion");
-    ctx.tui.chat.add_system_message("  \x1b[2mEsc\x1b[0m              Cancel autocomplete");
-    ctx.tui.chat.add_system_message("  \x1b[2mCtrl+C/D\x1b[0m        Quit");
-    ctx.tui.chat.add_system_message("  \x1b[2mCtrl+U\x1b[0m          Delete to line start");
-    ctx.tui.chat.add_system_message("  \x1b[2mCtrl+K\x1b[0m          Delete to line end");
-    ctx.tui.chat.add_system_message("  \x1b[2mCtrl+W\x1b[0m          Delete word backward");
-    ctx.tui.chat.add_system_message("  \x1b[2mCtrl+Z\x1b[0m          Undo");
+    ctx.tui
+        .chat
+        .add_system_message("  \x1b[2mEnter\x1b[0m            Send message");
+    ctx.tui
+        .chat
+        .add_system_message("  \x1b[2mShift+Enter\x1b[0m     New line");
+    ctx.tui
+        .chat
+        .add_system_message("  \x1b[2mTab\x1b[0m              Autocomplete / next suggestion");
+    ctx.tui
+        .chat
+        .add_system_message("  \x1b[2mEsc\x1b[0m              Cancel autocomplete");
+    ctx.tui
+        .chat
+        .add_system_message("  \x1b[2mCtrl+C/D\x1b[0m        Quit");
+    ctx.tui
+        .chat
+        .add_system_message("  \x1b[2mCtrl+U\x1b[0m          Delete to line start");
+    ctx.tui
+        .chat
+        .add_system_message("  \x1b[2mCtrl+K\x1b[0m          Delete to line end");
+    ctx.tui
+        .chat
+        .add_system_message("  \x1b[2mCtrl+W\x1b[0m          Delete word backward");
+    ctx.tui
+        .chat
+        .add_system_message("  \x1b[2mCtrl+Z\x1b[0m          Undo");
     ctx.tui.chat.add_system_message("");
     ctx.tui.chat.add_system_message("\x1b[1mCommands\x1b[0m");
-    ctx.tui.chat.add_system_message("  \x1b[2m/command\x1b[0m        Slash commands");
-    ctx.tui.chat.add_system_message("  \x1b[2m!command\x1b[0m        Run bash command");
-    ctx.tui.chat.add_system_message("  \x1b[2m!!command\x1b[0m       Run bash (excluded from context)");
-    ctx.tui.chat.add_system_message("  \x1b[2m/help\x1b[0m           Show all commands");
+    ctx.tui
+        .chat
+        .add_system_message("  \x1b[2m/command\x1b[0m        Slash commands");
+    ctx.tui
+        .chat
+        .add_system_message("  \x1b[2m!command\x1b[0m        Run bash command");
+    ctx.tui
+        .chat
+        .add_system_message("  \x1b[2m!!command\x1b[0m       Run bash (excluded from context)");
+    ctx.tui
+        .chat
+        .add_system_message("  \x1b[2m/help\x1b[0m           Show all commands");
 }
 
 /// Handle /quit slash command
 pub(crate) async fn handle_quit(ctx: &mut TuiContext) {
     ctx.tui.chat.add_system_message("Goodbye!");
-    ctx.mcp_cancelled.store(true, std::sync::atomic::Ordering::Relaxed);
+    ctx.mcp_cancelled
+        .store(true, std::sync::atomic::Ordering::Relaxed);
     ctx.mcp_manager.shutdown().await;
 }

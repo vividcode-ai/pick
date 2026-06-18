@@ -147,7 +147,11 @@ pub(crate) fn expand_skill_command(ctx: &mut TuiContext, user_text: &str) -> Opt
         return None;
     }
     let trimmed = user_text.trim();
-    let skill_name = trimmed[7..].split_whitespace().next().unwrap_or("").to_string();
+    let skill_name = trimmed[7..]
+        .split_whitespace()
+        .next()
+        .unwrap_or("")
+        .to_string();
     match crate::utils::frontmatter::expand_skill_command(trimmed, ctx.resource_loader.skills()) {
         Some(expanded) => {
             if let Some(skill) = ctx
@@ -163,12 +167,10 @@ pub(crate) fn expand_skill_command(ctx: &mut TuiContext, user_text: &str) -> Opt
             Some(expanded)
         }
         None => {
-            ctx.tui
-                .chat
-                .add_system_message(&format!(
-                    "Unknown skill: {}. Type /help to see available skills.",
-                    skill_name
-                ));
+            ctx.tui.chat.add_system_message(&format!(
+                "Unknown skill: {}. Type /help to see available skills.",
+                skill_name
+            ));
             ctx.tui.finalize_turn();
             None
         }

@@ -1,12 +1,11 @@
-﻿//! Skills loading and management
-
+//! Skills loading and management
 
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use crate::config::CONFIG_DIR_NAME;
 use crate::core::diagnostics::{ResourceCollision, ResourceDiagnostic};
-use crate::core::source_info::{create_synthetic_source_info, SourceInfo, SyntheticSourceOptions};
+use crate::core::source_info::{SourceInfo, SyntheticSourceOptions, create_synthetic_source_info};
 
 const MAX_NAME_LENGTH: usize = 64;
 const MAX_DESCRIPTION_LENGTH: usize = 1024;
@@ -47,10 +46,20 @@ fn parse_skill_frontmatter(content: &str) -> (HashMap<String, String>, String) {
 fn validate_name(name: &str) -> Vec<String> {
     let mut errors = Vec::new();
     if name.len() > MAX_NAME_LENGTH {
-        errors.push(format!("name exceeds {} characters ({})", MAX_NAME_LENGTH, name.len()));
+        errors.push(format!(
+            "name exceeds {} characters ({})",
+            MAX_NAME_LENGTH,
+            name.len()
+        ));
     }
-    if !name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-') {
-        errors.push("name contains invalid characters (must be lowercase a-z, 0-9, hyphens only)".to_string());
+    if !name
+        .chars()
+        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+    {
+        errors.push(
+            "name contains invalid characters (must be lowercase a-z, 0-9, hyphens only)"
+                .to_string(),
+        );
     }
     if name.starts_with('-') || name.ends_with('-') {
         errors.push("name must not start or end with a hyphen".to_string());
@@ -66,7 +75,11 @@ fn validate_description(description: Option<&str>) -> Vec<String> {
     match description {
         Some(d) if !d.trim().is_empty() => {
             if d.len() > MAX_DESCRIPTION_LENGTH {
-                errors.push(format!("description exceeds {} characters ({})", MAX_DESCRIPTION_LENGTH, d.len()));
+                errors.push(format!(
+                    "description exceeds {} characters ({})",
+                    MAX_DESCRIPTION_LENGTH,
+                    d.len()
+                ));
             }
         }
         _ => errors.push("description is required".to_string()),
@@ -85,12 +98,15 @@ fn create_skill_source_info(file_path: &str, base_dir: &str, source: &str) -> So
         "project" => Some(SourceScope::Project),
         _ => None,
     };
-    create_synthetic_source_info(file_path, SyntheticSourceOptions {
-        source: "local".to_string(),
-        scope,
-        origin: None,
-        base_dir: Some(base_dir.to_string()),
-    })
+    create_synthetic_source_info(
+        file_path,
+        SyntheticSourceOptions {
+            source: "local".to_string(),
+            scope,
+            origin: None,
+            base_dir: Some(base_dir.to_string()),
+        },
+    )
 }
 
 // ============================================================================
@@ -105,7 +121,9 @@ struct SkillIgnoreMatcher {
 
 impl SkillIgnoreMatcher {
     fn new() -> Self {
-        Self { patterns: Vec::new() }
+        Self {
+            patterns: Vec::new(),
+        }
     }
 
     fn add(&mut self, patterns: &[String]) {
@@ -133,8 +151,7 @@ impl SkillIgnoreMatcher {
 }
 
 fn add_ignore_rules(ig: &mut SkillIgnoreMatcher, dir: &Path, root_dir: &Path) {
-    let rel = pathdiff::diff_paths(dir, root_dir)
-        .unwrap_or_else(|| dir.to_path_buf());
+    let rel = pathdiff::diff_paths(dir, root_dir).unwrap_or_else(|| dir.to_path_buf());
     let prefix = if rel.to_string_lossy().is_empty() {
         String::new()
     } else {
@@ -168,8 +185,16 @@ fn prefix_ignore_pattern(line: &str, prefix: &str) -> Option<String> {
     let negated = pattern.starts_with('!');
 
     if negated {
-        let rest = if pattern[1..].starts_with('/') { &pattern[2..] } else { &pattern[1..] };
-        let prefixed = if prefix.is_empty() { rest.to_string() } else { format!("{}{}", prefix, rest) };
+        let rest = if pattern[1..].starts_with('/') {
+            &pattern[2..]
+        } else {
+            &pattern[1..]
+        };
+        let prefixed = if prefix.is_empty() {
+            rest.to_string()
+        } else {
+            format!("{}{}", prefix, rest)
+        };
         return Some(format!("!{}", prefixed));
     }
 
@@ -179,7 +204,11 @@ fn prefix_ignore_pattern(line: &str, prefix: &str) -> Option<String> {
     if pattern.starts_with('/') {
         pattern = pattern[1..].to_string();
     }
-    let result = if prefix.is_empty() { pattern } else { format!("{}{}", prefix, pattern) };
+    let result = if prefix.is_empty() {
+        pattern
+    } else {
+        format!("{}{}", prefix, pattern)
+    };
     Some(result)
 }
 
@@ -191,7 +220,9 @@ fn simple_glob_match(text: &str, pattern: &str) -> bool {
         return true;
     }
     let re_str = format!("^{}$", regex::escape(pattern).replace("\\*", ".*"));
-    regex::Regex::new(&re_str).map(|re| re.is_match(text)).unwrap_or(false)
+    regex::Regex::new(&re_str)
+        .map(|re| re.is_match(text))
+        .unwrap_or(false)
 }
 
 // ============================================================================
@@ -203,16 +234,21 @@ fn load_skill_from_file(file_path: &str, source: &str) -> (Option<Skill>, Vec<Re
     let content = match std::fs::read_to_string(file_path) {
         Ok(c) => c,
         Err(e) => {
-            diagnostics.push(ResourceDiagnostic::warning(e.to_string(), Some(file_path.to_string())));
+            diagnostics.push(ResourceDiagnostic::warning(
+                e.to_string(),
+                Some(file_path.to_string()),
+            ));
             return (None, diagnostics);
         }
     };
 
     let (frontmatter, _body) = parse_skill_frontmatter(&content);
-    let skill_dir = Path::new(file_path).parent()
+    let skill_dir = Path::new(file_path)
+        .parent()
         .map(|p| p.to_string_lossy().to_string())
         .unwrap_or_default();
-    let parent_dir_name = Path::new(&skill_dir).file_name()
+    let parent_dir_name = Path::new(&skill_dir)
+        .file_name()
         .map(|s| s.to_string_lossy().to_string())
         .unwrap_or_default();
 
@@ -220,14 +256,20 @@ fn load_skill_from_file(file_path: &str, source: &str) -> (Option<Skill>, Vec<Re
 
     let desc_errors = validate_description(description.as_deref());
     for error in desc_errors {
-        diagnostics.push(ResourceDiagnostic::warning(error, Some(file_path.to_string())));
+        diagnostics.push(ResourceDiagnostic::warning(
+            error,
+            Some(file_path.to_string()),
+        ));
     }
 
     let name = frontmatter.get("name").cloned().unwrap_or(parent_dir_name);
 
     let name_errors = validate_name(&name);
     for error in name_errors {
-        diagnostics.push(ResourceDiagnostic::warning(error, Some(file_path.to_string())));
+        diagnostics.push(ResourceDiagnostic::warning(
+            error,
+            Some(file_path.to_string()),
+        ));
     }
 
     let desc = match description {
@@ -235,7 +277,8 @@ fn load_skill_from_file(file_path: &str, source: &str) -> (Option<Skill>, Vec<Re
         _ => return (None, diagnostics),
     };
 
-    let disable = frontmatter.get("disable-model-invocation")
+    let disable = frontmatter
+        .get("disable-model-invocation")
         .map(|v| v == "true")
         .unwrap_or(false);
 
@@ -280,7 +323,10 @@ fn load_skills_from_dir_internal(
     let mut diagnostics = Vec::new();
 
     if !dir.exists() {
-        return LoadSkillsResult { skills, diagnostics };
+        return LoadSkillsResult {
+            skills,
+            diagnostics,
+        };
     }
 
     let root = root_dir.unwrap_or(dir);
@@ -295,7 +341,12 @@ fn load_skills_from_dir_internal(
 
     let entries: Vec<_> = match std::fs::read_dir(dir) {
         Ok(e) => e.flatten().collect(),
-        Err(_) => return LoadSkillsResult { skills, diagnostics },
+        Err(_) => {
+            return LoadSkillsResult {
+                skills,
+                diagnostics,
+            };
+        }
     };
 
     // First pass: look for SKILL.md
@@ -307,7 +358,11 @@ fn load_skills_from_dir_internal(
 
         let full_path = entry.path();
         let is_file = entry.metadata().map(|m| m.is_file()).unwrap_or(false)
-            || (entry.metadata().map(|m| m.file_type().is_symlink()).unwrap_or(false) && full_path.is_file());
+            || (entry
+                .metadata()
+                .map(|m| m.file_type().is_symlink())
+                .unwrap_or(false)
+                && full_path.is_file());
 
         if !is_file {
             continue;
@@ -324,7 +379,10 @@ fn load_skills_from_dir_internal(
         }
 
         load_single_skill_from_path(&full_path, source, &mut skills, &mut diagnostics);
-        return LoadSkillsResult { skills, diagnostics };
+        return LoadSkillsResult {
+            skills,
+            diagnostics,
+        };
     }
 
     // Second pass: recurse into subdirectories and load root .md files
@@ -336,9 +394,17 @@ fn load_skills_from_dir_internal(
 
         let full_path = entry.path();
         let is_dir = entry.metadata().map(|m| m.is_dir()).unwrap_or(false)
-            || (entry.metadata().map(|m| m.file_type().is_symlink()).unwrap_or(false) && full_path.is_dir());
+            || (entry
+                .metadata()
+                .map(|m| m.file_type().is_symlink())
+                .unwrap_or(false)
+                && full_path.is_dir());
         let is_file = entry.metadata().map(|m| m.is_file()).unwrap_or(false)
-            || (entry.metadata().map(|m| m.file_type().is_symlink()).unwrap_or(false) && full_path.is_file());
+            || (entry
+                .metadata()
+                .map(|m| m.file_type().is_symlink())
+                .unwrap_or(false)
+                && full_path.is_file());
 
         let rel_path = pathdiff::diff_paths(&full_path, root)
             .unwrap_or_else(|| full_path.clone())
@@ -346,13 +412,18 @@ fn load_skills_from_dir_internal(
             .to_string()
             .replace('\\', "/");
 
-        let ignore_path = if is_dir { format!("{}/", rel_path) } else { rel_path.clone() };
+        let ignore_path = if is_dir {
+            format!("{}/", rel_path)
+        } else {
+            rel_path.clone()
+        };
         if ig.ignores(&ignore_path) {
             continue;
         }
 
         if is_dir {
-            let sub = load_skills_from_dir_internal(&full_path, source, false, Some(ig), Some(root));
+            let sub =
+                load_skills_from_dir_internal(&full_path, source, false, Some(ig), Some(root));
             skills.extend(sub.skills);
             diagnostics.extend(sub.diagnostics);
         } else if is_file && include_root_files && name.ends_with(".md") {
@@ -360,7 +431,10 @@ fn load_skills_from_dir_internal(
         }
     }
 
-    LoadSkillsResult { skills, diagnostics }
+    LoadSkillsResult {
+        skills,
+        diagnostics,
+    }
 }
 
 // ============================================================================
@@ -369,14 +443,22 @@ fn load_skills_from_dir_internal(
 
 /// Format skills for inclusion in a system prompt
 pub fn format_skills_for_prompt(skills: &[Skill]) -> String {
-    let visible: Vec<&Skill> = skills.iter().filter(|s| !s.disable_model_invocation).collect();
+    let visible: Vec<&Skill> = skills
+        .iter()
+        .filter(|s| !s.disable_model_invocation)
+        .collect();
     if visible.is_empty() {
         return String::new();
     }
 
     let mut lines = Vec::new();
-    lines.push("\n\nThe following skills provide specialized instructions for specific tasks.".to_string());
-    lines.push("Use the read tool to load a skill's file when the task matches its description.".to_string());
+    lines.push(
+        "\n\nThe following skills provide specialized instructions for specific tasks.".to_string(),
+    );
+    lines.push(
+        "Use the read tool to load a skill's file when the task matches its description."
+            .to_string(),
+    );
     lines.push("When a skill file references a relative path, resolve it against the skill directory (parent of SKILL.md / dirname of the path) and use that absolute path in tool commands.".to_string());
     lines.push(String::new());
     lines.push("<available_skills>".to_string());
@@ -384,8 +466,14 @@ pub fn format_skills_for_prompt(skills: &[Skill]) -> String {
     for skill in visible {
         lines.push("  <skill>".to_string());
         lines.push(format!("    <name>{}</name>", escape_xml(&skill.name)));
-        lines.push(format!("    <description>{}</description>", escape_xml(&skill.description)));
-        lines.push(format!("    <location>{}</location>", escape_xml(&skill.file_path)));
+        lines.push(format!(
+            "    <description>{}</description>",
+            escape_xml(&skill.description)
+        ));
+        lines.push(format!(
+            "    <location>{}</location>",
+            escape_xml(&skill.file_path)
+        ));
         lines.push("  </skill>".to_string());
     }
 
@@ -394,14 +482,16 @@ pub fn format_skills_for_prompt(skills: &[Skill]) -> String {
 }
 
 fn escape_xml(s: &str) -> String {
-    s.chars().map(|c| match c {
-        '&' => "&amp;".to_string(),
-        '<' => "&lt;".to_string(),
-        '>' => "&gt;".to_string(),
-        '"' => "&quot;".to_string(),
-        '\'' => "&apos;".to_string(),
-        _ => c.to_string(),
-    }).collect()
+    s.chars()
+        .map(|c| match c {
+            '&' => "&amp;".to_string(),
+            '<' => "&lt;".to_string(),
+            '>' => "&gt;".to_string(),
+            '"' => "&quot;".to_string(),
+            '\'' => "&apos;".to_string(),
+            _ => c.to_string(),
+        })
+        .collect()
 }
 
 // ============================================================================
@@ -460,10 +550,30 @@ pub fn load_skills(options: LoadSkillsOptions) -> LoadSkillsResult {
     let mut all_diagnostics: Vec<ResourceDiagnostic> = Vec::new();
 
     if include_defaults {
-        add_skills_inner(&mut skill_map, &mut real_path_set, &mut all_diagnostics,
-            load_skills_from_dir_internal(&Path::new(agent_dir).join("skills"), "user", true, None, None));
-        add_skills_inner(&mut skill_map, &mut real_path_set, &mut all_diagnostics,
-            load_skills_from_dir_internal(&Path::new(cwd).join(CONFIG_DIR_NAME).join("skills"), "project", true, None, None));
+        add_skills_inner(
+            &mut skill_map,
+            &mut real_path_set,
+            &mut all_diagnostics,
+            load_skills_from_dir_internal(
+                &Path::new(agent_dir).join("skills"),
+                "user",
+                true,
+                None,
+                None,
+            ),
+        );
+        add_skills_inner(
+            &mut skill_map,
+            &mut real_path_set,
+            &mut all_diagnostics,
+            load_skills_from_dir_internal(
+                &Path::new(cwd).join(CONFIG_DIR_NAME).join("skills"),
+                "project",
+                true,
+                None,
+                None,
+            ),
+        );
     }
 
     let user_skills_dir = Path::new(agent_dir).join("skills");
@@ -476,7 +586,8 @@ pub fn load_skills(options: LoadSkillsOptions) -> LoadSkillsResult {
         let normalized_target = std::path::absolute(Path::new(target))
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_else(|_| target.to_string());
-        normalized_target == normalized_root || normalized_target.starts_with(&format!("{}/", normalized_root))
+        normalized_target == normalized_root
+            || normalized_target.starts_with(&format!("{}/", normalized_root))
     };
 
     let get_source = |resolved_path: &str| -> &str {
@@ -500,25 +611,42 @@ pub fn load_skills(options: LoadSkillsOptions) -> LoadSkillsResult {
 
         let resolved_path = Path::new(&resolved);
         if !resolved_path.exists() {
-            all_diagnostics.push(ResourceDiagnostic::warning("skill path does not exist".to_string(), Some(resolved)));
+            all_diagnostics.push(ResourceDiagnostic::warning(
+                "skill path does not exist".to_string(),
+                Some(resolved),
+            ));
             continue;
         }
 
         let source = get_source(&resolved);
 
         if resolved_path.is_dir() {
-            add_skills_inner(&mut skill_map, &mut real_path_set, &mut all_diagnostics,
-                load_skills_from_dir_internal(resolved_path, source, true, None, None));
+            add_skills_inner(
+                &mut skill_map,
+                &mut real_path_set,
+                &mut all_diagnostics,
+                load_skills_from_dir_internal(resolved_path, source, true, None, None),
+            );
         } else if resolved_path.is_file() && resolved.ends_with(".md") {
             let (skill, diags) = load_skill_from_file(&resolved, source);
             if let Some(s) = skill {
-                add_skills_inner(&mut skill_map, &mut real_path_set, &mut all_diagnostics,
-                    LoadSkillsResult { skills: vec![s], diagnostics: diags });
+                add_skills_inner(
+                    &mut skill_map,
+                    &mut real_path_set,
+                    &mut all_diagnostics,
+                    LoadSkillsResult {
+                        skills: vec![s],
+                        diagnostics: diags,
+                    },
+                );
             } else {
                 all_diagnostics.extend(diags);
             }
         } else {
-            all_diagnostics.push(ResourceDiagnostic::warning("skill path is not a markdown file".to_string(), Some(resolved)));
+            all_diagnostics.push(ResourceDiagnostic::warning(
+                "skill path is not a markdown file".to_string(),
+                Some(resolved),
+            ));
         }
     }
 

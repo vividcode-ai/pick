@@ -1,4 +1,4 @@
-﻿//! Tool registry for managing available tools
+//! Tool registry for managing available tools
 
 use std::sync::Arc;
 
@@ -112,11 +112,16 @@ pub fn create_extension_tools(runner: Arc<ExtensionRunner>) -> Vec<AgentTool> {
                     match r.execute_extension_tool(&tool_call_id, &name, args) {
                         Some(result) => {
                             let (content, is_error) = parse_tool_result(&result);
-                            Ok(AgentToolResult { content, is_error, terminate: false })
+                            Ok(AgentToolResult {
+                                content,
+                                is_error,
+                                terminate: false,
+                            })
                         }
-                        None => {
-                            Err(format!("Extension tool '{}' did not produce a result", name))
-                        }
+                        None => Err(format!(
+                            "Extension tool '{}' did not produce a result",
+                            name
+                        )),
                     }
                 })
             }),
@@ -135,9 +140,7 @@ fn tool_params_to_json_schema(params: &[ToolParameter]) -> JsonSchema {
     let mut required = Vec::new();
 
     for p in params {
-        let prop = if p.schema.is_null()
-            || p.schema.as_object().map_or(true, |o| o.is_empty())
-        {
+        let prop = if p.schema.is_null() || p.schema.as_object().map_or(true, |o| o.is_empty()) {
             serde_json::json!({
                 "type": "string",
                 "description": p.description
@@ -164,7 +167,11 @@ fn tool_params_to_json_schema(params: &[ToolParameter]) -> JsonSchema {
     JsonSchema {
         schema_type: "object".to_string(),
         properties: Some(properties),
-        required: if required.is_empty() { None } else { Some(required) },
+        required: if required.is_empty() {
+            None
+        } else {
+            Some(required)
+        },
         description: None,
         items: None,
         additional_properties: Some(false),
@@ -180,7 +187,8 @@ pub fn filter_goal_tools(
     if goal_manager.get().is_some() {
         return tools;
     }
-    tools.into_iter()
+    tools
+        .into_iter()
         .filter(|t| t.name != "get_goal" && t.name != "create_goal" && t.name != "update_goal")
         .collect()
 }

@@ -87,7 +87,11 @@ impl ChatView {
     /// Iterate over message entries only
     pub fn messages(&self) -> impl Iterator<Item = &ChatMessage> {
         self.entries.iter().filter_map(|e| {
-            if let ChatEntry::Message(m) = e { Some(m) } else { None }
+            if let ChatEntry::Message(m) = e {
+                Some(m)
+            } else {
+                None
+            }
         })
     }
 
@@ -97,11 +101,7 @@ impl ChatView {
     fn last_assistant_message_mut(&mut self) -> Option<&mut ChatMessage> {
         self.entries.iter_mut().rev().find_map(|e| {
             if let ChatEntry::Message(m) = e {
-                if m.role == "assistant" {
-                    Some(m)
-                } else {
-                    None
-                }
+                if m.role == "assistant" { Some(m) } else { None }
             } else {
                 None
             }
@@ -110,7 +110,10 @@ impl ChatView {
 
     /// Number of message entries
     pub fn message_count(&self) -> usize {
-        self.entries.iter().filter(|e| matches!(e, ChatEntry::Message(_))).count()
+        self.entries
+            .iter()
+            .filter(|e| matches!(e, ChatEntry::Message(_)))
+            .count()
     }
 
     /// Number of all entries (messages + tool executions)
@@ -120,7 +123,8 @@ impl ChatView {
 
     /// Add a user message
     pub fn add_user_message(&mut self, text: &str) {
-        self.entries.push(ChatEntry::Message(ChatMessage::new("user", text)));
+        self.entries
+            .push(ChatEntry::Message(ChatMessage::new("user", text)));
         self.invalidate_cache();
         self.scroll_to_bottom();
     }
@@ -135,7 +139,8 @@ impl ChatView {
             // Commit any existing active streaming content first
             if let Some(existing) = self.active_streaming_content.take() {
                 if !existing.is_empty() {
-                    self.entries.push(ChatEntry::Message(ChatMessage::new("assistant", existing)));
+                    self.entries
+                        .push(ChatEntry::Message(ChatMessage::new("assistant", existing)));
                     self.invalidate_cache();
                 }
             }
@@ -170,7 +175,8 @@ impl ChatView {
                     .rev()
                     .any(|e| matches!(e, ChatEntry::Message(m) if m.role == "assistant" && m.content == content));
                 if !is_duplicate {
-                    self.entries.push(ChatEntry::Message(ChatMessage::new("assistant", content)));
+                    self.entries
+                        .push(ChatEntry::Message(ChatMessage::new("assistant", content)));
                     self.invalidate_cache();
                 }
             }
@@ -194,7 +200,9 @@ impl ChatView {
     /// Render the active streaming tail as ratatui Lines.
     /// Returns empty vec if no active stream.
     pub fn render_active_stream(&self, width: usize) -> Vec<Line<'static>> {
-        let Some(content) = &self.active_streaming_content else { return vec![] };
+        let Some(content) = &self.active_streaming_content else {
+            return vec![];
+        };
         let mut lines = Vec::new();
         let msg = ChatMessage::new("assistant", content.clone());
         self.render_assistant_message_lines(&msg, width, &mut lines);
@@ -217,7 +225,10 @@ impl ChatView {
                 .last_assistant_message_mut()
                 .map_or(true, |m| m.role != "assistant");
             if needs_new {
-                self.entries.push(ChatEntry::Message(ChatMessage::new("assistant", text.to_string())));
+                self.entries.push(ChatEntry::Message(ChatMessage::new(
+                    "assistant",
+                    text.to_string(),
+                )));
                 self.invalidate_cache();
             } else if let Some(last) = self.last_assistant_message_mut() {
                 last.content.push_str(text);
@@ -228,14 +239,16 @@ impl ChatView {
 
     /// Show an error message in chat
     pub fn add_error(&mut self, text: &str) {
-        self.entries.push(ChatEntry::Message(ChatMessage::new("error", text)));
+        self.entries
+            .push(ChatEntry::Message(ChatMessage::new("error", text)));
         self.invalidate_cache();
         self.scroll_to_bottom();
     }
 
     /// Add a system/info message (used for startup header, context, etc.)
     pub fn add_system_message(&mut self, text: &str) {
-        self.entries.push(ChatEntry::Message(ChatMessage::new("system", text)));
+        self.entries
+            .push(ChatEntry::Message(ChatMessage::new("system", text)));
         self.invalidate_cache();
         // Don't scroll to bottom — system messages are at the top
     }
@@ -271,27 +284,36 @@ impl ChatView {
             }
             None => format!("Input: {}  Output: {}", input, output),
         };
-        self.entries.push(ChatEntry::Message(ChatMessage::new("usage", content)));
+        self.entries
+            .push(ChatEntry::Message(ChatMessage::new("usage", content)));
         self.invalidate_cache();
         self.scroll_to_bottom();
     }
 
     /// Add a pending tool execution entry.
     /// Skips if an entry with the same tool_call_id already exists (dedup).
-    pub fn add_tool_execution(&mut self, tool_call_id: &str, tool_name: &str, args: serde_json::Value) {
-        if self.entries.iter().any(|e| {
-            matches!(e, ChatEntry::ToolExecution(te) if te.tool_call_id == tool_call_id)
-        }) {
+    pub fn add_tool_execution(
+        &mut self,
+        tool_call_id: &str,
+        tool_name: &str,
+        args: serde_json::Value,
+    ) {
+        if self
+            .entries
+            .iter()
+            .any(|e| matches!(e, ChatEntry::ToolExecution(te) if te.tool_call_id == tool_call_id))
+        {
             return;
         }
-        self.entries.push(ChatEntry::ToolExecution(ToolExecutionEntry {
-            tool_call_id: tool_call_id.to_string(),
-            tool_name: tool_name.to_string(),
-            args,
-            status: ToolStatus::Pending,
-            output: String::new(),
-            expanded: false,
-        }));
+        self.entries
+            .push(ChatEntry::ToolExecution(ToolExecutionEntry {
+                tool_call_id: tool_call_id.to_string(),
+                tool_name: tool_name.to_string(),
+                args,
+                status: ToolStatus::Pending,
+                output: String::new(),
+                expanded: false,
+            }));
         self.invalidate_cache();
         self.scroll_to_bottom();
     }
@@ -323,7 +345,11 @@ impl ChatView {
         for entry in self.entries.iter_mut().rev() {
             if let ChatEntry::ToolExecution(te) = entry {
                 if te.tool_call_id == tool_call_id {
-                    te.status = if is_error { ToolStatus::Error } else { ToolStatus::Success };
+                    te.status = if is_error {
+                        ToolStatus::Error
+                    } else {
+                        ToolStatus::Success
+                    };
                     te.output = output.to_string();
                     break;
                 }
@@ -365,10 +391,7 @@ impl ChatView {
         expanded
     }
 
-
-
-
-/// Build the full rendered line list from scratch (no caching).
+    /// Build the full rendered line list from scratch (no caching).
     /// Used internally by `render_lines` when the cache is invalid.
     fn build_lines(&self, width: usize) -> Vec<Line<'static>> {
         let mut lines: Vec<Line<'static>> = Vec::new();
@@ -467,7 +490,12 @@ impl ChatView {
         Style::default().fg(self.colors.error.unwrap_or(Color::Rgb(204, 102, 102)))
     }
 
-    fn render_user_message_lines(&self, msg: &ChatMessage, width: usize, lines: &mut Vec<Line<'static>>) {
+    fn render_user_message_lines(
+        &self,
+        msg: &ChatMessage,
+        width: usize,
+        lines: &mut Vec<Line<'static>>,
+    ) {
         let bg = self.user_bg_color();
         let content_width = width.saturating_sub(4).max(1);
         let wrapped = wrap_text_with_ansi(&msg.content, content_width);
@@ -531,11 +559,7 @@ impl ChatView {
     }
 
     /// Render a markdown text block into styled lines, wrapped to fit terminal width.
-    fn render_markdown_lines(
-        text: &str,
-        content_width: usize,
-        lines: &mut Vec<Line<'static>>,
-    ) {
+    fn render_markdown_lines(text: &str, content_width: usize, lines: &mut Vec<Line<'static>>) {
         if text.is_empty() {
             return;
         }
@@ -554,7 +578,12 @@ impl ChatView {
         }
     }
 
-    fn render_assistant_message_lines(&self, msg: &ChatMessage, width: usize, lines: &mut Vec<Line<'static>>) {
+    fn render_assistant_message_lines(
+        &self,
+        msg: &ChatMessage,
+        width: usize,
+        lines: &mut Vec<Line<'static>>,
+    ) {
         let content_width = width.saturating_sub(1).max(1);
         let parts = Self::split_thinking_blocks(&msg.content);
 
@@ -592,7 +621,12 @@ impl ChatView {
         }
     }
 
-    fn render_system_message_lines(&self, msg: &ChatMessage, width: usize, lines: &mut Vec<Line<'static>>) {
+    fn render_system_message_lines(
+        &self,
+        msg: &ChatMessage,
+        width: usize,
+        lines: &mut Vec<Line<'static>>,
+    ) {
         // System messages contain ANSI escape codes (e.g., startup header).
         // Parse them into proper ratatui Styles instead of leaking raw ANSI.
         let wrapped = wrap_text_with_ansi(&msg.content, width);
@@ -607,7 +641,12 @@ impl ChatView {
         }
     }
 
-    fn render_error_message_lines(&self, msg: &ChatMessage, width: usize, lines: &mut Vec<Line<'static>>) {
+    fn render_error_message_lines(
+        &self,
+        msg: &ChatMessage,
+        width: usize,
+        lines: &mut Vec<Line<'static>>,
+    ) {
         let err_style = self.error_color().add_modifier(Modifier::BOLD);
         let prefix = "Error: ";
         let prefix_width = visible_width(prefix);
@@ -634,7 +673,12 @@ impl ChatView {
         }
     }
 
-    fn render_usage_message_lines(&self, msg: &ChatMessage, width: usize, lines: &mut Vec<Line<'static>>) {
+    fn render_usage_message_lines(
+        &self,
+        msg: &ChatMessage,
+        width: usize,
+        lines: &mut Vec<Line<'static>>,
+    ) {
         let dim = Style::default().add_modifier(Modifier::DIM);
         let wrapped = wrap_text_with_ansi(&msg.content, width);
         for line_text in &wrapped {
@@ -654,75 +698,119 @@ impl ChatView {
 
     /// Build tool label as styled spans.
     /// Returns (bullet_span, status_prefix, label_spans, is_error).
-    fn build_tool_label(&self, te: &ToolExecutionEntry) -> (Span<'static>, Span<'static>, Vec<Span<'static>>, bool) {
+    fn build_tool_label(
+        &self,
+        te: &ToolExecutionEntry,
+    ) -> (Span<'static>, Span<'static>, Vec<Span<'static>>, bool) {
         let dim = Style::default().add_modifier(Modifier::DIM);
         let is_error = te.status == ToolStatus::Error;
 
         let bullet = match te.status {
             ToolStatus::Pending => Span::styled("•", dim),
-            ToolStatus::Success => Span::styled("•", Style::default().fg(Color::Rgb(110, 210, 110)).add_modifier(Modifier::BOLD)),
-            ToolStatus::Error => Span::styled("•", Style::default().fg(Color::Rgb(255, 100, 100)).add_modifier(Modifier::BOLD)),
+            ToolStatus::Success => Span::styled(
+                "•",
+                Style::default()
+                    .fg(Color::Rgb(110, 210, 110))
+                    .add_modifier(Modifier::BOLD),
+            ),
+            ToolStatus::Error => Span::styled(
+                "•",
+                Style::default()
+                    .fg(Color::Rgb(255, 100, 100))
+                    .add_modifier(Modifier::BOLD),
+            ),
         };
         let status = match te.status {
-            ToolStatus::Pending => Span::styled("Running", Style::default().add_modifier(Modifier::BOLD)),
+            ToolStatus::Pending => {
+                Span::styled("Running", Style::default().add_modifier(Modifier::BOLD))
+            }
             _ => Span::styled("Ran", Style::default().add_modifier(Modifier::BOLD)),
         };
 
         let cmd_text = match &*te.tool_name.to_lowercase() {
-            "bash" => {
-                te.args.get("command")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("...")
-                    .to_string()
-            }
+            "bash" => te
+                .args
+                .get("command")
+                .and_then(|v| v.as_str())
+                .unwrap_or("...")
+                .to_string(),
             "read" => {
-                let path = te.args.get("file_path")
+                let path = te
+                    .args
+                    .get("file_path")
                     .or_else(|| te.args.get("path"))
                     .and_then(|v| v.as_str())
                     .unwrap_or("");
                 format!("read {}", if path.is_empty() { "?" } else { path })
             }
             "edit" => {
-                let path = te.args.get("file_path")
+                let path = te
+                    .args
+                    .get("file_path")
                     .or_else(|| te.args.get("path"))
                     .and_then(|v| v.as_str())
                     .unwrap_or("");
                 format!("edit {}", if path.is_empty() { "?" } else { path })
             }
             "write" => {
-                let path = te.args.get("file_path")
+                let path = te
+                    .args
+                    .get("file_path")
                     .or_else(|| te.args.get("path"))
                     .and_then(|v| v.as_str())
                     .unwrap_or("");
                 format!("write {}", if path.is_empty() { "?" } else { path })
             }
             "grep" => {
-                let pattern = te.args.get("pattern").and_then(|v| v.as_str()).unwrap_or("");
+                let pattern = te
+                    .args
+                    .get("pattern")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
                 let raw_path = te.args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
                 let glob = te.args.get("glob").and_then(|v| v.as_str());
                 let limit = te.args.get("limit").and_then(|v| v.as_u64());
                 let mut s = format!("grep /{}/ in {}", pattern, raw_path);
-                if let Some(g) = glob { s.push_str(&format!(" ({})", g)); }
-                if let Some(l) = limit { s.push_str(&format!(" limit {}", l)); }
+                if let Some(g) = glob {
+                    s.push_str(&format!(" ({})", g));
+                }
+                if let Some(l) = limit {
+                    s.push_str(&format!(" limit {}", l));
+                }
                 s
             }
             "find" => {
-                let pattern = te.args.get("pattern").and_then(|v| v.as_str()).unwrap_or("");
+                let pattern = te
+                    .args
+                    .get("pattern")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
                 let raw_path = te.args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
                 let limit = te.args.get("limit").and_then(|v| v.as_u64());
                 let mut s = format!("find {} in {}", pattern, raw_path);
-                if let Some(l) = limit { s.push_str(&format!(" (limit {})", l)); }
+                if let Some(l) = limit {
+                    s.push_str(&format!(" (limit {})", l));
+                }
                 s
             }
             "ls" => {
-                let path = te.args.get("path").or_else(|| te.args.get("file_path")).and_then(|v| v.as_str()).unwrap_or("");
+                let path = te
+                    .args
+                    .get("path")
+                    .or_else(|| te.args.get("file_path"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
                 let limit = te.args.get("limit").and_then(|v| v.as_u64());
                 let mut s = format!("ls {}", path);
-                if let Some(l) = limit { s.push_str(&format!(" (limit {})", l)); }
+                if let Some(l) = limit {
+                    s.push_str(&format!(" (limit {})", l));
+                }
                 s
             }
             _ => {
-                let val = te.args.as_object()
+                let val = te
+                    .args
+                    .as_object()
                     .and_then(|obj| obj.iter().next())
                     .map(|(_, v)| match v {
                         serde_json::Value::String(s) => s.clone(),
@@ -746,7 +834,12 @@ impl ChatView {
     ///     • Ran <command>              (success)
     ///       └ <dimmed output>          (first output line)
     ///         <dimmed output>          (subsequent output lines)
-    fn render_tool_execution_lines(&self, te: &ToolExecutionEntry, width: usize, lines: &mut Vec<Line<'static>>) {
+    fn render_tool_execution_lines(
+        &self,
+        te: &ToolExecutionEntry,
+        width: usize,
+        lines: &mut Vec<Line<'static>>,
+    ) {
         let (bullet, status, label_spans, _is_error) = self.build_tool_label(te);
         let content_width = width.saturating_sub(1).max(1);
         let dim = Style::default().add_modifier(Modifier::DIM);
@@ -809,9 +902,14 @@ impl ChatView {
                 } else if display.contains('\x1b') {
                     // Parse ANSI and apply dim modifier on top
                     let styled = crate::app::ansi_to_styled_line(&display);
-                    let dimmed_spans: Vec<Span<'static>> = styled.spans.into_iter().map(|span| {
-                        Span { style: span.style.patch(dim_style), content: span.content }
-                    }).collect();
+                    let dimmed_spans: Vec<Span<'static>> = styled
+                        .spans
+                        .into_iter()
+                        .map(|span| Span {
+                            style: span.style.patch(dim_style),
+                            content: span.content,
+                        })
+                        .collect();
                     lines.push(Line::from(dimmed_spans));
                 } else {
                     let trimmed = truncate_to_width(&display, content_width);
@@ -841,7 +939,6 @@ fn is_hidden_when_collapsed(_te: &ToolExecutionEntry) -> bool {
     false
 }
 
-
 impl Default for ChatView {
     fn default() -> Self {
         Self::new()
@@ -855,18 +952,20 @@ mod tests {
     /// Helper: render chat as plain text (no ANSI codes).
     fn render_text(chat: &mut ChatView, width: usize, max_height: usize) -> String {
         let lines = chat.render_lines(width, max_height);
-        lines.iter().flat_map(|l| {
-            let s: String = l.spans.iter().map(|sp| sp.content.as_ref()).collect();
-            if s.is_empty() { vec![] } else { vec![s] }
-        }).collect::<Vec<_>>().join(" ")
+        lines
+            .iter()
+            .flat_map(|l| {
+                let s: String = l.spans.iter().map(|sp| sp.content.as_ref()).collect();
+                if s.is_empty() { vec![] } else { vec![s] }
+            })
+            .collect::<Vec<_>>()
+            .join(" ")
     }
 
     /// Helper: convert a single ratatui Line to plain text.
     fn line_text(line: &Line<'static>) -> String {
         line.spans.iter().map(|s| s.content.as_ref()).collect()
     }
-
-
 
     #[test]
     fn test_streaming_render_updates_content_correctly() {
@@ -876,59 +975,97 @@ mod tests {
         // Step 1: User submits a message
         chat.add_user_message("你好");
         let text = render_text(&mut chat, width, usize::MAX);
-        assert!(text.contains("你好"), "user message should appear: got {:?}", text);
+        assert!(
+            text.contains("你好"),
+            "user message should appear: got {:?}",
+            text
+        );
 
         // Step 2: Assistant starts streaming (first chunk)
         // During streaming, content is in active_streaming_content, not entries.
         chat.stream_assistant_content("你好");
         assert!(chat.has_active_stream(), "should have active stream");
-        let stream_text: String = chat.render_active_stream(width)
-            .iter().flat_map(|l| {
+        let stream_text: String = chat
+            .render_active_stream(width)
+            .iter()
+            .flat_map(|l| {
                 let s: String = l.spans.iter().map(|sp| sp.content.as_ref()).collect();
                 if s.is_empty() { vec![] } else { vec![s] }
-            }).collect::<Vec<_>>().join(" ");
-        assert!(stream_text.contains("你好"), "streaming content should be in active stream");
+            })
+            .collect::<Vec<_>>()
+            .join(" ");
+        assert!(
+            stream_text.contains("你好"),
+            "streaming content should be in active stream"
+        );
 
         // Step 3: Streaming updates with longer content
         chat.stream_assistant_content("你好！有什么我可以帮助你的吗？😊");
-        let stream_text: String = chat.render_active_stream(width)
-            .iter().flat_map(|l| {
+        let stream_text: String = chat
+            .render_active_stream(width)
+            .iter()
+            .flat_map(|l| {
                 let s: String = l.spans.iter().map(|sp| sp.content.as_ref()).collect();
                 if s.is_empty() { vec![] } else { vec![s] }
-            }).collect::<Vec<_>>().join(" ");
-        assert!(stream_text.contains("有什么我可以帮助你的吗"), "longer streaming content should appear");
+            })
+            .collect::<Vec<_>>()
+            .join(" ");
+        assert!(
+            stream_text.contains("有什么我可以帮助你的吗"),
+            "longer streaming content should appear"
+        );
 
         // Step 4: Streaming content grows to multiple lines
         let long = "你好！有什么我可以帮助你的吗？😊\n我来帮你分析这个问题。\n首先我们需要了解具体的上下文。";
         chat.stream_assistant_content(long);
-        let stream_text: String = chat.render_active_stream(width)
-            .iter().flat_map(|l| {
+        let stream_text: String = chat
+            .render_active_stream(width)
+            .iter()
+            .flat_map(|l| {
                 let s: String = l.spans.iter().map(|sp| sp.content.as_ref()).collect();
                 if s.is_empty() { vec![] } else { vec![s] }
-            }).collect::<Vec<_>>().join(" ");
-        assert!(stream_text.contains("我来帮你分析"), "multi-line streaming content should appear");
+            })
+            .collect::<Vec<_>>()
+            .join(" ");
+        assert!(
+            stream_text.contains("我来帮你分析"),
+            "multi-line streaming content should appear"
+        );
 
         // Step 5: Finalize turn — content committed to entries
         chat.mark_turn_end();
-        assert!(!chat.has_active_stream(), "stream should be cleared after finalize");
+        assert!(
+            !chat.has_active_stream(),
+            "stream should be cleared after finalize"
+        );
         let text = render_text(&mut chat, width, usize::MAX);
-        assert!(text.contains("我来帮你分析"), "committed assistant content should be in render_lines");
+        assert!(
+            text.contains("我来帮你分析"),
+            "committed assistant content should be in render_lines"
+        );
 
         // Step 6: User sends another message
         chat.add_user_message("再问一个问题");
         let text = render_text(&mut chat, width, usize::MAX);
-        assert!(text.contains("再问一个问题"), "second user message should appear");
-        assert!(text.contains("我来帮你分析"), "first assistant response still visible");
+        assert!(
+            text.contains("再问一个问题"),
+            "second user message should appear"
+        );
+        assert!(
+            text.contains("我来帮你分析"),
+            "first assistant response still visible"
+        );
 
         // Step 7: Another streaming response
         chat.stream_assistant_content("第二个回答");
         assert!(chat.has_active_stream(), "should have active stream again");
         chat.mark_turn_end();
         let text = render_text(&mut chat, width, usize::MAX);
-        assert!(text.contains("第二个回答"), "second assistant response should appear after finalize");
+        assert!(
+            text.contains("第二个回答"),
+            "second assistant response should appear after finalize"
+        );
     }
-
-
 
     /// Replicates the exact combined format the MessageUpdate handler produces:
     /// thinking block → `\x1b[3m\x1b[38;2;128;128;128m{thinking}\x1b[23m\x1b[39m\n` followed by text block content
@@ -945,7 +1082,10 @@ mod tests {
         // ContentBlock::Text → combined.push_str(&t.text);
         let thinking = "用户发来问候，我需要礼貌地回应";
         let response = "你好！有什么我可以帮助你的吗？😊";
-        let combined = format!("\x1b[3m\x1b[38;2;128;128;128m{}\x1b[23m\x1b[39m\n\n{}", thinking, response);
+        let combined = format!(
+            "\x1b[3m\x1b[38;2;128;128;128m{}\x1b[23m\x1b[39m\n\n{}",
+            thinking, response
+        );
 
         chat.stream_assistant_content(&combined);
         chat.mark_turn_end();
@@ -1010,7 +1150,10 @@ mod tests {
 
         // Only thinking, no response text yet (during streaming)
         let thinking = "正在思考如何回复...";
-        let combined = format!("\x1b[3m\x1b[38;2;128;128;128m{}\x1b[23m\x1b[39m\n\n", thinking);
+        let combined = format!(
+            "\x1b[3m\x1b[38;2;128;128;128m{}\x1b[23m\x1b[39m\n\n",
+            thinking
+        );
         chat.stream_assistant_content(&combined);
         chat.mark_turn_end();
 
@@ -1036,7 +1179,10 @@ mod tests {
         // Step 2: Assistant streams thinking (using the exact format from tui.rs MessageUpdate handler)
         let thinking = "用户发来问候，我需要礼貌地回应";
         let response = "你好！有什么我可以帮助你的吗？😊";
-        let combined = format!("\x1b[3m\x1b[38;2;128;128;128m{}\x1b[23m\x1b[39m\n\n{}", thinking, response);
+        let combined = format!(
+            "\x1b[3m\x1b[38;2;128;128;128m{}\x1b[23m\x1b[39m\n\n{}",
+            thinking, response
+        );
         chat.stream_assistant_content(&combined);
         chat.mark_turn_end();
 
@@ -1080,12 +1226,17 @@ mod tests {
         assert!(
             max_blank_run <= 2,
             "FAIL: excessive blank lines (max {}). Lines:\n{:?}",
-            max_blank_run, line_texts
+            max_blank_run,
+            line_texts
         );
 
         // Print debug for manual verification
         eprintln!("\n===== ACCEPTANCE TEST: RENDERED OUTPUT =====");
-        eprintln!("Terminal width: {}, Total lines: {}", width, line_texts.len());
+        eprintln!(
+            "Terminal width: {}, Total lines: {}",
+            width,
+            line_texts.len()
+        );
         for (i, line) in line_texts.iter().enumerate() {
             eprintln!("  [{:>2}] {:?}", i, line);
         }
@@ -1098,12 +1249,20 @@ mod tests {
         let width = 80;
 
         chat.add_user_message("Run a command");
-        chat.add_tool_execution("call-1", "bash", serde_json::json!({"command": "echo hello"}));
+        chat.add_tool_execution(
+            "call-1",
+            "bash",
+            serde_json::json!({"command": "echo hello"}),
+        );
 
         let text = render_text(&mut chat, width, usize::MAX);
 
         // Format: bold "$ echo hello" (no tool name prefix)
-        assert!(text.contains("echo hello"), "command should appear. got: {:?}", text);
+        assert!(
+            text.contains("echo hello"),
+            "command should appear. got: {:?}",
+            text
+        );
     }
 
     #[test]
@@ -1112,7 +1271,11 @@ mod tests {
         let width = 80;
 
         chat.add_user_message("Read a file");
-        chat.add_tool_execution("call-1", "read", serde_json::json!({"file_path": "foo.txt"}));
+        chat.add_tool_execution(
+            "call-1",
+            "read",
+            serde_json::json!({"file_path": "foo.txt"}),
+        );
         chat.update_tool_execution("call-1", "file content here", false);
         chat.toggle_tool_expansion();
 
@@ -1120,7 +1283,10 @@ mod tests {
 
         assert!(text.contains("read"), "tool name should appear");
         assert!(text.contains("foo.txt"), "arg should appear");
-        assert!(text.contains("file content here"), "output should be shown when expanded");
+        assert!(
+            text.contains("file content here"),
+            "output should be shown when expanded"
+        );
     }
 
     #[test]
@@ -1129,7 +1295,11 @@ mod tests {
         let width = 80;
 
         chat.add_user_message("Read a file");
-        chat.add_tool_execution("call-1", "read", serde_json::json!({"file_path": "foo.txt"}));
+        chat.add_tool_execution(
+            "call-1",
+            "read",
+            serde_json::json!({"file_path": "foo.txt"}),
+        );
         chat.update_tool_execution("call-1", "error: file not found", true);
         chat.toggle_tool_expansion();
 
@@ -1137,7 +1307,10 @@ mod tests {
 
         assert!(text.contains("read"), "tool name should appear");
         assert!(text.contains("foo.txt"), "arg should appear");
-        assert!(text.contains("error: file not found"), "error output should appear");
+        assert!(
+            text.contains("error: file not found"),
+            "error output should appear"
+        );
     }
 
     #[test]
@@ -1147,20 +1320,32 @@ mod tests {
 
         chat.add_user_message("List directory");
         chat.add_tool_execution("call-1", "ls", serde_json::json!({"path": "/tmp"}));
-        let long_output = (1..=25).map(|i| format!("file_{}.txt", i)).collect::<Vec<_>>().join("\n");
+        let long_output = (1..=25)
+            .map(|i| format!("file_{}.txt", i))
+            .collect::<Vec<_>>()
+            .join("\n");
         chat.update_tool_execution("call-1", &long_output, false);
 
         // Collapsed: head+middle+tail with ellipsis
         let text = render_text(&mut chat, width, usize::MAX);
-        assert!(text.contains("file_1.txt"), "first file should appear in preview");
+        assert!(
+            text.contains("file_1.txt"),
+            "first file should appear in preview"
+        );
         assert!(text.contains("to expand"), "expand hint should appear");
         // Head+tail truncation: file_25.txt IS in the tail section
-        assert!(text.contains("file_25.txt"), "last file should appear in tail preview");
+        assert!(
+            text.contains("file_25.txt"),
+            "last file should appear in tail preview"
+        );
 
         // Toggle expansion — full output visible (no ellipsis)
         chat.toggle_tool_expansion();
         let text = render_text(&mut chat, width, usize::MAX);
-        assert!(!text.contains("to expand"), "expand hint should disappear when expanded");
+        assert!(
+            !text.contains("to expand"),
+            "expand hint should disappear when expanded"
+        );
         assert!(text.contains("ls"), "tool label should appear");
 
         // Toggle again — collapsed again with head+tail
@@ -1187,22 +1372,32 @@ mod tests {
 
         // 2. ls tool (head truncation, 20-line preview)
         chat.add_tool_execution("ls-1", "ls", serde_json::json!({"path": ".", "limit": 50}));
-        chat.update_tool_execution("ls-1",
+        chat.update_tool_execution(
+            "ls-1",
             ".github/\n.pick/\nCargo.lock\nCargo.toml\nCLAUDE.md\ncrates/\ndocs/\ntarget/",
             false,
         );
         chat.toggle_tool_expansion();
 
         // 3. read tool
-        chat.add_tool_execution("read-1", "read", serde_json::json!({"file_path": "Cargo.toml"}));
-        chat.update_tool_execution("read-1",
+        chat.add_tool_execution(
+            "read-1",
+            "read",
+            serde_json::json!({"file_path": "Cargo.toml"}),
+        );
+        chat.update_tool_execution(
+            "read-1",
             "[package]\nname = \"Pick\"\nversion = \"0.1.0\"",
             false,
         );
         chat.toggle_tool_expansion();
 
         // 4. bash tool with timer ANSI
-        chat.add_tool_execution("bash-1", "Bash", serde_json::json!({"command": "cargo test"}));
+        chat.add_tool_execution(
+            "bash-1",
+            "Bash",
+            serde_json::json!({"command": "cargo test"}),
+        );
         chat.update_tool_execution("bash-1",
             "running 226 tests\ntest result: ok. 226 passed\n\x1b[38;2;128;128;128mTook 42.3s\x1b[39m",
             false,
@@ -1210,23 +1405,37 @@ mod tests {
         chat.toggle_tool_expansion();
 
         // 5. grep tool
-        chat.add_tool_execution("grep-1", "grep", serde_json::json!({"pattern": "struct", "path": "src", "glob": "*.rs"}));
-        chat.update_tool_execution("grep-1",
+        chat.add_tool_execution(
+            "grep-1",
+            "grep",
+            serde_json::json!({"pattern": "struct", "path": "src", "glob": "*.rs"}),
+        );
+        chat.update_tool_execution(
+            "grep-1",
             "src/main.rs:10: struct App\ntui/src/app.rs:50: struct TuiApp",
             false,
         );
         chat.toggle_tool_expansion();
 
         // 6. find tool
-        chat.add_tool_execution("find-1", "find", serde_json::json!({"pattern": "*.rs", "path": "src", "limit": 100}));
-        chat.update_tool_execution("find-1",
+        chat.add_tool_execution(
+            "find-1",
+            "find",
+            serde_json::json!({"pattern": "*.rs", "path": "src", "limit": 100}),
+        );
+        chat.update_tool_execution(
+            "find-1",
             "./src/main.rs\n./src/lib.rs\n./src/components.rs",
             false,
         );
         chat.toggle_tool_expansion();
 
         // 7. edit tool with diff output
-        chat.add_tool_execution("edit-1", "Edit", serde_json::json!({"file_path": "src/main.rs"}));
+        chat.add_tool_execution(
+            "edit-1",
+            "Edit",
+            serde_json::json!({"file_path": "src/main.rs"}),
+        );
         chat.update_tool_execution("edit-1",
             "\x1b[38;2;204;102;102m-    let old = 1;\x1b[39m\n\x1b[38;2;181;189;104m+    let new = 2;\x1b[39m",
             false,
@@ -1243,7 +1452,11 @@ mod tests {
         let text: String = line_texts.join(" ");
 
         // Print every line for visual inspection
-        eprintln!("\n=== RENDERED OUTPUT ({} lines, width={}) ===", line_texts.len(), width);
+        eprintln!(
+            "\n=== RENDERED OUTPUT ({} lines, width={}) ===",
+            line_texts.len(),
+            width
+        );
         for (i, line) in line_texts.iter().enumerate() {
             eprintln!("[{:>3}] {:?}", i, line);
         }
@@ -1254,8 +1467,14 @@ mod tests {
         // A. Tool labels use aligned format
         eprintln!("[CHECK] Tool label formats...");
         assert!(text.contains("ls ."), "ls label should contain path");
-        assert!(text.contains("read Cargo.toml"), "read label: 'read Cargo.toml'");
-        assert!(text.contains("grep /struct/"), "grep label: 'grep /pattern/'");
+        assert!(
+            text.contains("read Cargo.toml"),
+            "read label: 'read Cargo.toml'"
+        );
+        assert!(
+            text.contains("grep /struct/"),
+            "grep label: 'grep /pattern/'"
+        );
         assert!(text.contains("find *.rs"), "find label: 'find pattern'");
         assert!(text.contains("edit src/main.rs"), "edit label: 'edit path'");
         eprintln!("       All tool labels match aligned format");
@@ -1270,7 +1489,11 @@ mod tests {
         eprintln!("[CHECK] Tool dedup...");
         let before_count = chat.entry_count();
         chat.add_tool_execution("ls-1", "ls", serde_json::json!({"path": "."}));
-        assert_eq!(chat.entry_count(), before_count, "dedup must prevent double entries");
+        assert_eq!(
+            chat.entry_count(),
+            before_count,
+            "dedup must prevent double entries"
+        );
 
         eprintln!("{}", "#".repeat(72));
         eprintln!("{}", "# ALL VERIFICATIONS PASSED");
@@ -1279,24 +1502,33 @@ mod tests {
         // === SIDE-BY-SIDE: canonical format vs Pick rendered plain text ===
         let collapse = |s: &str| -> String {
             let result: Vec<&str> = s.split_whitespace().collect();
-            if result.is_empty() { return String::new(); }
+            if result.is_empty() {
+                return String::new();
+            }
             let mut out = String::new();
             for (i, w) in result.iter().enumerate() {
-                if i > 0 { out.push(' '); }
+                if i > 0 {
+                    out.push(' ');
+                }
                 out.push_str(w);
             }
             out
         };
 
         eprintln!("\n{}", "=".repeat(80));
-        eprintln!("{}", "SIDE-BY-SIDE COMPARISON: canonical format vs Pick rendered");
+        eprintln!(
+            "{}",
+            "SIDE-BY-SIDE COMPARISON: canonical format vs Pick rendered"
+        );
         eprintln!("{}", "=".repeat(80));
         eprintln!("{:<30} | {:<48}|", "canonical format", "Pick (plain text)");
         eprintln!("{}", "-".repeat(80));
 
         for line in &line_texts {
             let plain = collapse(line);
-            if plain.is_empty() { continue; }
+            if plain.is_empty() {
+                continue;
+            }
             let plain_lower = plain.to_lowercase();
             let canonical_text = if plain_lower.contains("cargo test") {
                 Some("Ran cargo test")
@@ -1314,11 +1546,18 @@ mod tests {
                 None
             };
             if let Some(canonical) = canonical_text {
-                let canonical_joined: String = canonical.to_lowercase().split_whitespace().collect();
+                let canonical_joined: String =
+                    canonical.to_lowercase().split_whitespace().collect();
                 let pick_joined: String = plain.to_lowercase().split_whitespace().collect();
-                let matches = pick_joined.contains(&canonical_joined) || canonical_joined == pick_joined;
+                let matches =
+                    pick_joined.contains(&canonical_joined) || canonical_joined == pick_joined;
                 let mark = if matches { "Y" } else { " " };
-                eprintln!("{:<30} | {:<48}| {}", canonical, &plain[..std::cmp::min(48, plain.len())], mark);
+                eprintln!(
+                    "{:<30} | {:<48}| {}",
+                    canonical,
+                    &plain[..std::cmp::min(48, plain.len())],
+                    mark
+                );
             }
         }
         eprintln!("{}", "-".repeat(80));

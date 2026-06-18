@@ -1,7 +1,8 @@
-﻿//! Faux provider for testing
+//! Faux provider for testing
 
 use crate::types::{
-    AssistantMessage, ContentBlock, Context, Model, SimpleStreamOptions, StopReason, StreamEvent, StreamOptions, Usage,
+    AssistantMessage, ContentBlock, Context, Model, SimpleStreamOptions, StopReason, StreamEvent,
+    StreamOptions, Usage,
 };
 
 /// Faux provider that returns mock responses (for testing)
@@ -16,15 +17,15 @@ pub fn stream_faux(
         let last_msg = context.messages.last();
         let response_text = if let Some(msg) = last_msg {
             match msg {
-                crate::types::Message::User(u) => {
-                    u.content.iter()
-                        .filter_map(|c| match c {
-                            ContentBlock::Text(t) => Some(t.text.clone()),
-                            _ => None,
-                        })
-                        .collect::<Vec<_>>()
-                        .join(" ")
-                }
+                crate::types::Message::User(u) => u
+                    .content
+                    .iter()
+                    .filter_map(|c| match c {
+                        ContentBlock::Text(t) => Some(t.text.clone()),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" "),
                 _ => "Hello, I am the faux provider.".to_string(),
             }
         } else {
@@ -33,11 +34,19 @@ pub fn stream_faux(
 
         let msg = AssistantMessage::new(
             vec![ContentBlock::text(response_text)],
-            String::new(), "faux".to_string(), "faux-model".to_string(),
-            Usage::zero(), StopReason::Stop,
+            String::new(),
+            "faux".to_string(),
+            "faux-model".to_string(),
+            Usage::zero(),
+            StopReason::Stop,
         );
 
-        let _ = tx.send(StreamEvent::Done { reason: StopReason::Stop, message: msg }).await;
+        let _ = tx
+            .send(StreamEvent::Done {
+                reason: StopReason::Stop,
+                message: msg,
+            })
+            .await;
     });
 
     rx

@@ -1,13 +1,13 @@
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use pick_agent::core::agent_loop::AgentLoopConfig;
 use pick_agent::extensions::types::{
     ExtensionEvent, SessionBeforeCompactEvent, SessionCompactEvent,
 };
 use pick_agent::session::{CompactionEntry, SessionEntry, SessionEntryKind};
-use pick_ai::types::{ContentBlock, Message, UserMessage};
 use pick_ai::Context;
+use pick_ai::types::{ContentBlock, Message, UserMessage};
 use tokio::sync::mpsc;
 
 use super::context::TuiContext;
@@ -25,17 +25,14 @@ pub(crate) fn build_agent_config(
     let before_tool_call = {
         let mode_rules_clone = mode_rules.clone();
         Arc::new(move |tc: &pick_ai::types::ToolCall| -> Option<String> {
-            let tool_args_str = if let Some(cmd) = tc
-                .arguments
-                .get("command")
-                .and_then(|c| c.as_str())
-            {
-                cmd.to_string()
-            } else if let Some(path) = tc.arguments.get("path").and_then(|p| p.as_str()) {
-                path.to_string()
-            } else {
-                tc.arguments.to_string()
-            };
+            let tool_args_str =
+                if let Some(cmd) = tc.arguments.get("command").and_then(|c| c.as_str()) {
+                    cmd.to_string()
+                } else if let Some(path) = tc.arguments.get("path").and_then(|p| p.as_str()) {
+                    path.to_string()
+                } else {
+                    tc.arguments.to_string()
+                };
             match pick_agent::permission::evaluate::check_permission(
                 &tc.name,
                 &tool_args_str,
@@ -52,7 +49,8 @@ pub(crate) fn build_agent_config(
         let budget_injected = Arc::new(AtomicBool::new(false));
         Arc::new(move |_msg: &pick_ai::types::AssistantMessage| {
             budget_injected.load(Ordering::Relaxed)
-                && goal_manager.get()
+                && goal_manager
+                    .get()
                     .map(|g| g.status == "budget_limited")
                     .unwrap_or(false)
         })
@@ -81,7 +79,8 @@ pub(crate) fn build_agent_config(
             if let Some(goal) = goal_manager.get() {
                 match goal.status.as_str() {
                     "active" => {
-                        let remaining = goal_manager.remaining_tokens()
+                        let remaining = goal_manager
+                            .remaining_tokens()
                             .map(|r| format!("\nRemaining token budget: {}", r))
                             .unwrap_or_default();
                         msgs.push(Message::User(UserMessage::text(format!(
@@ -94,9 +93,13 @@ pub(crate) fn build_agent_config(
                             goal.tokens_used,
                             {
                                 let s = goal.time_used_seconds;
-                                if s < 60 { format!("{}s", s) }
-                                else if s < 3600 { format!("{}m", s / 60) }
-                                else { format!("{}h {}m", s / 3600, (s % 3600) / 60) }
+                                if s < 60 {
+                                    format!("{}s", s)
+                                } else if s < 3600 {
+                                    format!("{}m", s / 60)
+                                } else {
+                                    format!("{}h {}m", s / 3600, (s % 3600) / 60)
+                                }
                             },
                             remaining,
                         ))));
@@ -138,7 +141,8 @@ pub(crate) fn build_agent_config(
             if !goal_manager.register_continuation() {
                 return vec![];
             }
-            let remaining = goal_manager.remaining_tokens()
+            let remaining = goal_manager
+                .remaining_tokens()
                 .map(|r| format!(", remaining token budget: {}", r))
                 .unwrap_or_default();
             vec![Message::User(UserMessage::text(format!(
@@ -155,17 +159,28 @@ pub(crate) fn build_agent_config(
                 remaining,
                 {
                     let s = goal.time_used_seconds;
-                    if s < 60 { format!("{}s", s) }
-                    else if s < 3600 { format!("{}m", s / 60) }
-                    else { format!("{}h {}m", s / 3600, (s % 3600) / 60) }
+                    if s < 60 {
+                        format!("{}s", s)
+                    } else if s < 3600 {
+                        format!("{}m", s / 60)
+                    } else {
+                        format!("{}h {}m", s / 3600, (s % 3600) / 60)
+                    }
                 },
             )))]
         }
     };
 
     let question: Arc<
-        dyn Fn(Vec<pick_agent::core::state::QuestionPrompt>) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Vec<Vec<String>>, String>> + Send + 'static>>
-            + Send
+        dyn Fn(
+                Vec<pick_agent::core::state::QuestionPrompt>,
+            ) -> std::pin::Pin<
+                Box<
+                    dyn std::future::Future<Output = Result<Vec<Vec<String>>, String>>
+                        + Send
+                        + 'static,
+                >,
+            > + Send
             + Sync,
     > = Arc::new({
         let cmd_tx_clone = cmd_tx.clone();
@@ -178,12 +193,22 @@ pub(crate) fn build_agent_config(
                     response_tx: tx,
                 });
                 rx.await.map_err(|e| format!("question cancelled: {}", e))?
-            }) as std::pin::Pin<Box<dyn std::future::Future<Output = Result<Vec<Vec<String>>, String>> + Send + 'static>>
+            })
+                as std::pin::Pin<
+                    Box<
+                        dyn std::future::Future<Output = Result<Vec<Vec<String>>, String>>
+                            + Send
+                            + 'static,
+                    >,
+                >
         }
     });
 
     let on_turn_complete: Arc<
-        dyn Fn(&[Message]) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send + 'static>>
+        dyn Fn(
+                &[Message],
+            )
+                -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send + 'static>>
             + Send
             + Sync,
     > = Arc::new({
@@ -210,7 +235,8 @@ pub(crate) fn build_agent_config(
                         ));
                     }
                 }
-            }) as std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send + 'static>>
+            })
+                as std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send + 'static>>
         }
     });
 
@@ -253,7 +279,6 @@ pub(crate) fn spawn_title_generation(
     api_key: Option<String>,
     title_prompt: String,
 ) {
-
     tokio::spawn(async move {
         let send_title = |t: String| {
             let _ = cmd_tx.send(TuiCommand::SetSessionTitle(t));
@@ -267,7 +292,12 @@ pub(crate) fn spawn_title_generation(
             let registry = pick_ai::registry::global_registry();
             let provider = match registry.get(&mdl.api.as_str()) {
                 Some(p) => p,
-                None => return (String::new(), Some(format!("no provider for {}", mdl.api.as_str()))),
+                None => {
+                    return (
+                        String::new(),
+                        Some(format!("no provider for {}", mdl.api.as_str())),
+                    );
+                }
             };
             let stream_options = pick_ai::StreamOptions {
                 temperature: None,
@@ -298,7 +328,10 @@ pub(crate) fn spawn_title_generation(
                         break;
                     }
                     pick_ai::StreamEvent::Error { error: e, .. } => {
-                        error = Some(e.error_message.unwrap_or_else(|| "unknown error".to_string()));
+                        error = Some(
+                            e.error_message
+                                .unwrap_or_else(|| "unknown error".to_string()),
+                        );
                         break;
                     }
                     _ => {}
@@ -314,23 +347,37 @@ pub(crate) fn spawn_title_generation(
                     if trimmed.is_empty() || trimmed.starts_with('<') {
                         None
                     } else {
-                        Some(trimmed.trim_matches('"').trim_matches('\'').trim().to_string())
+                        Some(
+                            trimmed
+                                .trim_matches('"')
+                                .trim_matches('\'')
+                                .trim()
+                                .to_string(),
+                        )
                     }
                 })
                 .next()
                 .filter(|l| !l.is_empty())
-                .map(|l| if l.len() > 100 { format!("{}...", &l[..97]) } else { l })
+                .map(|l| {
+                    if l.len() > 100 {
+                        format!("{}...", &l[..97])
+                    } else {
+                        l
+                    }
+                })
         }
 
         // Attempt 1: system_prompt + same-language instruction
         let ctx1 = Context {
             system_prompt: Some(title_prompt.clone()),
-            messages: vec![UserMessage::text(&format!(
-                "Generate a title in the SAME LANGUAGE as the user message below. \
+            messages: vec![
+                UserMessage::text(&format!(
+                    "Generate a title in the SAME LANGUAGE as the user message below. \
                  Only output the title, nothing else.\n\n{}",
-                title_text
-            ))
-            .into()],
+                    title_text
+                ))
+                .into(),
+            ],
             tools: None,
         };
         let (resp1, _err1) = call_provider(&model, api_key.clone(), ctx1).await;
@@ -340,12 +387,14 @@ pub(crate) fn spawn_title_generation(
         if title.is_none() {
             let ctx2 = Context {
                 system_prompt: None,
-                messages: vec![UserMessage::text(&format!(
-                    "Generate a very short title in the SAME LANGUAGE as the user message. \
+                messages: vec![
+                    UserMessage::text(&format!(
+                        "Generate a very short title in the SAME LANGUAGE as the user message. \
                      Max 40 characters, no quotes, no explanation.\n\n{}",
-                    title_text
-                ))
-                .into()],
+                        title_text
+                    ))
+                    .into(),
+                ],
                 tools: None,
             };
             let (resp2, _err2) = call_provider(&model, api_key, ctx2).await;
@@ -438,18 +487,24 @@ pub(crate) async fn auto_compact_session(ctx: &mut TuiContext) {
         ));
     }
 
-    let api_key = ctx.auth.get_api_key(&ctx.provider, true).await.unwrap_or_default();
+    let api_key = ctx
+        .auth
+        .get_api_key(&ctx.provider, true)
+        .await
+        .unwrap_or_default();
     match prepare_compaction(&path_entries, &compact_settings) {
         Some(preparation) => {
             match compact(&preparation, &ctx.model, &api_key, None, None, None).await {
                 Ok(compaction_result) => {
                     let summary = compaction_result.summary;
                     let before = ctx.all_messages.len();
-                    ctx.all_messages = vec![UserMessage::text(&format!(
-                        "[Compacted conversation summary]\n\n{}",
-                        summary
-                    ))
-                    .into()];
+                    ctx.all_messages = vec![
+                        UserMessage::text(&format!(
+                            "[Compacted conversation summary]\n\n{}",
+                            summary
+                        ))
+                        .into(),
+                    ];
                     ctx.tui.chat.add_system_message(&format!(
                         "Auto-compacted ({} msgs → 1, {} tokens before).",
                         before, compaction_result.tokens_before

@@ -7,8 +7,6 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-
-
 type OAuthProviderBox = Arc<dyn OAuthProvider>;
 
 lazy_static::lazy_static! {
@@ -74,7 +72,8 @@ pub async fn get_oauth_api_key(
 
     let provider = get_oauth_provider(provider_id)
         .ok_or_else(|| format!("No OAuth provider: {}", provider_id))?;
-    provider.get_api_key(credentials)
+    provider
+        .get_api_key(credentials)
         .ok_or_else(|| "No API key in OAuth credentials".to_string())
 }
 
@@ -147,21 +146,25 @@ pub async fn poll_device_code_flow(
 
                 if status.is_success() {
                     if let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) {
-                        let access_token = json.get("access_token")
+                        let access_token = json
+                            .get("access_token")
                             .and_then(|v| v.as_str())
                             .ok_or("Missing access_token")?
                             .to_string();
-                        let refresh_token = json.get("refresh_token")
+                        let refresh_token = json
+                            .get("refresh_token")
                             .and_then(|v| v.as_str())
                             .unwrap_or("")
                             .to_string();
-                        let expires_in = json.get("expires_in")
+                        let expires_in = json
+                            .get("expires_in")
                             .and_then(|v| v.as_u64())
                             .unwrap_or(3600);
                         let expires_at = std::time::SystemTime::now()
                             .duration_since(std::time::UNIX_EPOCH)
                             .unwrap_or_default()
-                            .as_secs() as i64 + expires_in as i64;
+                            .as_secs() as i64
+                            + expires_in as i64;
 
                         return Ok(OAuthCredentials {
                             refresh_token,
@@ -213,16 +216,17 @@ pub async fn start_callback_server(
         .map_err(|e| format!("Failed to bind callback server: {}", e))?;
 
     listener.set_ttl(1).ok();
-    let (mut stream, _) = tokio::time::timeout(
-        Duration::from_secs(timeout_secs),
-        listener.accept(),
-    ).await
-        .map_err(|_| "Callback server timed out waiting for browser")?
-        .map_err(|e| format!("Callback accept error: {}", e))?;
+    let (mut stream, _) =
+        tokio::time::timeout(Duration::from_secs(timeout_secs), listener.accept())
+            .await
+            .map_err(|_| "Callback server timed out waiting for browser")?
+            .map_err(|e| format!("Callback accept error: {}", e))?;
 
     use tokio::io::AsyncReadExt;
     let mut buf = vec![0u8; 4096];
-    let n = stream.read(&mut buf).await
+    let n = stream
+        .read(&mut buf)
+        .await
         .map_err(|e| format!("Callback read error: {}", e))?;
 
     let request = String::from_utf8_lossy(&buf[..n]);
@@ -241,9 +245,12 @@ pub async fn start_callback_server(
                         let key = kv.next().unwrap_or("");
                         let value = kv.next().unwrap_or("");
                         if key == "code" {
-                            return Some(urlencoding::decode(value).ok()
-                                .map(|s| s.to_string())
-                                .unwrap_or_else(|| value.to_string()));
+                            return Some(
+                                urlencoding::decode(value)
+                                    .ok()
+                                    .map(|s| s.to_string())
+                                    .unwrap_or_else(|| value.to_string()),
+                            );
                         }
                     }
                 }
@@ -264,7 +271,9 @@ pub async fn start_callback_server(
         "<p>You can close this window and return to the terminal.</p>",
         "</div></body></html>"
     );
-    tokio::io::AsyncWriteExt::write_all(&mut stream, response.as_bytes()).await.ok();
+    tokio::io::AsyncWriteExt::write_all(&mut stream, response.as_bytes())
+        .await
+        .ok();
 
     Ok(code)
 }
@@ -273,8 +282,12 @@ pub struct AnthropicOAuth;
 
 #[async_trait::async_trait]
 impl OAuthProvider for AnthropicOAuth {
-    fn id(&self) -> &str { "anthropic" }
-    fn name(&self) -> &str { "Anthropic" }
+    fn id(&self) -> &str {
+        "anthropic"
+    }
+    fn name(&self) -> &str {
+        "Anthropic"
+    }
 
     async fn login(&self, callbacks: &OAuthLoginCallbacks) -> Result<OAuthCredentials, String> {
         let (verifier, challenge) = generate_pkce();
@@ -284,7 +297,9 @@ impl OAuthProvider for AnthropicOAuth {
             "9d1c250a-e61b-44d9-88ed-5944d1962f5e",
             urlencoding::encode("http://localhost:53692/callback"),
             &challenge,
-            urlencoding::encode("org:create_api_key user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload"),
+            urlencoding::encode(
+                "org:create_api_key user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload"
+            ),
         );
 
         (callbacks.on_auth_url)(&auth_url);
@@ -308,7 +323,8 @@ impl OAuthProvider for AnthropicOAuth {
             ("code_verifier", &verifier),
         ];
 
-        let resp = client.post("https://platform.claude.com/v1/oauth/token")
+        let resp = client
+            .post("https://platform.claude.com/v1/oauth/token")
             .form(&params)
             .send()
             .await
@@ -318,22 +334,26 @@ impl OAuthProvider for AnthropicOAuth {
         let json: serde_json::Value = serde_json::from_str(&text)
             .map_err(|e| format!("Failed to parse token response: {}: {}", e, text))?;
 
-        let access_token = json.get("access_token")
+        let access_token = json
+            .get("access_token")
             .and_then(|v| v.as_str())
             .ok_or_else(|| format!("Missing access_token: {}", text))?
             .to_string();
-        let refresh_token = json.get("refresh_token")
+        let refresh_token = json
+            .get("refresh_token")
             .and_then(|v| v.as_str())
             .ok_or_else(|| format!("Missing refresh_token: {}", text))?
             .to_string();
-        let expires_in = json.get("expires_in")
+        let expires_in = json
+            .get("expires_in")
             .and_then(|v| v.as_u64())
             .unwrap_or(3600);
 
         let expires_at = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
-            .as_secs() as i64 + expires_in as i64;
+            .as_secs() as i64
+            + expires_in as i64;
 
         Ok(OAuthCredentials {
             refresh_token,
@@ -343,7 +363,10 @@ impl OAuthProvider for AnthropicOAuth {
         })
     }
 
-    async fn refresh_token(&self, credentials: &OAuthCredentials) -> Result<OAuthCredentials, String> {
+    async fn refresh_token(
+        &self,
+        credentials: &OAuthCredentials,
+    ) -> Result<OAuthCredentials, String> {
         let client = reqwest::Client::new();
         let params = [
             ("grant_type", "refresh_token"),
@@ -351,7 +374,8 @@ impl OAuthProvider for AnthropicOAuth {
             ("client_id", "9d1c250a-e61b-44d9-88ed-5944d1962f5e"),
         ];
 
-        let resp = client.post("https://platform.claude.com/v1/oauth/token")
+        let resp = client
+            .post("https://platform.claude.com/v1/oauth/token")
             .form(&params)
             .send()
             .await
@@ -361,22 +385,26 @@ impl OAuthProvider for AnthropicOAuth {
         let json: serde_json::Value = serde_json::from_str(&text)
             .map_err(|e| format!("Failed to parse refresh response: {}: {}", e, text))?;
 
-        let access_token = json.get("access_token")
+        let access_token = json
+            .get("access_token")
             .and_then(|v| v.as_str())
             .ok_or_else(|| format!("Missing access_token: {}", text))?
             .to_string();
-        let refresh_token = json.get("refresh_token")
+        let refresh_token = json
+            .get("refresh_token")
             .and_then(|v| v.as_str())
             .unwrap_or(&credentials.refresh_token)
             .to_string();
-        let expires_in = json.get("expires_in")
+        let expires_in = json
+            .get("expires_in")
             .and_then(|v| v.as_u64())
             .unwrap_or(3600);
 
         let expires_at = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
-            .as_secs() as i64 + expires_in as i64;
+            .as_secs() as i64
+            + expires_in as i64;
 
         Ok(OAuthCredentials {
             refresh_token,
@@ -395,12 +423,18 @@ pub struct GitHubCopilotOAuth;
 
 #[async_trait::async_trait]
 impl OAuthProvider for GitHubCopilotOAuth {
-    fn id(&self) -> &str { "github-copilot" }
-    fn name(&self) -> &str { "GitHub Copilot" }
+    fn id(&self) -> &str {
+        "github-copilot"
+    }
+    fn name(&self) -> &str {
+        "GitHub Copilot"
+    }
 
     async fn login(&self, callbacks: &OAuthLoginCallbacks) -> Result<OAuthCredentials, String> {
-        let enterprise_domain = (callbacks.on_prompt)("GitHub Copilot enterprise domain (press Enter for default github.com):")
-            .unwrap_or_default();
+        let enterprise_domain = (callbacks.on_prompt)(
+            "GitHub Copilot enterprise domain (press Enter for default github.com):",
+        )
+        .unwrap_or_default();
 
         let domain = if enterprise_domain.is_empty() {
             "github.com".to_string()
@@ -420,25 +454,27 @@ impl OAuthProvider for GitHubCopilotOAuth {
             .map_err(|e| format!("Device code request failed: {}", e))?;
 
         let text = resp.text().await.unwrap_or_default();
-        let json: serde_json::Value = serde_json::from_str(&text)
-            .map_err(|e| format!("Parse error: {}: {}", e, text))?;
+        let json: serde_json::Value =
+            serde_json::from_str(&text).map_err(|e| format!("Parse error: {}: {}", e, text))?;
 
-        let device_code = json.get("device_code")
+        let device_code = json
+            .get("device_code")
             .and_then(|v| v.as_str())
             .ok_or_else(|| format!("Missing device_code: {}", text))?
             .to_string();
-        let user_code = json.get("user_code")
+        let user_code = json
+            .get("user_code")
             .and_then(|v| v.as_str())
             .ok_or_else(|| format!("Missing user_code: {}", text))?
             .to_string();
-        let verification_uri = json.get("verification_uri")
+        let verification_uri = json
+            .get("verification_uri")
             .and_then(|v| v.as_str())
             .unwrap_or("https://github.com/login/device")
             .to_string();
-        let interval = json.get("interval")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(5);
-        let expires_in = json.get("expires_in")
+        let interval = json.get("interval").and_then(|v| v.as_u64()).unwrap_or(5);
+        let expires_in = json
+            .get("expires_in")
             .and_then(|v| v.as_u64())
             .unwrap_or(900);
 
@@ -453,7 +489,8 @@ impl OAuthProvider for GitHubCopilotOAuth {
             client_id,
             None,
             callbacks.signal.clone(),
-        ).await?;
+        )
+        .await?;
 
         let copilot_resp = client
             .get("https://api.github.com/copilot_internal/v2/token")
@@ -467,10 +504,12 @@ impl OAuthProvider for GitHubCopilotOAuth {
         let copilot_json: serde_json::Value = serde_json::from_str(&copilot_text)
             .map_err(|e| format!("Parse copilot token response: {}: {}", e, copilot_text))?;
 
-        let token = copilot_json.get("token")
+        let token = copilot_json
+            .get("token")
             .and_then(|v| v.as_str())
             .ok_or_else(|| format!("Missing copilot token: {}", copilot_text))?;
-        let refresh_in = copilot_json.get("refresh_in")
+        let refresh_in = copilot_json
+            .get("refresh_in")
             .and_then(|v| v.as_u64())
             .unwrap_or(1500);
 
@@ -479,10 +518,14 @@ impl OAuthProvider for GitHubCopilotOAuth {
         let expires_at = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
-            .as_secs() as i64 + refresh_in as i64;
+            .as_secs() as i64
+            + refresh_in as i64;
 
         let mut extra = HashMap::new();
-        extra.insert("enterprise_domain".to_string(), serde_json::Value::String(domain));
+        extra.insert(
+            "enterprise_domain".to_string(),
+            serde_json::Value::String(domain),
+        );
         extra.insert("base_url".to_string(), serde_json::Value::String(base_url));
 
         Ok(OAuthCredentials {
@@ -493,15 +536,23 @@ impl OAuthProvider for GitHubCopilotOAuth {
         })
     }
 
-    async fn refresh_token(&self, credentials: &OAuthCredentials) -> Result<OAuthCredentials, String> {
-        let enterprise_domain = credentials.extra.get("enterprise_domain")
+    async fn refresh_token(
+        &self,
+        credentials: &OAuthCredentials,
+    ) -> Result<OAuthCredentials, String> {
+        let enterprise_domain = credentials
+            .extra
+            .get("enterprise_domain")
             .and_then(|v| v.as_str())
             .unwrap_or("github.com");
 
         let client = reqwest::Client::new();
 
         let resp = client
-            .post(format!("https://{}/login/oauth/access_token", enterprise_domain))
+            .post(format!(
+                "https://{}/login/oauth/access_token",
+                enterprise_domain
+            ))
             .header("Accept", "application/json")
             .form(&[
                 ("grant_type", "refresh_token"),
@@ -513,14 +564,16 @@ impl OAuthProvider for GitHubCopilotOAuth {
             .map_err(|e| format!("GitHub token refresh failed: {}", e))?;
 
         let text = resp.text().await.unwrap_or_default();
-        let json: serde_json::Value = serde_json::from_str(&text)
-            .map_err(|e| format!("Parse error: {}: {}", e, text))?;
+        let json: serde_json::Value =
+            serde_json::from_str(&text).map_err(|e| format!("Parse error: {}: {}", e, text))?;
 
-        let access_token = json.get("access_token")
+        let access_token = json
+            .get("access_token")
             .and_then(|v| v.as_str())
             .ok_or_else(|| format!("Missing access_token: {}", text))?
             .to_string();
-        let new_refresh_token = json.get("refresh_token")
+        let new_refresh_token = json
+            .get("refresh_token")
             .and_then(|v| v.as_str())
             .unwrap_or(&credentials.refresh_token)
             .to_string();
@@ -537,17 +590,20 @@ impl OAuthProvider for GitHubCopilotOAuth {
         let copilot_json: serde_json::Value = serde_json::from_str(&copilot_text)
             .map_err(|e| format!("Parse copilot token: {}: {}", e, copilot_text))?;
 
-        let token = copilot_json.get("token")
+        let token = copilot_json
+            .get("token")
             .and_then(|v| v.as_str())
             .ok_or_else(|| format!("Missing copilot token: {}", copilot_text))?;
-        let refresh_in = copilot_json.get("refresh_in")
+        let refresh_in = copilot_json
+            .get("refresh_in")
             .and_then(|v| v.as_u64())
             .unwrap_or(1500);
 
         let expires_at = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
-            .as_secs() as i64 + refresh_in as i64;
+            .as_secs() as i64
+            + refresh_in as i64;
 
         let mut extra = credentials.extra.clone();
         let base_url = extract_copilot_base_url(token);
@@ -586,8 +642,12 @@ pub struct OpenAICodexOAuth;
 
 #[async_trait::async_trait]
 impl OAuthProvider for OpenAICodexOAuth {
-    fn id(&self) -> &str { "openai-codex" }
-    fn name(&self) -> &str { "OpenAI Codex" }
+    fn id(&self) -> &str {
+        "openai-codex"
+    }
+    fn name(&self) -> &str {
+        "OpenAI Codex"
+    }
 
     async fn login(&self, callbacks: &OAuthLoginCallbacks) -> Result<OAuthCredentials, String> {
         let (verifier, challenge) = generate_pkce();
@@ -621,7 +681,8 @@ impl OAuthProvider for OpenAICodexOAuth {
             ("code_verifier", &verifier),
         ];
 
-        let resp = client.post("https://auth.openai.com/oauth/token")
+        let resp = client
+            .post("https://auth.openai.com/oauth/token")
             .form(&params)
             .send()
             .await
@@ -631,22 +692,26 @@ impl OAuthProvider for OpenAICodexOAuth {
         let json: serde_json::Value = serde_json::from_str(&text)
             .map_err(|e| format!("Failed to parse token response: {}: {}", e, text))?;
 
-        let access_token = json.get("access_token")
+        let access_token = json
+            .get("access_token")
             .and_then(|v| v.as_str())
             .ok_or_else(|| format!("Missing access_token: {}", text))?
             .to_string();
-        let refresh_token = json.get("refresh_token")
+        let refresh_token = json
+            .get("refresh_token")
             .and_then(|v| v.as_str())
             .ok_or_else(|| format!("Missing refresh_token: {}", text))?
             .to_string();
-        let expires_in = json.get("expires_in")
+        let expires_in = json
+            .get("expires_in")
             .and_then(|v| v.as_u64())
             .unwrap_or(3600);
 
         let expires_at = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
-            .as_secs() as i64 + expires_in as i64;
+            .as_secs() as i64
+            + expires_in as i64;
 
         let account_id = extract_openai_account_id(&access_token);
 
@@ -663,7 +728,10 @@ impl OAuthProvider for OpenAICodexOAuth {
         })
     }
 
-    async fn refresh_token(&self, credentials: &OAuthCredentials) -> Result<OAuthCredentials, String> {
+    async fn refresh_token(
+        &self,
+        credentials: &OAuthCredentials,
+    ) -> Result<OAuthCredentials, String> {
         let client = reqwest::Client::new();
         let params = [
             ("grant_type", "refresh_token"),
@@ -671,7 +739,8 @@ impl OAuthProvider for OpenAICodexOAuth {
             ("client_id", "app_EMoamEEZ73f0CkXaXp7hrann"),
         ];
 
-        let resp = client.post("https://auth.openai.com/oauth/token")
+        let resp = client
+            .post("https://auth.openai.com/oauth/token")
             .form(&params)
             .send()
             .await
@@ -681,22 +750,26 @@ impl OAuthProvider for OpenAICodexOAuth {
         let json: serde_json::Value = serde_json::from_str(&text)
             .map_err(|e| format!("Failed to parse refresh: {}: {}", e, text))?;
 
-        let access_token = json.get("access_token")
+        let access_token = json
+            .get("access_token")
             .and_then(|v| v.as_str())
             .ok_or_else(|| format!("Missing access_token: {}", text))?
             .to_string();
-        let refresh_token = json.get("refresh_token")
+        let refresh_token = json
+            .get("refresh_token")
             .and_then(|v| v.as_str())
             .unwrap_or(&credentials.refresh_token)
             .to_string();
-        let expires_in = json.get("expires_in")
+        let expires_in = json
+            .get("expires_in")
             .and_then(|v| v.as_u64())
             .unwrap_or(3600);
 
         let expires_at = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
-            .as_secs() as i64 + expires_in as i64;
+            .as_secs() as i64
+            + expires_in as i64;
 
         let mut extra = credentials.extra.clone();
         let account_id = extract_openai_account_id(&access_token);
@@ -724,7 +797,8 @@ fn extract_openai_account_id(token: &str) -> Option<String> {
         let engine = base64::engine::general_purpose::URL_SAFE_NO_PAD;
         if let Ok(decoded) = engine.decode(parts[1]) {
             if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&decoded) {
-                return json.pointer("/https://api.openai.com/auth")
+                return json
+                    .pointer("/https://api.openai.com/auth")
                     .and_then(|v| v.get("account_id"))
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string());

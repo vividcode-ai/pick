@@ -59,7 +59,8 @@ pub fn estimate_entry_tokens(entry: &SessionEntry) -> u64 {
                 if let Some(content) = msg.content.as_str() {
                     ceil_div(content.len() as u64, 4)
                 } else if let Some(arr) = msg.content.as_array() {
-                    let chars: usize = arr.iter()
+                    let chars: usize = arr
+                        .iter()
                         .filter_map(|block| block.get("text").and_then(|t| t.as_str()))
                         .map(|t| t.len())
                         .sum();
@@ -69,13 +70,19 @@ pub fn estimate_entry_tokens(entry: &SessionEntry) -> u64 {
                 }
             }
             "assistant" => {
-                if let Ok(blocks) = serde_json::from_value::<Vec<ContentBlock>>(msg.content.clone()) {
-                    let chars: usize = blocks.iter().map(|block| match block {
-                        ContentBlock::Text(t) => t.text.len(),
-                        ContentBlock::Thinking(t) => t.thinking.len(),
-                        ContentBlock::ToolCall(t) => t.name.len() + t.arguments.to_string().len(),
-                        ContentBlock::Image(_) => 4800,
-                    }).sum();
+                if let Ok(blocks) = serde_json::from_value::<Vec<ContentBlock>>(msg.content.clone())
+                {
+                    let chars: usize = blocks
+                        .iter()
+                        .map(|block| match block {
+                            ContentBlock::Text(t) => t.text.len(),
+                            ContentBlock::Thinking(t) => t.thinking.len(),
+                            ContentBlock::ToolCall(t) => {
+                                t.name.len() + t.arguments.to_string().len()
+                            }
+                            ContentBlock::Image(_) => 4800,
+                        })
+                        .sum();
                     ceil_div(chars as u64, 4)
                 } else {
                     0
@@ -85,7 +92,8 @@ pub fn estimate_entry_tokens(entry: &SessionEntry) -> u64 {
                 if let Some(text) = msg.content.as_str() {
                     ceil_div(text.len() as u64, 4)
                 } else if let Some(arr) = msg.content.as_array() {
-                    let chars: usize = arr.iter()
+                    let chars: usize = arr
+                        .iter()
                         .filter_map(|block| block.get("text").and_then(|t| t.as_str()))
                         .map(|t| t.len())
                         .sum();
@@ -111,17 +119,17 @@ fn ceil_div(a: u64, b: u64) -> u64 {
 
 /// Estimate context tokens from session entries
 pub fn estimate_context_tokens(entries: &[SessionEntry]) -> ContextUsageEstimate {
-    let usage_info = entries.iter()
+    let usage_info = entries
+        .iter()
         .enumerate()
         .rev()
-        .find_map(|(i, entry)| {
-            get_entry_usage(entry).map(|usage| (usage, i))
-        });
+        .find_map(|(i, entry)| get_entry_usage(entry).map(|usage| (usage, i)));
 
     match usage_info {
         Some((usage, last_idx)) => {
             let usage_tokens = calculate_context_tokens(&usage);
-            let trailing_tokens: u64 = entries.iter()
+            let trailing_tokens: u64 = entries
+                .iter()
                 .skip(last_idx + 1)
                 .map(estimate_entry_tokens)
                 .sum();
@@ -165,15 +173,13 @@ pub fn find_valid_cut_points(entries: &[SessionEntry], start: usize, end: usize)
     let mut cut_points = Vec::new();
     for i in start..end {
         match &entries[i].kind {
-            SessionEntryKind::Message(msg) => {
-                match msg.role.as_str() {
-                    "user" | "assistant" | "custom" | "bashExecution"
-                    | "branchSummary" | "compactionSummary" => {
-                        cut_points.push(i);
-                    }
-                    _ => {}
+            SessionEntryKind::Message(msg) => match msg.role.as_str() {
+                "user" | "assistant" | "custom" | "bashExecution" | "branchSummary"
+                | "compactionSummary" => {
+                    cut_points.push(i);
                 }
-            }
+                _ => {}
+            },
             SessionEntryKind::BranchSummary(_) | SessionEntryKind::Custom(_) => {
                 cut_points.push(i);
             }
@@ -184,7 +190,11 @@ pub fn find_valid_cut_points(entries: &[SessionEntry], start: usize, end: usize)
 }
 
 /// Find the user message that starts the turn containing the given entry index
-pub fn find_turn_start_index(entries: &[SessionEntry], entry_index: usize, start_index: usize) -> isize {
+pub fn find_turn_start_index(
+    entries: &[SessionEntry],
+    entry_index: usize,
+    start_index: usize,
+) -> isize {
     let mut i = entry_index as isize;
     while i >= start_index as isize {
         match &entries[i as usize].kind {
@@ -342,7 +352,11 @@ fn extract_file_ops_from_content(content: &serde_json::Value, file_ops: &mut Fil
 fn extract_paths_from_args(args: Option<&serde_json::Value>) -> Vec<String> {
     let mut paths = Vec::new();
     if let Some(args) = args {
-        if let Some(file_path) = args.get("file_path").or_else(|| args.get("path")).and_then(|v| v.as_str()) {
+        if let Some(file_path) = args
+            .get("file_path")
+            .or_else(|| args.get("path"))
+            .and_then(|v| v.as_str())
+        {
             paths.push(file_path.to_string());
         }
     }
@@ -441,8 +455,7 @@ pub trait Summarizer: Send + Sync {
 }
 
 /// Branch summary preamble for when returning from a different branch
-pub const BRANCH_SUMMARY_PREAMBLE: &str =
-    "The user explored a different conversation branch before returning here.\nSummary of that exploration:\n\n";
+pub const BRANCH_SUMMARY_PREAMBLE: &str = "The user explored a different conversation branch before returning here.\nSummary of that exploration:\n\n";
 
 /// Create a branch summary entry from a set of session entries.
 /// Uses the provided summarizer to generate a concise summary of the branch conversation.
@@ -451,14 +464,14 @@ pub async fn create_branch_summary(
     summarizer: &dyn Summarizer,
 ) -> Result<crate::session::entries::BranchSummaryEntry, String> {
     let text = serialize_entries(entries, 8000);
-    let summary = summarizer.generate_summary(
-        &format!("{}{}", BRANCH_SUMMARY_PREAMBLE, text),
-        SUMMARIZATION_PROMPT,
-    ).await?;
+    let summary = summarizer
+        .generate_summary(
+            &format!("{}{}", BRANCH_SUMMARY_PREAMBLE, text),
+            SUMMARIZATION_PROMPT,
+        )
+        .await?;
 
-    Ok(crate::session::entries::BranchSummaryEntry {
-        summary,
-    })
+    Ok(crate::session::entries::BranchSummaryEntry { summary })
 }
 
 // ============================================================================
@@ -479,7 +492,12 @@ impl LlmSummarizer {
         api_key: Option<String>,
         headers: Option<std::collections::HashMap<String, String>>,
     ) -> Self {
-        Self { model, api_key, headers, max_tokens: Some(4096) }
+        Self {
+            model,
+            api_key,
+            headers,
+            max_tokens: Some(4096),
+        }
     }
 }
 
@@ -492,7 +510,9 @@ impl Summarizer for LlmSummarizer {
     ) -> Result<String, String> {
         let context = pick_ai::Context {
             system_prompt: Some(system_prompt.to_string()),
-            messages: vec![pick_ai::Message::User(pick_ai::UserMessage::text(conversation_text))],
+            messages: vec![pick_ai::Message::User(pick_ai::UserMessage::text(
+                conversation_text,
+            ))],
             tools: None,
         };
 
@@ -597,7 +617,10 @@ mod tests {
         };
         assert!(should_compact(3500, 4096, &settings));
         assert!(!should_compact(3000, 4096, &settings));
-        let disabled = CompactionSettings { enabled: false, ..Default::default() };
+        let disabled = CompactionSettings {
+            enabled: false,
+            ..Default::default()
+        };
         assert!(!should_compact(100000, 200000, &disabled));
     }
 

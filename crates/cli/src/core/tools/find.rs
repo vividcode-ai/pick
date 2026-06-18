@@ -1,9 +1,10 @@
-﻿use tokio::process::Command;
+use tokio::process::Command;
 
-use super::truncate::*;
 use super::path_utils::resolve_to_cwd;
-use super::render_utils::{ToolRenderContext, ToolRenderOptions, ToolRenderOutput, ToolTheme,
-    shorten_path};
+use super::render_utils::{
+    ToolRenderContext, ToolRenderOptions, ToolRenderOutput, ToolTheme, shorten_path,
+};
+use super::truncate::*;
 
 /// Create a find tool definition
 pub fn create_find_tool_definition() -> FindToolDefinition {
@@ -32,10 +33,7 @@ impl FindToolDefinition {
         let effective_limit = limit.unwrap_or(1000);
 
         // Check if fd is available
-        let fd_check = Command::new("fd")
-            .arg("--version")
-            .output()
-            .await;
+        let fd_check = Command::new("fd").arg("--version").output().await;
         if fd_check.is_err() {
             return Err("fd is not available. Please install fd first.".to_string());
         }
@@ -104,8 +102,16 @@ impl FindToolDefinition {
         let mut output_text = truncation.content.clone();
 
         let details = FindToolDetails {
-            truncation: if truncation_truncated { Some(truncation) } else { None },
-            result_limit_reached: if result_limit_reached { Some(effective_limit) } else { None },
+            truncation: if truncation_truncated {
+                Some(truncation)
+            } else {
+                None
+            },
+            result_limit_reached: if result_limit_reached {
+                Some(effective_limit)
+            } else {
+                None
+            },
         };
 
         let mut notices: Vec<String> = Vec::new();
@@ -155,7 +161,8 @@ pub fn render_find_call(args: &serde_json::Value, _ctx: &ToolRenderContext) -> T
         _ => ".".to_string(),
     };
 
-    let mut label = format!("{} {} in {}",
+    let mut label = format!(
+        "{} {} in {}",
         ToolTheme::fg("toolTitle", &ToolTheme::bold("find")),
         ToolTheme::fg("accent", pattern.unwrap_or("")),
         ToolTheme::fg("toolOutput", &path_display),
@@ -165,7 +172,10 @@ pub fn render_find_call(args: &serde_json::Value, _ctx: &ToolRenderContext) -> T
         label.push_str(&ToolTheme::fg("toolOutput", &format!(" (limit {})", l)));
     }
 
-    ToolRenderOutput { label, formatted: String::new() }
+    ToolRenderOutput {
+        label,
+        formatted: String::new(),
+    }
 }
 
 /// Render a find tool result — file paths with warnings
@@ -185,16 +195,18 @@ pub fn render_find_result(
 
         formatted.push('\n');
         formatted.push_str(
-            &display_lines.iter()
+            &display_lines
+                .iter()
                 .map(|line| ToolTheme::fg("toolOutput", line))
                 .collect::<Vec<_>>()
                 .join("\n"),
         );
 
         if remaining > 0 {
-            formatted.push_str(
-                &ToolTheme::fg("muted", &format!("\n... ({} more lines, use expand to expand)", remaining)),
-            );
+            formatted.push_str(&ToolTheme::fg(
+                "muted",
+                &format!("\n... ({} more lines, use expand to expand)", remaining),
+            ));
         }
     }
 
@@ -209,10 +221,15 @@ pub fn render_find_result(
             }
         }
         if !warnings.is_empty() {
-            formatted.push_str(&format!("\n{}",
-                ToolTheme::fg("warning", &format!("[Truncated: {}]", warnings.join(", ")))));
+            formatted.push_str(&format!(
+                "\n{}",
+                ToolTheme::fg("warning", &format!("[Truncated: {}]", warnings.join(", ")))
+            ));
         }
     }
 
-    ToolRenderOutput { label: String::new(), formatted }
+    ToolRenderOutput {
+        label: String::new(),
+        formatted,
+    }
 }

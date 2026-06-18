@@ -1,4 +1,4 @@
-﻿//! Edit tool - applies string replacements to files with fuzzy matching
+//! Edit tool - applies string replacements to files with fuzzy matching
 
 use pick_ai::types::ContentBlock;
 
@@ -10,8 +10,7 @@ use crate::core::state::{AgentTool, AgentToolResult, ToolExecutionMode};
 
 /// Normalise text for lenient matching: NFKC + quote/dash/space normalisation
 fn normalise_for_fuzzy_match(text: &str) -> String {
-    text
-        .lines()
+    text.lines()
         .map(|line| line.trim_end())
         .collect::<Vec<_>>()
         .join("\n")
@@ -51,14 +50,32 @@ fn normalise_for_fuzzy_match(text: &str) -> String {
 /// Try to find old_text in content — exact match first, then fuzzy
 fn fuzzy_find_text(content: &str, old_text: &str) -> FuzzyMatch {
     if let Some(index) = content.find(old_text) {
-        return FuzzyMatch { found: true, index, match_length: old_text.len(), used_fuzzy: false, content_for_replacement: content.to_string() };
+        return FuzzyMatch {
+            found: true,
+            index,
+            match_length: old_text.len(),
+            used_fuzzy: false,
+            content_for_replacement: content.to_string(),
+        };
     }
     let fuzzy_c = normalise_for_fuzzy_match(content);
     let fuzzy_o = normalise_for_fuzzy_match(old_text);
     if let Some(index) = fuzzy_c.find(&fuzzy_o) {
-        return FuzzyMatch { found: true, index, match_length: fuzzy_o.len(), used_fuzzy: true, content_for_replacement: fuzzy_c };
+        return FuzzyMatch {
+            found: true,
+            index,
+            match_length: fuzzy_o.len(),
+            used_fuzzy: true,
+            content_for_replacement: fuzzy_c,
+        };
     }
-    FuzzyMatch { found: false, index: 0, match_length: 0, used_fuzzy: false, content_for_replacement: content.to_string() }
+    FuzzyMatch {
+        found: false,
+        index: 0,
+        match_length: 0,
+        used_fuzzy: false,
+        content_for_replacement: content.to_string(),
+    }
 }
 
 struct FuzzyMatch {
@@ -101,30 +118,48 @@ struct MatchedEdit {
     new_text: String,
 }
 
-fn apply_edits(content: &str, edits: &[(String, String)], file_path: &str) -> Result<(String, String), String> {
-    let norm_edits: Vec<(String, String)> = edits.iter()
+fn apply_edits(
+    content: &str,
+    edits: &[(String, String)],
+    file_path: &str,
+) -> Result<(String, String), String> {
+    let norm_edits: Vec<(String, String)> = edits
+        .iter()
         .map(|(o, n)| (normalise_to_lf(o), normalise_to_lf(n)))
         .collect();
 
     for (i, (old, _)) in norm_edits.iter().enumerate() {
         if old.is_empty() {
-            let label = if edits.len() == 1 { "oldText".to_string() } else { format!("edits[{}].oldText", i) };
+            let label = if edits.len() == 1 {
+                "oldText".to_string()
+            } else {
+                format!("edits[{}].oldText", i)
+            };
             return Err(format!("{} must not be empty in {}.", label, file_path));
         }
     }
 
-    let initial: Vec<FuzzyMatch> = norm_edits.iter()
+    let initial: Vec<FuzzyMatch> = norm_edits
+        .iter()
         .map(|(o, _)| fuzzy_find_text(content, o))
         .collect();
 
     let use_fuzzy = initial.iter().any(|m| m.used_fuzzy);
-    let base = if use_fuzzy { normalise_for_fuzzy_match(content) } else { content.to_string() };
+    let base = if use_fuzzy {
+        normalise_for_fuzzy_match(content)
+    } else {
+        content.to_string()
+    };
 
     let mut matched: Vec<MatchedEdit> = Vec::new();
     for (i, (old, new)) in norm_edits.iter().enumerate() {
         let m = fuzzy_find_text(&base, old);
         if !m.found {
-            let label = if edits.len() == 1 { "oldText".to_string() } else { format!("edits[{}]", i) };
+            let label = if edits.len() == 1 {
+                "oldText".to_string()
+            } else {
+                format!("edits[{}]", i)
+            };
             return Err(format!(
                 "Could not find the exact text for {} in {}. \
                  The text must match exactly including all whitespace and newlines. \
@@ -134,14 +169,22 @@ fn apply_edits(content: &str, edits: &[(String, String)], file_path: &str) -> Re
         }
         let occ = count_occurrences(&base, old);
         if occ > 1 {
-            let label = if edits.len() == 1 { "oldText".to_string() } else { format!("edits[{}]", i) };
+            let label = if edits.len() == 1 {
+                "oldText".to_string()
+            } else {
+                format!("edits[{}]", i)
+            };
             return Err(format!(
                 "Found {} occurrences of {} in {}. \
                  The text must be unique. Please provide more context to make it unique.",
                 occ, label, file_path
             ));
         }
-        matched.push(MatchedEdit { match_index: m.index, match_length: m.match_length, new_text: new.clone() });
+        matched.push(MatchedEdit {
+            match_index: m.index,
+            match_length: m.match_length,
+            new_text: new.clone(),
+        });
     }
 
     matched.sort_by_key(|m| m.match_index);
@@ -149,20 +192,33 @@ fn apply_edits(content: &str, edits: &[(String, String)], file_path: &str) -> Re
         let prev = &matched[i - 1];
         let cur = &matched[i];
         if prev.match_index + prev.match_length > cur.match_index {
-            let label = if edits.len() == 1 { "edits[0] and edits[0]".to_string() } else {
+            let label = if edits.len() == 1 {
+                "edits[0] and edits[0]".to_string()
+            } else {
                 format!("edits[{}] and edits[{}]", i - 1, i)
             };
-            return Err(format!("{} overlap in {}. Merge them into one edit.", label, file_path));
+            return Err(format!(
+                "{} overlap in {}. Merge them into one edit.",
+                label, file_path
+            ));
         }
     }
 
     let mut result = base.clone();
     for m in matched.iter().rev() {
-        result = format!("{}{}{}", &result[..m.match_index], m.new_text, &result[m.match_index + m.match_length..]);
+        result = format!(
+            "{}{}{}",
+            &result[..m.match_index],
+            m.new_text,
+            &result[m.match_index + m.match_length..]
+        );
     }
 
     if base == result {
-        return Err(format!("No changes made to {}. The replacement produced identical content.", file_path));
+        return Err(format!(
+            "No changes made to {}. The replacement produced identical content.",
+            file_path
+        ));
     }
 
     Ok((base, result))

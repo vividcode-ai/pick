@@ -1,5 +1,4 @@
-﻿//! Config selector component for resource configuration
-
+//! Config selector component for resource configuration
 
 use crate::core::tools::render_utils::ToolTheme;
 
@@ -84,7 +83,11 @@ fn format_base_dir(base_dir: &str) -> String {
         return format!("~{}/", normalized.trim_start_matches('/'));
     }
     let normalized = base_dir.replace('\\', "/");
-    if normalized.ends_with('/') { normalized } else { format!("{}/", normalized) }
+    if normalized.ends_with('/') {
+        normalized
+    } else {
+        format!("{}/", normalized)
+    }
 }
 
 fn get_group_label(metadata: &PathMetadata) -> String {
@@ -126,30 +129,42 @@ pub fn build_resource_groups(
                         resources: &[ResourceItem],
                         resource_type: ResourceType| {
         for res in resources {
-            let group_key = format!("{}:{}:{}:{}",
-                res.metadata.origin, res.metadata.scope, res.metadata.source,
-                res.metadata.base_dir.as_deref().unwrap_or(""));
+            let group_key = format!(
+                "{}:{}:{}:{}",
+                res.metadata.origin,
+                res.metadata.scope,
+                res.metadata.source,
+                res.metadata.base_dir.as_deref().unwrap_or("")
+            );
 
-            let group = group_map.entry(group_key.clone()).or_insert_with(|| {
-                ResourceGroup {
+            let group = group_map
+                .entry(group_key.clone())
+                .or_insert_with(|| ResourceGroup {
                     key: group_key,
                     label: get_group_label(&res.metadata),
                     scope: res.metadata.scope.clone(),
                     origin: res.metadata.origin.clone(),
                     source: res.metadata.source.clone(),
                     subgroups: Vec::new(),
-                }
-            });
+                });
 
             let subgroup_key = resource_type;
-            if !group.subgroups.iter().any(|sg| sg.resource_type == subgroup_key) {
+            if !group
+                .subgroups
+                .iter()
+                .any(|sg| sg.resource_type == subgroup_key)
+            {
                 group.subgroups.push(ResourceSubgroup {
                     resource_type,
                     label: resource_type.label().to_string(),
                     items: Vec::new(),
                 });
             }
-            if let Some(subgroup) = group.subgroups.iter_mut().find(|sg| sg.resource_type == subgroup_key) {
+            if let Some(subgroup) = group
+                .subgroups
+                .iter_mut()
+                .find(|sg| sg.resource_type == subgroup_key)
+            {
                 subgroup.items.push(res.clone());
             }
         }
@@ -164,10 +179,18 @@ pub fn build_resource_groups(
     let mut groups: Vec<ResourceGroup> = group_map.into_values().collect();
     groups.sort_by(|a, b| {
         if a.origin != b.origin {
-            return if a.origin == "package" { std::cmp::Ordering::Less } else { std::cmp::Ordering::Greater };
+            return if a.origin == "package" {
+                std::cmp::Ordering::Less
+            } else {
+                std::cmp::Ordering::Greater
+            };
         }
         if a.scope != b.scope {
-            return if a.scope == "user" { std::cmp::Ordering::Less } else { std::cmp::Ordering::Greater };
+            return if a.scope == "user" {
+                std::cmp::Ordering::Less
+            } else {
+                std::cmp::Ordering::Greater
+            };
         }
         a.source.cmp(&b.source)
     });
@@ -182,9 +205,13 @@ pub fn build_resource_groups(
         }
     };
     for group in &mut groups {
-        group.subgroups.sort_by_key(|sg| type_order(&sg.resource_type));
+        group
+            .subgroups
+            .sort_by_key(|sg| type_order(&sg.resource_type));
         for subgroup in &mut group.subgroups {
-            subgroup.items.sort_by(|a, b| a.display_name.cmp(&b.display_name));
+            subgroup
+                .items
+                .sort_by(|a, b| a.display_name.cmp(&b.display_name));
         }
     }
 
@@ -219,9 +246,9 @@ pub fn filter_entries(entries: &[FlatEntry], query: &str) -> Vec<FlatEntry> {
         .iter()
         .filter_map(|e| {
             if let FlatEntry::Item(item) = e {
-                if item.display_name.to_lowercase().contains(&lower) ||
-                   item.path.to_lowercase().contains(&lower) ||
-                   item.resource_type.label().to_lowercase().contains(&lower)
+                if item.display_name.to_lowercase().contains(&lower)
+                    || item.path.to_lowercase().contains(&lower)
+                    || item.resource_type.label().to_lowercase().contains(&lower)
                 {
                     Some(item.path.clone())
                 } else {
@@ -240,15 +267,16 @@ pub fn filter_entries(entries: &[FlatEntry], query: &str) -> Vec<FlatEntry> {
     for entry in entries {
         if let FlatEntry::Item(item) = entry {
             if matching_paths.contains(&item.path) {
-                let sub_key = format!("{}:{}",
-                    item.resource_type.label(),
-                    item.path
-                );
+                let sub_key = format!("{}:{}", item.resource_type.label(), item.path);
                 matching_subgroups.insert(sub_key);
 
-                let group_key = format!("{}:{}:{}:{}",
-                    item.metadata.origin, item.metadata.scope, item.metadata.source,
-                    item.metadata.base_dir.as_deref().unwrap_or(""));
+                let group_key = format!(
+                    "{}:{}:{}:{}",
+                    item.metadata.origin,
+                    item.metadata.scope,
+                    item.metadata.source,
+                    item.metadata.base_dir.as_deref().unwrap_or("")
+                );
                 matching_groups.insert(group_key);
             }
         }
@@ -260,14 +288,19 @@ pub fn filter_entries(entries: &[FlatEntry], query: &str) -> Vec<FlatEntry> {
             FlatEntry::Group(g) => {
                 // Check if any subgroup in this group matched
                 let has_matching = g.subgroups.iter().any(|sg| {
-                    sg.items.iter().any(|item| matching_paths.contains(&item.path))
+                    sg.items
+                        .iter()
+                        .any(|item| matching_paths.contains(&item.path))
                 });
                 if has_matching {
                     result.push(entry.clone());
                 }
             }
             FlatEntry::Subgroup(sg) => {
-                let has_matching = sg.items.iter().any(|item| matching_paths.contains(&item.path));
+                let has_matching = sg
+                    .items
+                    .iter()
+                    .any(|item| matching_paths.contains(&item.path));
                 if has_matching {
                     result.push(entry.clone());
                 }
@@ -285,7 +318,10 @@ pub fn filter_entries(entries: &[FlatEntry], query: &str) -> Vec<FlatEntry> {
 
 /// Find the first item index in flat entries
 pub fn find_first_item(entries: &[FlatEntry]) -> usize {
-    entries.iter().position(|e| matches!(e, FlatEntry::Item(_))).unwrap_or(0)
+    entries
+        .iter()
+        .position(|e| matches!(e, FlatEntry::Item(_)))
+        .unwrap_or(0)
 }
 
 /// Find the next item index in a direction
@@ -307,7 +343,12 @@ pub fn render_config_selector_header(width: usize) -> Vec<String> {
     let hint = format!("space: toggle{}esc: close", sep);
     let spacing = width.saturating_sub(title.len() + hint.len());
     vec![
-        format!("{}{}{}", title, " ".repeat(spacing), ToolTheme::fg("accent", &hint)),
+        format!(
+            "{}{}{}",
+            title,
+            " ".repeat(spacing),
+            ToolTheme::fg("accent", &hint)
+        ),
         ToolTheme::fg("muted", "Type to filter resources"),
     ]
 }
@@ -353,7 +394,10 @@ pub fn render_resource_list(
         if let Some(entry) = entries.get(i) {
             match entry {
                 FlatEntry::Group(group) => {
-                    lines.push(ToolTheme::fg("accent", &format!("\x1b[1m  {}\x1b[22m", group.label)));
+                    lines.push(ToolTheme::fg(
+                        "accent",
+                        &format!("\x1b[1m  {}\x1b[22m", group.label),
+                    ));
                 }
                 FlatEntry::Subgroup(subgroup) => {
                     lines.push(ToolTheme::fg("muted", &format!("    {}", subgroup.label)));
@@ -384,9 +428,18 @@ pub fn render_resource_list(
     }
 
     if total > max_visible {
-        let item_count = entries.iter().filter(|e| matches!(e, FlatEntry::Item(_))).count();
-        let current_item = entries[..=selected_index].iter().filter(|e| matches!(e, FlatEntry::Item(_))).count();
-        lines.push(ToolTheme::fg("dim", &format!("  ({}/{})", current_item, item_count)));
+        let item_count = entries
+            .iter()
+            .filter(|e| matches!(e, FlatEntry::Item(_)))
+            .count();
+        let current_item = entries[..=selected_index]
+            .iter()
+            .filter(|e| matches!(e, FlatEntry::Item(_)))
+            .count();
+        lines.push(ToolTheme::fg(
+            "dim",
+            &format!("  ({}/{})", current_item, item_count),
+        ));
     }
 
     lines

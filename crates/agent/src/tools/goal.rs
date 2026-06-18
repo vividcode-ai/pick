@@ -1,4 +1,4 @@
-﻿use std::sync::Arc;
+use std::sync::Arc;
 
 use pick_ai::types::ContentBlock;
 
@@ -10,7 +10,8 @@ use crate::session::goal::GoalManager;
 pub fn create_get_goal_tool_with_mode() -> AgentTool {
     AgentTool {
         name: "get_goal".to_string(),
-        description: "Get the current goal for this thread, including status and token usage.".to_string(),
+        description: "Get the current goal for this thread, including status and token usage."
+            .to_string(),
         prompt_snippet: Some("Get current thread goal".to_string()),
         prompt_guidelines: vec![],
         label: "get_goal".to_string(),
@@ -23,7 +24,7 @@ pub fn create_get_goal_tool_with_mode() -> AgentTool {
             Box::pin(async move {
                 Ok(AgentToolResult {
                     content: vec![ContentBlock::text(
-                        "{\"goal\": null, \"message\": \"No active goal for this thread.\"}"
+                        "{\"goal\": null, \"message\": \"No active goal for this thread.\"}",
                     )],
                     is_error: false,
                     terminate: false,
@@ -146,7 +147,11 @@ pub fn create_update_goal_tool_with_mode() -> AgentTool {
 
 // ── Real versions (wired to GoalManager) ──────────────────────────
 
-fn make_params(desc: &str, props: Vec<(&str, serde_json::Value)>, required: Vec<&str>) -> pick_ai::types::JsonSchema {
+fn make_params(
+    desc: &str,
+    props: Vec<(&str, serde_json::Value)>,
+    required: Vec<&str>,
+) -> pick_ai::types::JsonSchema {
     pick_ai::types::JsonSchema {
         schema_type: "object".to_string(),
         properties: Some(props.into_iter().map(|(k, v)| (k.to_string(), v)).collect()),
@@ -172,7 +177,8 @@ fn goal_entry_to_json(goal: &crate::session::entries::GoalEntry) -> serde_json::
 pub fn create_get_goal_tool(goal_manager: Arc<GoalManager>) -> AgentTool {
     AgentTool {
         name: "get_goal".to_string(),
-        description: "Get the current goal for this thread, including status and token usage.".to_string(),
+        description: "Get the current goal for this thread, including status and token usage."
+            .to_string(),
         prompt_snippet: Some("Get current thread goal".to_string()),
         prompt_guidelines: vec![],
         label: "get_goal".to_string(),
@@ -195,7 +201,7 @@ pub fn create_get_goal_tool(goal_manager: Arc<GoalManager>) -> AgentTool {
                         }
                         Ok(AgentToolResult {
                             content: vec![ContentBlock::text(
-                                serde_json::to_string_pretty(&resp).unwrap_or_default()
+                                serde_json::to_string_pretty(&resp).unwrap_or_default(),
                             )],
                             is_error: false,
                             terminate: false,
@@ -203,7 +209,7 @@ pub fn create_get_goal_tool(goal_manager: Arc<GoalManager>) -> AgentTool {
                     }
                     None => Ok(AgentToolResult {
                         content: vec![ContentBlock::text(
-                            "{\"goal\": null, \"message\": \"No active goal for this thread.\"}"
+                            "{\"goal\": null, \"message\": \"No active goal for this thread.\"}",
                         )],
                         is_error: false,
                         terminate: false,

@@ -1,4 +1,4 @@
-﻿//! Types for the package manager
+//! Types for the package manager
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -59,7 +59,7 @@ pub enum MissingSourceAction {
 /// Progress event during package operations
 #[derive(Debug, Clone)]
 pub struct ProgressEvent {
-    pub type_: String, // "start", "progress", "complete", "error"
+    pub type_: String,  // "start", "progress", "complete", "error"
     pub action: String, // "install", "remove", "update", "clone", "pull"
     pub source: String,
     pub message: Option<String>,

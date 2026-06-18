@@ -11,10 +11,7 @@ pub fn render_markdown_text(input: &str) -> Text<'static> {
     render_markdown_text_with_width_and_cwd(input, None, None)
 }
 
-pub(crate) fn render_markdown_text_with_width(
-    input: &str,
-    width: Option<usize>,
-) -> Text<'static> {
+pub(crate) fn render_markdown_text_with_width(input: &str, width: Option<usize>) -> Text<'static> {
     render_markdown_text_with_width_and_cwd(input, width, None)
 }
 
@@ -62,7 +59,9 @@ mod tests {
     #[test]
     fn renders_heading() {
         let result = render_markdown_text("# Heading 1");
-        let joined: String = result.lines.iter()
+        let joined: String = result
+            .lines
+            .iter()
             .flat_map(|l| l.spans.iter().map(|s| s.content.as_ref()))
             .collect();
         assert!(joined.contains("Heading 1"), "got: {joined}");
@@ -72,7 +71,9 @@ mod tests {
     fn renders_code_block() {
         let result = render_markdown_text("```rust\nfn main() {}\n```");
         assert!(!result.lines.is_empty());
-        let joined: String = result.lines.iter()
+        let joined: String = result
+            .lines
+            .iter()
             .flat_map(|l| l.spans.iter().map(|s| s.content.as_ref()))
             .collect();
         assert!(joined.contains("fn main()"), "got: {joined}");
@@ -82,7 +83,9 @@ mod tests {
     fn renders_table() {
         let md = "| H1 | H2 |\n|----|----|\n| A  | B  |\n| C  | D  |";
         let result = render_markdown_text(md);
-        let joined: String = result.lines.iter()
+        let joined: String = result
+            .lines
+            .iter()
             .flat_map(|l| l.spans.iter().map(|s| s.content.as_ref()))
             .collect();
         assert!(joined.contains("H1"), "got: {joined}");

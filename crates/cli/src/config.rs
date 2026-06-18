@@ -1,5 +1,4 @@
-﻿//! CLI configuration constants
-
+//! CLI configuration constants
 
 pub const APP_NAME: &str = "Pick";
 pub const APP_TITLE: &str = "Pick";

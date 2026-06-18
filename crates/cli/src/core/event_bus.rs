@@ -1,5 +1,4 @@
-﻿//! Event bus - typed event emitter system
-
+//! Event bus - typed event emitter system
 
 use std::any::Any;
 use std::collections::HashMap;
@@ -44,7 +43,10 @@ impl EventBus {
 
         {
             let mut handlers = self.handlers.lock().unwrap();
-            handlers.entry(channel.to_string()).or_default().push(wrapped.clone());
+            handlers
+                .entry(channel.to_string())
+                .or_default()
+                .push(wrapped.clone());
         }
 
         let channel = channel.to_string();

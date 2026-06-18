@@ -1,11 +1,12 @@
-﻿//! Prompt template loading, parsing, and expansion
-
+//! Prompt template loading, parsing, and expansion
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use crate::config::CONFIG_DIR_NAME;
-use crate::core::source_info::{create_synthetic_source_info, SourceInfo, SyntheticSourceOptions, SourceScope};
+use crate::core::source_info::{
+    SourceInfo, SourceScope, SyntheticSourceOptions, create_synthetic_source_info,
+};
 
 /// A loaded prompt template from a markdown file
 #[derive(Debug, Clone)]
@@ -57,40 +58,42 @@ pub fn substitute_args(content: &str, args: &[String]) -> String {
 
     // Replace $1, $2, etc. with positional args FIRST
     let re = regex::Regex::new(r"\$(\d+)").unwrap();
-    result = re.replace_all(&result, |caps: &regex::Captures| {
-        let num: usize = caps.get(1).unwrap().as_str().parse().unwrap_or(0);
-        if num > 0 {
-            args.get(num - 1).map(|s| s.as_str()).unwrap_or("")
-        } else {
-            ""
-        }
-        .to_string()
-    })
-    .to_string();
+    result = re
+        .replace_all(&result, |caps: &regex::Captures| {
+            let num: usize = caps.get(1).unwrap().as_str().parse().unwrap_or(0);
+            if num > 0 {
+                args.get(num - 1).map(|s| s.as_str()).unwrap_or("")
+            } else {
+                ""
+            }
+            .to_string()
+        })
+        .to_string();
 
     // Replace ${@:N} or ${@:N:L} with sliced args
     let re_slice = regex::Regex::new(r"\$\{@:(\d+)(?::(\d+))?\}").unwrap();
-    result = re_slice.replace_all(&result, |caps: &regex::Captures| {
-        let start_raw: usize = caps.get(1).unwrap().as_str().parse().unwrap_or(1);
-        let start = if start_raw == 0 { 0 } else { start_raw - 1 };
+    result = re_slice
+        .replace_all(&result, |caps: &regex::Captures| {
+            let start_raw: usize = caps.get(1).unwrap().as_str().parse().unwrap_or(1);
+            let start = if start_raw == 0 { 0 } else { start_raw - 1 };
 
-        if let Some(len_match) = caps.get(2) {
-            let length: usize = len_match.as_str().parse().unwrap_or(0);
-            args.iter()
-                .skip(start)
-                .take(length)
-                .map(|s| s.as_str())
-                .collect::<Vec<_>>()
-                .join(" ")
-        } else {
-            args.iter()
-                .skip(start)
-                .map(|s| s.as_str())
-                .collect::<Vec<_>>()
-                .join(" ")
-        }
-    })
-    .to_string();
+            if let Some(len_match) = caps.get(2) {
+                let length: usize = len_match.as_str().parse().unwrap_or(0);
+                args.iter()
+                    .skip(start)
+                    .take(length)
+                    .map(|s| s.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            } else {
+                args.iter()
+                    .skip(start)
+                    .map(|s| s.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            }
+        })
+        .to_string();
 
     // $ARGUMENTS
     let all_args = args.join(" ");
@@ -198,7 +201,9 @@ fn load_templates_from_dir(
         };
 
         let is_file = if metadata.is_symlink() {
-            std::fs::metadata(&path).map(|m| m.is_file()).unwrap_or(false)
+            std::fs::metadata(&path)
+                .map(|m| m.is_file())
+                .unwrap_or(false)
         } else {
             metadata.is_file()
         };
@@ -284,8 +289,14 @@ pub fn load_prompt_templates(options: LoadPromptTemplatesOptions) -> Vec<PromptT
     };
 
     if include_defaults {
-        templates.extend(load_templates_from_dir(&global_prompts_dir, &get_source_info));
-        templates.extend(load_templates_from_dir(&project_prompts_dir, &get_source_info));
+        templates.extend(load_templates_from_dir(
+            &global_prompts_dir,
+            &get_source_info,
+        ));
+        templates.extend(load_templates_from_dir(
+            &project_prompts_dir,
+            &get_source_info,
+        ));
     }
 
     // Load explicit prompt paths
@@ -328,7 +339,9 @@ fn is_under_path(target: &Path, root: &Path) -> bool {
     let target_str = target.to_string_lossy().to_lowercase();
     let root_str = canonical_root.to_string_lossy().to_lowercase();
 
-    target_str == root_str || target_str.starts_with(&format!("{}\\", root_str)) || target_str.starts_with(&format!("{}/", root_str))
+    target_str == root_str
+        || target_str.starts_with(&format!("{}\\", root_str))
+        || target_str.starts_with(&format!("{}/", root_str))
 }
 
 /// Expand a prompt template if the text matches a template name.
@@ -363,12 +376,18 @@ mod tests {
 
     #[test]
     fn test_parse_command_args_quoted() {
-        assert_eq!(parse_command_args("hello \"foo bar\" world"), vec!["hello", "foo bar", "world"]);
+        assert_eq!(
+            parse_command_args("hello \"foo bar\" world"),
+            vec!["hello", "foo bar", "world"]
+        );
     }
 
     #[test]
     fn test_parse_command_args_single_quoted() {
-        assert_eq!(parse_command_args("hello 'foo bar'"), vec!["hello", "foo bar"]);
+        assert_eq!(
+            parse_command_args("hello 'foo bar'"),
+            vec!["hello", "foo bar"]
+        );
     }
 
     #[test]
@@ -398,7 +417,8 @@ mod tests {
 
     #[test]
     fn test_parse_frontmatter_basic() {
-        let content = "---\ndescription: A test template\nargument-hint: <name>\n---\n\nHello, {{name}}!";
+        let content =
+            "---\ndescription: A test template\nargument-hint: <name>\n---\n\nHello, {{name}}!";
         let (fm, _body) = parse_frontmatter(content);
         assert_eq!(fm.get("description").unwrap(), "A test template");
         assert_eq!(fm.get("argument-hint").unwrap(), "<name>");
@@ -411,12 +431,15 @@ mod tests {
             description: "A test".to_string(),
             argument_hint: Some("<input>".to_string()),
             content: "You said: $1".to_string(),
-            source_info: create_synthetic_source_info("/tmp/test.md", SyntheticSourceOptions {
-                source: "local".to_string(),
-                scope: None,
-                origin: None,
-                base_dir: None,
-            }),
+            source_info: create_synthetic_source_info(
+                "/tmp/test.md",
+                SyntheticSourceOptions {
+                    source: "local".to_string(),
+                    scope: None,
+                    origin: None,
+                    base_dir: None,
+                },
+            ),
             file_path: "/tmp/test.md".to_string(),
         };
 

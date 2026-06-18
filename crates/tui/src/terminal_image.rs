@@ -1,4 +1,4 @@
-﻿//! Terminal image rendering for Kitty and iTerm2 protocols
+//! Terminal image rendering for Kitty and iTerm2 protocols
 
 use std::sync::{Mutex, OnceLock};
 
@@ -74,13 +74,14 @@ pub fn detect_capabilities() -> TerminalCapabilities {
         .unwrap_or_default()
         .to_lowercase();
     let term = std::env::var("TERM").unwrap_or_default().to_lowercase();
-    let color_term = std::env::var("COLORTERM").unwrap_or_default().to_lowercase();
+    let color_term = std::env::var("COLORTERM")
+        .unwrap_or_default()
+        .to_lowercase();
     let has_true_color = color_term == "truecolor" || color_term == "24bit";
 
     // tmux/screen
-    let in_tmux = std::env::var("TMUX").is_ok()
-        || term.starts_with("tmux")
-        || term.starts_with("screen");
+    let in_tmux =
+        std::env::var("TMUX").is_ok() || term.starts_with("tmux") || term.starts_with("screen");
     if in_tmux {
         return TerminalCapabilities {
             images: None,
@@ -164,9 +165,7 @@ pub fn detect_capabilities() -> TerminalCapabilities {
 
 /// Get cached terminal capabilities
 pub fn get_capabilities() -> TerminalCapabilities {
-    CACHED_CAPABILITIES
-        .get_or_init(detect_capabilities)
-        .clone()
+    CACHED_CAPABILITIES.get_or_init(detect_capabilities).clone()
 }
 
 pub fn reset_capabilities_cache() {
@@ -310,10 +309,13 @@ pub fn calculate_image_cell_size(
 
     ImageCellSize {
         columns: std::cmp::max(1, std::cmp::min(max_width, columns)),
-        rows: std::cmp::max(1, match max_height_cells {
-            Some(mh) if mh > 0 => std::cmp::min(mh, rows),
-            _ => rows,
-        }),
+        rows: std::cmp::max(
+            1,
+            match max_height_cells {
+                Some(mh) if mh > 0 => std::cmp::min(mh, rows),
+                _ => rows,
+            },
+        ),
     }
 }
 
@@ -380,7 +382,11 @@ pub fn hyperlink(text: &str, url: &str) -> String {
 }
 
 /// Create an image fallback text
-pub fn image_fallback(mime_type: &str, dimensions: Option<ImageDimensions>, filename: Option<&str>) -> String {
+pub fn image_fallback(
+    mime_type: &str,
+    dimensions: Option<ImageDimensions>,
+    filename: Option<&str>,
+) -> String {
     let mut parts = Vec::new();
     if let Some(f) = filename {
         parts.push(f.to_string());

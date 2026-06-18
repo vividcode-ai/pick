@@ -1,4 +1,4 @@
-﻿//! Agent configuration types and discovery
+//! Agent configuration types and discovery
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -83,7 +83,8 @@ pub fn load_agents_from_dir(dir: &Path, source: AgentSource) -> Vec<AgentConfig>
         };
 
         let tools = frontmatter.get("tools").and_then(|t| {
-            let list: Vec<String> = t.split(',')
+            let list: Vec<String> = t
+                .split(',')
                 .map(|s| s.trim().to_string())
                 .filter(|s| !s.is_empty())
                 .collect();

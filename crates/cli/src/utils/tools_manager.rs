@@ -1,4 +1,4 @@
-﻿//! External tools manager (fd, ripgrep auto-download)
+//! External tools manager (fd, ripgrep auto-download)
 
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -86,7 +86,10 @@ pub async fn ensure_tool(tool: &str, silent: bool) -> Option<String> {
 
     if is_offline_mode() {
         if !silent {
-            eprintln!("{} not found. Offline mode enabled, skipping download.", config.name);
+            eprintln!(
+                "{} not found. Offline mode enabled, skipping download.",
+                config.name
+            );
         }
         return None;
     }
@@ -135,8 +138,12 @@ fn get_asset_name(tool: &str, _config: &ToolCfg) -> Option<String> {
         ("fd", "linux", a) => Some(format!("fd-v{{version}}-{a}-unknown-linux-gnu.tar.gz")),
         ("fd", "win32", a) => Some(format!("fd-v{{version}}-{a}-pc-windows-msvc.zip")),
         ("rg", "darwin", a) => Some(format!("ripgrep-{{version}}-{a}-apple-darwin.tar.gz")),
-        ("rg", "linux", "x86_64") => Some(format!("ripgrep-{{version}}-x86_64-unknown-linux-musl.tar.gz")),
-        ("rg", "linux", "arm64") => Some(format!("ripgrep-{{version}}-aarch64-unknown-linux-gnu.tar.gz")),
+        ("rg", "linux", "x86_64") => Some(format!(
+            "ripgrep-{{version}}-x86_64-unknown-linux-musl.tar.gz"
+        )),
+        ("rg", "linux", "arm64") => Some(format!(
+            "ripgrep-{{version}}-aarch64-unknown-linux-gnu.tar.gz"
+        )),
         ("rg", "win32", a) => Some(format!("ripgrep-{{version}}-{a}-pc-windows-msvc.zip")),
         _ => None,
     }
@@ -150,12 +157,19 @@ async fn get_latest_version(repo: &str) -> Result<String, String> {
         .build()
         .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
 
-    let resp = client.get(&url).send().await.map_err(|e| format!("GitHub API error: {}", e))?;
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| format!("GitHub API error: {}", e))?;
     if !resp.status().is_success() {
         return Err(format!("GitHub API error: {}", resp.status()));
     }
 
-    let data: serde_json::Value = resp.json().await.map_err(|e| format!("Failed to parse response: {}", e))?;
+    let data: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| format!("Failed to parse response: {}", e))?;
     let tag = data["tag_name"].as_str().ok_or("Missing tag_name")?;
     Ok(tag.trim_start_matches('v').to_string())
 }
@@ -166,12 +180,19 @@ async fn download_file(url: &str, dest: &Path) -> Result<(), String> {
         .build()
         .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
 
-    let response = client.get(url).send().await.map_err(|e| format!("Download failed: {}", e))?;
+    let response = client
+        .get(url)
+        .send()
+        .await
+        .map_err(|e| format!("Download failed: {}", e))?;
     if !response.status().is_success() {
         return Err(format!("Download failed: {}", response.status()));
     }
 
-    let bytes = response.bytes().await.map_err(|e| format!("Read failed: {}", e))?;
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|e| format!("Read failed: {}", e))?;
     std::fs::write(dest, &bytes).map_err(|e| format!("Write failed: {}", e))?;
     Ok(())
 }
@@ -191,34 +212,79 @@ fn run_extraction(cmd: &str, args: &[&str]) -> Result<(), String> {
 }
 
 fn extract_tar_gz(archive: &Path, extract_dir: &Path) -> Result<(), String> {
-    run_extraction("tar", &["xzf", &archive.to_string_lossy(), "-C", &extract_dir.to_string_lossy()])
+    run_extraction(
+        "tar",
+        &[
+            "xzf",
+            &archive.to_string_lossy(),
+            "-C",
+            &extract_dir.to_string_lossy(),
+        ],
+    )
 }
 
 fn extract_zip(archive: &Path, extract_dir: &Path) -> Result<(), String> {
     #[cfg(windows)]
     {
         // Try tar.exe from System32 (Windows ships bsdtar which handles zip)
-        let system_root = std::env::var("SystemRoot").or_else(|_| std::env::var("WINDIR")).unwrap_or_default();
+        let system_root = std::env::var("SystemRoot")
+            .or_else(|_| std::env::var("WINDIR"))
+            .unwrap_or_default();
         let system_tar = Path::new(&system_root).join("System32").join("tar.exe");
         if system_tar.exists() {
             if run_extraction(
                 &system_tar.to_string_lossy(),
-                &["xf", &archive.to_string_lossy(), "-C", &extract_dir.to_string_lossy()],
-            ).is_ok() {
+                &[
+                    "xf",
+                    &archive.to_string_lossy(),
+                    "-C",
+                    &extract_dir.to_string_lossy(),
+                ],
+            )
+            .is_ok()
+            {
                 return Ok(());
             }
         }
         // Fallback: PowerShell Expand-Archive
         let script = "& { param($a,$d) $ErrorActionPreference='Stop'; Expand-Archive -LiteralPath $a -DestinationPath $d -Force }";
-        run_extraction("powershell.exe", &[
-            "-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
-            "-Command", script, &archive.to_string_lossy(), &extract_dir.to_string_lossy(),
-        ])
+        run_extraction(
+            "powershell.exe",
+            &[
+                "-NoLogo",
+                "-NoProfile",
+                "-NonInteractive",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                script,
+                &archive.to_string_lossy(),
+                &extract_dir.to_string_lossy(),
+            ],
+        )
     }
     #[cfg(not(windows))]
     {
-        run_extraction("unzip", &["-q", &archive.to_string_lossy(), "-d", &extract_dir.to_string_lossy()])
-            .or_else(|_| run_extraction("tar", &["xf", &archive.to_string_lossy(), "-C", &extract_dir.to_string_lossy()]))
+        run_extraction(
+            "unzip",
+            &[
+                "-q",
+                &archive.to_string_lossy(),
+                "-d",
+                &extract_dir.to_string_lossy(),
+            ],
+        )
+        .or_else(|_| {
+            run_extraction(
+                "tar",
+                &[
+                    "xf",
+                    &archive.to_string_lossy(),
+                    "-C",
+                    &extract_dir.to_string_lossy(),
+                ],
+            )
+        })
     }
 }
 
@@ -227,7 +293,8 @@ fn find_binary(root: &Path, binary_name: &str) -> Option<PathBuf> {
         if let Ok(entries) = std::fs::read_dir(root) {
             for entry in entries.flatten() {
                 let path = entry.path();
-                if path.is_file() && path.file_name().and_then(|n| n.to_str()) == Some(binary_name) {
+                if path.is_file() && path.file_name().and_then(|n| n.to_str()) == Some(binary_name)
+                {
                     return Some(path);
                 }
                 if path.is_dir() {
@@ -275,8 +342,14 @@ async fn download_tool(tool: &str, config: &ToolCfg) -> Result<PathBuf, String> 
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_nanos())
         .unwrap_or(0);
-    let extract_dir = bin_dir.join(format!("extract_tmp_{}_{}_{}", config.binary_name, std::process::id(), timestamp));
-    std::fs::create_dir_all(&extract_dir).map_err(|e| format!("Failed to create extract dir: {}", e))?;
+    let extract_dir = bin_dir.join(format!(
+        "extract_tmp_{}_{}_{}",
+        config.binary_name,
+        std::process::id(),
+        timestamp
+    ));
+    std::fs::create_dir_all(&extract_dir)
+        .map_err(|e| format!("Failed to create extract dir: {}", e))?;
 
     let result = (|| -> Result<(), String> {
         if asset_name.ends_with(".tar.gz") {
@@ -294,7 +367,9 @@ async fn download_tool(tool: &str, config: &ToolCfg) -> Result<PathBuf, String> 
             extract_dir.join(&binary_name),
         ];
         let found = candidates.iter().find(|p| p.exists());
-        let found = found.map(|p| p.clone()).or_else(|| find_binary(&extract_dir, &binary_name));
+        let found = found
+            .map(|p| p.clone())
+            .or_else(|| find_binary(&extract_dir, &binary_name));
 
         match found {
             Some(src) => {

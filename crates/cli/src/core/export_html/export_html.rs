@@ -1,5 +1,4 @@
-﻿//! HTML session export
-
+//! HTML session export
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -116,19 +115,23 @@ pub fn derive_export_colors(base_color: &str) -> ExportColors {
         ExportColors {
             page_bg: adjust_brightness(base_color, 0.96),
             card_bg: base_color.to_string(),
-            info_bg: format!("rgb({}, {}, {})",
+            info_bg: format!(
+                "rgb({}, {}, {})",
                 (r as u16).min(255),
                 (g as u16).min(255),
-                (b as u16).saturating_sub(20)),
+                (b as u16).saturating_sub(20)
+            ),
         }
     } else {
         ExportColors {
             page_bg: adjust_brightness(base_color, 0.7),
             card_bg: adjust_brightness(base_color, 0.85),
-            info_bg: format!("rgb({}, {}, {})",
+            info_bg: format!(
+                "rgb({}, {}, {})",
                 (r as u16 + 20).min(255),
                 (g as u16 + 15).min(255),
-                b),
+                b
+            ),
         }
     }
 }
@@ -151,7 +154,10 @@ impl Default for ExportColors {
 }
 
 /// Generate CSS custom property declarations from theme colors
-pub fn generate_theme_vars(theme_colors: &HashMap<String, String>, export_colors: &ExportColors) -> String {
+pub fn generate_theme_vars(
+    theme_colors: &HashMap<String, String>,
+    export_colors: &ExportColors,
+) -> String {
     let mut lines: Vec<String> = Vec::new();
     for (key, value) in theme_colors {
         lines.push(format!("--{}: {};", key, value));
@@ -173,7 +179,11 @@ fn get_template_js() -> &'static str {
 }
 
 /// Generate the full HTML document for session export
-pub fn generate_html(session_data: &SessionData, theme_colors: &HashMap<String, String>, export_colors: &ExportColors) -> String {
+pub fn generate_html(
+    session_data: &SessionData,
+    theme_colors: &HashMap<String, String>,
+    export_colors: &ExportColors,
+) -> String {
     let theme_vars = generate_theme_vars(theme_colors, export_colors);
     let body_bg = &export_colors.page_bg;
     let container_bg = &export_colors.card_bg;
@@ -182,43 +192,90 @@ pub fn generate_html(session_data: &SessionData, theme_colors: &HashMap<String, 
     // Build session data JSON (manual construction to avoid macro issues with closures)
     let mut session_obj = serde_json::Map::new();
     session_obj.insert("header".to_string(), session_data.header.clone());
-    session_obj.insert("entries".to_string(), serde_json::Value::Array(session_data.entries.clone()));
-    session_obj.insert("leafId".to_string(), session_data.leaf_id.clone().map_or(serde_json::Value::Null, serde_json::Value::String));
-    session_obj.insert("systemPrompt".to_string(), session_data.system_prompt.clone().map_or(serde_json::Value::Null, serde_json::Value::String));
+    session_obj.insert(
+        "entries".to_string(),
+        serde_json::Value::Array(session_data.entries.clone()),
+    );
+    session_obj.insert(
+        "leafId".to_string(),
+        session_data
+            .leaf_id
+            .clone()
+            .map_or(serde_json::Value::Null, serde_json::Value::String),
+    );
+    session_obj.insert(
+        "systemPrompt".to_string(),
+        session_data
+            .system_prompt
+            .clone()
+            .map_or(serde_json::Value::Null, serde_json::Value::String),
+    );
 
     // Tools array
-    let tools_val = session_data.tools.as_ref().map(|tools| {
-        serde_json::Value::Array(tools.iter().map(|t| {
-            let mut obj = serde_json::Map::new();
-            obj.insert("name".to_string(), serde_json::Value::String(t.name.clone()));
-            obj.insert("description".to_string(), serde_json::Value::String(t.description.clone()));
-            obj.insert("parameters".to_string(), t.parameters.clone().unwrap_or(serde_json::Value::Null));
-            serde_json::Value::Object(obj)
-        }).collect())
-    }).unwrap_or(serde_json::Value::Null);
+    let tools_val = session_data
+        .tools
+        .as_ref()
+        .map(|tools| {
+            serde_json::Value::Array(
+                tools
+                    .iter()
+                    .map(|t| {
+                        let mut obj = serde_json::Map::new();
+                        obj.insert(
+                            "name".to_string(),
+                            serde_json::Value::String(t.name.clone()),
+                        );
+                        obj.insert(
+                            "description".to_string(),
+                            serde_json::Value::String(t.description.clone()),
+                        );
+                        obj.insert(
+                            "parameters".to_string(),
+                            t.parameters.clone().unwrap_or(serde_json::Value::Null),
+                        );
+                        serde_json::Value::Object(obj)
+                    })
+                    .collect(),
+            )
+        })
+        .unwrap_or(serde_json::Value::Null);
     session_obj.insert("tools".to_string(), tools_val);
 
     // Rendered tools
-    let rendered_val = session_data.rendered_tools.as_ref().map(|rt| {
-        let mut map = serde_json::Map::new();
-        for (id, html) in rt {
-            let mut obj = serde_json::Map::new();
-            if let Some(ref call) = html.call_html {
-                obj.insert("callHtml".to_string(), serde_json::Value::String(call.clone()));
+    let rendered_val = session_data
+        .rendered_tools
+        .as_ref()
+        .map(|rt| {
+            let mut map = serde_json::Map::new();
+            for (id, html) in rt {
+                let mut obj = serde_json::Map::new();
+                if let Some(ref call) = html.call_html {
+                    obj.insert(
+                        "callHtml".to_string(),
+                        serde_json::Value::String(call.clone()),
+                    );
+                }
+                if let Some(ref collapsed) = html.result_html_collapsed {
+                    obj.insert(
+                        "resultHtmlCollapsed".to_string(),
+                        serde_json::Value::String(collapsed.clone()),
+                    );
+                }
+                if let Some(ref expanded) = html.result_html_expanded {
+                    obj.insert(
+                        "resultHtmlExpanded".to_string(),
+                        serde_json::Value::String(expanded.clone()),
+                    );
+                }
+                map.insert(id.clone(), serde_json::Value::Object(obj));
             }
-            if let Some(ref collapsed) = html.result_html_collapsed {
-                obj.insert("resultHtmlCollapsed".to_string(), serde_json::Value::String(collapsed.clone()));
-            }
-            if let Some(ref expanded) = html.result_html_expanded {
-                obj.insert("resultHtmlExpanded".to_string(), serde_json::Value::String(expanded.clone()));
-            }
-            map.insert(id.clone(), serde_json::Value::Object(obj));
-        }
-        serde_json::Value::Object(map)
-    }).unwrap_or(serde_json::Value::Null);
+            serde_json::Value::Object(map)
+        })
+        .unwrap_or(serde_json::Value::Null);
     session_obj.insert("renderedTools".to_string(), rendered_val);
 
-    let session_json = serde_json::to_string(&serde_json::Value::Object(session_obj)).unwrap_or_default();
+    let session_json =
+        serde_json::to_string(&serde_json::Value::Object(session_obj)).unwrap_or_default();
 
     let session_data_base64 = base64_encode(&session_json);
 
@@ -337,8 +394,7 @@ pub fn export_session_to_html(
     let html = generate_html(session_data, theme_colors, export_colors);
 
     if let Some(path) = output_path {
-        std::fs::write(path, &html)
-            .map_err(|e| format!("Failed to write export file: {}", e))?;
+        std::fs::write(path, &html).map_err(|e| format!("Failed to write export file: {}", e))?;
         Ok(path.to_string_lossy().to_string())
     } else {
         // Return HTML as string if no output path given

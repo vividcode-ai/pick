@@ -1,4 +1,4 @@
-﻿//! Earendil announcement component
+//! Earendil announcement component
 
 use crate::core::tools::render_utils::ToolTheme;
 
@@ -9,7 +9,10 @@ pub fn render_earendil_announcement(width: usize) -> Vec<String> {
     let mut lines = Vec::new();
     let border = "─".repeat(std::cmp::max(1, width));
     lines.push(ToolTheme::fg("accent", &border));
-    lines.push(ToolTheme::fg("accent", &format!("\x1b[1m{}\x1b[22m", "pick has joined Earendil")));
+    lines.push(ToolTheme::fg(
+        "accent",
+        &format!("\x1b[1m{}\x1b[22m", "pick has joined Earendil"),
+    ));
     lines.push(String::new());
     lines.push(ToolTheme::fg("muted", "Read the blog post:"));
     lines.push(ToolTheme::fg("accent", BLOG_URL));

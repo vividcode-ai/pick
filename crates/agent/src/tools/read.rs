@@ -1,7 +1,7 @@
-﻿//! Read tool - reads file contents (text) or image data
+//! Read tool - reads file contents (text) or image data
 
-use tokio::io::AsyncReadExt;
 use pick_ai::types::ContentBlock;
+use tokio::io::AsyncReadExt;
 
 use crate::core::state::{AgentTool, AgentToolResult, ToolExecutionMode};
 
@@ -20,22 +20,37 @@ fn detect_image_mime_type(buf: &[u8]) -> Option<&'static str> {
     }
     // PNG: 89 50 4E 47 0D 0A 1A 0A
     if buf.len() >= 8
-        && buf[0] == 0x89 && buf[1] == b'P' && buf[2] == b'N' && buf[3] == b'G'
-        && buf[4] == 0x0D && buf[5] == 0x0A && buf[6] == 0x1A && buf[7] == 0x0A
+        && buf[0] == 0x89
+        && buf[1] == b'P'
+        && buf[2] == b'N'
+        && buf[3] == b'G'
+        && buf[4] == 0x0D
+        && buf[5] == 0x0A
+        && buf[6] == 0x1A
+        && buf[7] == 0x0A
     {
         return Some("image/png");
     }
     // GIF: "GIF87a" or "GIF89a"
     if buf.len() >= 6
-        && buf[0] == b'G' && buf[1] == b'I' && buf[2] == b'F'
-        && (buf[3] == b'8' || buf[3] == b'9') && buf[4] == b'a'
+        && buf[0] == b'G'
+        && buf[1] == b'I'
+        && buf[2] == b'F'
+        && (buf[3] == b'8' || buf[3] == b'9')
+        && buf[4] == b'a'
     {
         return Some("image/gif");
     }
     // WebP: RIFF .... WEBP
     if buf.len() >= 12
-        && buf[0] == b'R' && buf[1] == b'I' && buf[2] == b'F' && buf[3] == b'F'
-        && buf[8] == b'W' && buf[9] == b'E' && buf[10] == b'B' && buf[11] == b'P'
+        && buf[0] == b'R'
+        && buf[1] == b'I'
+        && buf[2] == b'F'
+        && buf[3] == b'F'
+        && buf[8] == b'W'
+        && buf[9] == b'E'
+        && buf[10] == b'B'
+        && buf[11] == b'P'
     {
         return Some("image/webp");
     }
@@ -45,11 +60,14 @@ fn detect_image_mime_type(buf: &[u8]) -> Option<&'static str> {
 /// Read a file, returning text content or image data depending on MIME type
 pub async fn read_file(file_path: &str) -> Result<Vec<ContentBlock>, String> {
     // Try to detect MIME type first by reading the file header
-    let mut file = tokio::fs::File::open(file_path).await
+    let mut file = tokio::fs::File::open(file_path)
+        .await
         .map_err(|e| format!("Error opening file: {}", e))?;
 
     let mut header = vec![0u8; 16];
-    let n = file.read(&mut header).await
+    let n = file
+        .read(&mut header)
+        .await
         .map_err(|e| format!("Error reading file header: {}", e))?;
     header.truncate(n);
 
@@ -61,7 +79,8 @@ pub async fn read_file(file_path: &str) -> Result<Vec<ContentBlock>, String> {
         // Image file: read the rest as binary, base64 encode
         let mut data = header;
         let mut rest = Vec::new();
-        file.read_to_end(&mut rest).await
+        file.read_to_end(&mut rest)
+            .await
             .map_err(|e| format!("Error reading image file: {}", e))?;
         data.extend(rest);
 
@@ -76,7 +95,8 @@ pub async fn read_file(file_path: &str) -> Result<Vec<ContentBlock>, String> {
         // Text file: read as string (drop the partial header read)
         drop(file);
 
-        let text = tokio::fs::read_to_string(file_path).await
+        let text = tokio::fs::read_to_string(file_path)
+            .await
             .map_err(|e| format!("Error reading text file: {}", e))?;
 
         Ok(vec![ContentBlock::text(text)])

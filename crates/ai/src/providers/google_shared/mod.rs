@@ -17,7 +17,10 @@ pub fn is_thinking_part(thought: Option<bool>) -> bool {
 }
 
 /// Retain thought signatures during streaming.
-pub fn retain_thought_signature(existing: Option<String>, incoming: Option<String>) -> Option<String> {
+pub fn retain_thought_signature(
+    existing: Option<String>,
+    incoming: Option<String>,
+) -> Option<String> {
     match incoming {
         Some(ref s) if !s.is_empty() => incoming,
         _ => existing,
@@ -32,7 +35,8 @@ fn is_valid_thought_signature(signature: Option<&str>) -> bool {
     if sig.len() % 4 != 0 {
         return false;
     }
-    sig.chars().all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '=')
+    sig.chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '/' || c == '=')
 }
 
 fn resolve_thought_signature(
@@ -167,8 +171,7 @@ fn convert_assistant_message_to_google(
     a: &AssistantMessage,
     model: &Model,
 ) -> Option<GoogleContent> {
-    let is_same_provider_and_model =
-        a.provider == model.provider.as_str() && a.model == model.id;
+    let is_same_provider_and_model = a.provider == model.provider.as_str() && a.model == model.id;
 
     let mut parts: Vec<GooglePart> = Vec::new();
     for block in &a.content {
@@ -177,8 +180,10 @@ fn convert_assistant_message_to_google(
                 if t.text.trim().is_empty() {
                     continue;
                 }
-                let thought_sig =
-                    resolve_thought_signature(is_same_provider_and_model, t.text_signature.as_deref());
+                let thought_sig = resolve_thought_signature(
+                    is_same_provider_and_model,
+                    t.text_signature.as_deref(),
+                );
                 let sanitized = crate::utils::sanitize_unicode::sanitize_unicode(&t.text);
                 parts.push(GooglePart {
                     text: Some(sanitized),
@@ -192,10 +197,8 @@ fn convert_assistant_message_to_google(
                 }
                 let sanitized = crate::utils::sanitize_unicode::sanitize_unicode(&th.thinking);
                 if is_same_provider_and_model {
-                    let thought_sig = resolve_thought_signature(
-                        true,
-                        th.thinking_signature.as_deref(),
-                    );
+                    let thought_sig =
+                        resolve_thought_signature(true, th.thinking_signature.as_deref());
                     parts.push(GooglePart {
                         thought: Some(true),
                         text: Some(sanitized),
@@ -259,8 +262,14 @@ fn convert_tool_result_to_google(
         .collect();
     let text_result = text_content.join("\n");
 
-    let has_images = model.input_capabilities.iter().any(|cap| cap == &Capability::Image)
-        && tr.content.iter().any(|c| matches!(c, ContentBlock::Image(_)));
+    let has_images = model
+        .input_capabilities
+        .iter()
+        .any(|cap| cap == &Capability::Image)
+        && tr
+            .content
+            .iter()
+            .any(|c| matches!(c, ContentBlock::Image(_)));
 
     let model_supports_multimodal = supports_multimodal_function_response(&model.id);
 
@@ -307,7 +316,11 @@ fn convert_tool_result_to_google(
             } else {
                 None
             },
-            id: if include_id { Some(tr.tool_call_id.clone()) } else { None },
+            id: if include_id {
+                Some(tr.tool_call_id.clone())
+            } else {
+                None
+            },
         }),
         ..Default::default()
     };
@@ -329,12 +342,10 @@ fn convert_tool_result_to_google(
     }
 
     if has_images && !model_supports_multimodal {
-        let mut extra_parts = vec![
-            GooglePart {
-                text: Some("Tool result image:".to_string()),
-                ..Default::default()
-            },
-        ];
+        let mut extra_parts = vec![GooglePart {
+            text: Some("Tool result image:".to_string()),
+            ..Default::default()
+        }];
         extra_parts.extend(image_parts);
         contents.push(GoogleContent {
             role: "user".to_string(),
@@ -351,7 +362,13 @@ pub fn convert_messages(model: &Model, context: &Context) -> Vec<GoogleContent> 
     let needs_id_normalization = requires_tool_call_id(model_id);
     let normalize_id_closure = |id: &str, _model: &Model, _msg: &AssistantMessage| -> String {
         id.chars()
-            .map(|c| if c.is_alphanumeric() || c == '_' || c == '-' { c } else { '_' })
+            .map(|c| {
+                if c.is_alphanumeric() || c == '_' || c == '-' {
+                    c
+                } else {
+                    '_'
+                }
+            })
             .take(64)
             .collect()
     };
@@ -386,8 +403,14 @@ pub fn convert_messages(model: &Model, context: &Context) -> Vec<GoogleContent> 
 }
 
 const JSON_SCHEMA_META_DECLARATIONS: &[&str] = &[
-    "$schema", "$id", "$anchor", "$dynamicAnchor",
-    "$vocabulary", "$comment", "$defs", "definitions",
+    "$schema",
+    "$id",
+    "$anchor",
+    "$dynamicAnchor",
+    "$vocabulary",
+    "$comment",
+    "$defs",
+    "definitions",
 ];
 
 fn sanitize_for_openapi(schema: &Value) -> Value {
@@ -425,7 +448,11 @@ pub fn convert_tools(tools: &[ToolDefinition], use_parameters: bool) -> Option<V
                     name: t.name.clone(),
                     description: t.description.clone(),
                     parameters: params,
-                    parameters_json_schema: if use_parameters { None } else { Some(params_value) },
+                    parameters_json_schema: if use_parameters {
+                        None
+                    } else {
+                        Some(params_value)
+                    },
                 }
             })
             .collect(),
@@ -610,7 +637,11 @@ mod tests {
         let result = convert_tools(&tools, true);
         let tools = result.unwrap();
         assert!(tools[0].function_declarations[0].parameters.is_some());
-        assert!(tools[0].function_declarations[0].parameters_json_schema.is_none());
+        assert!(
+            tools[0].function_declarations[0]
+                .parameters_json_schema
+                .is_none()
+        );
     }
 
     #[test]

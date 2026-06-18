@@ -1,5 +1,4 @@
-﻿//! SDK - main entry point for creating agent sessions
-
+//! SDK - main entry point for creating agent sessions
 
 use std::path::PathBuf;
 
@@ -73,20 +72,23 @@ pub async fn create_agent_session(
             .unwrap_or_default()
     });
 
-    let agent_dir = options.agent_dir.unwrap_or_else(|| {
-        crate::config::get_agent_dir().to_string_lossy().to_string()
-    });
+    let agent_dir = options
+        .agent_dir
+        .unwrap_or_else(|| crate::config::get_agent_dir().to_string_lossy().to_string());
 
     let model_registry = options.model_registry.unwrap_or_else(|| {
-        let auth_storage = crate::core::auth_storage::AuthStorage::create(
-            Some(PathBuf::from(&agent_dir).join("auth.json"))
-        );
-        ModelRegistry::create(auth_storage, Some(PathBuf::from(&agent_dir).join("models.json")))
+        let auth_storage = crate::core::auth_storage::AuthStorage::create(Some(
+            PathBuf::from(&agent_dir).join("auth.json"),
+        ));
+        ModelRegistry::create(
+            auth_storage,
+            Some(PathBuf::from(&agent_dir).join("models.json")),
+        )
     });
 
-    let settings_manager = options.settings_manager.unwrap_or_else(|| {
-        SettingsManager::load(std::path::Path::new(&cwd))
-    });
+    let settings_manager = options
+        .settings_manager
+        .unwrap_or_else(|| SettingsManager::load(std::path::Path::new(&cwd)));
 
     let session_manager = match options.session_manager {
         Some(sm) => sm,
@@ -103,11 +105,12 @@ pub async fn create_agent_session(
     let model_fallback_message: Option<String> = None;
 
     // Determine model from session or settings
-    let model = model_registry
-        .find(
-            settings_manager.default_provider().unwrap_or("anthropic"),
-            settings_manager.default_model().unwrap_or("claude-sonnet-4-6"),
-        );
+    let model = model_registry.find(
+        settings_manager.default_provider().unwrap_or("anthropic"),
+        settings_manager
+            .default_model()
+            .unwrap_or("claude-sonnet-4-6"),
+    );
 
     let _model = model.or_else(|| model_registry.get_available().first().cloned());
 
@@ -116,7 +119,10 @@ pub async fn create_agent_session(
         .unwrap_or(DEFAULT_THINKING_LEVEL)
         .to_string();
 
-    let session_id = session_manager.header().map(|h| h.id.clone()).unwrap_or_default();
+    let session_id = session_manager
+        .header()
+        .map(|h| h.id.clone())
+        .unwrap_or_default();
 
     Ok(CreateAgentSessionResult {
         session_id,

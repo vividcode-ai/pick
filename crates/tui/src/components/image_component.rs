@@ -1,8 +1,8 @@
-﻿//! Image component for rendering images in terminal
+//! Image component for rendering images in terminal
 
 use crate::terminal_image::{
-    allocate_image_id, get_capabilities, get_cell_dimensions,
-    image_fallback, render_image, ImageDimensions, ImageRenderOptions,
+    ImageDimensions, ImageRenderOptions, allocate_image_id, get_capabilities, get_cell_dimensions,
+    image_fallback, render_image,
 };
 
 /// Options for image display
@@ -81,7 +81,10 @@ impl Image {
 
         let max_width = std::cmp::max(
             1,
-            std::cmp::min(width.saturating_sub(2) as u32, self.options.max_width_cells.unwrap_or(60)),
+            std::cmp::min(
+                width.saturating_sub(2) as u32,
+                self.options.max_width_cells.unwrap_or(60),
+            ),
         );
         let cell_dims = get_cell_dimensions();
         let default_max_height = std::cmp::max(
@@ -174,9 +177,7 @@ pub fn get_image_dimensions(base64_data: &str, mime_type: &str) -> Option<ImageD
 
 fn base64_decode(data: &str) -> Option<Vec<u8>> {
     use base64::Engine;
-    base64::engine::general_purpose::STANDARD
-        .decode(data)
-        .ok()
+    base64::engine::general_purpose::STANDARD.decode(data).ok()
 }
 
 fn get_png_dims(data: &[u8]) -> Option<ImageDimensions> {
@@ -282,8 +283,12 @@ fn get_webp_dims(data: &[u8]) -> Option<ImageDimensions> {
             if data.len() < 30 {
                 return None;
             }
-            let w = (u32::from(data[24]) | (u32::from(data[25]) << 8) | (u32::from(data[26]) << 16)) + 1;
-            let h = (u32::from(data[27]) | (u32::from(data[28]) << 8) | (u32::from(data[29]) << 16)) + 1;
+            let w =
+                (u32::from(data[24]) | (u32::from(data[25]) << 8) | (u32::from(data[26]) << 16))
+                    + 1;
+            let h =
+                (u32::from(data[27]) | (u32::from(data[28]) << 8) | (u32::from(data[29]) << 16))
+                    + 1;
             Some(ImageDimensions {
                 width_px: w,
                 height_px: h,

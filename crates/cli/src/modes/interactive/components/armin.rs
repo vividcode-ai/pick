@@ -1,5 +1,4 @@
-﻿//! Armin says hi! ASCII art easter egg
-
+//! Armin says hi! ASCII art easter egg
 
 use crate::core::tools::render_utils::ToolTheme;
 
@@ -23,20 +22,29 @@ const BYTES_PER_ROW: usize = 4;
 const DISPLAY_HEIGHT: usize = HEIGHT / 2;
 
 fn get_pixel(x: usize, y: usize) -> bool {
-    if y >= HEIGHT { return false; }
+    if y >= HEIGHT {
+        return false;
+    }
     let byte_index = y * BYTES_PER_ROW + x / 8;
     let bit_index = x % 8;
-    if byte_index >= BITS.len() { return false; }
+    if byte_index >= BITS.len() {
+        return false;
+    }
     ((BITS[byte_index] >> bit_index) & 1) == 0
 }
 
 fn get_char(x: usize, row: usize) -> char {
     let upper = get_pixel(x, row * 2);
     let lower = get_pixel(x, row * 2 + 1);
-    if upper && lower { '█' }
-    else if upper { '▀' }
-    else if lower { '▄' }
-    else { ' ' }
+    if upper && lower {
+        '█'
+    } else if upper {
+        '▀'
+    } else if lower {
+        '▄'
+    } else {
+        ' '
+    }
 }
 
 /// Render the Armin ASCII art

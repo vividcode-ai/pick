@@ -1,4 +1,4 @@
-﻿use std::fmt;
+use std::fmt;
 use std::str::FromStr;
 
 use pick_agent::permission::{Action, Rule, Ruleset};
@@ -56,23 +56,40 @@ impl AgentMode {
         rules.push(Rule::new("edit", ".pick/plans/*.md", Action::Allow));
 
         let read_only_commands: &[&str] = &[
-            "ls", "cat", "head", "tail", "rg", "grep", "find", "which",
-            "stat", "wc", "diff", "sort", "uniq", "echo", "pwd", "type",
-            "where", "dir", "more", "less", "printf", "env", "printenv",
+            "ls", "cat", "head", "tail", "rg", "grep", "find", "which", "stat", "wc", "diff",
+            "sort", "uniq", "echo", "pwd", "type", "where", "dir", "more", "less", "printf", "env",
+            "printenv",
         ];
         for cmd in read_only_commands {
             rules.push(Rule::new("bash", *cmd, Action::Allow));
         }
 
         let read_only_compound: &[(&str, &[&str])] = &[
-            ("git", &["diff", "log", "show", "status", "branch", "ls-files",
-                      "rev-parse", "rev-list", "describe", "config"]),
+            (
+                "git",
+                &[
+                    "diff",
+                    "log",
+                    "show",
+                    "status",
+                    "branch",
+                    "ls-files",
+                    "rev-parse",
+                    "rev-list",
+                    "describe",
+                    "config",
+                ],
+            ),
             ("npm", &["list", "view", "pack", "config"]),
             ("cargo", &["check", "metadata", "tree", "doc", "search"]),
         ];
         for (base, subcmds) in read_only_compound {
             for sub in *subcmds {
-                rules.push(Rule::new("bash", &format!("{} {}", base, sub), Action::Allow));
+                rules.push(Rule::new(
+                    "bash",
+                    &format!("{} {}", base, sub),
+                    Action::Allow,
+                ));
             }
         }
 
@@ -124,7 +141,10 @@ impl FromStr for AgentMode {
         match s.to_lowercase().as_str() {
             "build" => Ok(AgentMode::Build),
             "plan" => Ok(AgentMode::Plan),
-            _ => Err(format!("Invalid agent mode: '{}'. Expected 'build' or 'plan'", s)),
+            _ => Err(format!(
+                "Invalid agent mode: '{}'. Expected 'build' or 'plan'",
+                s
+            )),
         }
     }
 }

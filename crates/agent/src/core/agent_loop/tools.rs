@@ -10,8 +10,14 @@ pub fn fmt_tool_params(tool: &AgentTool) -> String {
         let required = tool.parameters.required.as_deref().unwrap_or(&[]);
         for (key, schema) in props {
             let t = schema.get("type").and_then(|v| v.as_str()).unwrap_or("any");
-            let req = if required.contains(key) { "required" } else { "optional" };
-            if !s.is_empty() { s.push_str(", "); }
+            let req = if required.contains(key) {
+                "required"
+            } else {
+                "optional"
+            };
+            if !s.is_empty() {
+                s.push_str(", ");
+            }
             s.push_str(&format!("{} ({}, {})", key, t, req));
         }
     }
@@ -62,13 +68,11 @@ pub fn validate_tool_arguments(
                             ("integer", serde_json::Value::String(s)) => {
                                 s.parse::<i64>().ok().map(serde_json::Value::from)
                             }
-                            ("boolean", serde_json::Value::String(s)) => {
-                                match s.as_str() {
-                                    "true" => Some(serde_json::Value::Bool(true)),
-                                    "false" => Some(serde_json::Value::Bool(false)),
-                                    _ => None,
-                                }
-                            }
+                            ("boolean", serde_json::Value::String(s)) => match s.as_str() {
+                                "true" => Some(serde_json::Value::Bool(true)),
+                                "false" => Some(serde_json::Value::Bool(false)),
+                                _ => None,
+                            },
                             _ => None,
                         };
                         if let Some(cv) = coerced_val {

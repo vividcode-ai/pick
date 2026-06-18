@@ -32,7 +32,9 @@ impl UpdatePromptState {
         let dim = Style::default().add_modifier(Modifier::DIM);
         let bold = Style::default().add_modifier(Modifier::BOLD);
         let accent = Style::default().fg(Color::Cyan);
-        let selected_bg = Style::default().bg(Color::Rgb(50, 80, 120)).fg(Color::White);
+        let selected_bg = Style::default()
+            .bg(Color::Rgb(50, 80, 120))
+            .fg(Color::White);
 
         let sep = "\u{2500}".repeat(width);
 
@@ -45,11 +47,7 @@ impl UpdatePromptState {
         lines.push(Line::from(""));
 
         // Version info
-        let info = format!(
-            "  Pick v{}  →  v{}",
-            self.current_version,
-            self.new_version,
-        );
+        let info = format!("  Pick v{}  →  v{}", self.current_version, self.new_version,);
         lines.push(Line::from(Span::styled(info, Style::default())));
         lines.push(Line::from(""));
 
@@ -57,7 +55,10 @@ impl UpdatePromptState {
         let options = [
             ("  1. Update now", "Download and install the latest version"),
             ("  2. Skip", "Remind me later"),
-            ("  3. Don't remind for this version", "Silence notifications for v{}"),
+            (
+                "  3. Don't remind for this version",
+                "Silence notifications for v{}",
+            ),
         ];
 
         for (i, (label, desc)) in options.iter().enumerate() {

@@ -1,9 +1,10 @@
-﻿use tokio::process::Command;
+use tokio::process::Command;
 
-use super::truncate::*;
 use super::path_utils::resolve_to_cwd;
-use super::render_utils::{ToolRenderContext, ToolRenderOptions, ToolRenderOutput, ToolTheme,
-    shorten_path};
+use super::render_utils::{
+    ToolRenderContext, ToolRenderOptions, ToolRenderOutput, ToolTheme, shorten_path,
+};
+use super::truncate::*;
 
 /// Create a grep tool definition
 pub fn create_grep_tool_definition() -> GrepToolDefinition {
@@ -37,10 +38,7 @@ impl GrepToolDefinition {
         let context_value = context.unwrap_or(0);
 
         // Check if ripgrep is available
-        let rg_check = Command::new("rg")
-            .arg("--version")
-            .output()
-            .await;
+        let rg_check = Command::new("rg").arg("--version").output().await;
         if rg_check.is_err() {
             return Err("ripgrep (rg) is not available. Please install ripgrep first.".to_string());
         }
@@ -117,15 +115,18 @@ impl GrepToolDefinition {
                             .unwrap_or("")
                             .trim_end_matches('\n');
 
-                        let (truncated_text, was_truncated) = truncate_line(line_text, GREP_MAX_LINE_LENGTH);
+                        let (truncated_text, was_truncated) =
+                            truncate_line(line_text, GREP_MAX_LINE_LENGTH);
                         if was_truncated {
                             lines_truncated = true;
                         }
 
                         if context_value > 0 {
-                            match_lines.push(format!("{}:{}: {}", rel_path, line_number, truncated_text));
+                            match_lines
+                                .push(format!("{}:{}: {}", rel_path, line_number, truncated_text));
                         } else {
-                            match_lines.push(format!("{}:{}: {}", rel_path, line_number, truncated_text));
+                            match_lines
+                                .push(format!("{}:{}: {}", rel_path, line_number, truncated_text));
                         }
                         match_count += 1;
                     }
@@ -147,8 +148,16 @@ impl GrepToolDefinition {
         let match_limit_reached = match_count >= effective_limit;
 
         let details = GrepToolDetails {
-            truncation: if truncation_truncated { Some(truncation) } else { None },
-            match_limit_reached: if match_limit_reached { Some(effective_limit) } else { None },
+            truncation: if truncation_truncated {
+                Some(truncation)
+            } else {
+                None
+            },
+            match_limit_reached: if match_limit_reached {
+                Some(effective_limit)
+            } else {
+                None
+            },
             lines_truncated: if lines_truncated { Some(true) } else { None },
         };
 
@@ -207,7 +216,8 @@ pub fn render_grep_call(args: &serde_json::Value, _ctx: &ToolRenderContext) -> T
         _ => ".".to_string(),
     };
 
-    let mut label = format!("{} /{}/ in {}",
+    let mut label = format!(
+        "{} /{}/ in {}",
         ToolTheme::fg("toolTitle", &ToolTheme::bold("grep")),
         ToolTheme::fg("accent", pattern.unwrap_or("")),
         ToolTheme::fg("toolOutput", &path_display),
@@ -220,7 +230,10 @@ pub fn render_grep_call(args: &serde_json::Value, _ctx: &ToolRenderContext) -> T
         label.push_str(&ToolTheme::fg("toolOutput", &format!(" limit {}", l)));
     }
 
-    ToolRenderOutput { label, formatted: String::new() }
+    ToolRenderOutput {
+        label,
+        formatted: String::new(),
+    }
 }
 
 /// Render a grep tool result — match lines with warnings
@@ -240,16 +253,18 @@ pub fn render_grep_result(
 
         formatted.push('\n');
         formatted.push_str(
-            &display_lines.iter()
+            &display_lines
+                .iter()
                 .map(|line| ToolTheme::fg("toolOutput", line))
                 .collect::<Vec<_>>()
                 .join("\n"),
         );
 
         if remaining > 0 {
-            formatted.push_str(
-                &ToolTheme::fg("muted", &format!("\n... ({} more lines, use expand to expand)", remaining)),
-            );
+            formatted.push_str(&ToolTheme::fg(
+                "muted",
+                &format!("\n... ({} more lines, use expand to expand)", remaining),
+            ));
         }
     }
 
@@ -267,10 +282,15 @@ pub fn render_grep_result(
             warnings.push("some lines truncated".to_string());
         }
         if !warnings.is_empty() {
-            formatted.push_str(&format!("\n{}",
-                ToolTheme::fg("warning", &format!("[Truncated: {}]", warnings.join(", ")))));
+            formatted.push_str(&format!(
+                "\n{}",
+                ToolTheme::fg("warning", &format!("[Truncated: {}]", warnings.join(", ")))
+            ));
         }
     }
 
-    ToolRenderOutput { label: String::new(), formatted }
+    ToolRenderOutput {
+        label: String::new(),
+        formatted,
+    }
 }

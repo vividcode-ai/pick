@@ -23,10 +23,7 @@ impl ExtensionFactoryRegistry {
     }
 
     pub fn get_all(&self) -> Vec<Arc<dyn ExtensionFactory>> {
-        self.factories
-            .lock()
-            .map(|f| f.clone())
-            .unwrap_or_default()
+        self.factories.lock().map(|f| f.clone()).unwrap_or_default()
     }
 }
 

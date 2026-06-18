@@ -1,4 +1,4 @@
-﻿use serde::Deserialize;
+use serde::Deserialize;
 
 /// Line ending detection
 pub fn detect_line_ending(content: &str) -> &str {
@@ -171,7 +171,10 @@ pub fn apply_edits_to_normalized_content(
             return if normalized_edits.len() == 1 {
                 Err(format!("oldText must not be empty in {}.", path))
             } else {
-                Err(format!("edits[{}].oldText must not be empty in {}.", i, path))
+                Err(format!(
+                    "edits[{}].oldText must not be empty in {}.",
+                    i, path
+                ))
             };
         }
     }
@@ -257,7 +260,10 @@ pub fn apply_edits_to_normalized_content(
                 path
             ))
         } else {
-            Err(format!("No changes made to {}. The replacements produced identical content.", path))
+            Err(format!(
+                "No changes made to {}. The replacements produced identical content.",
+                path
+            ))
         };
     }
 
@@ -268,7 +274,11 @@ pub fn apply_edits_to_normalized_content(
 }
 
 /// Generate a diff string with line numbers
-pub fn generate_diff_string(old_content: &str, new_content: &str, context_lines: usize) -> DiffResult {
+pub fn generate_diff_string(
+    old_content: &str,
+    new_content: &str,
+    context_lines: usize,
+) -> DiffResult {
     let old_lines: Vec<&str> = if old_content.is_empty() {
         Vec::new()
     } else {
@@ -306,7 +316,9 @@ pub fn generate_diff_string(old_content: &str, new_content: &str, context_lines:
         match tag {
             similar::ChangeTag::Equal => {
                 let raw = value.trim_end_matches('\n');
-                if raw.is_empty() && (i == ops.len() - 1 || ops[i + 1].0 == similar::ChangeTag::Equal) {
+                if raw.is_empty()
+                    && (i == ops.len() - 1 || ops[i + 1].0 == similar::ChangeTag::Equal)
+                {
                     // Skip trailing empty context
                     break;
                 }
@@ -316,13 +328,17 @@ pub fn generate_diff_string(old_content: &str, new_content: &str, context_lines:
                 } else {
                     raw.split('\n').collect()
                 };
-                if value.ends_with('\n') && !eq_lines.is_empty() && eq_lines.last().copied() == Some("") {
+                if value.ends_with('\n')
+                    && !eq_lines.is_empty()
+                    && eq_lines.last().copied() == Some("")
+                {
                     eq_lines.pop();
                 }
 
                 // Check if next ops are changes
                 let next_is_change = i + 1 < ops.len()
-                    && (ops[i + 1].0 == similar::ChangeTag::Insert || ops[i + 1].0 == similar::ChangeTag::Delete);
+                    && (ops[i + 1].0 == similar::ChangeTag::Insert
+                        || ops[i + 1].0 == similar::ChangeTag::Delete);
 
                 let prev_is_change = last_was_change;
 
@@ -448,13 +464,18 @@ pub async fn compute_edits_diff(
     }
 
     // Read the file
-    let content = tokio::fs::read_to_string(&absolute_path).await
+    let content = tokio::fs::read_to_string(&absolute_path)
+        .await
         .map_err(|e| format!("Could not edit file: {}. {}", path, e))?;
 
     let (_bom, text) = strip_bom(&content);
     let normalized_content = normalize_to_lf(&text);
-    let result = apply_edits_to_normalized_content(&normalized_content, edits, path)
-        .map_err(|e| e)?;
+    let result =
+        apply_edits_to_normalized_content(&normalized_content, edits, path).map_err(|e| e)?;
 
-    Ok(generate_diff_string(&result.base_content, &result.new_content, 4))
+    Ok(generate_diff_string(
+        &result.base_content,
+        &result.new_content,
+        4,
+    ))
 }

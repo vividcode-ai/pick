@@ -1,6 +1,5 @@
 //! Keybinding system with user binding loading and migration
 
-
 pub mod defaults;
 
 pub use defaults::default_keybindings;
@@ -171,7 +170,10 @@ pub fn migrate_keybindings_config(raw_config: HashMap<String, serde_json::Value>
 
     let ordered = order_keybindings_config(config, &default_keys);
 
-    MigrateResult { config: ordered, migrated }
+    MigrateResult {
+        config: ordered,
+        migrated,
+    }
 }
 
 pub struct MigrateResult {
@@ -191,7 +193,10 @@ fn order_keybindings_config(
         }
     }
 
-    let mut extras: Vec<&String> = config.keys().filter(|k| !default_keys.contains_key(*k)).collect();
+    let mut extras: Vec<&String> = config
+        .keys()
+        .filter(|k| !default_keys.contains_key(*k))
+        .collect();
     extras.sort();
     for key in extras {
         ordered.insert(key.clone(), config[key].clone());
@@ -237,8 +242,7 @@ pub fn load_raw_config(path: &std::path::Path) -> Option<HashMap<String, serde_j
     let parsed: serde_json::Value = serde_json::from_str(&content).ok()?;
     match parsed {
         serde_json::Value::Object(map) => {
-            let result: HashMap<String, serde_json::Value> =
-                map.into_iter().collect();
+            let result: HashMap<String, serde_json::Value> = map.into_iter().collect();
             Some(result)
         }
         _ => None,
@@ -289,7 +293,9 @@ impl KeybindingsManager {
         match raw_config {
             Some(raw) => {
                 let migrated = migrate_keybindings_config(raw);
-                to_keybindings_config(serde_json::to_value(migrated.config).unwrap_or(serde_json::Value::Null))
+                to_keybindings_config(
+                    serde_json::to_value(migrated.config).unwrap_or(serde_json::Value::Null),
+                )
             }
             None => KeybindingsConfig::new(),
         }

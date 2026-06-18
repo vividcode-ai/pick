@@ -1,11 +1,11 @@
-﻿//! Types for TUI mode
+//! Types for TUI mode
 
 use std::path::Path;
 
-use async_trait::async_trait;
 use crate::core::agent_mode::AgentMode;
 use crate::core::resource_loader::ResourceLoader;
 use crate::core::system_prompt::build_system_prompt_with_defaults_and_mode;
+use async_trait::async_trait;
 use pick_agent::core::state::{AgentTool, QuestionPrompt};
 use pick_ai::types::ContentBlock;
 
@@ -66,7 +66,12 @@ impl pick_agent::permission::hooks::PermissionRequestHook for TuiApprovalHook {
         });
         match rx.await {
             Ok(Ok(answers)) => {
-                if answers.first().and_then(|a| a.first()).map(|s| s == "Allow").unwrap_or(false) {
+                if answers
+                    .first()
+                    .and_then(|a| a.first())
+                    .map(|s| s == "Allow")
+                    .unwrap_or(false)
+                {
                     pick_agent::permission::hooks::HookAction::Allow
                 } else {
                     pick_agent::permission::hooks::HookAction::Deny {
@@ -191,4 +196,3 @@ pub(crate) fn combine_content_blocks(content: &[ContentBlock]) -> String {
     }
     combined
 }
-

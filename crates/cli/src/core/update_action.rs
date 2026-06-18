@@ -1,6 +1,5 @@
 //! Update action definitions for Pick.
 
-
 use super::install_context::{InstallContext, InstallMethod, StandalonePlatform};
 
 const PICK_NPM_PACKAGE: &str = "@vividcodeai/pick";
@@ -19,12 +18,12 @@ impl UpdateAction {
     pub fn from_install_context(ctx: &InstallContext) -> Self {
         match ctx.method {
             InstallMethod::Npm => Self::NpmGlobalLatest,
-            InstallMethod::GitHub { platform: StandalonePlatform::Unix } => {
-                Self::GitHubStandaloneUnix
-            }
-            InstallMethod::GitHub { platform: StandalonePlatform::Windows } => {
-                Self::GitHubStandaloneWindows
-            }
+            InstallMethod::GitHub {
+                platform: StandalonePlatform::Unix,
+            } => Self::GitHubStandaloneUnix,
+            InstallMethod::GitHub {
+                platform: StandalonePlatform::Windows,
+            } => Self::GitHubStandaloneWindows,
             InstallMethod::Cargo => Self::CargoInstall,
             InstallMethod::Other => Self::Manual,
         }
@@ -33,18 +32,23 @@ impl UpdateAction {
     pub fn command_args(&self) -> (&'static str, Vec<&'static str>) {
         match self {
             Self::NpmGlobalLatest => ("npm", vec!["install", "-g", PICK_NPM_PACKAGE]),
-            Self::GitHubStandaloneUnix => {
-                ("sh", vec!["-c", "curl -fsSL https://vividcodeai.github.io/pick/install.sh | sh"])
-            }
-            Self::GitHubStandaloneWindows => {
-                ("powershell", vec![
-                    "-ExecutionPolicy", "Bypass",
-                    "-c", "irm https://vividcodeai.github.io/pick/install.ps1 | iex",
-                ])
-            }
-            Self::CargoInstall => {
-                ("cargo", vec!["install", "pick", "--git", PICK_REPO])
-            }
+            Self::GitHubStandaloneUnix => (
+                "sh",
+                vec![
+                    "-c",
+                    "curl -fsSL https://vividcodeai.github.io/pick/install.sh | sh",
+                ],
+            ),
+            Self::GitHubStandaloneWindows => (
+                "powershell",
+                vec![
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-c",
+                    "irm https://vividcodeai.github.io/pick/install.ps1 | iex",
+                ],
+            ),
+            Self::CargoInstall => ("cargo", vec!["install", "pick", "--git", PICK_REPO]),
             Self::Manual => ("", vec![]),
         }
     }
@@ -60,7 +64,8 @@ impl UpdateAction {
             }
             Self::CargoInstall => format!("cargo install pick --git {PICK_REPO}"),
             Self::Manual => {
-                "Manually download from https://github.com/vividcodeai/pick/releases/latest".to_string()
+                "Manually download from https://github.com/vividcodeai/pick/releases/latest"
+                    .to_string()
             }
         }
     }

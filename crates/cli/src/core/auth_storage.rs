@@ -1,5 +1,4 @@
-﻿//! Credential storage for API keys and OAuth tokens
-
+//! Credential storage for API keys and OAuth tokens
 
 use std::collections::HashMap;
 use std::fs;
@@ -241,10 +240,7 @@ impl AuthStorage {
     }
 
     pub fn remove_runtime_api_key(&self, provider: &str) {
-        self.runtime_overrides
-            .lock()
-            .unwrap()
-            .remove(provider);
+        self.runtime_overrides.lock().unwrap().remove(provider);
     }
 
     pub fn set_fallback_resolver<F>(&self, resolver: F)
@@ -255,10 +251,7 @@ impl AuthStorage {
     }
 
     fn record_error(&self, error: impl std::fmt::Display) {
-        self.errors
-            .lock()
-            .unwrap()
-            .push(error.to_string());
+        self.errors.lock().unwrap().push(error.to_string());
     }
 
     fn parse_storage_data(&self, content: Option<&str>) -> AuthStorageData {
@@ -314,7 +307,12 @@ impl AuthStorage {
     /// Convenience method: set a simple API key credential.
     /// Equivalent to `set(provider, AuthCredential::ApiKey { key: key.into() })`.
     pub fn set_api_key(&self, provider: &str, key: &str) {
-        self.set(provider, AuthCredential::ApiKey { key: key.to_string() });
+        self.set(
+            provider,
+            AuthCredential::ApiKey {
+                key: key.to_string(),
+            },
+        );
     }
 
     pub fn remove(&self, provider: &str) {
@@ -336,7 +334,12 @@ impl AuthStorage {
     }
 
     pub fn has_auth(&self, provider: &str) -> bool {
-        if self.runtime_overrides.lock().unwrap().contains_key(provider) {
+        if self
+            .runtime_overrides
+            .lock()
+            .unwrap()
+            .contains_key(provider)
+        {
             return true;
         }
         if self.data.lock().unwrap().contains_key(provider) {
@@ -361,7 +364,12 @@ impl AuthStorage {
                 label: None,
             };
         }
-        if self.runtime_overrides.lock().unwrap().contains_key(provider) {
+        if self
+            .runtime_overrides
+            .lock()
+            .unwrap()
+            .contains_key(provider)
+        {
             return AuthStatus {
                 configured: false,
                 source: Some("runtime".to_string()),
@@ -399,11 +407,7 @@ impl AuthStorage {
         self.errors.lock().unwrap().drain(..).collect()
     }
 
-    pub async fn get_api_key(
-        &self,
-        provider_id: &str,
-        include_fallback: bool,
-    ) -> Option<String> {
+    pub async fn get_api_key(&self, provider_id: &str, include_fallback: bool) -> Option<String> {
         // Runtime override takes highest priority
         if let Some(key) = self.runtime_overrides.lock().unwrap().get(provider_id) {
             return Some(key.clone());
@@ -419,7 +423,9 @@ impl AuthStorage {
             Some(AuthCredential::Oauth { inner }) => {
                 let stored_creds = inner.clone();
                 drop(data);
-                return self.refresh_oauth_credentials(provider_id, stored_creds).await;
+                return self
+                    .refresh_oauth_credentials(provider_id, stored_creds)
+                    .await;
             }
             None => {}
         }
@@ -489,5 +495,7 @@ fn find_env_key(provider: &str) -> Option<String> {
         format!("OPENAI_API_KEY"),
         format!("GOOGLE_API_KEY"),
     ];
-    candidates.into_iter().find(|key| std::env::var(key).is_ok())
+    candidates
+        .into_iter()
+        .find(|key| std::env::var(key).is_ok())
 }

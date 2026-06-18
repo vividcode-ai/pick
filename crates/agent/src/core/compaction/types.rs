@@ -86,7 +86,8 @@ impl FileOperations {
     /// Get list of read-only files
     pub fn read_files(&self) -> Vec<String> {
         let modified = self.modified_files();
-        self.read.iter()
+        self.read
+            .iter()
             .filter(|f| !modified.contains(f))
             .cloned()
             .collect()

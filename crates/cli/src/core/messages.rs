@@ -1,5 +1,4 @@
-﻿//! Message types used across the agent session
-
+//! Message types used across the agent session
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -54,7 +53,11 @@ pub fn create_branch_summary_message(summary: String, from_id: String, timestamp
 }
 
 /// Create a compaction summary message value
-pub fn create_compaction_summary_message(summary: String, tokens_before: usize, timestamp: i64) -> Value {
+pub fn create_compaction_summary_message(
+    summary: String,
+    tokens_before: usize,
+    timestamp: i64,
+) -> Value {
     serde_json::json!({
         "role": "compactionSummary",
         "summary": summary,
@@ -65,20 +68,23 @@ pub fn create_compaction_summary_message(summary: String, tokens_before: usize, 
 
 /// Convert agent messages to LLM-compatible format
 pub fn convert_to_llm_messages(messages: &[Value]) -> Vec<Value> {
-    messages.iter().map(|msg| {
-        let role = msg.get("role").and_then(|v| v.as_str()).unwrap_or("");
-        match role {
-            "user" | "assistant" | "toolResult" => msg.clone(),
-            "custom" => {
-                let custom_type = msg.get("customType").and_then(|v| v.as_str()).unwrap_or("");
-                let content = msg.get("content").cloned().unwrap_or(Value::Null);
-                serde_json::json!({
-                    "role": "custom",
-                    "customType": custom_type,
-                    "content": content,
-                })
+    messages
+        .iter()
+        .map(|msg| {
+            let role = msg.get("role").and_then(|v| v.as_str()).unwrap_or("");
+            match role {
+                "user" | "assistant" | "toolResult" => msg.clone(),
+                "custom" => {
+                    let custom_type = msg.get("customType").and_then(|v| v.as_str()).unwrap_or("");
+                    let content = msg.get("content").cloned().unwrap_or(Value::Null);
+                    serde_json::json!({
+                        "role": "custom",
+                        "customType": custom_type,
+                        "content": content,
+                    })
+                }
+                _ => msg.clone(),
             }
-            _ => msg.clone(),
-        }
-    }).collect()
+        })
+        .collect()
 }

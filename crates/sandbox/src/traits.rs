@@ -1,7 +1,5 @@
-﻿pub use pick_agent::permission::sandbox::{
-    Sandbox as PlatformSandbox,
-    SandboxRequest,
-    SandboxType,
+pub use pick_agent::permission::sandbox::{
+    Sandbox as PlatformSandbox, SandboxRequest, SandboxType,
 };
 
 #[derive(Debug)]

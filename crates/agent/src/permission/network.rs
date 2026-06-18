@@ -1,4 +1,4 @@
-﻿use std::collections::HashSet;
+use std::collections::HashSet;
 use std::net::IpAddr;
 
 #[derive(Debug, Clone)]
@@ -41,7 +41,8 @@ impl NetworkPolicy {
 
     pub fn new_restricted() -> Self {
         let blocked_raw: [&str; 9] = [
-            "localhost:*", "127.0.0.1:*",
+            "localhost:*",
+            "127.0.0.1:*",
             "169.254.0.0/16",
             "10.0.0.0/8",
             "172.16.0.0/12",
@@ -188,7 +189,10 @@ mod tests {
 
     #[test]
     fn test_extract_domain() {
-        assert_eq!(extract_domain("https://api.anthropic.com/v1"), "api.anthropic.com");
+        assert_eq!(
+            extract_domain("https://api.anthropic.com/v1"),
+            "api.anthropic.com"
+        );
         assert_eq!(extract_domain("http://example.com/path"), "example.com");
         assert_eq!(extract_domain("example.com"), "example.com");
     }
@@ -221,7 +225,11 @@ mod tests {
     #[test]
     fn test_restricted_allows_known() {
         let policy = NetworkPolicy::new_restricted();
-        assert!(policy.can_access("https://api.anthropic.com/v1/messages").is_ok());
+        assert!(
+            policy
+                .can_access("https://api.anthropic.com/v1/messages")
+                .is_ok()
+        );
     }
 
     #[test]

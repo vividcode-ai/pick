@@ -1,5 +1,4 @@
-﻿//! Powered by Daxnuts - Easter egg with RGB image rendering
-
+//! Powered by Daxnuts - Easter egg with RGB image rendering
 
 use crate::core::tools::render_utils::ToolTheme;
 
@@ -30,7 +29,9 @@ fn build_image_lines() -> Vec<String> {
     let hex_data = DAX_HEX.as_bytes();
     let mut rgb_data = Vec::with_capacity(HEIGHT * WIDTH * 3);
     for chunk in hex_data.chunks(6) {
-        if chunk.len() < 6 { break; }
+        if chunk.len() < 6 {
+            break;
+        }
         let hex_str = std::str::from_utf8(&chunk[..6]).unwrap_or("000000");
         let val = u32::from_str_radix(hex_str, 16).unwrap_or(0);
         rgb_data.push(((val >> 16) & 0xff) as u8);
@@ -45,12 +46,28 @@ fn build_image_lines() -> Vec<String> {
             let top_offset = (row * WIDTH + x) * 3;
             let bot_offset = ((row + 1) * WIDTH + x) * 3;
             let (tr, tg, tb) = if top_offset + 2 < rgb_data.len() {
-                (rgb_data[top_offset], rgb_data[top_offset + 1], rgb_data[top_offset + 2])
-            } else { (0, 0, 0) };
+                (
+                    rgb_data[top_offset],
+                    rgb_data[top_offset + 1],
+                    rgb_data[top_offset + 2],
+                )
+            } else {
+                (0, 0, 0)
+            };
             let (br, bg, bb) = if bot_offset + 2 < rgb_data.len() {
-                (rgb_data[bot_offset], rgb_data[bot_offset + 1], rgb_data[bot_offset + 2])
-            } else { (tr, tg, tb) };
-            line.push_str(&format!("{}{}\u{2584}", rgb_fg(br, bg, bb), rgb_bg(tr, tg, tb)));
+                (
+                    rgb_data[bot_offset],
+                    rgb_data[bot_offset + 1],
+                    rgb_data[bot_offset + 2],
+                )
+            } else {
+                (tr, tg, tb)
+            };
+            line.push_str(&format!(
+                "{}{}\u{2584}",
+                rgb_fg(br, bg, bb),
+                rgb_bg(tr, tg, tb)
+            ));
         }
         line.push_str(RESET);
         lines.push(line);
@@ -66,7 +83,11 @@ pub fn render_daxnuts(width: usize) -> Vec<String> {
 
     for img_line in &image {
         let visible_len = img_line.chars().filter(|&c| c != '\x1b').count();
-        let left = if visible_len < width { (width - visible_len) / 2 } else { 0 };
+        let left = if visible_len < width {
+            (width - visible_len) / 2
+        } else {
+            0
+        };
         lines.push(format!("{}{}", " ".repeat(left), img_line));
     }
 
@@ -74,10 +95,17 @@ pub fn render_daxnuts(width: usize) -> Vec<String> {
     if width >= 30 {
         let center = |s: &str| {
             let visible = s.chars().filter(|&c| c != '\x1b').count();
-            let left = if visible < width { (width - visible) / 2 } else { 0 };
+            let left = if visible < width {
+                (width - visible) / 2
+            } else {
+                0
+            };
             format!("{}{}", " ".repeat(left), s)
         };
-        lines.push(center(&ToolTheme::fg("accent", "Free Kimi K2.5 via OpenCode Zen")));
+        lines.push(center(&ToolTheme::fg(
+            "accent",
+            "Free Kimi K2.5 via OpenCode Zen",
+        )));
         lines.push(center(&ToolTheme::fg("success", "\"Powered by daxnuts\"")));
         lines.push(center(&ToolTheme::fg("muted", "— @thdxr")));
         lines.push(String::new());

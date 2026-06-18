@@ -1,10 +1,10 @@
-﻿//! WebFetch tool - fetches content from URLs
+//! WebFetch tool - fetches content from URLs
 //! Maps to opencode packages/opencode/src/tool/webfetch.ts
 
 use std::time::Duration;
 
-use scraper::Element;
 use pick_ai::types::ContentBlock;
+use scraper::Element;
 
 use crate::core::state::{AgentTool, AgentToolResult, ToolContext, ToolExecutionMode};
 
@@ -20,7 +20,9 @@ fn html_to_text(html: &str) -> String {
     for node in root.text() {
         let trimmed = node.trim();
         if !trimmed.is_empty() {
-            if !text.is_empty() { text.push(' '); }
+            if !text.is_empty() {
+                text.push(' ');
+            }
             text.push_str(trimmed);
         }
     }
@@ -42,7 +44,9 @@ fn convert_node_to_markdown(node: &scraper::ElementRef, md: &mut String, depth: 
             "h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
                 let level = tag[1..].parse::<usize>().unwrap_or(1);
                 let prefix = "#".repeat(level);
-                if !md.is_empty() && !md.ends_with('\n') { md.push('\n'); }
+                if !md.is_empty() && !md.ends_with('\n') {
+                    md.push('\n');
+                }
                 md.push_str(&format!("{} ", prefix));
                 for text in child.text() {
                     md.push_str(text.trim());
@@ -57,13 +61,17 @@ fn convert_node_to_markdown(node: &scraper::ElementRef, md: &mut String, depth: 
                         md.push(' ');
                     }
                 }
-                if tag == "p" { md.push_str("\n\n"); }
+                if tag == "p" {
+                    md.push_str("\n\n");
+                }
                 convert_node_to_markdown(&child, md, depth);
             }
             "a" => {
                 let href = child.attr("href").unwrap_or("");
                 let mut text = String::new();
-                for t in child.text() { text.push_str(t.trim()); }
+                for t in child.text() {
+                    text.push_str(t.trim());
+                }
                 if !text.is_empty() {
                     md.push_str(&format!("[{}]({})", text, href));
                 }
@@ -75,13 +83,19 @@ fn convert_node_to_markdown(node: &scraper::ElementRef, md: &mut String, depth: 
             }
             "code" => {
                 md.push('`');
-                for t in child.text() { md.push_str(t.trim()); }
+                for t in child.text() {
+                    md.push_str(t.trim());
+                }
                 md.push('`');
             }
             "pre" => {
                 md.push_str("\n```\n");
-                for t in child.text() { md.push_str(t); }
-                if !md.ends_with('\n') { md.push('\n'); }
+                for t in child.text() {
+                    md.push_str(t);
+                }
+                if !md.ends_with('\n') {
+                    md.push('\n');
+                }
                 md.push_str("```\n\n");
             }
             "ul" | "ol" => {
@@ -89,14 +103,19 @@ fn convert_node_to_markdown(node: &scraper::ElementRef, md: &mut String, depth: 
                 md.push('\n');
             }
             "li" => {
-                let prefix = if child.parent_element().map_or(false, |p| p.value().name() == "ol") {
+                let prefix = if child
+                    .parent_element()
+                    .map_or(false, |p| p.value().name() == "ol")
+                {
                     "1. "
                 } else {
                     "- "
                 };
                 md.push_str(&"  ".repeat(depth));
                 md.push_str(prefix);
-                for t in child.text() { md.push_str(t.trim()); }
+                for t in child.text() {
+                    md.push_str(t.trim());
+                }
                 md.push('\n');
                 convert_node_to_markdown(&child, md, depth + 1);
             }
@@ -113,12 +132,16 @@ fn convert_node_to_markdown(node: &scraper::ElementRef, md: &mut String, depth: 
             }
             "strong" | "b" => {
                 md.push_str("**");
-                for t in child.text() { md.push_str(t.trim()); }
+                for t in child.text() {
+                    md.push_str(t.trim());
+                }
                 md.push_str("**");
             }
             "em" | "i" => {
                 md.push_str("*");
-                for t in child.text() { md.push_str(t.trim()); }
+                for t in child.text() {
+                    md.push_str(t.trim());
+                }
                 md.push_str("*");
             }
             _ => {
@@ -131,8 +154,7 @@ fn convert_node_to_markdown(node: &scraper::ElementRef, md: &mut String, depth: 
 /// Check if a MIME type is an image (except SVG)
 fn is_image_mime(mime: &str) -> bool {
     let mime = mime.to_lowercase();
-    (mime.starts_with("image/") && !mime.contains("svg"))
-        || mime == "application/octet-stream"
+    (mime.starts_with("image/") && !mime.contains("svg")) || mime == "application/octet-stream"
 }
 
 /// Create the webfetch tool

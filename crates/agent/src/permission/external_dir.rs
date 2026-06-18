@@ -1,4 +1,4 @@
-﻿use std::path::Path;
+use std::path::Path;
 use std::sync::Mutex;
 
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -38,12 +38,10 @@ impl ExternalDirectoryAuth {
         let file_path = project_dir.join(".pick").join("local.auth.json");
         let entries = if file_path.exists() {
             match std::fs::read_to_string(&file_path) {
-                Ok(content) => {
-                    match serde_json::from_str::<AuthFile>(&content) {
-                        Ok(auth_file) => auth_file.permissions.allow,
-                        Err(_) => Vec::new(),
-                    }
-                }
+                Ok(content) => match serde_json::from_str::<AuthFile>(&content) {
+                    Ok(auth_file) => auth_file.permissions.allow,
+                    Err(_) => Vec::new(),
+                },
                 Err(_) => Vec::new(),
             }
         } else {
@@ -69,7 +67,8 @@ impl ExternalDirectoryAuth {
         for entry in entries.iter() {
             if let Some((entry_tool, entry_pattern)) = parse_permission_string(&entry.entry) {
                 if entry_tool == tool
-                    && (match_pattern(&entry_pattern, &norm_path) || match_pattern(&entry_pattern, &real_path))
+                    && (match_pattern(&entry_pattern, &norm_path)
+                        || match_pattern(&entry_pattern, &real_path))
                 {
                     return Some(entry.auth_type);
                 }
@@ -166,7 +165,10 @@ impl ExternalDirectoryAuth {
     /// Revoke all permanent authorizations matching the given tool and path pattern.
     /// Returns the number of entries revoked.
     pub fn revoke(&self, tool: &str, path_pattern: &str) -> usize {
-        let norm_pattern = path_pattern.replace('\\', "/").trim_end_matches('/').to_string();
+        let norm_pattern = path_pattern
+            .replace('\\', "/")
+            .trim_end_matches('/')
+            .to_string();
         let mut entries = self.entries.lock().unwrap();
         let before = entries.len();
         entries.retain(|e| {
@@ -222,14 +224,28 @@ pub async fn check_authorization(
     if let Some(ref ask) = question {
         let answers = ask(vec![QuestionPrompt {
             header: "External Directory Access".into(),
-            question: format!("Allow access to '{}'?\nPath is outside the current workspace", path),
+            question: format!(
+                "Allow access to '{}'?\nPath is outside the current workspace",
+                path
+            ),
             multiple: false,
             options: vec![
-                QuestionOption { label: "Allow Once".into(), description: "Allow this one time only".into() },
-                QuestionOption { label: "Allow Always".into(), description: "Permanently allow access to this directory".into() },
-                QuestionOption { label: "Deny".into(), description: "Reject this request".into() },
+                QuestionOption {
+                    label: "Allow Once".into(),
+                    description: "Allow this one time only".into(),
+                },
+                QuestionOption {
+                    label: "Allow Always".into(),
+                    description: "Permanently allow access to this directory".into(),
+                },
+                QuestionOption {
+                    label: "Deny".into(),
+                    description: "Reject this request".into(),
+                },
             ],
-        }]).await.map_err(|e| format!("Question prompt failed: {}", e))?;
+        }])
+        .await
+        .map_err(|e| format!("Question prompt failed: {}", e))?;
 
         let choice = answers.first().and_then(|a| a.first()).map(|s| s.as_str());
         match choice {
@@ -254,7 +270,6 @@ pub async fn check_authorization(
 /// Note: bare `*` or `**` patterns are NOT supported — they would match all paths
 /// and bypass authorization.
 fn match_pattern(pattern: &str, path: &str) -> bool {
-
     let pat_norm = pattern.replace('\\', "/").trim_end_matches('/').to_string();
     let path_norm = path.trim_end_matches('/').to_string();
 
@@ -265,8 +280,7 @@ fn match_pattern(pattern: &str, path: &str) -> bool {
     // Handle ** glob (matches any depth)
     if let Some(prefix) = pat_norm.strip_suffix("/**") {
         let prefix = prefix.trim_end_matches('/');
-        return path_norm == prefix
-            || path_norm.starts_with(&format!("{}/", prefix));
+        return path_norm == prefix || path_norm.starts_with(&format!("{}/", prefix));
     }
 
     // Handle * glob (matches single component)

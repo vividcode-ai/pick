@@ -1,4 +1,4 @@
-﻿use std::sync::Arc;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 
@@ -129,15 +129,24 @@ impl PermissionHookRegistry {
     }
 
     pub fn has_pre_hooks(&self) -> bool {
-        self.pre_hooks.lock().map(|h| !h.is_empty()).unwrap_or(false)
+        self.pre_hooks
+            .lock()
+            .map(|h| !h.is_empty())
+            .unwrap_or(false)
     }
 
     pub fn has_post_hooks(&self) -> bool {
-        self.post_hooks.lock().map(|h| !h.is_empty()).unwrap_or(false)
+        self.post_hooks
+            .lock()
+            .map(|h| !h.is_empty())
+            .unwrap_or(false)
     }
 
     pub fn has_permission_hooks(&self) -> bool {
-        self.permission_hooks.lock().map(|h| !h.is_empty()).unwrap_or(false)
+        self.permission_hooks
+            .lock()
+            .map(|h| !h.is_empty())
+            .unwrap_or(false)
     }
 }
 

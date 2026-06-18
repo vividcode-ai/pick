@@ -1,4 +1,4 @@
-﻿use std::collections::HashSet;
+use std::collections::HashSet;
 use std::path::Path;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -31,22 +31,75 @@ impl Default for ExecPolicy {
 impl ExecPolicy {
     pub fn new() -> Self {
         let known_safe: HashSet<String> = [
-            "ls", "cat", "head", "tail", "rg", "grep", "find", "which",
-            "stat", "wc", "diff", "sort", "uniq", "echo", "pwd", "type",
-            "where", "dir", "more", "less", "date", "cal", "df", "du", "uptime",
-        ].into_iter().map(String::from).collect();
+            "ls", "cat", "head", "tail", "rg", "grep", "find", "which", "stat", "wc", "diff",
+            "sort", "uniq", "echo", "pwd", "type", "where", "dir", "more", "less", "date", "cal",
+            "df", "du", "uptime",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
 
         let known_dangerous: HashSet<String> = [
-            "rm", "mv", "sudo", "chmod", "chown", "mkfs", "dd",
-            "shutdown", "reboot", "kill", "pkill", "iptables",
-            "curl", "wget", "nc", "ncat", "ssh", "scp", "sftp", "rsync",
-            "python", "python3", "pip", "pip3", "perl", "ruby", "php",
-            "node", "deno", "mount", "umount", "passwd", "chsh",
-            "useradd", "usermod", "crontab", "systemctl", "service",
-            "docker", "podman", "kubectl", "helm", "go", "rustc",
-            "gcc", "clang", "make", "cmake", "tar", "gzip", "zip",
-            "unzip", "base64", "openssl", "tee", "eval",
-        ].into_iter().map(String::from).collect();
+            "rm",
+            "mv",
+            "sudo",
+            "chmod",
+            "chown",
+            "mkfs",
+            "dd",
+            "shutdown",
+            "reboot",
+            "kill",
+            "pkill",
+            "iptables",
+            "curl",
+            "wget",
+            "nc",
+            "ncat",
+            "ssh",
+            "scp",
+            "sftp",
+            "rsync",
+            "python",
+            "python3",
+            "pip",
+            "pip3",
+            "perl",
+            "ruby",
+            "php",
+            "node",
+            "deno",
+            "mount",
+            "umount",
+            "passwd",
+            "chsh",
+            "useradd",
+            "usermod",
+            "crontab",
+            "systemctl",
+            "service",
+            "docker",
+            "podman",
+            "kubectl",
+            "helm",
+            "go",
+            "rustc",
+            "gcc",
+            "clang",
+            "make",
+            "cmake",
+            "tar",
+            "gzip",
+            "zip",
+            "unzip",
+            "base64",
+            "openssl",
+            "tee",
+            "eval",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
 
         Self {
             rules: Vec::new(),
@@ -69,7 +122,8 @@ impl ExecPolicy {
             if trimmed.is_empty() || trimmed.starts_with('#') {
                 continue;
             }
-            let rule = self.parse_rule_line(trimmed)
+            let rule = self
+                .parse_rule_line(trimmed)
                 .map_err(|e| format!("Line {}: {}", line_num + 1, e))?;
             self.rules.push(rule);
         }
@@ -119,7 +173,11 @@ impl ExecPolicy {
         }
 
         // Heuristic fallback
-        let first_word = trimmed.split_whitespace().next().unwrap_or("").to_lowercase();
+        let first_word = trimmed
+            .split_whitespace()
+            .next()
+            .unwrap_or("")
+            .to_lowercase();
 
         // If the first command has shell meta characters, always prompt
         if has_shell_meta {
@@ -145,7 +203,10 @@ impl ExecPolicy {
 
     fn parse_rule_line(&self, line: &str) -> Result<ExecRule, String> {
         let arrow_pos = line.find("->").ok_or_else(|| {
-            format!("Invalid rule syntax '{}': expected 'pattern -> decision'", line)
+            format!(
+                "Invalid rule syntax '{}': expected 'pattern -> decision'",
+                line
+            )
         })?;
 
         let pattern = line[..arrow_pos].trim().to_string();
@@ -155,10 +216,12 @@ impl ExecPolicy {
             "allow" => ExecDecision::Allow,
             "prompt" => ExecDecision::Prompt,
             "forbid" | "forbidden" => ExecDecision::Forbidden,
-            _ => return Err(format!(
-                "Invalid decision '{}' in rule '{}'. Expected 'allow', 'prompt', or 'forbid'",
-                decision_str, line
-            )),
+            _ => {
+                return Err(format!(
+                    "Invalid decision '{}' in rule '{}'. Expected 'allow', 'prompt', or 'forbid'",
+                    decision_str, line
+                ));
+            }
         };
 
         Ok(ExecRule {
@@ -178,9 +241,8 @@ fn extract_command_prefix(command: &str) -> String {
     let first = parts[0].to_lowercase();
 
     let compound_commands = [
-        "git", "npm", "cargo", "docker", "kubectl", "gh", "npx", "bun",
-        "yarn", "dotnet", "make", "pip", "rustup", "go", "winget", "choco",
-        "apt", "apt-get", "brew", "pacman", "snap",
+        "git", "npm", "cargo", "docker", "kubectl", "gh", "npx", "bun", "yarn", "dotnet", "make",
+        "pip", "rustup", "go", "winget", "choco", "apt", "apt-get", "brew", "pacman", "snap",
     ];
 
     if compound_commands.contains(&first.as_str()) && parts.len() > 1 {
@@ -211,11 +273,15 @@ fn command_starts_with_pattern(command: &str, pattern: &str) -> bool {
         if cmd_tokens.len() < base.len() {
             return false;
         }
-        return cmd_tokens[..base.len()].iter().zip(base.iter())
+        return cmd_tokens[..base.len()]
+            .iter()
+            .zip(base.iter())
             .all(|(a, b)| a.eq_ignore_ascii_case(b));
     }
 
-    cmd_tokens[..pat_tokens.len()].iter().zip(pat_tokens.iter())
+    cmd_tokens[..pat_tokens.len()]
+        .iter()
+        .zip(pat_tokens.iter())
         .all(|(a, b)| a.eq_ignore_ascii_case(b))
 }
 
@@ -296,7 +362,10 @@ mod tests {
     fn test_extract_prefix_compound() {
         assert_eq!(extract_command_prefix("git push origin main"), "git push");
         assert_eq!(extract_command_prefix("npm install --save"), "npm install");
-        assert_eq!(extract_command_prefix("cargo build --release"), "cargo build");
+        assert_eq!(
+            extract_command_prefix("cargo build --release"),
+            "cargo build"
+        );
     }
 
     #[test]
@@ -310,7 +379,10 @@ mod tests {
     #[test]
     fn test_evaluate_unknown_is_prompt() {
         let policy = ExecPolicy::new();
-        assert_eq!(policy.evaluate("some_random_tool --flag"), ExecDecision::Prompt);
+        assert_eq!(
+            policy.evaluate("some_random_tool --flag"),
+            ExecDecision::Prompt
+        );
     }
 
     #[test]
@@ -341,16 +413,23 @@ git push -> prompt
         assert_eq!(policy.evaluate("cat /etc/passwd"), ExecDecision::Allow);
         assert_eq!(policy.evaluate("git diff HEAD"), ExecDecision::Allow);
         assert_eq!(policy.evaluate("rm -rf /"), ExecDecision::Forbidden);
-        assert_eq!(policy.evaluate("git push origin main"), ExecDecision::Prompt);
+        assert_eq!(
+            policy.evaluate("git push origin main"),
+            ExecDecision::Prompt
+        );
     }
 
     #[test]
     fn test_last_match_wins() {
         let mut policy = ExecPolicy::new();
-        policy.load_rules_from_str("
+        policy
+            .load_rules_from_str(
+                "
 git -> forbid
 git push -> allow
-        ").unwrap();
+        ",
+            )
+            .unwrap();
 
         assert_eq!(policy.evaluate("git status"), ExecDecision::Forbidden);
         assert_eq!(policy.evaluate("git push"), ExecDecision::Allow);
@@ -359,10 +438,14 @@ git push -> allow
     #[test]
     fn test_wildcard_last_match_wins() {
         let mut policy = ExecPolicy::new();
-        policy.load_rules_from_str("
+        policy
+            .load_rules_from_str(
+                "
 npm * -> allow
 * -> prompt
-        ").unwrap();
+        ",
+            )
+            .unwrap();
 
         // * -> prompt comes last, so npm install gets Prompt
         assert_eq!(policy.evaluate("npm install"), ExecDecision::Prompt);

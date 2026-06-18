@@ -1,5 +1,4 @@
-﻿//! Shared command execution utilities for extensions and custom tools
-
+//! Shared command execution utilities for extensions and custom tools
 
 use std::time::Duration;
 use tokio::process::Command;

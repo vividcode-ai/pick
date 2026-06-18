@@ -1,4 +1,4 @@
-﻿//! OAuth callback HTML page templates
+//! OAuth callback HTML page templates
 
 const LOGO_SVG: &str = r##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" aria-hidden="true"><path fill="#fff" fill-rule="evenodd" d="M165.29 165.29 H517.36 V400 H400 V517.36 H282.65 V634.72 H165.29 Z M282.65 282.65 V400 H400 V282.65 Z"/><path fill="#fff" d="M517.36 400 H634.72 V634.72 H517.36 Z"/></svg>"##;
 
@@ -15,12 +15,12 @@ fn render_page(title: &str, heading: &str, message: &str, details: Option<&str>)
     let title = escape_html(title);
     let heading = escape_html(heading);
     let message = escape_html(message);
-    let details_html = details.map(|d| format!(
-        r#"<div class="details">{}</div>"#,
-        escape_html(d)
-    )).unwrap_or_default();
+    let details_html = details
+        .map(|d| format!(r#"<div class="details">{}</div>"#, escape_html(d)))
+        .unwrap_or_default();
 
-    format!(r#"<!doctype html>
+    format!(
+        r#"<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -93,17 +93,28 @@ fn render_page(title: &str, heading: &str, message: &str, details: Option<&str>)
     {details_html}
   </main>
 </body>
-</html>"#)
+</html>"#
+    )
 }
 
 /// Generate OAuth success HTML page
 pub fn oauth_success_html(message: &str) -> String {
-    render_page("Authentication successful", "Authentication successful", message, None)
+    render_page(
+        "Authentication successful",
+        "Authentication successful",
+        message,
+        None,
+    )
 }
 
 /// Generate OAuth error HTML page
 pub fn oauth_error_html(message: &str, details: Option<&str>) -> String {
-    render_page("Authentication failed", "Authentication failed", message, details)
+    render_page(
+        "Authentication failed",
+        "Authentication failed",
+        message,
+        details,
+    )
 }
 
 #[cfg(test)]

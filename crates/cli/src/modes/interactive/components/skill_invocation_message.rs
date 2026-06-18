@@ -1,5 +1,4 @@
-﻿//! Skill invocation message display
-
+//! Skill invocation message display
 
 use crate::core::tools::render_utils::ToolTheme;
 

@@ -1,4 +1,4 @@
-﻿//! Google Generative AI (Gemini) provider with SSE streaming
+//! Google Generative AI (Gemini) provider with SSE streaming
 //! Uses the Google Gemini streamGenerateContent REST API
 
 use crate::sse::SseParser;
@@ -14,18 +14,30 @@ pub fn stream_google(
 ) -> tokio::sync::mpsc::Receiver<StreamEvent> {
     let (tx, rx) = tokio::sync::mpsc::channel(64);
     let max_retries = options.as_ref().and_then(|o| o.max_retries).unwrap_or(3);
-    let max_delay = options.as_ref().and_then(|o| o.max_retry_delay_ms).unwrap_or(60000);
+    let max_delay = options
+        .as_ref()
+        .and_then(|o| o.max_retry_delay_ms)
+        .unwrap_or(60000);
 
     tokio::spawn(async move {
         let api_key = std::env::var("GOOGLE_API_KEY").unwrap_or_default();
 
         if api_key.is_empty() {
             let mut msg = AssistantMessage::new(
-                vec![], "google-generative-ai".to_string(), "google".to_string(),
-                model.id.clone(), Usage::zero(), StopReason::Error,
+                vec![],
+                "google-generative-ai".to_string(),
+                "google".to_string(),
+                model.id.clone(),
+                Usage::zero(),
+                StopReason::Error,
             );
             msg.error_message = Some("GOOGLE_API_KEY is not set.".to_string());
-            let _ = tx.send(StreamEvent::Error { reason: StopReason::Error, error: msg }).await;
+            let _ = tx
+                .send(StreamEvent::Error {
+                    reason: StopReason::Error,
+                    error: msg,
+                })
+                .await;
             return;
         }
 
@@ -102,10 +114,15 @@ pub fn stream_google(
                 }
                 crate::types::Message::ToolResult(tr) => {
                     let mut parts = Vec::new();
-                    let text_content: Vec<String> = tr.content.iter()
+                    let text_content: Vec<String> = tr
+                        .content
+                        .iter()
                         .filter_map(|c| {
-                            if let ContentBlock::Text(t) = c { Some(t.text.clone()) }
-                            else { None }
+                            if let ContentBlock::Text(t) = c {
+                                Some(t.text.clone())
+                            } else {
+                                None
+                            }
                         })
                         .collect();
                     let text = text_content.join("\n");
@@ -137,13 +154,16 @@ pub fn stream_google(
             body["systemInstruction"] = serde_json::json!({"parts": [{"text": system}]});
         }
         if let Some(tools) = &context.tools {
-            let function_declarations: Vec<serde_json::Value> = tools.iter().map(|t| {
-                serde_json::json!({
-                    "name": t.name,
-                    "description": t.description,
-                    "parameters": t.parameters,
+            let function_declarations: Vec<serde_json::Value> = tools
+                .iter()
+                .map(|t| {
+                    serde_json::json!({
+                        "name": t.name,
+                        "description": t.description,
+                        "parameters": t.parameters,
+                    })
                 })
-            }).collect();
+                .collect();
             body["tools"] = serde_json::json!([{
                 "functionDeclarations": function_declarations,
             }]);
@@ -163,18 +183,20 @@ pub fn stream_google(
                 StopReason::Stop,
             );
 
-            let _ = tx.send(StreamEvent::Start {
-                partial: crate::types::PartialAssistantMessage {
-                    content: vec![],
-                    api: Some("google-generative-ai".to_string()),
-                    provider: Some("google".to_string()),
-                    model: Some(model.id.clone()),
-                    usage: Some(Usage::zero()),
-                    stop_reason: None,
-                    error_message: None,
-                    timestamp: chrono::Utc::now().timestamp_millis(),
-                },
-            }).await;
+            let _ = tx
+                .send(StreamEvent::Start {
+                    partial: crate::types::PartialAssistantMessage {
+                        content: vec![],
+                        api: Some("google-generative-ai".to_string()),
+                        provider: Some("google".to_string()),
+                        model: Some(model.id.clone()),
+                        usage: Some(Usage::zero()),
+                        stop_reason: None,
+                        error_message: None,
+                        timestamp: chrono::Utc::now().timestamp_millis(),
+                    },
+                })
+                .await;
 
             let client = reqwest::Client::new();
             match client
@@ -188,17 +210,21 @@ pub fn stream_google(
                 Ok(resp) => {
                     let status = resp.status();
                     if !status.is_success() {
-                        if crate::retry::is_retryable_http_status(status.as_u16()) && crate::retry::should_retry(attempt, max_retries) {
+                        if crate::retry::is_retryable_http_status(status.as_u16())
+                            && crate::retry::should_retry(attempt, max_retries)
+                        {
                             continue;
                         }
                         let body_text = resp.text().await.unwrap_or_default();
                         let err_msg = format!("Google AI API error ({}): {}", status, body_text);
                         output.stop_reason = StopReason::Error;
                         output.error_message = Some(err_msg);
-                        let _ = tx.send(StreamEvent::Error {
-                            reason: StopReason::Error,
-                            error: output.clone(),
-                        }).await;
+                        let _ = tx
+                            .send(StreamEvent::Error {
+                                reason: StopReason::Error,
+                                error: output.clone(),
+                            })
+                            .await;
                         return;
                     }
 
@@ -214,51 +240,72 @@ pub fn stream_google(
                                 let events = parser.feed(&chunk);
                                 for sse in events {
                                     process_google_chunk(
-                                        &tx, &sse, &mut output,
-                                        &mut text_block_idx, &mut thinking_block_idx,
-                                    ).await;
+                                        &tx,
+                                        &sse,
+                                        &mut output,
+                                        &mut text_block_idx,
+                                        &mut thinking_block_idx,
+                                    )
+                                    .await;
                                 }
                             }
                             Err(e) => {
                                 output.stop_reason = StopReason::Error;
                                 output.error_message = Some(format!("Stream error: {}", e));
-                                let _ = tx.send(StreamEvent::Error {
-                                    reason: StopReason::Error,
-                                    error: output.clone(),
-                                }).await;
+                                let _ = tx
+                                    .send(StreamEvent::Error {
+                                        reason: StopReason::Error,
+                                        error: output.clone(),
+                                    })
+                                    .await;
                                 return;
                             }
                         }
                     }
 
                     // Send done
-                    let _ = tx.send(StreamEvent::Done {
-                        reason: output.stop_reason.clone(),
-                        message: output,
-                    }).await;
+                    let _ = tx
+                        .send(StreamEvent::Done {
+                            reason: output.stop_reason.clone(),
+                            message: output,
+                        })
+                        .await;
                     return;
                 }
                 Err(e) => {
-                    if crate::retry::is_retryable_request_error(&e) && crate::retry::should_retry(attempt, max_retries) {
+                    if crate::retry::is_retryable_request_error(&e)
+                        && crate::retry::should_retry(attempt, max_retries)
+                    {
                         continue;
                     }
                     output.stop_reason = StopReason::Error;
                     output.error_message = Some(format!("Request failed: {}", e));
-                    let _ = tx.send(StreamEvent::Error {
-                        reason: StopReason::Error,
-                        error: output.clone(),
-                    }).await;
+                    let _ = tx
+                        .send(StreamEvent::Error {
+                            reason: StopReason::Error,
+                            error: output.clone(),
+                        })
+                        .await;
                     return;
                 }
             }
         }
 
         let mut msg = AssistantMessage::new(
-            vec![], "google-generative-ai".to_string(), "google".to_string(),
-            model.id.clone(), Usage::zero(), StopReason::Error,
+            vec![],
+            "google-generative-ai".to_string(),
+            "google".to_string(),
+            model.id.clone(),
+            Usage::zero(),
+            StopReason::Error,
         );
         msg.error_message = Some("Max retries exceeded.".to_string());
-        let _ = tx.send(StreamEvent::Error { reason: StopReason::Error, error: msg }).await;
+        let _ = tx
+            .send(StreamEvent::Error {
+                reason: StopReason::Error,
+                error: msg,
+            })
+            .await;
     });
 
     rx
@@ -309,11 +356,26 @@ async fn process_google_response(
 
     // Process usage metadata
     if let Some(usage) = data.get("usageMetadata") {
-        let input = usage.get("promptTokenCount").and_then(|v| v.as_u64()).unwrap_or(0);
-        let output_tokens = usage.get("candidatesTokenCount").and_then(|v| v.as_u64()).unwrap_or(0);
-        let thoughts = usage.get("thoughtsTokenCount").and_then(|v| v.as_u64()).unwrap_or(0);
-        let cache_read = usage.get("cachedContentTokenCount").and_then(|v| v.as_u64()).unwrap_or(0);
-        let total = usage.get("totalTokenCount").and_then(|v| v.as_u64()).unwrap_or(input + output_tokens + thoughts);
+        let input = usage
+            .get("promptTokenCount")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
+        let output_tokens = usage
+            .get("candidatesTokenCount")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
+        let thoughts = usage
+            .get("thoughtsTokenCount")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
+        let cache_read = usage
+            .get("cachedContentTokenCount")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
+        let total = usage
+            .get("totalTokenCount")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(input + output_tokens + thoughts);
 
         output.usage.input = input;
         output.usage.output = output_tokens + thoughts;
@@ -337,7 +399,12 @@ async fn process_google_response(
                 _ => StopReason::Stop,
             };
             // If tool calls are present, override to ToolUse
-            if !output.content.is_empty() && output.content.iter().any(|c| matches!(c, ContentBlock::ToolCall(_))) {
+            if !output.content.is_empty()
+                && output
+                    .content
+                    .iter()
+                    .any(|c| matches!(c, ContentBlock::ToolCall(_)))
+            {
                 output.stop_reason = StopReason::ToolUse;
             }
         }
@@ -358,23 +425,30 @@ async fn process_google_response(
                     continue;
                 }
 
-                let is_thinking = part.get("thought").and_then(|v| v.as_bool()).unwrap_or(false);
+                let is_thinking = part
+                    .get("thought")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
 
                 if is_thinking {
                     let idx = if let Some(idx) = thinking_block_idx {
                         *idx
                     } else {
                         let idx = output.content.len();
-                        output.content.push(ContentBlock::Thinking(crate::types::ThinkingContent {
-                            thinking: String::new(),
-                            thinking_signature: None,
-                            redacted: false,
-                        }));
+                        output.content.push(ContentBlock::Thinking(
+                            crate::types::ThinkingContent {
+                                thinking: String::new(),
+                                thinking_signature: None,
+                                redacted: false,
+                            },
+                        ));
                         *thinking_block_idx = Some(idx);
-                        let _ = tx.send(StreamEvent::ThinkingStart {
-                            content_index: idx,
-                            partial: partial_from_output(output),
-                        }).await;
+                        let _ = tx
+                            .send(StreamEvent::ThinkingStart {
+                                content_index: idx,
+                                partial: partial_from_output(output),
+                            })
+                            .await;
                         idx
                     };
                     if let ContentBlock::Thinking(ref mut tc) = output.content[idx] {
@@ -386,11 +460,13 @@ async fn process_google_response(
                             }
                         }
                     }
-                    let _ = tx.send(StreamEvent::ThinkingDelta {
-                        content_index: idx,
-                        delta: text.to_string(),
-                        partial: partial_from_output(output),
-                    }).await;
+                    let _ = tx
+                        .send(StreamEvent::ThinkingDelta {
+                            content_index: idx,
+                            delta: text.to_string(),
+                            partial: partial_from_output(output),
+                        })
+                        .await;
                 } else {
                     let idx = if let Some(idx) = text_block_idx {
                         *idx
@@ -398,10 +474,12 @@ async fn process_google_response(
                         let idx = output.content.len();
                         output.content.push(ContentBlock::text(""));
                         *text_block_idx = Some(idx);
-                        let _ = tx.send(StreamEvent::TextStart {
-                            content_index: idx,
-                            partial: partial_from_output(output),
-                        }).await;
+                        let _ = tx
+                            .send(StreamEvent::TextStart {
+                                content_index: idx,
+                                partial: partial_from_output(output),
+                            })
+                            .await;
                         idx
                     };
                     if let ContentBlock::Text(ref mut tc) = output.content[idx] {
@@ -412,11 +490,13 @@ async fn process_google_response(
                             }
                         }
                     }
-                    let _ = tx.send(StreamEvent::TextDelta {
-                        content_index: idx,
-                        delta: text.to_string(),
-                        partial: partial_from_output(output),
-                    }).await;
+                    let _ = tx
+                        .send(StreamEvent::TextDelta {
+                            content_index: idx,
+                            delta: text.to_string(),
+                            partial: partial_from_output(output),
+                        })
+                        .await;
                 }
             }
 
@@ -432,24 +512,30 @@ async fn process_google_response(
                     args.clone(),
                 ));
 
-                let _ = tx.send(StreamEvent::ToolCallStart {
-                    content_index: idx,
-                    partial: partial_from_output(output),
-                }).await;
+                let _ = tx
+                    .send(StreamEvent::ToolCallStart {
+                        content_index: idx,
+                        partial: partial_from_output(output),
+                    })
+                    .await;
 
-                let _ = tx.send(StreamEvent::ToolCallDelta {
-                    content_index: idx,
-                    delta: serde_json::to_string(args).unwrap_or_default(),
-                    partial: partial_from_output(output),
-                }).await;
+                let _ = tx
+                    .send(StreamEvent::ToolCallDelta {
+                        content_index: idx,
+                        delta: serde_json::to_string(args).unwrap_or_default(),
+                        partial: partial_from_output(output),
+                    })
+                    .await;
 
                 // End the tool call immediately since Google sends it all at once
                 if let ContentBlock::ToolCall(tc) = &output.content[idx] {
-                    let _ = tx.send(StreamEvent::ToolCallEnd {
-                        content_index: idx,
-                        tool_call: tc.clone(),
-                        partial: partial_from_output(output),
-                    }).await;
+                    let _ = tx
+                        .send(StreamEvent::ToolCallEnd {
+                            content_index: idx,
+                            tool_call: tc.clone(),
+                            partial: partial_from_output(output),
+                        })
+                        .await;
                 }
             }
         }

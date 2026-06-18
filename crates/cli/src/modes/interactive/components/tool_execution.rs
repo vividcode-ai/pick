@@ -1,5 +1,4 @@
-﻿//! Tool execution display component
-
+//! Tool execution display component
 
 /// State of a tool execution in the display
 pub enum ToolExecutionState {

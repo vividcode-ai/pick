@@ -1,5 +1,4 @@
-﻿//! Package manager CLI commands
-
+//! Package manager CLI commands
 
 /// Run a package manager CLI command
 pub async fn run_package_manager_cli(args: &[String]) -> Result<(), String> {
@@ -61,7 +60,10 @@ pub async fn run_package_manager_cli(args: &[String]) -> Result<(), String> {
             print_help();
         }
         _ => {
-            return Err(format!("Unknown command: {}. Use 'pkg help' for usage.", args[0]));
+            return Err(format!(
+                "Unknown command: {}. Use 'pkg help' for usage.",
+                args[0]
+            ));
         }
     }
 

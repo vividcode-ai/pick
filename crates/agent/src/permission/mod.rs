@@ -1,16 +1,16 @@
-﻿pub mod evaluate;
-pub mod disabled;
-pub mod fs_policy;
-pub mod exec_policy;
-pub mod hooks;
 pub mod approval;
-pub mod profiles;
-pub mod guardian;
-pub mod network;
-pub mod sandbox;
-pub mod manager;
-pub mod external_dir;
 pub mod audit;
+pub mod disabled;
+pub mod evaluate;
+pub mod exec_policy;
+pub mod external_dir;
+pub mod fs_policy;
+pub mod guardian;
+pub mod hooks;
+pub mod manager;
+pub mod network;
+pub mod profiles;
+pub mod sandbox;
 
 use serde::{Deserialize, Serialize};
 
@@ -104,9 +104,22 @@ pub fn action_to_str(a: Action) -> &'static str {
 }
 
 pub const PERMISSION_KEYS: &[&str] = &[
-    "read", "edit", "bash", "grep", "glob", "list", "subagent",
-    "question", "plan_enter", "plan_exit", "external_directory",
-    "webfetch", "todo_plan", "create_goal", "update_goal", "get_goal",
+    "read",
+    "edit",
+    "bash",
+    "grep",
+    "glob",
+    "list",
+    "subagent",
+    "question",
+    "plan_enter",
+    "plan_exit",
+    "external_directory",
+    "webfetch",
+    "todo_plan",
+    "create_goal",
+    "update_goal",
+    "get_goal",
 ];
 
 pub fn tool_to_permission_key(tool_name: &str) -> &str {

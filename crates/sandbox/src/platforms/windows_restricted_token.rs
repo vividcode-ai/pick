@@ -1,6 +1,6 @@
-﻿#![allow(unsafe_op_in_unsafe_fn, unused_imports, dead_code)]
+#![allow(unsafe_op_in_unsafe_fn, unused_imports, dead_code)]
 
-use pick_agent::permission::sandbox::{SandboxConfig, SandboxRequest, Sandbox, SandboxType};
+use pick_agent::permission::sandbox::{Sandbox, SandboxConfig, SandboxRequest, SandboxType};
 
 pub struct WindowsRestrictedTokenSandbox {
     enabled: bool,
@@ -26,37 +26,30 @@ pub(crate) mod win_impl {
     use std::path::Path;
     use std::ptr;
 
-    use super::{DACL_SECURITY_INFORMATION, CONTAINER_INHERIT_ACE, OBJECT_INHERIT_ACE};
+    use super::{CONTAINER_INHERIT_ACE, DACL_SECURITY_INFORMATION, OBJECT_INHERIT_ACE};
     use pick_agent::permission::sandbox::SandboxRequest;
 
     use windows_sys::Win32::Foundation::{
-        CloseHandle, GetLastError, HANDLE, INVALID_HANDLE_VALUE,
-        ERROR_SUCCESS, WAIT_OBJECT_0, WAIT_TIMEOUT, HLOCAL,
-    };
-    use windows_sys::Win32::Security::{
-        CreateRestrictedToken, GetTokenInformation, SetTokenInformation,
-        TokenDefaultDacl, TokenGroups,
-        DISABLE_MAX_PRIVILEGE, LUA_TOKEN, WRITE_RESTRICTED,
-        SID_AND_ATTRIBUTES, TOKEN_GROUPS,
-        TOKEN_QUERY, TOKEN_DUPLICATE, TOKEN_ADJUST_DEFAULT,
-        TOKEN_ASSIGN_PRIMARY, TOKEN_ADJUST_SESSIONID,
-        TOKEN_ADJUST_PRIVILEGES,
-        GetLengthSid, ACL,
+        CloseHandle, ERROR_SUCCESS, GetLastError, HANDLE, HLOCAL, INVALID_HANDLE_VALUE,
+        WAIT_OBJECT_0, WAIT_TIMEOUT,
     };
     use windows_sys::Win32::Security::Authorization::{
-        SetEntriesInAclW, SetNamedSecurityInfoW, GetNamedSecurityInfoW,
-        EXPLICIT_ACCESS_W, TRUSTEE_W, TRUSTEE_IS_SID,
-        TRUSTEE_IS_USER, NO_MULTIPLE_TRUSTEE,
-        SE_FILE_OBJECT,
+        EXPLICIT_ACCESS_W, GetNamedSecurityInfoW, NO_MULTIPLE_TRUSTEE, SE_FILE_OBJECT,
+        SetEntriesInAclW, SetNamedSecurityInfoW, TRUSTEE_IS_SID, TRUSTEE_IS_USER, TRUSTEE_W,
     };
-    use windows_sys::Win32::System::Threading::{
-        CreateProcessAsUserW, GetCurrentProcess, OpenProcessToken,
-        PROCESS_INFORMATION, STARTUPINFOW,
-        WaitForSingleObject, GetExitCodeProcess, TerminateProcess,
+    use windows_sys::Win32::Security::{
+        ACL, CreateRestrictedToken, DISABLE_MAX_PRIVILEGE, GetLengthSid, GetTokenInformation,
+        LUA_TOKEN, SID_AND_ATTRIBUTES, SetTokenInformation, TOKEN_ADJUST_DEFAULT,
+        TOKEN_ADJUST_PRIVILEGES, TOKEN_ADJUST_SESSIONID, TOKEN_ASSIGN_PRIMARY, TOKEN_DUPLICATE,
+        TOKEN_GROUPS, TOKEN_QUERY, TokenDefaultDacl, TokenGroups, WRITE_RESTRICTED,
+    };
+    use windows_sys::Win32::Storage::FileSystem::{
+        FILE_DELETE_CHILD, FILE_GENERIC_WRITE, ReadFile,
     };
     use windows_sys::Win32::System::Pipes::CreatePipe;
-    use windows_sys::Win32::Storage::FileSystem::{
-        ReadFile, FILE_GENERIC_WRITE, FILE_DELETE_CHILD,
+    use windows_sys::Win32::System::Threading::{
+        CreateProcessAsUserW, GetCurrentProcess, GetExitCodeProcess, OpenProcessToken,
+        PROCESS_INFORMATION, STARTUPINFOW, TerminateProcess, WaitForSingleObject,
     };
 
     unsafe fn create_restricted_token() -> Result<(HANDLE, Vec<u8>), String> {
@@ -64,8 +57,11 @@ pub(crate) mod win_impl {
         let mut h_token: HANDLE = INVALID_HANDLE_VALUE;
         let ok = OpenProcessToken(
             current_process,
-            TOKEN_DUPLICATE | TOKEN_QUERY | TOKEN_ADJUST_DEFAULT
-                | TOKEN_ASSIGN_PRIMARY | TOKEN_ADJUST_SESSIONID
+            TOKEN_DUPLICATE
+                | TOKEN_QUERY
+                | TOKEN_ADJUST_DEFAULT
+                | TOKEN_ASSIGN_PRIMARY
+                | TOKEN_ADJUST_SESSIONID
                 | TOKEN_ADJUST_PRIVILEGES,
             &mut h_token,
         );
@@ -82,10 +78,14 @@ pub(crate) mod win_impl {
         let mut new_token: HANDLE = 0;
         let flags = DISABLE_MAX_PRIVILEGE | LUA_TOKEN | WRITE_RESTRICTED;
         let ok = CreateRestrictedToken(
-            h_token, flags,
-            0, ptr::null(),
-            0, ptr::null(),
-            entries.len() as u32, entries.as_mut_ptr(),
+            h_token,
+            flags,
+            0,
+            ptr::null(),
+            0,
+            ptr::null(),
+            entries.len() as u32,
+            entries.as_mut_ptr(),
             &mut new_token,
         );
         CloseHandle(h_token);
@@ -111,7 +111,8 @@ pub(crate) mod win_impl {
         let code = SetEntriesInAclW(1, &explicit, ptr::null(), &mut p_new_dacl);
         if code == ERROR_SUCCESS && !p_new_dacl.is_null() {
             let _ = SetTokenInformation(
-                new_token, TokenDefaultDacl,
+                new_token,
+                TokenDefaultDacl,
                 &p_new_dacl as *const *mut ACL as *const c_void,
                 std::mem::size_of::<*mut ACL>() as u32,
             );
@@ -129,8 +130,11 @@ pub(crate) mod win_impl {
         }
         let mut buf = vec![0u8; size as usize];
         let ok = GetTokenInformation(
-            token, TokenGroups,
-            buf.as_mut_ptr() as *mut c_void, size, &mut size,
+            token,
+            TokenGroups,
+            buf.as_mut_ptr() as *mut c_void,
+            size,
+            &mut size,
         );
         if ok == 0 {
             return Ok(vec![0u8; 68]);
@@ -144,7 +148,9 @@ pub(crate) mod win_impl {
                 let sid_len = GetLengthSid(sid_ptr) as usize;
                 let mut sid_bytes = vec![0u8; sid_len];
                 std::ptr::copy_nonoverlapping(
-                    sid_ptr as *const u8, sid_bytes.as_mut_ptr(), sid_len,
+                    sid_ptr as *const u8,
+                    sid_bytes.as_mut_ptr(),
+                    sid_len,
                 );
                 return Ok(sid_bytes);
             }
@@ -159,14 +165,16 @@ pub(crate) mod win_impl {
         let mut stderr_write: HANDLE = 0;
 
         let mut sa: windows_sys::Win32::Security::SECURITY_ATTRIBUTES = std::mem::zeroed();
-        sa.nLength = std::mem::size_of::<windows_sys::Win32::Security::SECURITY_ATTRIBUTES>() as u32;
+        sa.nLength =
+            std::mem::size_of::<windows_sys::Win32::Security::SECURITY_ATTRIBUTES>() as u32;
         sa.bInheritHandle = 1;
 
         if CreatePipe(&mut stdout_read, &mut stdout_write, &sa, 0) == 0 {
             return Err(format!("CreatePipe stdout failed: {}", GetLastError()));
         }
         if CreatePipe(&mut stderr_read, &mut stderr_write, &sa, 0) == 0 {
-            CloseHandle(stdout_read); CloseHandle(stdout_write);
+            CloseHandle(stdout_read);
+            CloseHandle(stdout_write);
             return Err(format!("CreatePipe stderr failed: {}", GetLastError()));
         }
 
@@ -183,10 +191,11 @@ pub(crate) mod win_impl {
         stdout_write: HANDLE,
         stderr_write: HANDLE,
     ) -> Result<PROCESS_INFORMATION, String> {
-        let mut cmd_ws: Vec<u16> = command_line.encode_utf16()
-            .chain(std::iter::once(0)).collect();
-        let cwd_ws: Vec<u16> = cwd.encode_utf16()
-            .chain(std::iter::once(0)).collect();
+        let mut cmd_ws: Vec<u16> = command_line
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
+        let cwd_ws: Vec<u16> = cwd.encode_utf16().chain(std::iter::once(0)).collect();
 
         let si = STARTUPINFOW {
             cb: std::mem::size_of::<STARTUPINFOW>() as u32,
@@ -209,7 +218,8 @@ pub(crate) mod win_impl {
             token,
             ptr::null(),
             cmd_ws.as_mut_ptr() as *mut u16,
-            ptr::null(), ptr::null(),
+            ptr::null(),
+            ptr::null(),
             1,
             flags,
             ptr::null(),
@@ -245,7 +255,9 @@ pub(crate) mod win_impl {
                     result.push_str(&s);
                 }
             }
-            unsafe { CloseHandle(pipe); }
+            unsafe {
+                CloseHandle(pipe);
+            }
             result
         })
     }
@@ -274,8 +286,11 @@ pub(crate) mod win_impl {
 
             let full_cmd = format!("{} {}", req.program, req.args.join(" "));
             let pi = spawn_process(
-                token, &full_cmd, &req.cwd.to_string_lossy(),
-                stdout_write, stderr_write,
+                token,
+                &full_cmd,
+                &req.cwd.to_string_lossy(),
+                stdout_write,
+                stderr_write,
             )?;
 
             CloseHandle(stdout_write);
@@ -285,7 +300,11 @@ pub(crate) mod win_impl {
             let stdout_thread = read_pipe_async(stdout_read);
             let stderr_thread = read_pipe_async(stderr_read);
 
-            let timeout_ms = if req.timeout_secs > 0 { req.timeout_secs * 1000 } else { 30000 };
+            let timeout_ms = if req.timeout_secs > 0 {
+                req.timeout_secs * 1000
+            } else {
+                30000
+            };
             let wait_result = WaitForSingleObject(pi.hProcess, timeout_ms as u32);
 
             let mut exit_code: i32 = -1;
@@ -308,16 +327,17 @@ pub(crate) mod win_impl {
 
     unsafe fn apply_allow_ace(path: &str, psid: *mut c_void) -> Result<(), String> {
         use std::ptr;
-        let wide: Vec<u16> = path.encode_utf16()
-            .chain(std::iter::once(0)).collect();
+        let wide: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
         let mut p_dacl: *mut ACL = ptr::null_mut();
         let mut p_sd: *mut c_void = ptr::null_mut();
         let code = GetNamedSecurityInfoW(
             wide.as_ptr(),
             SE_FILE_OBJECT,
             DACL_SECURITY_INFORMATION,
-            ptr::null_mut(), ptr::null_mut(),
-            &mut p_dacl, ptr::null_mut(),
+            ptr::null_mut(),
+            ptr::null_mut(),
+            &mut p_dacl,
+            ptr::null_mut(),
             &mut p_sd,
         );
         if code != ERROR_SUCCESS {
@@ -348,8 +368,10 @@ pub(crate) mod win_impl {
                 wide.as_ptr() as *mut u16,
                 SE_FILE_OBJECT,
                 DACL_SECURITY_INFORMATION,
-                ptr::null_mut(), ptr::null_mut(),
-                p_new_dacl, ptr::null_mut(),
+                ptr::null_mut(),
+                ptr::null_mut(),
+                p_new_dacl,
+                ptr::null_mut(),
             );
             windows_sys::Win32::Foundation::LocalFree(p_new_dacl as HLOCAL);
         }
@@ -361,16 +383,17 @@ pub(crate) mod win_impl {
 
     unsafe fn apply_deny_write_ace(path: &str, psid: *mut c_void) -> Result<(), String> {
         use std::ptr;
-        let wide: Vec<u16> = path.encode_utf16()
-            .chain(std::iter::once(0)).collect();
+        let wide: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
         let mut p_dacl: *mut ACL = ptr::null_mut();
         let mut p_sd: *mut c_void = ptr::null_mut();
         let code = GetNamedSecurityInfoW(
             wide.as_ptr(),
             SE_FILE_OBJECT,
             DACL_SECURITY_INFORMATION,
-            ptr::null_mut(), ptr::null_mut(),
-            &mut p_dacl, ptr::null_mut(),
+            ptr::null_mut(),
+            ptr::null_mut(),
+            &mut p_dacl,
+            ptr::null_mut(),
             &mut p_sd,
         );
         if code != ERROR_SUCCESS {
@@ -388,10 +411,7 @@ pub(crate) mod win_impl {
             ptstrName: psid as *mut u16,
         };
         let mut explicit: EXPLICIT_ACCESS_W = std::mem::zeroed();
-        explicit.grfAccessPermissions =
-            FILE_GENERIC_WRITE
-            | FILE_DELETE_CHILD
-            | 0x00010000; // DELETE
+        explicit.grfAccessPermissions = FILE_GENERIC_WRITE | FILE_DELETE_CHILD | 0x00010000; // DELETE
         explicit.grfAccessMode = 1; // DENY_ACCESS
         explicit.grfInheritance = CONTAINER_INHERIT_ACE | OBJECT_INHERIT_ACE;
         explicit.Trustee = trustee;
@@ -403,8 +423,10 @@ pub(crate) mod win_impl {
                 wide.as_ptr() as *mut u16,
                 SE_FILE_OBJECT,
                 DACL_SECURITY_INFORMATION,
-                ptr::null_mut(), ptr::null_mut(),
-                p_new_dacl, ptr::null_mut(),
+                ptr::null_mut(),
+                ptr::null_mut(),
+                p_new_dacl,
+                ptr::null_mut(),
             );
             windows_sys::Win32::Foundation::LocalFree(p_new_dacl as HLOCAL);
         }

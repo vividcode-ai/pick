@@ -65,7 +65,10 @@ pub fn extract_ansi_code(s: &str, pos: usize) -> Option<AnsiCodeMatch> {
         }
         if j < bytes.len() {
             let code = s[pos..=j].to_string();
-            return Some(AnsiCodeMatch { code, length: j + 1 - pos });
+            return Some(AnsiCodeMatch {
+                code,
+                length: j + 1 - pos,
+            });
         }
         return None;
     }
@@ -75,11 +78,17 @@ pub fn extract_ansi_code(s: &str, pos: usize) -> Option<AnsiCodeMatch> {
         while j < bytes.len() {
             if bytes[j] == 0x07 {
                 let code = s[pos..=j].to_string();
-                return Some(AnsiCodeMatch { code, length: j + 1 - pos });
+                return Some(AnsiCodeMatch {
+                    code,
+                    length: j + 1 - pos,
+                });
             }
             if bytes[j] == 0x1b && bytes.get(j + 1) == Some(&b'\\') {
                 let code = s[pos..=j + 2].to_string();
-                return Some(AnsiCodeMatch { code, length: j + 2 - pos });
+                return Some(AnsiCodeMatch {
+                    code,
+                    length: j + 2 - pos,
+                });
             }
             j += 1;
         }
@@ -91,11 +100,17 @@ pub fn extract_ansi_code(s: &str, pos: usize) -> Option<AnsiCodeMatch> {
         while j < bytes.len() {
             if bytes[j] == 0x07 {
                 let code = s[pos..=j].to_string();
-                return Some(AnsiCodeMatch { code, length: j + 1 - pos });
+                return Some(AnsiCodeMatch {
+                    code,
+                    length: j + 1 - pos,
+                });
             }
             if bytes[j] == 0x1b && bytes.get(j + 1) == Some(&b'\\') {
                 let code = s[pos..=j + 2].to_string();
-                return Some(AnsiCodeMatch { code, length: j + 2 - pos });
+                return Some(AnsiCodeMatch {
+                    code,
+                    length: j + 2 - pos,
+                });
             }
             j += 1;
         }
@@ -161,21 +176,36 @@ impl AnsiCodeTracker {
         while i < parts.len() {
             let code: u16 = match parts[i].parse() {
                 Ok(v) => v,
-                Err(_) => { i += 1; continue; }
+                Err(_) => {
+                    i += 1;
+                    continue;
+                }
             };
 
             if code == 38 || code == 48 {
                 if i + 2 < parts.len() && parts.get(i + 1) == Some(&"5") {
                     let color_code = format!("{};{};{}", parts[i], parts[i + 1], parts[i + 2]);
-                    if code == 38 { self.fg_color = Some(color_code); }
-                    else { self.bg_color = Some(color_code); }
+                    if code == 38 {
+                        self.fg_color = Some(color_code);
+                    } else {
+                        self.bg_color = Some(color_code);
+                    }
                     i += 3;
                     continue;
                 } else if i + 4 < parts.len() && parts.get(i + 1) == Some(&"2") {
-                    let color_code = format!("{};{};{};{};{}",
-                        parts[i], parts[i + 1], parts[i + 2], parts[i + 3], parts[i + 4]);
-                    if code == 38 { self.fg_color = Some(color_code); }
-                    else { self.bg_color = Some(color_code); }
+                    let color_code = format!(
+                        "{};{};{};{};{}",
+                        parts[i],
+                        parts[i + 1],
+                        parts[i + 2],
+                        parts[i + 3],
+                        parts[i + 4]
+                    );
+                    if code == 38 {
+                        self.fg_color = Some(color_code);
+                    } else {
+                        self.bg_color = Some(color_code);
+                    }
                     i += 5;
                     continue;
                 }
@@ -191,7 +221,10 @@ impl AnsiCodeTracker {
                 7 => self.inverse = true,
                 8 => self.hidden = true,
                 9 => self.strikethrough = true,
-                21 | 22 => { self.bold = false; self.dim = false; }
+                21 | 22 => {
+                    self.bold = false;
+                    self.dim = false;
+                }
                 23 => self.italic = false,
                 24 => self.underline = false,
                 25 => self.blink = false,
@@ -231,16 +264,36 @@ impl AnsiCodeTracker {
 
     pub fn get_active_codes(&self) -> String {
         let mut codes: Vec<String> = Vec::new();
-        if self.bold { codes.push("1".to_string()); }
-        if self.dim { codes.push("2".to_string()); }
-        if self.italic { codes.push("3".to_string()); }
-        if self.underline { codes.push("4".to_string()); }
-        if self.blink { codes.push("5".to_string()); }
-        if self.inverse { codes.push("7".to_string()); }
-        if self.hidden { codes.push("8".to_string()); }
-        if self.strikethrough { codes.push("9".to_string()); }
-        if let Some(ref c) = self.fg_color { codes.push(c.clone()); }
-        if let Some(ref c) = self.bg_color { codes.push(c.clone()); }
+        if self.bold {
+            codes.push("1".to_string());
+        }
+        if self.dim {
+            codes.push("2".to_string());
+        }
+        if self.italic {
+            codes.push("3".to_string());
+        }
+        if self.underline {
+            codes.push("4".to_string());
+        }
+        if self.blink {
+            codes.push("5".to_string());
+        }
+        if self.inverse {
+            codes.push("7".to_string());
+        }
+        if self.hidden {
+            codes.push("8".to_string());
+        }
+        if self.strikethrough {
+            codes.push("9".to_string());
+        }
+        if let Some(ref c) = self.fg_color {
+            codes.push(c.clone());
+        }
+        if let Some(ref c) = self.bg_color {
+            codes.push(c.clone());
+        }
 
         if codes.is_empty() {
             String::new()
@@ -250,9 +303,16 @@ impl AnsiCodeTracker {
     }
 
     pub fn has_active_codes(&self) -> bool {
-        self.bold || self.dim || self.italic || self.underline || self.blink
-            || self.inverse || self.hidden || self.strikethrough
-            || self.fg_color.is_some() || self.bg_color.is_some()
+        self.bold
+            || self.dim
+            || self.italic
+            || self.underline
+            || self.blink
+            || self.inverse
+            || self.hidden
+            || self.strikethrough
+            || self.fg_color.is_some()
+            || self.bg_color.is_some()
     }
 
     pub fn get_line_end_reset(&self) -> String {

@@ -1,6 +1,4 @@
-use pick_agent::session::{
-    AgentModeChangeEntry, SessionEntry, SessionEntryKind,
-};
+use pick_agent::session::{AgentModeChangeEntry, SessionEntry, SessionEntryKind};
 use pick_tui::components::select::{SelectItem, SelectList};
 
 use super::context::TuiContext;
@@ -39,12 +37,7 @@ pub(crate) async fn handle_cycle_model(ctx: &mut TuiContext) {
     let (next_model_id, next_provider) = &cycle_list[next_idx];
 
     if *next_model_id != ctx.model_id {
-        switch_to_model(
-            ctx,
-            next_model_id,
-            Some(next_provider),
-        )
-        .await;
+        switch_to_model(ctx, next_model_id, Some(next_provider)).await;
     }
     ctx.tui.finalize_turn();
 }
@@ -84,12 +77,7 @@ pub(crate) async fn handle_cycle_model_backward(ctx: &mut TuiContext) {
     let (next_model_id, next_provider) = &cycle_list[prev_idx];
 
     if *next_model_id != ctx.model_id {
-        switch_to_model(
-            ctx,
-            next_model_id,
-            Some(next_provider),
-        )
-        .await;
+        switch_to_model(ctx, next_model_id, Some(next_provider)).await;
     }
     ctx.tui.finalize_turn();
 }
@@ -99,15 +87,13 @@ pub(crate) fn handle_select_model(ctx: &mut TuiContext) {
     ctx.pending_command = Some("model".to_string());
     let models = pick_ai::models::get_models(&ctx.provider);
     let items: Vec<SelectItem> = if models.is_empty() {
-        vec![SelectItem::new(ctx.model_id.clone(), ctx.model_id.clone())
-            .with_description("Current")]
+        vec![
+            SelectItem::new(ctx.model_id.clone(), ctx.model_id.clone()).with_description("Current"),
+        ]
     } else {
         models
             .iter()
-            .map(|m| {
-                SelectItem::new(m.id.clone(), m.id.clone())
-                    .with_description(m.name.clone())
-            })
+            .map(|m| SelectItem::new(m.id.clone(), m.id.clone()).with_description(m.name.clone()))
             .collect()
     };
     let select = SelectList::new("Models", items);
@@ -131,9 +117,10 @@ pub(crate) fn handle_cycle_thinking(ctx: &mut TuiContext) {
     ctx.thinking_level = next_level;
     let level_str = format!("{:?}", ctx.thinking_level).to_lowercase();
     ctx.tui.thinking_level = level_str.clone();
-    ctx.tui
-        .chat
-        .add_system_message(&format!("Thinking level set to \x1b[1m{}\x1b[0m.", level_str));
+    ctx.tui.chat.add_system_message(&format!(
+        "Thinking level set to \x1b[1m{}\x1b[0m.",
+        level_str
+    ));
     ctx.tui.finalize_turn();
 }
 
@@ -181,11 +168,7 @@ pub(crate) async fn handle_cycle_mode(ctx: &mut TuiContext) {
 }
 
 /// Switch to a different model/provider and update state
-async fn switch_to_model(
-    ctx: &mut TuiContext,
-    new_model_id: &str,
-    new_provider: Option<&str>,
-) {
+async fn switch_to_model(ctx: &mut TuiContext, new_model_id: &str, new_provider: Option<&str>) {
     let resolved_provider = match new_provider {
         Some(p) if p != ctx.provider => p.to_string(),
         _ => ctx.provider.clone(),
@@ -211,12 +194,10 @@ async fn switch_to_model(
 
     ctx.tui.model_id = ctx.model_id.clone();
     ctx.tui.provider = ctx.provider.clone();
-    ctx.tui
-        .chat
-        .add_system_message(&format!(
-            "Switched to model: \x1b[1m{} ({})\x1b[0m",
-            ctx.model_id, ctx.provider
-        ));
+    ctx.tui.chat.add_system_message(&format!(
+        "Switched to model: \x1b[1m{} ({})\x1b[0m",
+        ctx.model_id, ctx.provider
+    ));
 }
 
 /// Refresh tools and system prompt after mode/MCP change

@@ -31,7 +31,9 @@ pub struct SessionManager {
 impl SessionManager {
     /// Create a new session in the given directory
     pub async fn create(cwd: PathBuf, session_dir: Option<PathBuf>) -> Result<Self, StorageError> {
-        let dir = session_dir.clone().unwrap_or_else(|| cwd.join(".pick").join("sessions"));
+        let dir = session_dir
+            .clone()
+            .unwrap_or_else(|| cwd.join(".pick").join("sessions"));
         let id = uuid::Uuid::now_v7().to_string();
         let path = dir.join(format!("{}.jsonl", id));
         std::fs::create_dir_all(&dir).ok();
@@ -79,7 +81,8 @@ impl SessionManager {
         for entry in &self.entries {
             if let SessionEntryKind::Label(le) = &entry.kind {
                 if let Some(label) = &le.label {
-                    self.labels_by_id.insert(le.target_id.clone(), label.clone());
+                    self.labels_by_id
+                        .insert(le.target_id.clone(), label.clone());
                     self.label_timestamps_by_id
                         .insert(le.target_id.clone(), entry.timestamp.to_string());
                 } else {
@@ -112,7 +115,6 @@ impl SessionManager {
         };
         mgr.rebuild_label_index();
         Ok(mgr)
-
     }
 
     /// Detect leaf_id from a slice of entries (static helper)
@@ -146,21 +148,30 @@ impl SessionManager {
         new_header.id = uuid::Uuid::now_v7().to_string();
         new_header.cwd = Some(cwd.to_string_lossy().to_string());
 
-        let session_path = cwd.join(".pick").join("sessions").join(&format!("{}.jsonl", new_header.id));
+        let session_path = cwd
+            .join(".pick")
+            .join("sessions")
+            .join(&format!("{}.jsonl", new_header.id));
         if let Some(parent) = session_path.parent() {
-            tokio::fs::create_dir_all(parent).await.map_err(StorageError::Io)?;
+            tokio::fs::create_dir_all(parent)
+                .await
+                .map_err(StorageError::Io)?;
         }
         let storage = JsonlStorage::new(session_path.clone());
         storage.save_header(new_header.clone()).await?;
 
         // Update latest session_info entry with fork numbering
         let mut entries = entries;
-        if let Some(idx) = entries.iter().rposition(|e| matches!(&e.kind, SessionEntryKind::SessionInfo(_))) {
+        if let Some(idx) = entries
+            .iter()
+            .rposition(|e| matches!(&e.kind, SessionEntryKind::SessionInfo(_)))
+        {
             if let SessionEntryKind::SessionInfo(ref info) = entries[idx].kind.clone() {
                 let forked_name = Self::forked_title(&info.name);
-                entries[idx].kind = SessionEntryKind::SessionInfo(super::entries::SessionInfoEntry {
-                    name: forked_name,
-                });
+                entries[idx].kind =
+                    SessionEntryKind::SessionInfo(super::entries::SessionInfoEntry {
+                        name: forked_name,
+                    });
             }
         }
 
@@ -260,7 +271,10 @@ impl SessionManager {
         let mut current = entry_map.get(entry_id);
         while let Some(entry) = current {
             path.push(*entry);
-            current = entry.parent_id.as_deref().and_then(|pid| entry_map.get(pid));
+            current = entry
+                .parent_id
+                .as_deref()
+                .and_then(|pid| entry_map.get(pid));
         }
 
         path.reverse();
@@ -269,33 +283,41 @@ impl SessionManager {
 
     /// Find all entries of a specific kind
     pub fn find_entries_by_kind(&self, kind: &str) -> Vec<&SessionEntry> {
-        self.entries.iter().filter(|e| {
-            let entry_kind = match &e.kind {
-                super::entries::SessionEntryKind::Message(_) => "message",
-                super::entries::SessionEntryKind::Compaction(_) => "compaction",
-                super::entries::SessionEntryKind::BranchSummary(_) => "branch_summary",
-                super::entries::SessionEntryKind::ModelChange(_) => "model_change",
-                super::entries::SessionEntryKind::ThinkingLevelChange(_) => "thinking_level_change",
-                super::entries::SessionEntryKind::Custom(_) => "custom",
-                super::entries::SessionEntryKind::SessionInfo(_) => "session_info",
-                super::entries::SessionEntryKind::LeafChange(_) => "leaf_change",
-                super::entries::SessionEntryKind::Label(_) => "label",
-                super::entries::SessionEntryKind::AgentModeChange(_) => "agent_mode_change",
-                super::entries::SessionEntryKind::TodoUpdate(_) => "todo_update",
-                super::entries::SessionEntryKind::Goal(_) => "goal",
-            };
-            entry_kind == kind
-        }).collect()
+        self.entries
+            .iter()
+            .filter(|e| {
+                let entry_kind = match &e.kind {
+                    super::entries::SessionEntryKind::Message(_) => "message",
+                    super::entries::SessionEntryKind::Compaction(_) => "compaction",
+                    super::entries::SessionEntryKind::BranchSummary(_) => "branch_summary",
+                    super::entries::SessionEntryKind::ModelChange(_) => "model_change",
+                    super::entries::SessionEntryKind::ThinkingLevelChange(_) => {
+                        "thinking_level_change"
+                    }
+                    super::entries::SessionEntryKind::Custom(_) => "custom",
+                    super::entries::SessionEntryKind::SessionInfo(_) => "session_info",
+                    super::entries::SessionEntryKind::LeafChange(_) => "leaf_change",
+                    super::entries::SessionEntryKind::Label(_) => "label",
+                    super::entries::SessionEntryKind::AgentModeChange(_) => "agent_mode_change",
+                    super::entries::SessionEntryKind::TodoUpdate(_) => "todo_update",
+                    super::entries::SessionEntryKind::Goal(_) => "goal",
+                };
+                entry_kind == kind
+            })
+            .collect()
     }
 
     /// Get leaf entries (entries with no children) - these represent
     /// the latest state on each conversation branch.
     pub fn get_leaf_entries(&self) -> Vec<&SessionEntry> {
-        let child_ids: HashSet<&str> = self.entries.iter()
+        let child_ids: HashSet<&str> = self
+            .entries
+            .iter()
             .filter_map(|e| e.parent_id.as_deref())
             .collect();
 
-        self.entries.iter()
+        self.entries
+            .iter()
             .filter(|e| !child_ids.contains(e.id.as_str()))
             .collect()
     }
@@ -303,7 +325,9 @@ impl SessionManager {
     /// Get entries that have a specific parent (direct children).
     /// Returns entries in chronological order.
     pub fn get_children(&self, parent_id: &str) -> Vec<&SessionEntry> {
-        let mut children: Vec<&SessionEntry> = self.entries.iter()
+        let mut children: Vec<&SessionEntry> = self
+            .entries
+            .iter()
             .filter(|e| e.parent_id.as_deref() == Some(parent_id))
             .collect();
         children.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
@@ -333,16 +357,13 @@ impl SessionManager {
 
     /// Get the latest session name by scanning entries in reverse
     pub fn get_session_name(&self) -> Option<&str> {
-        self.entries
-            .iter()
-            .rev()
-            .find_map(|e| {
-                if let SessionEntryKind::SessionInfo(info) = &e.kind {
-                    Some(info.name.as_str())
-                } else {
-                    None
-                }
-            })
+        self.entries.iter().rev().find_map(|e| {
+            if let SessionEntryKind::SessionInfo(info) = &e.kind {
+                Some(info.name.as_str())
+            } else {
+                None
+            }
+        })
     }
 
     // ── Leaf / Branch navigation ─────────────────────────────────────
@@ -393,8 +414,10 @@ impl SessionManager {
             }),
         };
         if let Some(l) = label {
-            self.labels_by_id.insert(target_id.to_string(), l.to_string());
-            self.label_timestamps_by_id.insert(target_id.to_string(), entry.timestamp.to_string());
+            self.labels_by_id
+                .insert(target_id.to_string(), l.to_string());
+            self.label_timestamps_by_id
+                .insert(target_id.to_string(), entry.timestamp.to_string());
         } else {
             self.labels_by_id.remove(target_id);
             self.label_timestamps_by_id.remove(target_id);
@@ -426,7 +449,9 @@ impl SessionManager {
 
     /// Build tree data for TUI rendering.
     pub fn build_tree(&self) -> Vec<tree::TreeNodeData> {
-        if self.entries.is_empty() { return Vec::new(); }
+        if self.entries.is_empty() {
+            return Vec::new();
+        }
         let mut children_map: HashMap<&str, Vec<&SessionEntry>> = HashMap::new();
         for entry in &self.entries {
             let pid = entry.parent_id.as_deref().unwrap_or("");
@@ -435,10 +460,14 @@ impl SessionManager {
         for (_, children) in children_map.iter_mut() {
             children.sort_by_key(|e| e.timestamp);
         }
-        let roots: Vec<&SessionEntry> = self.entries.iter()
+        let roots: Vec<&SessionEntry> = self
+            .entries
+            .iter()
             .filter(|e| e.parent_id.is_none() || e.parent_id.as_deref() == Some(""))
             .collect();
-        if roots.is_empty() { return Vec::new(); }
+        if roots.is_empty() {
+            return Vec::new();
+        }
 
         let mut result: Vec<tree::TreeNodeData> = Vec::new();
         let mut stack: Vec<(usize, &SessionEntry, bool, Vec<bool>)> = Vec::new();
@@ -452,9 +481,15 @@ impl SessionManager {
             let label = self.labels_by_id.get(&entry.id).cloned();
             let label_timestamp = self.label_timestamps_by_id.get(&entry.id).cloned();
             result.push(tree::TreeNodeData {
-                entry_id: entry.id.clone(), parent_id: entry.parent_id.clone(),
-                depth, has_children: child_count > 0, is_last,
-                gutters: gutters.clone(), label, label_timestamp, entry: entry.clone(),
+                entry_id: entry.id.clone(),
+                parent_id: entry.parent_id.clone(),
+                depth,
+                has_children: child_count > 0,
+                is_last,
+                gutters: gutters.clone(),
+                label,
+                label_timestamp,
+                entry: entry.clone(),
             });
             if let Some(children) = children {
                 for (i, child) in children.iter().enumerate().rev() {
@@ -483,24 +518,36 @@ impl SessionManager {
         }
         let mut current = Some(id_b);
         while let Some(id) = current {
-            if path_a.contains(&id) { return Some(id.to_string()); }
+            if path_a.contains(&id) {
+                return Some(id.to_string());
+            }
             current = entry_map.get(id).and_then(|e| e.parent_id.as_deref());
         }
         None
     }
 
-    pub fn collect_entries_for_summary<'a>(&'a self, old_leaf: &str, target_id: &str) -> Vec<&'a SessionEntry> {
+    pub fn collect_entries_for_summary<'a>(
+        &'a self,
+        old_leaf: &str,
+        target_id: &str,
+    ) -> Vec<&'a SessionEntry> {
         let ancestor = match self.find_common_ancestor(old_leaf, target_id) {
-            Some(a) => a, None => return Vec::new(),
+            Some(a) => a,
+            None => return Vec::new(),
         };
         let entry_map: HashMap<&str, &SessionEntry> =
             self.entries.iter().map(|e| (e.id.as_str(), e)).collect();
         let mut result: Vec<&SessionEntry> = Vec::new();
         let mut current = entry_map.get(old_leaf);
         while let Some(entry) = current {
-            if entry.id == ancestor { break; }
+            if entry.id == ancestor {
+                break;
+            }
             result.push(*entry);
-            current = entry.parent_id.as_deref().and_then(|pid| entry_map.get(pid));
+            current = entry
+                .parent_id
+                .as_deref()
+                .and_then(|pid| entry_map.get(pid));
         }
         result.reverse();
         result

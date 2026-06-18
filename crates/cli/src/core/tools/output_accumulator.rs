@@ -1,8 +1,10 @@
-﻿use std::fs::{File, OpenOptions};
+use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::PathBuf;
 
-use super::truncate::{TruncationResult, TruncationOptions, truncate_tail, DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES};
+use super::truncate::{
+    DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, TruncationOptions, TruncationResult, truncate_tail,
+};
 
 #[derive(Debug, Clone)]
 pub struct OutputSnapshot {
@@ -35,7 +37,11 @@ pub struct OutputAccumulator {
 }
 
 impl OutputAccumulator {
-    pub fn new(max_lines: Option<usize>, max_bytes: Option<usize>, temp_file_prefix: Option<&str>) -> Self {
+    pub fn new(
+        max_lines: Option<usize>,
+        max_bytes: Option<usize>,
+        temp_file_prefix: Option<&str>,
+    ) -> Self {
         let max_lines = max_lines.unwrap_or(DEFAULT_MAX_LINES);
         let max_bytes = max_bytes.unwrap_or(DEFAULT_MAX_BYTES);
         Self {
@@ -97,18 +103,16 @@ impl OutputAccumulator {
             },
         );
 
-        let truncated = self.total_lines > self.max_lines || self.total_decoded_bytes > self.max_bytes;
+        let truncated =
+            self.total_lines > self.max_lines || self.total_decoded_bytes > self.max_bytes;
         let truncated_by = if truncated {
-            Some(
-                tail_truncation
-                    .truncated_by
-                    .clone()
-                    .unwrap_or(if self.total_decoded_bytes > self.max_bytes {
-                        super::truncate::TruncationType::Bytes
-                    } else {
-                        super::truncate::TruncationType::Lines
-                    }),
-            )
+            Some(tail_truncation.truncated_by.clone().unwrap_or(
+                if self.total_decoded_bytes > self.max_bytes {
+                    super::truncate::TruncationType::Bytes
+                } else {
+                    super::truncate::TruncationType::Lines
+                },
+            ))
         } else {
             None
         };
@@ -134,7 +138,10 @@ impl OutputAccumulator {
         OutputSnapshot {
             content: truncation.content.clone(),
             truncation,
-            full_output_path: self.temp_file_path.as_ref().map(|p| p.to_string_lossy().to_string()),
+            full_output_path: self
+                .temp_file_path
+                .as_ref()
+                .map(|p| p.to_string_lossy().to_string()),
         }
     }
 
@@ -219,9 +226,8 @@ impl OutputAccumulator {
         if self.temp_file_path.is_some() {
             return;
         }
-        let id = uuid::Uuid::new_v7(uuid::Timestamp::now(uuid::NoContext))
-            .to_string()[..8]
-            .to_string();
+        let id =
+            uuid::Uuid::new_v7(uuid::Timestamp::now(uuid::NoContext)).to_string()[..8].to_string();
         let tmp_path = std::env::temp_dir().join(format!("{}-{}.log", self.temp_file_prefix, id));
         if let Ok(file) = OpenOptions::new()
             .create(true)

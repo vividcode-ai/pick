@@ -44,7 +44,11 @@ pub(crate) async fn init_tui_mode(
     mcp_cancelled: Arc<AtomicBool>,
     permission_manager: Arc<pick_agent::permission::manager::PermissionManager>,
     platform_sandbox: Option<Arc<dyn pick_agent::permission::sandbox::Sandbox>>,
-) -> (TuiContext, mpsc::UnboundedReceiver<TuiCommand>, mpsc::UnboundedReceiver<crossterm::event::Event>) {
+) -> (
+    TuiContext,
+    mpsc::UnboundedReceiver<TuiCommand>,
+    mpsc::UnboundedReceiver<crossterm::event::Event>,
+) {
     let version = crate::config::VERSION;
     let app_name = crate::config::APP_NAME;
     let cwd = std::env::current_dir().unwrap_or_default();
@@ -85,10 +89,7 @@ pub(crate) async fn init_tui_mode(
     let home_dir = dirs::home_dir().map(|h| h.to_string_lossy().to_string());
 
     // Create autocomplete provider
-    let autocomplete_provider = build_autocomplete_provider(
-        &cwd,
-        &resource_loader,
-    );
+    let autocomplete_provider = build_autocomplete_provider(&cwd, &resource_loader);
 
     // Compute folder name for terminal title
     let folder = std::env::current_dir()
@@ -176,15 +177,17 @@ pub(crate) async fn init_tui_mode(
     let (evt_tx, evt_rx) = mpsc::unbounded_channel::<crossterm::event::Event>();
 
     // Spawn keyboard reader thread
-    std::thread::spawn(move || loop {
-        match crossterm::event::read() {
-            Ok(event) => {
-                if evt_tx.send(event).is_err() {
-                    break;
+    std::thread::spawn(move || {
+        loop {
+            match crossterm::event::read() {
+                Ok(event) => {
+                    if evt_tx.send(event).is_err() {
+                        break;
+                    }
                 }
-            }
-            Err(_) => {
-                std::thread::sleep(std::time::Duration::from_millis(50));
+                Err(_) => {
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                }
             }
         }
     });
@@ -207,11 +210,8 @@ pub(crate) async fn init_tui_mode(
     );
 
     // Restore session history
-    let all_messages = message_utils::restore_session_history(
-        &mut tui,
-        &session_manager,
-        &initial_messages,
-    );
+    let all_messages =
+        message_utils::restore_session_history(&mut tui, &session_manager, &initial_messages);
 
     let ctx = TuiContext {
         tui,

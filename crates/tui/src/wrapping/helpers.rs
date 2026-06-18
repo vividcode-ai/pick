@@ -9,10 +9,14 @@ pub(crate) fn push_owned_lines(src: &[Line<'_>], out: &mut Vec<Line<'static>>) {
         out.push(Line {
             style: line.style,
             alignment: line.alignment,
-            spans: line.spans.iter().map(|s| ratatui::text::Span {
-                style: s.style,
-                content: std::borrow::Cow::Owned(s.content.to_string()),
-            }).collect(),
+            spans: line
+                .spans
+                .iter()
+                .map(|s| ratatui::text::Span {
+                    style: s.style,
+                    content: std::borrow::Cow::Owned(s.content.to_string()),
+                })
+                .collect(),
         });
     }
 }
@@ -53,7 +57,9 @@ where
     lines
 }
 
-pub(crate) fn flatten_line(line: &Line<'_>) -> (String, Vec<(Range<usize>, ratatui::style::Style)>) {
+pub(crate) fn flatten_line(
+    line: &Line<'_>,
+) -> (String, Vec<(Range<usize>, ratatui::style::Style)>) {
     let mut flat = String::new();
     let mut span_bounds = Vec::new();
     let mut acc = 0usize;

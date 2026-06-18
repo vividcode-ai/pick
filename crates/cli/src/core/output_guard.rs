@@ -1,5 +1,4 @@
-﻿//! Output guard - stdout takeover for controlled output
-
+//! Output guard - stdout takeover for controlled output
 
 use std::io::Write;
 use std::sync::Mutex;

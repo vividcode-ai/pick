@@ -1,17 +1,14 @@
-﻿//! Child process utilities
+//! Child process utilities
 
-use tokio::process::Child;
-use tokio::io::AsyncReadExt;
 use std::process::{Command as StdCommand, Output, Stdio};
 use std::time::Duration;
+use tokio::io::AsyncReadExt;
+use tokio::process::Child;
 
 const EXIT_STDIO_GRACE_MS: u64 = 100;
 
 /// Cross-platform process spawning (async, returns child with piped stdio)
-pub fn spawn_process(
-    command: &str,
-    args: &[String],
-) -> std::io::Result<std::process::Child> {
+pub fn spawn_process(command: &str, args: &[String]) -> std::io::Result<std::process::Child> {
     let mut cmd = StdCommand::new(command);
     cmd.args(args)
         .stdin(Stdio::null())
@@ -21,10 +18,7 @@ pub fn spawn_process(
 }
 
 /// Cross-platform process spawning via tokio (async)
-pub async fn spawn_process_async(
-    command: &str,
-    args: &[String],
-) -> std::io::Result<Child> {
+pub async fn spawn_process_async(command: &str, args: &[String]) -> std::io::Result<Child> {
     let mut cmd = tokio::process::Command::new(command);
     cmd.args(args)
         .stdin(Stdio::null())
@@ -34,10 +28,7 @@ pub async fn spawn_process_async(
 }
 
 /// Synchronous process spawn + wait for output
-pub fn spawn_process_sync(
-    command: &str,
-    args: &[String],
-) -> std::io::Result<Output> {
+pub fn spawn_process_sync(command: &str, args: &[String]) -> std::io::Result<Output> {
     let mut cmd = StdCommand::new(command);
     cmd.args(args)
         .stdin(Stdio::null())
@@ -71,10 +62,8 @@ pub async fn wait_for_child_process(child: &mut Child) -> std::io::Result<Option
     });
 
     // Wait for process exit with grace period for stdio to drain
-    let exit_status = tokio::time::timeout(
-        Duration::from_millis(EXIT_STDIO_GRACE_MS),
-        child.wait(),
-    ).await;
+    let exit_status =
+        tokio::time::timeout(Duration::from_millis(EXIT_STDIO_GRACE_MS), child.wait()).await;
 
     // Ensure drain completes
     let _ = drain.await;

@@ -1,4 +1,4 @@
-﻿mod action_dispatch;
+mod action_dispatch;
 mod actions_login;
 mod actions_model;
 mod actions_session;
@@ -99,10 +99,7 @@ mod tests {
         assert_eq!(modes.len(), 5, "there are exactly 5 tree filter modes");
         assert!(synonyms.contains("no-tools"), "no-tools accepted");
         assert!(synonyms.contains("user-only"), "user-only accepted");
-        assert!(
-            synonyms.contains("labeled-only"),
-            "labeled-only accepted"
-        );
+        assert!(synonyms.contains("labeled-only"), "labeled-only accepted");
         assert!(synonyms.contains("all"), "all accepted");
     }
 

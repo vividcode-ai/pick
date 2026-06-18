@@ -1,4 +1,4 @@
-﻿use super::{Action, Ruleset};
+use super::{Action, Ruleset};
 
 pub fn wildcard_match(pattern: &str, input: &str) -> bool {
     let pattern_lower = pattern.to_lowercase();
@@ -41,11 +41,7 @@ pub fn wildcard_match(pattern: &str, input: &str) -> bool {
     true
 }
 
-pub fn evaluate(
-    permission: &str,
-    pattern: &str,
-    rulesets: &[&Ruleset],
-) -> Action {
+pub fn evaluate(permission: &str, pattern: &str, rulesets: &[&Ruleset]) -> Action {
     let mut result = Action::Ask;
 
     for ruleset in rulesets {
@@ -61,11 +57,7 @@ pub fn evaluate(
     result
 }
 
-pub fn evaluate_tool(
-    tool_name: &str,
-    tool_args: &str,
-    rulesets: &[&Ruleset],
-) -> Action {
+pub fn evaluate_tool(tool_name: &str, tool_args: &str, rulesets: &[&Ruleset]) -> Action {
     let permission_key = super::tool_to_permission_key(tool_name);
 
     let pattern = if permission_key == "bash" {
@@ -77,11 +69,7 @@ pub fn evaluate_tool(
     evaluate(permission_key, &pattern, rulesets)
 }
 
-pub fn evaluate_tool_allow(
-    tool_name: &str,
-    tool_args: &str,
-    rulesets: &[&Ruleset],
-) -> bool {
+pub fn evaluate_tool_allow(tool_name: &str, tool_args: &str, rulesets: &[&Ruleset]) -> bool {
     let action = evaluate_tool(tool_name, tool_args, rulesets);
     action == Action::Allow
 }
@@ -93,9 +81,11 @@ pub fn is_tool_disabled(tool_name: &str, rulesets: &[&Ruleset]) -> bool {
     // This is separate from evaluate() which uses wildcard_match(pattern, "*") — a specific
     // rule like ".pick/plans/*.md allow" would match "*" via wildcard but its pattern is
     // NOT exactly "*", so it won't be considered a catch-all.
-    let last_catch_all = rulesets.iter().flat_map(|rs| rs.rules()).rev().find(|r| {
-        wildcard_match(&r.permission, perm_key) && r.pattern == "*"
-    });
+    let last_catch_all = rulesets
+        .iter()
+        .flat_map(|rs| rs.rules())
+        .rev()
+        .find(|r| wildcard_match(&r.permission, perm_key) && r.pattern == "*");
 
     match last_catch_all {
         Some(rule) => rule.action == Action::Deny,
@@ -116,12 +106,25 @@ pub fn bash_command_prefix(args: &str) -> String {
 
     let first = parts[0].to_lowercase();
 
-    if (first == "git" || first == "npm" || first == "cargo" || first == "docker"
-        || first == "kubectl" || first == "gh" || first == "npx" || first == "bun"
-        || first == "yarn" || first == "dotnet" || first == "make"
-        || first == "pip" || first == "rustup" || first == "go"
-        || first == "apt" || first == "apt-get" || first == "brew"
-        || first == "pacman" || first == "snap")
+    if (first == "git"
+        || first == "npm"
+        || first == "cargo"
+        || first == "docker"
+        || first == "kubectl"
+        || first == "gh"
+        || first == "npx"
+        || first == "bun"
+        || first == "yarn"
+        || first == "dotnet"
+        || first == "make"
+        || first == "pip"
+        || first == "rustup"
+        || first == "go"
+        || first == "apt"
+        || first == "apt-get"
+        || first == "brew"
+        || first == "pacman"
+        || first == "snap")
         && parts.len() > 1
     {
         format!("{} {}", first, parts[1].to_lowercase())
@@ -189,22 +192,30 @@ mod tests {
 
     #[test]
     fn test_wildcard_match_glob() {
-        assert!(wildcard_match(".opencode/plans/*.md", ".opencode/plans/plan-123.md"));
-        assert!(!wildcard_match(".opencode/plans/*.md", ".opencode/other/file.txt"));
+        assert!(wildcard_match(
+            ".opencode/plans/*.md",
+            ".opencode/plans/plan-123.md"
+        ));
+        assert!(!wildcard_match(
+            ".opencode/plans/*.md",
+            ".opencode/other/file.txt"
+        ));
     }
 
     #[test]
     fn test_evaluate_last_match_wins() {
-        let deny_all = Ruleset::new(vec![
-            Rule::new("edit", "*", Action::Deny),
-        ]);
-        let allow_md = Ruleset::new(vec![
-            Rule::new("edit", "*.md", Action::Allow),
-        ]);
+        let deny_all = Ruleset::new(vec![Rule::new("edit", "*", Action::Deny)]);
+        let allow_md = Ruleset::new(vec![Rule::new("edit", "*.md", Action::Allow)]);
 
         // deny all first, then allow *.md — last match wins
-        assert_eq!(evaluate("edit", "foo.md", &[&deny_all, &allow_md]), Action::Allow);
-        assert_eq!(evaluate("edit", "foo.rs", &[&deny_all, &allow_md]), Action::Deny);
+        assert_eq!(
+            evaluate("edit", "foo.md", &[&deny_all, &allow_md]),
+            Action::Allow
+        );
+        assert_eq!(
+            evaluate("edit", "foo.rs", &[&deny_all, &allow_md]),
+            Action::Deny
+        );
     }
 
     #[test]
@@ -243,9 +254,15 @@ mod tests {
         ]);
 
         // *: Deny at the end overrides specific allows with last-match-wins
-        assert_eq!(evaluate_tool("bash", "ls -la", &[&plan_rules]), Action::Deny);
+        assert_eq!(
+            evaluate_tool("bash", "ls -la", &[&plan_rules]),
+            Action::Deny
+        );
         // No specific rule for sed, catch-all deny applies
-        assert_eq!(evaluate_tool("bash", "sed -i 's/foo/bar/' file.txt", &[&plan_rules]), Action::Deny);
+        assert_eq!(
+            evaluate_tool("bash", "sed -i 's/foo/bar/' file.txt", &[&plan_rules]),
+            Action::Deny
+        );
     }
 
     #[test]
@@ -257,16 +274,23 @@ mod tests {
             Rule::new("bash", "rg", Action::Allow),
         ]);
 
-        assert_eq!(evaluate_tool("bash", "ls -la", &[&plan_rules]), Action::Allow);
-        assert_eq!(evaluate_tool("bash", "cat file.txt", &[&plan_rules]), Action::Allow);
-        assert_eq!(evaluate_tool("bash", "sed -i 's/foo/bar/' file.txt", &[&plan_rules]), Action::Ask);
+        assert_eq!(
+            evaluate_tool("bash", "ls -la", &[&plan_rules]),
+            Action::Allow
+        );
+        assert_eq!(
+            evaluate_tool("bash", "cat file.txt", &[&plan_rules]),
+            Action::Allow
+        );
+        assert_eq!(
+            evaluate_tool("bash", "sed -i 's/foo/bar/' file.txt", &[&plan_rules]),
+            Action::Ask
+        );
     }
 
     #[test]
     fn test_is_tool_disabled() {
-        let edit_deny = Ruleset::new(vec![
-            Rule::new("edit", "*", Action::Deny),
-        ]);
+        let edit_deny = Ruleset::new(vec![Rule::new("edit", "*", Action::Deny)]);
         assert!(is_tool_disabled("write", &[&edit_deny]));
         assert!(is_tool_disabled("edit", &[&edit_deny]));
 
@@ -278,9 +302,7 @@ mod tests {
         // (specific allows like "ls" don't make the tool visible; they apply at runtime)
         assert!(is_tool_disabled("bash", &[&bash_allowed]));
 
-        let bash_deny = Ruleset::new(vec![
-            Rule::new("bash", "*", Action::Deny),
-        ]);
+        let bash_deny = Ruleset::new(vec![Rule::new("bash", "*", Action::Deny)]);
         assert!(is_tool_disabled("bash", &[&bash_deny]));
     }
 
@@ -306,32 +328,32 @@ mod tests {
             Rule::new("edit", ".pick/plans/*.md", Action::Allow),
         ]);
 
-        assert_eq!(evaluate_tool("write", "anything", &[&plan_rules]), Action::Deny);
-        assert_eq!(evaluate_tool("edit", "anything", &[&plan_rules]), Action::Deny);
+        assert_eq!(
+            evaluate_tool("write", "anything", &[&plan_rules]),
+            Action::Deny
+        );
+        assert_eq!(
+            evaluate_tool("edit", "anything", &[&plan_rules]),
+            Action::Deny
+        );
         assert_eq!(evaluate_tool("read", "", &[&plan_rules]), Action::Ask); // no read rule
     }
 
     #[test]
     fn test_check_permission_denied() {
-        let rules = Ruleset::new(vec![
-            Rule::new("edit", "*", Action::Deny),
-        ]);
+        let rules = Ruleset::new(vec![Rule::new("edit", "*", Action::Deny)]);
         assert!(check_permission("write", "file.rs", &[&rules]).is_err());
         // read has no rules, defaults to Ask
         // read has no rules, defaults to Ask which is treated as error by check_permission
         assert!(check_permission("read", "file.rs", &[&rules]).is_err());
         // check_permission with Allow rules succeeds
-        let allow_rules = Ruleset::new(vec![
-            Rule::new("read", "*", Action::Allow),
-        ]);
+        let allow_rules = Ruleset::new(vec![Rule::new("read", "*", Action::Allow)]);
         assert!(check_permission("read", "file.rs", &[&allow_rules]).is_ok());
     }
 
     #[test]
     fn test_is_tool_disabled_edit() {
-        let rules = Ruleset::new(vec![
-            Rule::new("edit", "*", Action::Deny),
-        ]);
+        let rules = Ruleset::new(vec![Rule::new("edit", "*", Action::Deny)]);
         assert!(is_tool_disabled("write", &[&rules]));
         assert!(is_tool_disabled("edit", &[&rules]));
         assert!(is_tool_disabled("apply_patch", &[&rules]));
@@ -348,4 +370,3 @@ mod tests {
         assert_eq!(ttpk("bash"), "bash");
     }
 }
-

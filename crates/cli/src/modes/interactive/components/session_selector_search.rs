@@ -1,5 +1,4 @@
-﻿//! Session search and filter logic
-
+//! Session search and filter logic
 
 /// Sort mode for session listing
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -72,7 +71,10 @@ fn get_session_search_text(session: &SessionSearchInfo) -> String {
 }
 
 pub fn has_session_name(session: &SessionSearchInfo) -> bool {
-    session.name.as_ref().map_or(false, |n| !n.trim().is_empty())
+    session
+        .name
+        .as_ref()
+        .map_or(false, |n| !n.trim().is_empty())
 }
 
 fn matches_name_filter(session: &SessionSearchInfo, filter: NameFilter) -> bool {
@@ -95,7 +97,10 @@ fn fuzzy_match(token: &str, text: &str) -> MatchResult {
             ti += 1;
         }
         if ti >= chars.len() {
-            return MatchResult { matches: false, score: 0.0 };
+            return MatchResult {
+                matches: false,
+                score: 0.0,
+            };
         }
         ti += 1;
     }
@@ -108,14 +113,20 @@ fn fuzzy_match(token: &str, text: &str) -> MatchResult {
         text.len() as f64 * 0.5
     };
 
-    MatchResult { matches: true, score }
+    MatchResult {
+        matches: true,
+        score,
+    }
 }
 
 /// Parse search query
 pub fn parse_search_query(query: &str) -> ParsedSearchQuery {
     let trimmed = query.trim();
     if trimmed.is_empty() {
-        return ParsedSearchQuery { mode: SearchMode::Empty, error: None };
+        return ParsedSearchQuery {
+            mode: SearchMode::Empty,
+            error: None,
+        };
     }
 
     // Regex mode: re:<pattern>
@@ -128,8 +139,18 @@ pub fn parse_search_query(query: &str) -> ParsedSearchQuery {
             };
         }
         match regex::Regex::new(&format!("(?i){}", pattern)) {
-            Ok(re) => return ParsedSearchQuery { mode: SearchMode::Regex(re), error: None },
-            Err(e) => return ParsedSearchQuery { mode: SearchMode::Empty, error: Some(e.to_string()) },
+            Ok(re) => {
+                return ParsedSearchQuery {
+                    mode: SearchMode::Regex(re),
+                    error: None,
+                };
+            }
+            Err(e) => {
+                return ParsedSearchQuery {
+                    mode: SearchMode::Empty,
+                    error: Some(e.to_string()),
+                };
+            }
         }
     }
 
@@ -139,13 +160,14 @@ pub fn parse_search_query(query: &str) -> ParsedSearchQuery {
     let mut in_quote = false;
     let mut had_unclosed_quote = false;
 
-    let flush = |buf: &mut String, kind: &mut Vec<SearchToken>, kind_type: fn(String) -> SearchToken| {
-        let v = buf.trim().to_string();
-        buf.clear();
-        if !v.is_empty() {
-            kind.push(kind_type(v));
-        }
-    };
+    let flush =
+        |buf: &mut String, kind: &mut Vec<SearchToken>, kind_type: fn(String) -> SearchToken| {
+            let v = buf.trim().to_string();
+            buf.clear();
+            if !v.is_empty() {
+                kind.push(kind_type(v));
+            }
+        };
 
     for ch in trimmed.chars() {
         if ch == '"' {
@@ -184,7 +206,11 @@ pub fn parse_search_query(query: &str) -> ParsedSearchQuery {
     } else {
         let v = buf.trim().to_string();
         if !v.is_empty() {
-            tokens.push(if in_quote { SearchToken::Phrase(v) } else { SearchToken::Fuzzy(v) });
+            tokens.push(if in_quote {
+                SearchToken::Phrase(v)
+            } else {
+                SearchToken::Fuzzy(v)
+            });
         }
     }
 
@@ -199,16 +225,26 @@ pub fn match_session(session: &SessionSearchInfo, parsed: &ParsedSearchQuery) ->
     let text = get_session_search_text(session);
 
     match &parsed.mode {
-        SearchMode::Empty => MatchResult { matches: true, score: 0.0 },
-        SearchMode::Regex(re) => {
-            match re.find(&text) {
-                Some(m) => MatchResult { matches: true, score: m.start() as f64 * 0.1 },
-                None => MatchResult { matches: false, score: 0.0 },
-            }
-        }
+        SearchMode::Empty => MatchResult {
+            matches: true,
+            score: 0.0,
+        },
+        SearchMode::Regex(re) => match re.find(&text) {
+            Some(m) => MatchResult {
+                matches: true,
+                score: m.start() as f64 * 0.1,
+            },
+            None => MatchResult {
+                matches: false,
+                score: 0.0,
+            },
+        },
         SearchMode::Tokens(tokens) => {
             if tokens.is_empty() {
-                return MatchResult { matches: true, score: 0.0 };
+                return MatchResult {
+                    matches: true,
+                    score: 0.0,
+                };
             }
 
             let mut total_score = 0.0;
@@ -223,20 +259,31 @@ pub fn match_session(session: &SessionSearchInfo, parsed: &ParsedSearchQuery) ->
                         }
                         match normalized_text.find(&normalized_phrase) {
                             Some(idx) => total_score += idx as f64 * 0.1,
-                            None => return MatchResult { matches: false, score: 0.0 },
+                            None => {
+                                return MatchResult {
+                                    matches: false,
+                                    score: 0.0,
+                                };
+                            }
                         }
                     }
                     SearchToken::Fuzzy(fuzzy) => {
                         let m = fuzzy_match(fuzzy, &text);
                         if !m.matches {
-                            return MatchResult { matches: false, score: 0.0 };
+                            return MatchResult {
+                                matches: false,
+                                score: 0.0,
+                            };
                         }
                         total_score += m.score;
                     }
                 }
             }
 
-            MatchResult { matches: true, score: total_score }
+            MatchResult {
+                matches: true,
+                score: total_score,
+            }
         }
     }
 }

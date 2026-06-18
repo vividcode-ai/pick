@@ -1,5 +1,4 @@
-﻿//! Print mode - non-interactive agent execution with stdout output
-
+//! Print mode - non-interactive agent execution with stdout output
 
 use std::io::Read;
 
@@ -8,7 +7,7 @@ use std::sync::Arc;
 use crate::args::Args;
 use crate::core::auth_storage::AuthStorage;
 use pick_agent::core::agent_loop::AgentLoopConfig;
-use pick_agent::core::events::{agent_event_to_json_value, AgentEvent};
+use pick_agent::core::events::{AgentEvent, agent_event_to_json_value};
 use pick_agent::core::state::{AgentTool, ThinkingLevel};
 use pick_agent::extensions::runner::ExtensionRunner;
 use pick_agent::session::{SessionEntry, SessionManager};
@@ -39,21 +38,32 @@ pub async fn run_print_mode(
     let model = match model {
         Some(m) => m,
         None => {
-            eprintln!("Error: model '{}' not found for provider '{}'", model_id, provider);
+            eprintln!(
+                "Error: model '{}' not found for provider '{}'",
+                model_id, provider
+            );
             std::process::exit(1);
         }
     };
 
     let env_var = format!("{}_API_KEY", provider.to_uppercase().replace('-', "_"));
-    let api_key = auth.get_api_key(provider, true).await.or_else(|| std::env::var(&env_var).ok());
+    let api_key = auth
+        .get_api_key(provider, true)
+        .await
+        .or_else(|| std::env::var(&env_var).ok());
     if api_key.is_none() {
-        eprintln!("Error: No API key for '{}'. Set {}_API_KEY.", provider, env_var);
+        eprintln!(
+            "Error: No API key for '{}'. Set {}_API_KEY.",
+            provider, env_var
+        );
         std::process::exit(1);
     }
     if std::env::var(&env_var).is_err() {
         if let Some(ref key) = api_key {
             // SAFETY: set_var is safe in single-threaded context at startup
-            unsafe { std::env::set_var(&env_var, key); }
+            unsafe {
+                std::env::set_var(&env_var, key);
+            }
         }
     }
 
@@ -63,7 +73,12 @@ pub async fn run_print_mode(
     let append_text = if args.append_system_prompt.is_empty() {
         format!("Provider: {}  Model: {}", provider, model_id)
     } else {
-        format!("{}\nProvider: {}  Model: {}", args.append_system_prompt.join("\n"), provider, model_id)
+        format!(
+            "{}\nProvider: {}  Model: {}",
+            args.append_system_prompt.join("\n"),
+            provider,
+            model_id
+        )
     };
     let tools = pick_agent::tools::filter_goal_tools(
         pick_agent::permission::disabled::filter_tools(tools, &[&agent_mode.ruleset()]),
@@ -140,27 +155,29 @@ pub async fn run_print_mode(
             }
         })),
         mode_rulesets: Some(vec![mode_rules.clone()]),
-        before_tool_call: Some(std::sync::Arc::new(move |tc: &pick_ai::types::ToolCall| -> Option<String> {
-            let tool_args_str = tc.arguments.to_string();
-            match pick_agent::permission::evaluate::check_permission(
-                &tc.name, &tool_args_str, &[&mode_rules],
-            ) {
-                Ok(()) => None,
-                Err(msg) => Some(msg),
-            }
-        })),
+        before_tool_call: Some(std::sync::Arc::new(
+            move |tc: &pick_ai::types::ToolCall| -> Option<String> {
+                let tool_args_str = tc.arguments.to_string();
+                match pick_agent::permission::evaluate::check_permission(
+                    &tc.name,
+                    &tool_args_str,
+                    &[&mode_rules],
+                ) {
+                    Ok(()) => None,
+                    Err(msg) => Some(msg),
+                }
+            },
+        )),
         should_stop_after_turn: None,
         get_steering_messages: Some(Arc::new({
             let mode = agent_mode;
-            move || {
-                match mode {
-                    AgentMode::Plan => {
-                        vec![Message::User(UserMessage::text(
-                            crate::core::agent_mode::PLAN_MODE_REMINDER,
-                        ))]
-                    }
-                    AgentMode::Build => vec![],
+            move || match mode {
+                AgentMode::Plan => {
+                    vec![Message::User(UserMessage::text(
+                        crate::core::agent_mode::PLAN_MODE_REMINDER,
+                    ))]
                 }
+                AgentMode::Build => vec![],
             }
         })),
         get_follow_up_messages: None,
@@ -199,8 +216,13 @@ pub async fn run_print_mode(
     };
 
     match crate::core::agent_session::run_agent_loop_with_retry_and_continuation(
-        config, messages, Default::default(), None,
-    ).await {
+        config,
+        messages,
+        Default::default(),
+        None,
+    )
+    .await
+    {
         Ok(result) => {
             // Flush any remaining messages not yet persisted by on_turn_complete
             let prev = persisted_count.load(std::sync::atomic::Ordering::Relaxed);
@@ -248,8 +270,10 @@ pub async fn run_print_mode(
 
                 eprintln!(
                     "\n[Input: {} | Output: {} | Cache R/W: {}/{}]",
-                    result.usage.input, result.usage.output,
-                    result.usage.cache_read, result.usage.cache_write,
+                    result.usage.input,
+                    result.usage.output,
+                    result.usage.cache_read,
+                    result.usage.cache_write,
                 );
             }
         }
@@ -269,7 +293,11 @@ fn read_stdin() -> Option<String> {
         Ok(0) => None,
         Ok(_) => {
             let trimmed = content.trim().to_string();
-            if trimmed.is_empty() { None } else { Some(trimmed) }
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed)
+            }
         }
         Err(_) => None,
     }

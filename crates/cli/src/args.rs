@@ -1,4 +1,4 @@
-﻿//! CLI argument parsing
+//! CLI argument parsing
 
 use std::collections::HashMap;
 
@@ -278,13 +278,17 @@ pub fn parse_args(args: Vec<String>) -> Args {
                     if let Some(idx) = eq_index {
                         let flag_name = arg[2..idx].to_string();
                         let flag_value = arg[idx + 1..].to_string();
-                        parsed.unknown_flags.insert(flag_name, ArgValue::String(flag_value));
+                        parsed
+                            .unknown_flags
+                            .insert(flag_name, ArgValue::String(flag_value));
                     } else {
                         let flag_name = arg[2..].to_string();
                         if i + 1 < args.len() {
                             let next = &args[i + 1];
                             if !next.starts_with('-') && !next.starts_with('@') {
-                                parsed.unknown_flags.insert(flag_name, ArgValue::String(next.clone()));
+                                parsed
+                                    .unknown_flags
+                                    .insert(flag_name, ArgValue::String(next.clone()));
                                 i += 1;
                             } else {
                                 parsed.unknown_flags.insert(flag_name, ArgValue::Bool(true));
@@ -309,10 +313,7 @@ pub fn parse_args(args: Vec<String>) -> Args {
     }
 
     // Check if first positional argument is "update" subcommand
-    if !parsed.messages.is_empty()
-        && parsed.messages[0] == "update"
-        && !parsed.print
-    {
+    if !parsed.messages.is_empty() && parsed.messages[0] == "update" && !parsed.print {
         parsed.update = true;
         parsed.messages.remove(0);
     }

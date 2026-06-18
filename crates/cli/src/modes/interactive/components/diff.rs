@@ -1,5 +1,4 @@
-﻿//! Diff rendering for tool results
-
+//! Diff rendering for tool results
 
 use crate::core::tools::edit_diff::generate_diff_string;
 use crate::core::tools::render_utils::ToolTheme;

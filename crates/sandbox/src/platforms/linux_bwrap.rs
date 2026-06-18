@@ -1,8 +1,8 @@
-﻿use std::path::Path;
+use std::path::Path;
 
 use pick_agent::permission::fs_policy::AccessMode;
-use pick_agent::permission::sandbox::{SandboxConfig, SandboxRequest, Sandbox, SandboxType};
 use pick_agent::permission::profiles::NetworkAccess;
+use pick_agent::permission::sandbox::{Sandbox, SandboxConfig, SandboxRequest, SandboxType};
 
 pub struct LinuxBwrapSandbox;
 
@@ -35,10 +35,7 @@ impl Sandbox for LinuxBwrapSandbox {
         Self::check_bwrap()
     }
 
-    fn transform(
-        &self,
-        req: &SandboxRequest,
-    ) -> Result<(String, Vec<String>), String> {
+    fn transform(&self, req: &SandboxRequest) -> Result<(String, Vec<String>), String> {
         let policy = match req.fs_policy {
             Some(ref p) => p,
             None => return Ok((req.program.clone(), req.args.clone())),

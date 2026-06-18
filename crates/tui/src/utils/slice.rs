@@ -1,6 +1,6 @@
 use unicode_width::UnicodeWidthStr;
 
-use crate::utils::ansi::{extract_ansi_code, AnsiCodeTracker};
+use crate::utils::ansi::{AnsiCodeTracker, extract_ansi_code};
 
 pub fn slice_by_column(line: &str, start_col: usize, length: usize) -> String {
     slice_with_width(line, start_col, length).text
@@ -8,7 +8,10 @@ pub fn slice_by_column(line: &str, start_col: usize, length: usize) -> String {
 
 pub fn slice_with_width(line: &str, start_col: usize, length: usize) -> SliceResult {
     if length == 0 {
-        return SliceResult { text: String::new(), width: 0 };
+        return SliceResult {
+            text: String::new(),
+            width: 0,
+        };
     }
 
     let end_col = start_col + length;
@@ -34,7 +37,11 @@ pub fn slice_with_width(line: &str, start_col: usize, length: usize) -> SliceRes
 
         let c = line[i..].chars().next().unwrap_or(' ');
         let c_width = UnicodeWidthStr::width(c.to_string().as_str());
-        let c_str: String = line[i..].chars().next().map(|c| c.to_string()).unwrap_or_default();
+        let c_str: String = line[i..]
+            .chars()
+            .next()
+            .map(|c| c.to_string())
+            .unwrap_or_default();
         let byte_len = c.len_utf8();
 
         if current_col >= start_col && current_col < end_col {
@@ -54,7 +61,10 @@ pub fn slice_with_width(line: &str, start_col: usize, length: usize) -> SliceRes
         }
     }
 
-    SliceResult { text: result, width: result_width }
+    SliceResult {
+        text: result,
+        width: result_width,
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -98,7 +108,11 @@ pub fn extract_segments(
 
         let c = line[i..].chars().next().unwrap_or(' ');
         let c_width = UnicodeWidthStr::width(c.to_string().as_str());
-        let c_str: String = line[i..].chars().next().map(|c| c.to_string()).unwrap_or_default();
+        let c_str: String = line[i..]
+            .chars()
+            .next()
+            .map(|c| c.to_string())
+            .unwrap_or_default();
         let byte_len = c.len_utf8();
 
         if current_col < before_end {

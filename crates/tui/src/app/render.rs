@@ -10,12 +10,12 @@ use ratatui::widgets::Paragraph;
 use unicode_width::UnicodeWidthStr;
 
 use crate::terminal_manager::TerminalManager;
-use crate::utils::{wrap_text_with_ansi, visible_width};
+use crate::utils::{visible_width, wrap_text_with_ansi};
 
-use super::types::format_cwd_for_footer;
-use super::types::format_tokens;
 use super::types::AppState;
 use super::types::TuiApp;
+use super::types::format_cwd_for_footer;
+use super::types::format_tokens;
 use super::types::set_windows_terminal_title;
 
 impl TuiApp {
@@ -28,8 +28,7 @@ impl TuiApp {
         B: ratatui::backend::Backend + Write,
         std::io::Error: From<B::Error>,
     {
-        let (width, height) = size()
-            .map_err(|_| "Failed to get terminal size".to_string())?;
+        let (width, height) = size().map_err(|_| "Failed to get terminal size".to_string())?;
 
         // Resize reflow: when terminal width changes, invalidate
         // scrollback cache so all entries are re-rendered at new width.
@@ -43,7 +42,10 @@ impl TuiApp {
             self.last_render_state.clone_from(&self.state);
         }
         let editor_line_count = self.compute_editor_line_count(width);
-        let mut autocomplete_lines = if self.state == AppState::Selecting || self.state == AppState::TreeSelecting || self.state == AppState::ApiKeyInput {
+        let mut autocomplete_lines = if self.state == AppState::Selecting
+            || self.state == AppState::TreeSelecting
+            || self.state == AppState::ApiKeyInput
+        {
             0_u16
         } else {
             self.editor.autocomplete_line_count() as u16
@@ -71,8 +73,15 @@ impl TuiApp {
         if has_dialog {
             autocomplete_lines = 0;
         }
-        let status_lines = if self.status_text.is_some() { 1_u16 } else { 0_u16 };
-        let has_selection = matches!(self.state, AppState::Selecting | AppState::TreeSelecting | AppState::ApiKeyInput);
+        let status_lines = if self.status_text.is_some() {
+            1_u16
+        } else {
+            0_u16
+        };
+        let has_selection = matches!(
+            self.state,
+            AppState::Selecting | AppState::TreeSelecting | AppState::ApiKeyInput
+        );
 
         let entry_count = self.chat.entry_count();
         if entry_count > self.cached_lines_entry_count || self.chat.cache_dirty {
@@ -126,20 +135,26 @@ impl TuiApp {
         let todo_lines: u16 = if has_todo {
             let line_count = self.render_todo_lines(width as usize).len() as u16;
             line_count
-        } else { 0 };
+        } else {
+            0
+        };
 
         let fixed_non_stream = 1u16
             + editor_line_count
             + 1
             + 2
             + if has_status { 3 } else { 0 }
-            + if has_pending { pending_lines + (if pending_overflow { 2 } else { 1 }) } else { 0 }
+            + if has_pending {
+                pending_lines + (if pending_overflow { 2 } else { 1 })
+            } else {
+                0
+            }
             + if has_todo { todo_lines + 1 } else { 0 }
             + self.autocomplete_space_lines
             + dialog_lines;
         let stream_extra = if stream_chat_len > 0 { 2 } else { 0 };
-        let stream_display_len = stream_chat_len
-            .min(height.saturating_sub(fixed_non_stream + stream_extra));
+        let stream_display_len =
+            stream_chat_len.min(height.saturating_sub(fixed_non_stream + stream_extra));
         let has_stream = stream_display_len > 0;
 
         let mut constraints: Vec<Constraint> = Vec::with_capacity(12);
@@ -176,219 +191,260 @@ impl TuiApp {
         constraints.push(Constraint::Length(1));
         constraints.push(Constraint::Length(1));
         constraints.push(Constraint::Length(1));
-        if self.autocomplete_space_lines > 0 { constraints.push(Constraint::Length(self.autocomplete_space_lines)); }
-        if dialog_lines > 0 { constraints.push(Constraint::Length(dialog_lines)); }
+        if self.autocomplete_space_lines > 0 {
+            constraints.push(Constraint::Length(self.autocomplete_space_lines));
+        }
+        if dialog_lines > 0 {
+            constraints.push(Constraint::Length(dialog_lines));
+        }
 
-        let content_height: u16 = constraints.iter().map(|c| match c {
-            Constraint::Length(len) => *len, _ => 0,
-        }).sum();
+        let content_height: u16 = constraints
+            .iter()
+            .map(|c| match c {
+                Constraint::Length(len) => *len,
+                _ => 0,
+            })
+            .sum();
 
         let top_border = Line::from(Span::styled(
             "\u{2500}".repeat(width as usize),
             Style::default().add_modifier(Modifier::DIM),
         ));
 
-        manager.draw(content_height, self.autocomplete_space_lines + dialog_lines, |frame: &mut crate::custom_terminal::Frame| {
-            let area = frame.area();
-            let chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints(constraints.clone())
-                .split(area);
+        manager
+            .draw(
+                content_height,
+                self.autocomplete_space_lines + dialog_lines,
+                |frame: &mut crate::custom_terminal::Frame| {
+                    let area = frame.area();
+                    let chunks = Layout::default()
+                        .direction(Direction::Vertical)
+                        .constraints(constraints.clone())
+                        .split(area);
 
-            let mut i = 0;
+                    let mut i = 0;
 
-            // Helper: render to chunks[i] with bounds check
-            macro_rules! render_at {
-                ($idx:expr, $widget:expr) => {
-                    if $idx < chunks.len() {
-                        frame.render_widget_ref(&$widget, chunks[$idx]);
-                    }
-                };
-            }
-
-            if has_stream {
-                render_at!(i, Line::from(""));
-                i += 1;
-                if i < chunks.len() {
-                    let overflow = stream_lines.len().saturating_sub(chunks[i].height as usize);
-                    let paragraph = Paragraph::new(ratatui::text::Text::from(stream_lines))
-                        .scroll((overflow as u16, 0));
-                    frame.render_widget_ref(&paragraph, chunks[i]);
-                }
-                i += 1;
-                render_at!(i, Line::from(""));
-                i += 1;
-            }
-
-            if has_status {
-                render_at!(i, Line::from(""));
-                i += 1;
-
-                if i < chunks.len() {
-                    if let Some(ref status) = self.status_text {
-                        let frame_idx = self.status_frame % Self::SPINNER_FRAMES.len();
-                        let spinner = Self::SPINNER_FRAMES[frame_idx];
-                        let display_text = if let Some(start) = self.agent_start_time {
-                            let secs = start.elapsed().as_secs();
-                            format!("{} {} ({} • esc to interrupt)", spinner, status, Self::format_elapsed(secs))
-                        } else {
-                            format!("{} {}", spinner, status)
+                    // Helper: render to chunks[i] with bounds check
+                    macro_rules! render_at {
+                        ($idx:expr, $widget:expr) => {
+                            if $idx < chunks.len() {
+                                frame.render_widget_ref(&$widget, chunks[$idx]);
+                            }
                         };
-                        let status_line = Line::from(Span::styled(
-                            display_text,
-                            Style::default().add_modifier(Modifier::DIM),
-                        ));
-                        frame.render_widget_ref(&status_line, chunks[i]);
                     }
-                }
-                i += 1;
 
-                render_at!(i, Line::from(""));
-                i += 1;
-            }
-
-            if has_todo {
-                let todo_lines_rendered = self.render_todo_lines(width as usize);
-                for line in &todo_lines_rendered {
-                    render_at!(i, line.clone());
-                    i += 1;
-                }
-                render_at!(i, Line::from(""));
-                i += 1;
-            }
-
-            if has_pending {
-                let user_bg = Style::default().bg(
-                    self.chat.colors.user_msg_bg.unwrap_or(Color::Rgb(52, 53, 69))
-                );
-                let content_width = (width as usize).saturating_sub(4).max(1);
-                render_at!(i, Line::from(""));
-                i += 1;
-
-                let max_visible = 5usize;
-                let max_lines_per_msg = 3usize;
-                for (msg_idx, msg) in self.pending_user_messages.iter().enumerate() {
-                    if msg_idx >= max_visible { break; }
-                    if i >= chunks.len() { break; }
-                    let wrapped = wrap_text_with_ansi(msg, content_width);
-                    let display_lines = wrapped.len().min(max_lines_per_msg);
-                    for line_idx in 0..display_lines {
-                        if i >= chunks.len() { break; }
-                        let line_text = &wrapped[line_idx];
-                        let vis = visible_width(line_text);
-                        let right_pad = (width as usize).saturating_sub(vis + 2);
-                        let padded = format!("  {}{}", line_text, " ".repeat(right_pad));
-                        frame.render_widget_ref(&Line::from(Span::styled(padded, user_bg)), chunks[i]);
+                    if has_stream {
+                        render_at!(i, Line::from(""));
                         i += 1;
-                    }
-                    if msg_idx + 1 < max_visible {
+                        if i < chunks.len() {
+                            let overflow =
+                                stream_lines.len().saturating_sub(chunks[i].height as usize);
+                            let paragraph = Paragraph::new(ratatui::text::Text::from(stream_lines))
+                                .scroll((overflow as u16, 0));
+                            frame.render_widget_ref(&paragraph, chunks[i]);
+                        }
+                        i += 1;
                         render_at!(i, Line::from(""));
                         i += 1;
                     }
-                }
 
-                if pending_overflow {
-                    let extra = self.pending_user_messages.len() - max_visible;
-                    let overflow_line = Line::from(Span::styled(
-                        format!("  \u{2026} {} more pending", extra),
-                        Style::default().add_modifier(Modifier::DIM),
-                    ));
-                    render_at!(i, overflow_line);
-                    i += 1;
-                    render_at!(i, Line::from(""));
-                    i += 1;
-                } else {
-                    render_at!(i, Line::from(""));
-                    i += 1;
-                }
-            }
+                    if has_status {
+                        render_at!(i, Line::from(""));
+                        i += 1;
 
-            render_at!(i, top_border.clone());
-            i += 1;
+                        if i < chunks.len() {
+                            if let Some(ref status) = self.status_text {
+                                let frame_idx = self.status_frame % Self::SPINNER_FRAMES.len();
+                                let spinner = Self::SPINNER_FRAMES[frame_idx];
+                                let display_text = if let Some(start) = self.agent_start_time {
+                                    let secs = start.elapsed().as_secs();
+                                    format!(
+                                        "{} {} ({} • esc to interrupt)",
+                                        spinner,
+                                        status,
+                                        Self::format_elapsed(secs)
+                                    )
+                                } else {
+                                    format!("{} {}", spinner, status)
+                                };
+                                let status_line = Line::from(Span::styled(
+                                    display_text,
+                                    Style::default().add_modifier(Modifier::DIM),
+                                ));
+                                frame.render_widget_ref(&status_line, chunks[i]);
+                            }
+                        }
+                        i += 1;
 
-            if i < chunks.len() {
-                match self.state {
-                    AppState::Selecting => {
-                        let popup = self.build_selection_popup_lines(width);
-                        frame.render_widget_ref(&Paragraph::new(ratatui::text::Text::from(popup)), chunks[i]);
+                        render_at!(i, Line::from(""));
+                        i += 1;
                     }
-                    AppState::TreeSelecting => {
-                        let popup = self.render_tree_view_lines(width);
-                        frame.render_widget_ref(&Paragraph::new(ratatui::text::Text::from(popup)), chunks[i]);
+
+                    if has_todo {
+                        let todo_lines_rendered = self.render_todo_lines(width as usize);
+                        for line in &todo_lines_rendered {
+                            render_at!(i, line.clone());
+                            i += 1;
+                        }
+                        render_at!(i, Line::from(""));
+                        i += 1;
                     }
-                    AppState::ApiKeyInput => {
-                        let popup = self.build_apikey_popup_lines(width);
-                        frame.render_widget_ref(&Paragraph::new(ratatui::text::Text::from(popup)), chunks[i]);
-                    }
-                    AppState::UpdatePrompt => {
-                        // render empty editor area (the dialog is drawn as overlay)
-                    }
-                    _ => {
-                        let editor_max = editor_line_count as usize;
-                        let (editor_lines, cursor_row, cursor_col) =
-                            self.editor.render(width as usize, editor_max);
-                        frame.render_widget_ref(&Paragraph::new(ratatui::text::Text::from(editor_lines)), chunks[i]);
-                        if !has_selection {
-                            frame.set_cursor_position((
-                                cursor_col as u16,
-                                chunks[i].y + cursor_row as u16,
+
+                    if has_pending {
+                        let user_bg = Style::default().bg(self
+                            .chat
+                            .colors
+                            .user_msg_bg
+                            .unwrap_or(Color::Rgb(52, 53, 69)));
+                        let content_width = (width as usize).saturating_sub(4).max(1);
+                        render_at!(i, Line::from(""));
+                        i += 1;
+
+                        let max_visible = 5usize;
+                        let max_lines_per_msg = 3usize;
+                        for (msg_idx, msg) in self.pending_user_messages.iter().enumerate() {
+                            if msg_idx >= max_visible {
+                                break;
+                            }
+                            if i >= chunks.len() {
+                                break;
+                            }
+                            let wrapped = wrap_text_with_ansi(msg, content_width);
+                            let display_lines = wrapped.len().min(max_lines_per_msg);
+                            for line_idx in 0..display_lines {
+                                if i >= chunks.len() {
+                                    break;
+                                }
+                                let line_text = &wrapped[line_idx];
+                                let vis = visible_width(line_text);
+                                let right_pad = (width as usize).saturating_sub(vis + 2);
+                                let padded = format!("  {}{}", line_text, " ".repeat(right_pad));
+                                frame.render_widget_ref(
+                                    &Line::from(Span::styled(padded, user_bg)),
+                                    chunks[i],
+                                );
+                                i += 1;
+                            }
+                            if msg_idx + 1 < max_visible {
+                                render_at!(i, Line::from(""));
+                                i += 1;
+                            }
+                        }
+
+                        if pending_overflow {
+                            let extra = self.pending_user_messages.len() - max_visible;
+                            let overflow_line = Line::from(Span::styled(
+                                format!("  \u{2026} {} more pending", extra),
+                                Style::default().add_modifier(Modifier::DIM),
                             ));
+                            render_at!(i, overflow_line);
+                            i += 1;
+                            render_at!(i, Line::from(""));
+                            i += 1;
+                        } else {
+                            render_at!(i, Line::from(""));
+                            i += 1;
                         }
                     }
-                }
-            }
-            i += 1;
 
-            render_at!(i, top_border.clone());
-            i += 1;
+                    render_at!(i, top_border.clone());
+                    i += 1;
 
-            if !has_ac && !has_dialog {
-                render_at!(i, self.render_footer_line1(width));
-                if i + 1 < chunks.len() {
-                    frame.render_widget_ref(&self.render_footer_line2(width), chunks[i + 1]);
-                }
-            }
-
-            if self.autocomplete_space_lines > 0 {
-                i += 1;
-            }
-
-            if dialog_lines > 0 {
-                i += 1;
-            }
-
-            if has_ac && i >= 2 && i - 2 < chunks.len() {
-                let ac_content = self.editor.render_autocomplete(
-                    width as usize,
-                    autocomplete_lines as usize,
-                );
-                let bottom_sep = &chunks[i - 2];
-                let ac_y = bottom_sep.y + bottom_sep.height as u16;
-                let ac_area = Rect::new(0, ac_y, width, autocomplete_lines);
-                frame.render_widget_ref(
-                    &Paragraph::new(ratatui::text::Text::from(ac_content)),
-                    ac_area,
-                );
-            }
-
-            if has_dialog && i >= 4 && i - 4 < chunks.len() {
-                let dialog_content = match self.state {
-                    AppState::UpdatePrompt => {
-                        self.render_update_prompt_lines(width as usize)
+                    if i < chunks.len() {
+                        match self.state {
+                            AppState::Selecting => {
+                                let popup = self.build_selection_popup_lines(width);
+                                frame.render_widget_ref(
+                                    &Paragraph::new(ratatui::text::Text::from(popup)),
+                                    chunks[i],
+                                );
+                            }
+                            AppState::TreeSelecting => {
+                                let popup = self.render_tree_view_lines(width);
+                                frame.render_widget_ref(
+                                    &Paragraph::new(ratatui::text::Text::from(popup)),
+                                    chunks[i],
+                                );
+                            }
+                            AppState::ApiKeyInput => {
+                                let popup = self.build_apikey_popup_lines(width);
+                                frame.render_widget_ref(
+                                    &Paragraph::new(ratatui::text::Text::from(popup)),
+                                    chunks[i],
+                                );
+                            }
+                            AppState::UpdatePrompt => {
+                                // render empty editor area (the dialog is drawn as overlay)
+                            }
+                            _ => {
+                                let editor_max = editor_line_count as usize;
+                                let (editor_lines, cursor_row, cursor_col) =
+                                    self.editor.render(width as usize, editor_max);
+                                frame.render_widget_ref(
+                                    &Paragraph::new(ratatui::text::Text::from(editor_lines)),
+                                    chunks[i],
+                                );
+                                if !has_selection {
+                                    frame.set_cursor_position((
+                                        cursor_col as u16,
+                                        chunks[i].y + cursor_row as u16,
+                                    ));
+                                }
+                            }
+                        }
                     }
-                    _ => {
-                        self.render_question_lines(width as usize)
+                    i += 1;
+
+                    render_at!(i, top_border.clone());
+                    i += 1;
+
+                    if !has_ac && !has_dialog {
+                        render_at!(i, self.render_footer_line1(width));
+                        if i + 1 < chunks.len() {
+                            frame
+                                .render_widget_ref(&self.render_footer_line2(width), chunks[i + 1]);
+                        }
                     }
-                };
-                let top_sep = &chunks[i - 4];
-                let overlay_y = top_sep.y;
-                let overlay_area = Rect::new(0, overlay_y, width, dialog_lines);
-                frame.render_widget_ref(
-                    &Paragraph::new(ratatui::text::Text::from(dialog_content)),
-                    overlay_area,
-                );
-            }
-        }).map_err(|e| format!("Render error: {}", e))?;
+
+                    if self.autocomplete_space_lines > 0 {
+                        i += 1;
+                    }
+
+                    if dialog_lines > 0 {
+                        i += 1;
+                    }
+
+                    if has_ac && i >= 2 && i - 2 < chunks.len() {
+                        let ac_content = self
+                            .editor
+                            .render_autocomplete(width as usize, autocomplete_lines as usize);
+                        let bottom_sep = &chunks[i - 2];
+                        let ac_y = bottom_sep.y + bottom_sep.height as u16;
+                        let ac_area = Rect::new(0, ac_y, width, autocomplete_lines);
+                        frame.render_widget_ref(
+                            &Paragraph::new(ratatui::text::Text::from(ac_content)),
+                            ac_area,
+                        );
+                    }
+
+                    if has_dialog && i >= 4 && i - 4 < chunks.len() {
+                        let dialog_content = match self.state {
+                            AppState::UpdatePrompt => {
+                                self.render_update_prompt_lines(width as usize)
+                            }
+                            _ => self.render_question_lines(width as usize),
+                        };
+                        let top_sep = &chunks[i - 4];
+                        let overlay_y = top_sep.y;
+                        let overlay_area = Rect::new(0, overlay_y, width, dialog_lines);
+                        frame.render_widget_ref(
+                            &Paragraph::new(ratatui::text::Text::from(dialog_content)),
+                            overlay_area,
+                        );
+                    }
+                },
+            )
+            .map_err(|e| format!("Render error: {}", e))?;
 
         Ok(())
     }
@@ -403,25 +459,32 @@ impl TuiApp {
         natural = natural.max(format!("directory: {}", cwd_display).chars().count());
         if self.thinking_level != "off" {
             natural = natural.max(
-                format!("model:     {} {}   /model to change", self.model_id, self.thinking_level)
-                    .chars().count(),
+                format!(
+                    "model:     {} {}   /model to change",
+                    self.model_id, self.thinking_level
+                )
+                .chars()
+                .count(),
             );
         } else {
             natural = natural.max(
                 format!("model:     {}   /model to change", self.model_id)
-                    .chars().count(),
+                    .chars()
+                    .count(),
             );
         }
         if !self.context_file_names.is_empty() {
             natural = natural.max(
                 format!("[Context]  {}", self.context_file_names.join(", "))
-                    .chars().count(),
+                    .chars()
+                    .count(),
             );
         }
         if !self.skill_names.is_empty() {
             natural = natural.max(
                 format!("[Skills]   {}", self.skill_names.join(", "))
-                    .chars().count(),
+                    .chars()
+                    .count(),
             );
         }
 
@@ -481,7 +544,11 @@ impl TuiApp {
         lines.push(box_line(&dir));
         lines.push(box_line(""));
 
-        let app_title = if self.app_name == "Pick" { "Pick" } else { &self.app_name };
+        let app_title = if self.app_name == "Pick" {
+            "Pick"
+        } else {
+            &self.app_name
+        };
         let desc = format!(
             "{} can explain its own features and look up its docs. Ask it how to use or extend {}.",
             app_title, app_title
@@ -568,7 +635,9 @@ impl TuiApp {
                     let mut w = 4;
                     for c in path_part.chars().rev() {
                         let cw = c.to_string().width();
-                        if w + cw > max_path { break; }
+                        if w + cw > max_path {
+                            break;
+                        }
                         tail.insert(0, c);
                         w += cw;
                     }
@@ -597,7 +666,12 @@ impl TuiApp {
         let dim = Style::default().add_modifier(Modifier::DIM);
         let auto_indicator = if self.auto_compact { " (auto)" } else { "" };
         let left_side = match self.context_percent {
-            Some(pct) => format!("{:.1}%/{}{}", pct, format_tokens(self.context_window), auto_indicator),
+            Some(pct) => format!(
+                "{:.1}%/{}{}",
+                pct,
+                format_tokens(self.context_window),
+                auto_indicator
+            ),
             None => format!("?/{}{}", format_tokens(self.context_window), auto_indicator),
         };
         let mut right_side = self.model_id.clone();
@@ -623,7 +697,9 @@ impl TuiApp {
     /// Render the todo list viewport (between status bar and pending messages)
     pub fn render_todo_lines(&self, width: usize) -> Vec<Line<'static>> {
         use ratatui::prelude::*;
-        if self.todo_items.is_empty() { return vec![]; }
+        if self.todo_items.is_empty() {
+            return vec![];
+        }
 
         let dim = Style::default().add_modifier(Modifier::DIM);
         let accent = Style::default().fg(Color::Cyan);
@@ -634,14 +710,19 @@ impl TuiApp {
             Style::default().add_modifier(Modifier::BOLD),
         )));
 
-        let active_items: Vec<&serde_json::Value> = self.todo_items.iter()
+        let active_items: Vec<&serde_json::Value> = self
+            .todo_items
+            .iter()
             .filter(|t| {
                 let s = t.get("status").and_then(|v| v.as_str()).unwrap_or("");
                 s != "completed" && s != "cancelled"
             })
             .collect();
-        let scroll = self.todo_scroll_offset.min(active_items.len().saturating_sub(1));
-        let visible_items: Vec<&serde_json::Value> = active_items.iter().skip(scroll).take(5).copied().collect();
+        let scroll = self
+            .todo_scroll_offset
+            .min(active_items.len().saturating_sub(1));
+        let visible_items: Vec<&serde_json::Value> =
+            active_items.iter().skip(scroll).take(5).copied().collect();
 
         for item in &visible_items {
             let content = item.get("content").and_then(|v| v.as_str()).unwrap_or("");
@@ -706,7 +787,9 @@ impl TuiApp {
     pub fn compute_editor_line_count(&self, width: u16) -> u16 {
         if self.state == AppState::Selecting {
             let item_count = self.selection.as_ref().map(|s| s.items.len()).unwrap_or(0);
-            let has_desc = self.selection.as_ref()
+            let has_desc = self
+                .selection
+                .as_ref()
                 .and_then(|s| s.selected())
                 .and_then(|i| i.description.as_ref())
                 .is_some();
@@ -714,7 +797,11 @@ impl TuiApp {
             let visible = std::cmp::min(item_count, 10) as u16;
             std::cmp::max(5, std::cmp::min(reserved + visible, 14))
         } else if self.state == AppState::TreeSelecting {
-            let count = self.tree_view.as_ref().map(|tv| tv.visible_count()).unwrap_or(0);
+            let count = self
+                .tree_view
+                .as_ref()
+                .map(|tv| tv.visible_count())
+                .unwrap_or(0);
             let visible = std::cmp::min(count, 12) as u16;
             std::cmp::max(5, std::cmp::min(visible + 5, 18))
         } else if self.state == AppState::ApiKeyInput {
@@ -743,7 +830,9 @@ impl TuiApp {
         let count = pending.len().min(max_visible);
 
         for (idx, msg) in pending.iter().enumerate() {
-            if idx >= count { break; }
+            if idx >= count {
+                break;
+            }
             let wrapped = wrap_text_with_ansi(msg, content_width);
             total += wrapped.len().min(max_lines_per);
             if idx + 1 < count {
@@ -784,17 +873,27 @@ impl TuiApp {
                         }
                         format!("{}...", &item.label[..end])
                     } else {
-                        format!("{}{}", item.label, " ".repeat(label_max.saturating_sub(item.label.len())))
+                        format!(
+                            "{}{}",
+                            item.label,
+                            " ".repeat(label_max.saturating_sub(item.label.len()))
+                        )
                     };
                     result.push(Line::from(Span::raw(truncated)));
                 }
             }
             let total = sel.items.len();
             let current_pos = sel.selected_index + 1;
-            result.push(Line::from(Span::styled(format!("  ({}/{})", current_pos, total), dim)));
+            result.push(Line::from(Span::styled(
+                format!("  ({}/{})", current_pos, total),
+                dim,
+            )));
             result.push(Line::from(""));
             if let Some(desc) = sel.selected().and_then(|i| i.description.as_ref()) {
-                let desc_trimmed: String = desc.chars().take(width.saturating_sub(4) as usize).collect();
+                let desc_trimmed: String = desc
+                    .chars()
+                    .take(width.saturating_sub(4) as usize)
+                    .collect();
                 result.push(Line::from(Span::styled(format!(" {}", desc_trimmed), dim)));
                 result.push(Line::from(""));
             }
@@ -813,7 +912,10 @@ impl TuiApp {
         let dim = Style::default().add_modifier(Modifier::DIM);
         let provider = self.api_key_provider.as_deref().unwrap_or("provider");
         let mut lines: Vec<Line<'static>> = Vec::new();
-        lines.push(Line::from(Span::styled(format!("Login to {}", provider), bold)));
+        lines.push(Line::from(Span::styled(
+            format!("Login to {}", provider),
+            bold,
+        )));
         lines.push(Line::from(""));
         lines.push(Line::from(Span::raw("Enter your API key:")));
         let input_display = if self.api_key_input.is_empty() {
@@ -824,9 +926,17 @@ impl TuiApp {
             let last_four = &self.api_key_input[self.api_key_input.len().saturating_sub(4)..];
             Line::from(Span::raw(format!("{}{}", masked, last_four)))
         };
-        lines.push(Line::from(vec![Span::raw("> ".to_string())].into_iter().chain(input_display.spans.into_iter()).collect::<Vec<_>>()));
+        lines.push(Line::from(
+            vec![Span::raw("> ".to_string())]
+                .into_iter()
+                .chain(input_display.spans.into_iter())
+                .collect::<Vec<_>>(),
+        ));
         lines.push(Line::from(""));
-        lines.push(Line::from(Span::styled("Enter to confirm \u{00B7} Esc to cancel".to_string(), dim)));
+        lines.push(Line::from(Span::styled(
+            "Enter to confirm \u{00B7} Esc to cancel".to_string(),
+            dim,
+        )));
         lines
     }
 
@@ -845,7 +955,11 @@ impl TuiApp {
     pub fn update_terminal_title(&self) {
         let indicator = match self.state {
             AppState::Streaming => {
-                if (self.status_frame / 5) % 2 == 0 { "☀️" } else { "  " }
+                if (self.status_frame / 5) % 2 == 0 {
+                    "☀️"
+                } else {
+                    "  "
+                }
             }
             _ => "✅",
         };
@@ -882,7 +996,10 @@ impl TuiApp {
 
     /// Show usage info
     pub fn show_usage(&mut self, input: u64, output: u64) {
-        let duration_secs = self.agent_start_time.as_ref().map(|t| t.elapsed().as_secs());
+        let duration_secs = self
+            .agent_start_time
+            .as_ref()
+            .map(|t| t.elapsed().as_secs());
         self.chat.add_usage(input, output, duration_secs);
         self.total_input = self.total_input.saturating_add(input);
         self.total_output = self.total_output.saturating_add(output);
@@ -926,24 +1043,34 @@ impl TuiApp {
     }
 
     /// Add a pending tool execution entry to the chat
-    pub fn add_tool_execution(&mut self, tool_call_id: &str, tool_name: &str, args: serde_json::Value) {
+    pub fn add_tool_execution(
+        &mut self,
+        tool_call_id: &str,
+        tool_name: &str,
+        args: serde_json::Value,
+    ) {
         self.chat.add_tool_execution(tool_call_id, tool_name, args);
     }
 
     /// Update a tool execution entry with result
     pub fn update_tool_execution(&mut self, tool_call_id: &str, output: &str, is_error: bool) {
-        self.chat.update_tool_execution(tool_call_id, output, is_error);
+        self.chat
+            .update_tool_execution(tool_call_id, output, is_error);
     }
 
     /// Append partial output to a running tool execution
     pub fn update_tool_execution_output(&mut self, tool_call_id: &str, partial: &str) {
-        self.chat.update_tool_execution_output(tool_call_id, partial);
+        self.chat
+            .update_tool_execution_output(tool_call_id, partial);
     }
 
     /// Finalize the current turn (assistant done).
     pub fn finalize_turn(&mut self) {
         self.chat.mark_turn_end();
-        if self.state != AppState::Selecting && self.state != AppState::TreeSelecting && self.state != AppState::ApiKeyInput {
+        if self.state != AppState::Selecting
+            && self.state != AppState::TreeSelecting
+            && self.state != AppState::ApiKeyInput
+        {
             self.state = AppState::Input;
             self.update_terminal_title();
         }

@@ -1,6 +1,5 @@
 //! Settings manager - two-tier (global + project) settings
 
-
 pub mod types;
 
 use std::path::PathBuf;
@@ -165,7 +164,9 @@ pub struct SettingsManager {
 impl SettingsManager {
     pub fn load(cwd: &std::path::Path) -> Self {
         let global_path = crate::config::get_settings_path();
-        let project_path = cwd.join(crate::config::CONFIG_DIR_NAME).join("settings.json");
+        let project_path = cwd
+            .join(crate::config::CONFIG_DIR_NAME)
+            .join("settings.json");
 
         let global_settings = load_settings_from_file(&global_path);
         let project_settings = load_settings_from_file(&project_path);
@@ -182,7 +183,9 @@ impl SettingsManager {
 
     pub fn reload(&mut self, cwd: &std::path::Path) {
         let global_settings = load_settings_from_file(&self.global_path);
-        let project_settings_path = cwd.join(crate::config::CONFIG_DIR_NAME).join("settings.json");
+        let project_settings_path = cwd
+            .join(crate::config::CONFIG_DIR_NAME)
+            .join("settings.json");
         let project_settings = if project_settings_path != self.project_path {
             load_settings_from_file(&project_settings_path)
         } else {
@@ -263,15 +266,24 @@ impl SettingsManager {
     }
 
     pub fn get_steering_mode(&self) -> &str {
-        self.merged.steering_mode.as_deref().unwrap_or("one-at-a-time")
+        self.merged
+            .steering_mode
+            .as_deref()
+            .unwrap_or("one-at-a-time")
     }
 
     pub fn get_follow_up_mode(&self) -> &str {
-        self.merged.follow_up_mode.as_deref().unwrap_or("one-at-a-time")
+        self.merged
+            .follow_up_mode
+            .as_deref()
+            .unwrap_or("one-at-a-time")
     }
 
     pub fn get_double_escape_action(&self) -> &str {
-        self.merged.double_escape_action.as_deref().unwrap_or("tree")
+        self.merged
+            .double_escape_action
+            .as_deref()
+            .unwrap_or("tree")
     }
 
     pub fn get_tree_filter_mode(&self) -> &str {
@@ -291,11 +303,19 @@ impl SettingsManager {
     }
 
     pub fn get_clear_on_shrink(&self) -> bool {
-        self.merged.terminal.as_ref().and_then(|t| t.clear_on_shrink).unwrap_or(false)
+        self.merged
+            .terminal
+            .as_ref()
+            .and_then(|t| t.clear_on_shrink)
+            .unwrap_or(false)
     }
 
     pub fn get_show_terminal_progress(&self) -> bool {
-        self.merged.terminal.as_ref().and_then(|t| t.show_terminal_progress).unwrap_or(false)
+        self.merged
+            .terminal
+            .as_ref()
+            .and_then(|t| t.show_terminal_progress)
+            .unwrap_or(false)
     }
 
     pub fn get_http_idle_timeout_ms(&self) -> u64 {
@@ -303,24 +323,43 @@ impl SettingsManager {
     }
 
     pub fn get_show_images(&self) -> bool {
-        self.merged.terminal.as_ref().and_then(|t| t.show_images).unwrap_or(true)
+        self.merged
+            .terminal
+            .as_ref()
+            .and_then(|t| t.show_images)
+            .unwrap_or(true)
     }
 
     pub fn get_image_width_cells(&self) -> u32 {
-        self.merged.terminal.as_ref().and_then(|t| t.image_width_cells).unwrap_or(60)
+        self.merged
+            .terminal
+            .as_ref()
+            .and_then(|t| t.image_width_cells)
+            .unwrap_or(60)
     }
 
     pub fn get_image_auto_resize(&self) -> bool {
-        self.merged.images.as_ref().and_then(|i| i.auto_resize).unwrap_or(true)
+        self.merged
+            .images
+            .as_ref()
+            .and_then(|i| i.auto_resize)
+            .unwrap_or(true)
     }
 
     pub fn get_block_images(&self) -> bool {
-        self.merged.images.as_ref().and_then(|i| i.block_images).unwrap_or(false)
+        self.merged
+            .images
+            .as_ref()
+            .and_then(|i| i.block_images)
+            .unwrap_or(false)
     }
 
     pub fn get_retry_enabled(&self) -> bool {
-        self.merged.retry.as_ref()
-            .and_then(|r| r.enabled).unwrap_or(true)
+        self.merged
+            .retry
+            .as_ref()
+            .and_then(|r| r.enabled)
+            .unwrap_or(true)
     }
 
     pub fn get_retry_settings(&self) -> super::agent_session::RetryConfig {
@@ -360,12 +399,10 @@ fn load_settings_from_file(path: &std::path::Path) -> Settings {
         return Settings::default();
     }
     match std::fs::read_to_string(path) {
-        Ok(content) => {
-            serde_json::from_str(&content).unwrap_or_else(|e| {
-                tracing::warn!("Failed to parse settings file {:?}: {}", path, e);
-                Settings::default()
-            })
-        }
+        Ok(content) => serde_json::from_str(&content).unwrap_or_else(|e| {
+            tracing::warn!("Failed to parse settings file {:?}: {}", path, e);
+            Settings::default()
+        }),
         Err(e) => {
             tracing::warn!("Failed to read settings file {:?}: {}", path, e);
             Settings::default()
@@ -375,7 +412,8 @@ fn load_settings_from_file(path: &std::path::Path) -> Settings {
 
 fn save_settings_to_file(path: &std::path::Path, settings: &Settings) -> Result<(), String> {
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| format!("Failed to create settings dir: {}", e))?;
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create settings dir: {}", e))?;
     }
     let content = serde_json::to_string_pretty(settings)
         .map_err(|e| format!("Failed to serialize settings: {}", e))?;
@@ -385,10 +423,13 @@ fn save_settings_to_file(path: &std::path::Path, settings: &Settings) -> Result<
         .truncate(true)
         .open(path)
         .map_err(|e| format!("Failed to open settings file: {}", e))?;
-    file.lock_exclusive().map_err(|e| format!("Failed to lock settings file: {}", e))?;
+    file.lock_exclusive()
+        .map_err(|e| format!("Failed to lock settings file: {}", e))?;
     use std::io::Write;
-    file.write_all(content.as_bytes()).map_err(|e| format!("Failed to write settings: {}", e))?;
-    file.unlock().map_err(|e| format!("Failed to unlock settings file: {}", e))?;
+    file.write_all(content.as_bytes())
+        .map_err(|e| format!("Failed to write settings: {}", e))?;
+    file.unlock()
+        .map_err(|e| format!("Failed to unlock settings file: {}", e))?;
     Ok(())
 }
 
@@ -411,7 +452,10 @@ mod tests {
 
         let merged = deep_merge(&base, &overrides);
         assert_eq!(merged.default_provider.as_deref(), Some("anthropic"));
-        assert_eq!(merged.default_model.as_deref(), Some("claude-opus-4-20250514"));
+        assert_eq!(
+            merged.default_model.as_deref(),
+            Some("claude-opus-4-20250514")
+        );
     }
 
     #[test]

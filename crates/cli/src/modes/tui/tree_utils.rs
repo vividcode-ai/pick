@@ -47,9 +47,9 @@ pub(crate) fn entry_label(entry: &pick_agent::session::SessionEntry) -> String {
                     let texts: Vec<String> = arr
                         .iter()
                         .filter_map(|c| {
-                            c.get("text").and_then(|t| t.as_str()).map(|s| {
-                                s.replace('\n', " ").chars().take(60).collect::<String>()
-                            })
+                            c.get("text")
+                                .and_then(|t| t.as_str())
+                                .map(|s| s.replace('\n', " ").chars().take(60).collect::<String>())
                         })
                         .collect();
                     if texts.is_empty() {

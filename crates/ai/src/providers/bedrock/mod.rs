@@ -7,11 +7,7 @@ use crate::types::{
     AssistantMessage, ContentBlock, Context, Model, StopReason, StreamEvent, StreamOptions, Usage,
 };
 
-fn build_bedrock_request(
-    model: &Model,
-    context: &Context,
-    region: &str,
-) -> (String, Vec<u8>) {
+fn build_bedrock_request(model: &Model, context: &Context, region: &str) -> (String, Vec<u8>) {
     let base_url = if model.base_url.contains("amazonaws.com") {
         model.base_url.trim_end_matches('/').to_string()
     } else {
@@ -107,10 +103,15 @@ fn build_bedrock_request(
                 }
             }
             crate::types::Message::ToolResult(tr) => {
-                let text_content: Vec<String> = tr.content.iter()
+                let text_content: Vec<String> = tr
+                    .content
+                    .iter()
                     .filter_map(|c| {
-                        if let ContentBlock::Text(t) = c { Some(t.text.clone()) }
-                        else { None }
+                        if let ContentBlock::Text(t) = c {
+                            Some(t.text.clone())
+                        } else {
+                            None
+                        }
                     })
                     .collect();
                 let text = text_content.join("\n");
@@ -157,15 +158,18 @@ fn build_bedrock_request(
         body["system"] = serde_json::json!([{"text": system}]);
     }
     if let Some(tools) = &context.tools {
-        let tool_specs: Vec<serde_json::Value> = tools.iter().map(|t| {
-            serde_json::json!({
-                "toolSpec": {
-                    "name": t.name,
-                    "description": t.description,
-                    "inputSchema": {"json": t.parameters},
-                }
+        let tool_specs: Vec<serde_json::Value> = tools
+            .iter()
+            .map(|t| {
+                serde_json::json!({
+                    "toolSpec": {
+                        "name": t.name,
+                        "description": t.description,
+                        "inputSchema": {"json": t.parameters},
+                    }
+                })
             })
-        }).collect();
+            .collect();
         body["toolConfig"] = serde_json::json!({
             "tools": tool_specs,
         });
@@ -216,18 +220,20 @@ async fn process_bedrock_stream(
             StopReason::Stop,
         );
 
-        let _ = tx.send(StreamEvent::Start {
-            partial: crate::types::PartialAssistantMessage {
-                content: vec![],
-                api: Some("bedrock-converse-stream".to_string()),
-                provider: Some("amazon-bedrock".to_string()),
-                model: Some(model_id.clone()),
-                usage: Some(Usage::zero()),
-                stop_reason: None,
-                error_message: None,
-                timestamp: chrono::Utc::now().timestamp_millis(),
-            },
-        }).await;
+        let _ = tx
+            .send(StreamEvent::Start {
+                partial: crate::types::PartialAssistantMessage {
+                    content: vec![],
+                    api: Some("bedrock-converse-stream".to_string()),
+                    provider: Some("amazon-bedrock".to_string()),
+                    model: Some(model_id.clone()),
+                    usage: Some(Usage::zero()),
+                    stop_reason: None,
+                    error_message: None,
+                    timestamp: chrono::Utc::now().timestamp_millis(),
+                },
+            })
+            .await;
 
         let client = reqwest::Client::new();
         let x_amz_date = {
@@ -260,16 +266,20 @@ async fn process_bedrock_stream(
                     }
                     output.stop_reason = StopReason::Error;
                     output.error_message = Some(err_msg);
-                    let _ = tx.send(StreamEvent::Error {
-                        reason: StopReason::Error,
-                        error: output,
-                    }).await;
+                    let _ = tx
+                        .send(StreamEvent::Error {
+                            reason: StopReason::Error,
+                            error: output,
+                        })
+                        .await;
                     return;
                 }
 
                 let mut parser = crate::sse::SseParser::new();
-                let mut text_blocks: std::collections::HashMap<usize, usize> = std::collections::HashMap::new();
-                let mut tool_blocks: std::collections::HashMap<usize, (String, String, String)> = std::collections::HashMap::new();
+                let mut text_blocks: std::collections::HashMap<usize, usize> =
+                    std::collections::HashMap::new();
+                let mut tool_blocks: std::collections::HashMap<usize, (String, String, String)> =
+                    std::collections::HashMap::new();
                 let mut saw_message_start = false;
 
                 use futures::StreamExt;
@@ -280,28 +290,36 @@ async fn process_bedrock_stream(
                             let events = parser.feed(&chunk);
                             for sse in events {
                                 events::process_bedrock_event(
-                                    &tx, &sse, &mut output,
-                                    &mut text_blocks, &mut tool_blocks,
+                                    &tx,
+                                    &sse,
+                                    &mut output,
+                                    &mut text_blocks,
+                                    &mut tool_blocks,
                                     &mut saw_message_start,
-                                ).await;
+                                )
+                                .await;
                             }
                         }
                         Err(e) => {
                             output.stop_reason = StopReason::Error;
                             output.error_message = Some(format!("Stream error: {}", e));
-                            let _ = tx.send(StreamEvent::Error {
-                                reason: StopReason::Error,
-                                error: output,
-                            }).await;
+                            let _ = tx
+                                .send(StreamEvent::Error {
+                                    reason: StopReason::Error,
+                                    error: output,
+                                })
+                                .await;
                             return;
                         }
                     }
                 }
 
-                let _ = tx.send(StreamEvent::Done {
-                    reason: output.stop_reason.clone(),
-                    message: output,
-                }).await;
+                let _ = tx
+                    .send(StreamEvent::Done {
+                        reason: output.stop_reason.clone(),
+                        message: output,
+                    })
+                    .await;
                 return;
             }
             Err(e) => {
@@ -312,21 +330,32 @@ async fn process_bedrock_stream(
                 }
                 output.stop_reason = StopReason::Error;
                 output.error_message = Some(format!("Request failed: {}", e));
-                let _ = tx.send(StreamEvent::Error {
-                    reason: StopReason::Error,
-                    error: output,
-                }).await;
+                let _ = tx
+                    .send(StreamEvent::Error {
+                        reason: StopReason::Error,
+                        error: output,
+                    })
+                    .await;
                 return;
             }
         }
     }
 
     let mut msg = AssistantMessage::new(
-        vec![], "bedrock-converse-stream".to_string(), "amazon-bedrock".to_string(),
-        model_id, Usage::zero(), StopReason::Error,
+        vec![],
+        "bedrock-converse-stream".to_string(),
+        "amazon-bedrock".to_string(),
+        model_id,
+        Usage::zero(),
+        StopReason::Error,
     );
     msg.error_message = Some("Max retries exceeded".to_string());
-    let _ = tx.send(StreamEvent::Error { reason: StopReason::Error, error: msg }).await;
+    let _ = tx
+        .send(StreamEvent::Error {
+            reason: StopReason::Error,
+            error: msg,
+        })
+        .await;
 }
 
 /// Stream a response from AWS Bedrock Converse Stream API
@@ -338,7 +367,10 @@ pub fn stream_bedrock(
     let (tx, rx) = tokio::sync::mpsc::channel(64);
 
     let max_retries = options.as_ref().and_then(|o| o.max_retries).unwrap_or(3);
-    let max_delay = options.as_ref().and_then(|o| o.max_retry_delay_ms).unwrap_or(60000);
+    let max_delay = options
+        .as_ref()
+        .and_then(|o| o.max_retry_delay_ms)
+        .unwrap_or(60000);
 
     tokio::spawn(async move {
         let access_key = std::env::var("AWS_ACCESS_KEY_ID")
@@ -352,20 +384,37 @@ pub fn stream_bedrock(
 
         if access_key.is_empty() || secret_key.is_empty() {
             let msg = AssistantMessage::new(
-                vec![], "bedrock-converse-stream".to_string(), "amazon-bedrock".to_string(),
-                model.id.clone(), Usage::zero(), StopReason::Error,
+                vec![],
+                "bedrock-converse-stream".to_string(),
+                "amazon-bedrock".to_string(),
+                model.id.clone(),
+                Usage::zero(),
+                StopReason::Error,
             );
-            let _ = tx.send(StreamEvent::Error { reason: StopReason::Error, error: msg }).await;
+            let _ = tx
+                .send(StreamEvent::Error {
+                    reason: StopReason::Error,
+                    error: msg,
+                })
+                .await;
             return;
         }
 
         let (stream_url, payload) = build_bedrock_request(&model, &context, &region);
 
         process_bedrock_stream(
-            tx, stream_url, payload,
-            access_key, secret_key, session_token, region,
-            model.id.clone(), max_retries, max_delay,
-        ).await;
+            tx,
+            stream_url,
+            payload,
+            access_key,
+            secret_key,
+            session_token,
+            region,
+            model.id.clone(),
+            max_retries,
+            max_delay,
+        )
+        .await;
     });
 
     rx
@@ -378,7 +427,10 @@ fn find_tool_call_index(
 ) -> Option<usize> {
     let tool_order: Vec<usize> = tool_blocks.keys().copied().collect();
     let pos = tool_order.iter().position(|k| *k == block_index)?;
-    output.content.iter().enumerate()
+    output
+        .content
+        .iter()
+        .enumerate()
         .filter(|(_, c)| matches!(c, ContentBlock::ToolCall(_)))
         .nth(pos)
         .map(|(i, _)| i)

@@ -1,16 +1,18 @@
-﻿//! Message transformation utilities for cross-provider compatibility
+//! Message transformation utilities for cross-provider compatibility
 
 use std::collections::HashMap;
 
-use crate::types::{
-    AssistantMessage, ContentBlock, Message, Model, ToolCall, ToolResultMessage,
-};
+use crate::types::{AssistantMessage, ContentBlock, Message, Model, ToolCall, ToolResultMessage};
 
 const NON_VISION_USER_IMAGE_PLACEHOLDER: &str = "(image omitted: model does not support images)";
-const NON_VISION_TOOL_IMAGE_PLACEHOLDER: &str = "(tool image omitted: model does not support images)";
+const NON_VISION_TOOL_IMAGE_PLACEHOLDER: &str =
+    "(tool image omitted: model does not support images)";
 
 /// Replace image content blocks with a text placeholder, avoiding consecutive placeholders.
-fn replace_images_with_placeholder(content: &[ContentBlock], placeholder: &str) -> Vec<ContentBlock> {
+fn replace_images_with_placeholder(
+    content: &[ContentBlock],
+    placeholder: &str,
+) -> Vec<ContentBlock> {
     let mut result = Vec::new();
     let mut previous_was_placeholder = false;
 
@@ -36,29 +38,37 @@ fn replace_images_with_placeholder(content: &[ContentBlock], placeholder: &str) 
 
 /// Remove images from messages if the model doesn't support them.
 fn downgrade_unsupported_images(messages: &[Message], model: &Model) -> Vec<Message> {
-    let supports_images = model.input_capabilities.iter().any(|c| matches!(c, crate::types::Capability::Image));
+    let supports_images = model
+        .input_capabilities
+        .iter()
+        .any(|c| matches!(c, crate::types::Capability::Image));
 
     if supports_images {
         return messages.to_vec();
     }
 
-    messages.iter().map(|msg| match msg {
-        Message::User(u) => {
-            let new_content = replace_images_with_placeholder(&u.content, NON_VISION_USER_IMAGE_PLACEHOLDER);
-            Message::User(crate::types::UserMessage {
-                content: new_content,
-                ..u.clone()
-            })
-        }
-        Message::ToolResult(tr) => {
-            let new_content = replace_images_with_placeholder(&tr.content, NON_VISION_TOOL_IMAGE_PLACEHOLDER);
-            Message::ToolResult(ToolResultMessage {
-                content: new_content,
-                ..tr.clone()
-            })
-        }
-        other => other.clone(),
-    }).collect()
+    messages
+        .iter()
+        .map(|msg| match msg {
+            Message::User(u) => {
+                let new_content =
+                    replace_images_with_placeholder(&u.content, NON_VISION_USER_IMAGE_PLACEHOLDER);
+                Message::User(crate::types::UserMessage {
+                    content: new_content,
+                    ..u.clone()
+                })
+            }
+            Message::ToolResult(tr) => {
+                let new_content =
+                    replace_images_with_placeholder(&tr.content, NON_VISION_TOOL_IMAGE_PLACEHOLDER);
+                Message::ToolResult(ToolResultMessage {
+                    content: new_content,
+                    ..tr.clone()
+                })
+            }
+            other => other.clone(),
+        })
+        .collect()
 }
 
 /// Transform messages for cross-provider compatibility.
@@ -78,90 +88,100 @@ pub fn transform_messages(
     let image_aware_messages = downgrade_unsupported_images(messages, model);
 
     // First pass: transform messages
-    let transformed: Vec<Message> = image_aware_messages.iter().map(|msg| {
-        match msg {
-            Message::User(_) => msg.clone(),
-            Message::ToolResult(tr) => {
-                let normalized_id = tool_call_id_map.get(&tr.tool_call_id);
-                if let Some(nid) = normalized_id {
-                    if nid != &tr.tool_call_id {
-                        let mut new_tr = tr.clone();
-                        new_tr.tool_call_id = nid.clone();
-                        return Message::ToolResult(new_tr);
+    let transformed: Vec<Message> = image_aware_messages
+        .iter()
+        .map(|msg| {
+            match msg {
+                Message::User(_) => msg.clone(),
+                Message::ToolResult(tr) => {
+                    let normalized_id = tool_call_id_map.get(&tr.tool_call_id);
+                    if let Some(nid) = normalized_id {
+                        if nid != &tr.tool_call_id {
+                            let mut new_tr = tr.clone();
+                            new_tr.tool_call_id = nid.clone();
+                            return Message::ToolResult(new_tr);
+                        }
                     }
+                    msg.clone()
                 }
-                msg.clone()
-            }
-            Message::Assistant(a) => {
-                let is_same_model = a.provider == model.provider.as_str()
-                    && a.api == model.api.as_str()
-                    && a.model == model.id;
+                Message::Assistant(a) => {
+                    let is_same_model = a.provider == model.provider.as_str()
+                        && a.api == model.api.as_str()
+                        && a.model == model.id;
 
-                let transformed_content: Vec<ContentBlock> = a.content.iter().flat_map(|block| {
-                    match block {
-                        ContentBlock::Thinking(tc) => {
-                            if tc.redacted {
-                                // Redacted thinking is opaque, only valid for same model
-                                return if is_same_model {
-                                    vec![block.clone()]
-                                } else {
-                                    vec![]
-                                };
-                            }
-                            // For same model: keep thinking blocks with signatures
-                            if is_same_model && tc.thinking_signature.is_some() {
-                                return vec![block.clone()];
-                            }
-                            // Skip empty thinking
-                            if tc.thinking.trim().is_empty() {
-                                return vec![];
-                            }
-                            if is_same_model {
-                                return vec![block.clone()];
-                            }
-                            // Cross-model: convert thinking to text
-                            vec![ContentBlock::text(&tc.thinking)]
-                        }
-                        ContentBlock::Text(tc) => {
-                            if is_same_model {
-                                vec![block.clone()]
-                            } else {
-                                vec![ContentBlock::text(&tc.text)]
-                            }
-                        }
-                        ContentBlock::ToolCall(tc) => {
-                            let mut normalized = tc.clone();
-                            if !is_same_model && tc.thought_signature.is_some() {
-                                normalized.thought_signature = None;
-                            }
-                            if !is_same_model {
-                                if let Some(normalize_fn) = &normalize_tool_call_id {
-                                    let new_id = normalize_fn(&tc.id, model, a);
-                                    if new_id != tc.id {
-                                        tool_call_id_map.insert(tc.id.clone(), new_id.clone());
-                                        normalized.id = new_id;
+                    let transformed_content: Vec<ContentBlock> = a
+                        .content
+                        .iter()
+                        .flat_map(|block| {
+                            match block {
+                                ContentBlock::Thinking(tc) => {
+                                    if tc.redacted {
+                                        // Redacted thinking is opaque, only valid for same model
+                                        return if is_same_model {
+                                            vec![block.clone()]
+                                        } else {
+                                            vec![]
+                                        };
+                                    }
+                                    // For same model: keep thinking blocks with signatures
+                                    if is_same_model && tc.thinking_signature.is_some() {
+                                        return vec![block.clone()];
+                                    }
+                                    // Skip empty thinking
+                                    if tc.thinking.trim().is_empty() {
+                                        return vec![];
+                                    }
+                                    if is_same_model {
+                                        return vec![block.clone()];
+                                    }
+                                    // Cross-model: convert thinking to text
+                                    vec![ContentBlock::text(&tc.thinking)]
+                                }
+                                ContentBlock::Text(tc) => {
+                                    if is_same_model {
+                                        vec![block.clone()]
+                                    } else {
+                                        vec![ContentBlock::text(&tc.text)]
                                     }
                                 }
+                                ContentBlock::ToolCall(tc) => {
+                                    let mut normalized = tc.clone();
+                                    if !is_same_model && tc.thought_signature.is_some() {
+                                        normalized.thought_signature = None;
+                                    }
+                                    if !is_same_model {
+                                        if let Some(normalize_fn) = &normalize_tool_call_id {
+                                            let new_id = normalize_fn(&tc.id, model, a);
+                                            if new_id != tc.id {
+                                                tool_call_id_map
+                                                    .insert(tc.id.clone(), new_id.clone());
+                                                normalized.id = new_id;
+                                            }
+                                        }
+                                    }
+                                    vec![ContentBlock::ToolCall(normalized)]
+                                }
+                                _ => vec![block.clone()],
                             }
-                            vec![ContentBlock::ToolCall(normalized)]
-                        }
-                        _ => vec![block.clone()],
-                    }
-                }).collect();
+                        })
+                        .collect();
 
-                let mut new_a = a.clone();
-                new_a.content = transformed_content;
-                Message::Assistant(new_a)
+                    let mut new_a = a.clone();
+                    new_a.content = transformed_content;
+                    Message::Assistant(new_a)
+                }
             }
-        }
-    }).collect();
+        })
+        .collect();
 
     // Second pass: insert synthetic tool results for orphaned tool calls
     let mut result: Vec<Message> = Vec::new();
     let mut pending_tool_calls: Vec<ToolCall> = Vec::new();
     let mut existing_tool_result_ids: HashMap<String, bool> = HashMap::new();
 
-    let insert_synthetic = |result: &mut Vec<Message>, pending: &mut Vec<ToolCall>, existing: &mut HashMap<String, bool>| {
+    let insert_synthetic = |result: &mut Vec<Message>,
+                            pending: &mut Vec<ToolCall>,
+                            existing: &mut HashMap<String, bool>| {
         if !pending.is_empty() {
             for tc in pending.drain(..) {
                 if !existing.contains_key(&tc.id) {
@@ -180,7 +200,11 @@ pub fn transform_messages(
     for msg in &transformed {
         match msg {
             Message::Assistant(a) => {
-                insert_synthetic(&mut result, &mut pending_tool_calls, &mut existing_tool_result_ids);
+                insert_synthetic(
+                    &mut result,
+                    &mut pending_tool_calls,
+                    &mut existing_tool_result_ids,
+                );
 
                 // Skip errored/aborted assistant messages
                 if a.stop_reason == crate::types::StopReason::Error
@@ -190,9 +214,15 @@ pub fn transform_messages(
                 }
 
                 // Track tool calls
-                let tool_calls: Vec<ToolCall> = a.content.iter()
+                let tool_calls: Vec<ToolCall> = a
+                    .content
+                    .iter()
                     .filter_map(|b| {
-                        if let ContentBlock::ToolCall(tc) = b { Some(tc.clone()) } else { None }
+                        if let ContentBlock::ToolCall(tc) = b {
+                            Some(tc.clone())
+                        } else {
+                            None
+                        }
                     })
                     .collect();
                 if !tool_calls.is_empty() {
@@ -207,14 +237,22 @@ pub fn transform_messages(
                 result.push(msg.clone());
             }
             Message::User(_) => {
-                insert_synthetic(&mut result, &mut pending_tool_calls, &mut existing_tool_result_ids);
+                insert_synthetic(
+                    &mut result,
+                    &mut pending_tool_calls,
+                    &mut existing_tool_result_ids,
+                );
                 result.push(msg.clone());
             }
         }
     }
 
     // Handle unresolved tool calls at end
-    insert_synthetic(&mut result, &mut pending_tool_calls, &mut existing_tool_result_ids);
+    insert_synthetic(
+        &mut result,
+        &mut pending_tool_calls,
+        &mut existing_tool_result_ids,
+    );
 
     result
 }

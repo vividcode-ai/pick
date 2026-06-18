@@ -1,12 +1,12 @@
-﻿//! Session entry types
+//! Session entry types
 
 use serde::{Deserialize, Serialize};
 
+use pick_ai::types::Message;
 use pick_ai::types::content::ContentBlock;
 use pick_ai::types::message::{AssistantMessage, ToolResultMessage, UserMessage};
-use pick_ai::types::stream::StopReason;
-use pick_ai::types::Message;
 use pick_ai::types::model::Usage;
+use pick_ai::types::stream::StopReason;
 
 /// A single entry in a session.
 /// Entries can form a tree via the optional parent_id field.
@@ -171,7 +171,11 @@ impl From<&Message> for SessionEntry {
             Message::User(u) => (
                 "user",
                 serde_json::to_value(&u.content).unwrap_or_default(),
-                None, None, None, None, None,
+                None,
+                None,
+                None,
+                None,
+                None,
             ),
             Message::Assistant(a) => (
                 "assistant",
@@ -185,7 +189,11 @@ impl From<&Message> for SessionEntry {
             Message::ToolResult(t) => (
                 "tool_result",
                 serde_json::to_value(&t.content).unwrap_or_default(),
-                None, None, None, None, None,
+                None,
+                None,
+                None,
+                None,
+                None,
             ),
         };
 

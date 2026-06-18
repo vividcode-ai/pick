@@ -1,4 +1,4 @@
-﻿//! Cloudflare AI Gateway / Workers AI utilities
+//! Cloudflare AI Gateway / Workers AI utilities
 
 use crate::types::Provider;
 
@@ -15,8 +15,7 @@ pub const CLOUDFLARE_AI_GATEWAY_OPENAI_BASE_URL: &str =
     "https://gateway.ai.cloudflare.com/v1/{CLOUDFLARE_ACCOUNT_ID}/{CLOUDFLARE_GATEWAY_ID}/openai";
 
 /// AI Gateway -> Anthropic passthrough URL template
-pub const CLOUDFLARE_AI_GATEWAY_ANTHROPIC_BASE_URL: &str =
-    "https://gateway.ai.cloudflare.com/v1/{CLOUDFLARE_ACCOUNT_ID}/{CLOUDFLARE_GATEWAY_ID}/anthropic";
+pub const CLOUDFLARE_AI_GATEWAY_ANTHROPIC_BASE_URL: &str = "https://gateway.ai.cloudflare.com/v1/{CLOUDFLARE_ACCOUNT_ID}/{CLOUDFLARE_GATEWAY_ID}/anthropic";
 
 /// Check if a provider is a Cloudflare provider (Workers AI or AI Gateway)
 pub fn is_cloudflare_provider(provider: &Provider) -> bool {
@@ -25,7 +24,10 @@ pub fn is_cloudflare_provider(provider: &Provider) -> bool {
 
 /// Check if provider is specifically Workers AI
 pub fn is_cloudflare_workers_ai(provider: &Provider) -> bool {
-    matches!(provider, Provider::Known(crate::types::KnownProvider::CloudflareWorkersAi))
+    matches!(
+        provider,
+        Provider::Known(crate::types::KnownProvider::CloudflareWorkersAi)
+    )
 }
 
 /// Check if provider is specifically AI Gateway
@@ -49,12 +51,17 @@ pub fn resolve_cloudflare_base_url(base_url: &str) -> Result<String, String> {
         result.push_str(&rest[..start]);
         rest = &rest[start..];
 
-        let end = rest.find('}')
+        let end = rest
+            .find('}')
             .ok_or_else(|| format!("Unmatched {{ in Cloudflare base URL: {}", base_url))?;
 
         let var_name = &rest[1..end];
-        let value = std::env::var(var_name)
-            .map_err(|_| format!("{} is required for Cloudflare provider but is not set.", var_name))?;
+        let value = std::env::var(var_name).map_err(|_| {
+            format!(
+                "{} is required for Cloudflare provider but is not set.",
+                var_name
+            )
+        })?;
 
         result.push_str(&value);
         rest = &rest[end + 1..];
@@ -69,12 +76,13 @@ pub fn resolve_cloudflare_base_url(base_url: &str) -> Result<String, String> {
 pub fn get_cloudflare_headers(provider: &Provider, api_key: &str) -> Vec<(String, String)> {
     if is_cloudflare_ai_gateway(provider) {
         vec![
-            ("cf-aig-authorization".to_string(), format!("Bearer {}", api_key)),
+            (
+                "cf-aig-authorization".to_string(),
+                format!("Bearer {}", api_key),
+            ),
             ("Authorization".to_string(), String::new()),
         ]
     } else {
-        vec![
-            ("Authorization".to_string(), format!("Bearer {}", api_key)),
-        ]
+        vec![("Authorization".to_string(), format!("Bearer {}", api_key))]
     }
 }

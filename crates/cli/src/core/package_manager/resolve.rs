@@ -1,4 +1,4 @@
-﻿//! Package resolution and path parsing utilities
+//! Package resolution and path parsing utilities
 
 use std::collections::HashSet;
 use std::path::Path;
@@ -18,7 +18,9 @@ pub(crate) struct IgnoreMatcher {
 
 impl IgnoreMatcher {
     pub(crate) fn new() -> Self {
-        Self { patterns: Vec::new() }
+        Self {
+            patterns: Vec::new(),
+        }
     }
 
     pub(crate) fn add(&mut self, patterns: &[String]) {
@@ -97,7 +99,11 @@ pub(crate) fn prefix_ignore_pattern(line: &str, prefix: &str) -> Option<String> 
 
     if negated {
         let rest = &pattern[1..];
-        let rest = if rest.starts_with('/') { &rest[1..] } else { rest };
+        let rest = if rest.starts_with('/') {
+            &rest[1..]
+        } else {
+            rest
+        };
         let prefixed = if prefix.is_empty() {
             rest.to_string()
         } else {
@@ -124,8 +130,7 @@ pub(crate) fn prefix_ignore_pattern(line: &str, prefix: &str) -> Option<String> 
 }
 
 pub(crate) fn add_ignore_rules(ig: &mut IgnoreMatcher, dir: &Path, root_dir: &Path) {
-    let relative_dir = pathdiff::diff_paths(dir, root_dir)
-        .unwrap_or_else(|| dir.to_path_buf());
+    let relative_dir = pathdiff::diff_paths(dir, root_dir).unwrap_or_else(|| dir.to_path_buf());
     let prefix = if relative_dir.to_string_lossy().is_empty() {
         String::new()
     } else {
@@ -196,7 +201,8 @@ pub(crate) fn collect_files(
         };
 
         let is_dir = metadata.is_dir() || metadata.file_type().is_symlink() && full_path.is_dir();
-        let is_file = metadata.is_file() || metadata.file_type().is_symlink() && full_path.is_file();
+        let is_file =
+            metadata.is_file() || metadata.file_type().is_symlink() && full_path.is_file();
 
         let rel_path = pathdiff::diff_paths(&full_path, root)
             .unwrap_or_else(|| full_path.clone())
@@ -220,8 +226,13 @@ pub(crate) fn collect_files(
         }
 
         if is_dir {
-            files.extend(collect_files(&full_path, file_pattern, skip_node_modules,
-                ignore_matcher.as_mut().map(|r| &mut **r), Some(root)));
+            files.extend(collect_files(
+                &full_path,
+                file_pattern,
+                skip_node_modules,
+                ignore_matcher.as_mut().map(|r| &mut **r),
+                Some(root),
+            ));
         } else if is_file && file_pattern.is_match(&name) {
             files.push(full_path.to_string_lossy().to_string());
         }
@@ -260,7 +271,11 @@ pub(crate) fn collect_skill_entries(
         if name == "SKILL.md" {
             let full_path = entry.path();
             let is_file = entry.metadata().map(|m| m.is_file()).unwrap_or(false)
-                || (entry.metadata().map(|m| m.file_type().is_symlink()).unwrap_or(false) && full_path.is_file());
+                || (entry
+                    .metadata()
+                    .map(|m| m.file_type().is_symlink())
+                    .unwrap_or(false)
+                    && full_path.is_file());
 
             let rel_path = pathdiff::diff_paths(&full_path, root)
                 .unwrap_or_else(|| full_path.clone())
@@ -329,7 +344,12 @@ pub(crate) fn collect_skill_entries(
             continue;
         }
 
-        entries.extend(collect_skill_entries(&full_path, mode, ignore_matcher.as_mut().map(|r| &mut **r), Some(root)));
+        entries.extend(collect_skill_entries(
+            &full_path,
+            mode,
+            ignore_matcher.as_mut().map(|r| &mut **r),
+            Some(root),
+        ));
     }
 
     entries
@@ -370,9 +390,8 @@ pub(crate) fn parse_git_url(source: &str) -> Option<GitSource> {
     }
 
     // Full git URL
-    let re_full = regex::Regex::new(
-        r"^(?:git@|https?://)([^:/]+)[:/](.+?)(?:\.git)?(?:@(.+))?$"
-    ).unwrap();
+    let re_full =
+        regex::Regex::new(r"^(?:git@|https?://)([^:/]+)[:/](.+?)(?:\.git)?(?:@(.+))?$").unwrap();
     if let Some(caps) = re_full.captures(source) {
         let host = caps.get(1).unwrap().as_str().to_string();
         let path_ = caps.get(2).unwrap().as_str().to_string();
@@ -382,7 +401,12 @@ pub(crate) fn parse_git_url(source: &str) -> Option<GitSource> {
         } else {
             format!("https://{}/{}.git", host, path_)
         };
-        return Some(GitSource { repo, host, path_, r#ref });
+        return Some(GitSource {
+            repo,
+            host,
+            path_,
+            r#ref,
+        });
     }
 
     None
@@ -420,7 +444,11 @@ pub(crate) fn parse_source(source: &str) -> ParsedSource {
 // ============================================================================
 
 pub(crate) fn is_pattern(s: &str) -> bool {
-    s.starts_with('!') || s.starts_with('+') || s.starts_with('-') || s.contains('*') || s.contains('?')
+    s.starts_with('!')
+        || s.starts_with('+')
+        || s.starts_with('-')
+        || s.contains('*')
+        || s.contains('?')
 }
 
 pub(crate) fn is_override_pattern(s: &str) -> bool {
@@ -435,12 +463,22 @@ fn matches_any_pattern(file_path: &str, patterns: &[String], base_dir: &str) -> 
         .replace('\\', "/");
 
     let path = Path::new(file_path);
-    let name = path.file_name().map(|s| s.to_string_lossy()).unwrap_or_default().to_string();
+    let name = path
+        .file_name()
+        .map(|s| s.to_string_lossy())
+        .unwrap_or_default()
+        .to_string();
     let is_skill_file = name == "SKILL.md";
     let parent_dir = if is_skill_file { path.parent() } else { None };
-    let parent_rel = parent_dir.and_then(|p| pathdiff::diff_paths(p, base_dir))
+    let parent_rel = parent_dir
+        .and_then(|p| pathdiff::diff_paths(p, base_dir))
         .map(|p| p.to_string_lossy().to_string().replace('\\', "/"));
-    let parent_name = parent_dir.map(|p| p.file_name().map(|s| s.to_string_lossy()).unwrap_or_default().to_string());
+    let parent_name = parent_dir.map(|p| {
+        p.file_name()
+            .map(|s| s.to_string_lossy())
+            .unwrap_or_default()
+            .to_string()
+    });
 
     patterns.iter().any(|pattern| {
         let normalized = pattern.replace('\\', "/");
@@ -486,10 +524,15 @@ fn matches_any_exact_pattern(file_path: &str, patterns: &[String], base_dir: &st
         .replace('\\', "/");
 
     let path = Path::new(file_path);
-    let name = path.file_name().map(|s| s.to_string_lossy()).unwrap_or_default().to_string();
+    let name = path
+        .file_name()
+        .map(|s| s.to_string_lossy())
+        .unwrap_or_default()
+        .to_string();
     let is_skill_file = name == "SKILL.md";
     let parent_dir = if is_skill_file { path.parent() } else { None };
-    let parent_rel = parent_dir.and_then(|p| pathdiff::diff_paths(p, base_dir))
+    let parent_rel = parent_dir
+        .and_then(|p| pathdiff::diff_paths(p, base_dir))
         .map(|p| p.to_string_lossy().to_string().replace('\\', "/"));
     let parent_dir_posix = parent_dir.map(|p| p.to_string_lossy().to_string().replace('\\', "/"));
 
@@ -519,7 +562,8 @@ fn normalize_exact_pattern(pattern: &str) -> String {
 }
 
 fn get_override_patterns(entries: &[String]) -> Vec<String> {
-    entries.iter()
+    entries
+        .iter()
         .filter(|p| p.starts_with('!') || p.starts_with('+') || p.starts_with('-'))
         .cloned()
         .collect()
@@ -538,7 +582,11 @@ pub(crate) fn split_patterns(entries: &[String]) -> (Vec<String>, Vec<String>) {
     (plain, patterns)
 }
 
-pub(crate) fn apply_patterns(all_paths: &[String], patterns: &[String], base_dir: &str) -> HashSet<String> {
+pub(crate) fn apply_patterns(
+    all_paths: &[String],
+    patterns: &[String],
+    base_dir: &str,
+) -> HashSet<String> {
     let mut includes: Vec<String> = Vec::new();
     let mut excludes: Vec<String> = Vec::new();
     let mut force_includes: Vec<String> = Vec::new();
@@ -560,7 +608,8 @@ pub(crate) fn apply_patterns(all_paths: &[String], patterns: &[String], base_dir
     let mut result: Vec<String> = if includes.is_empty() {
         all_paths.to_vec()
     } else {
-        all_paths.iter()
+        all_paths
+            .iter()
             .filter(|f| matches_any_pattern(f, &includes, base_dir))
             .cloned()
             .collect()

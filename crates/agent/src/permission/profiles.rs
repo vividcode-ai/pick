@@ -1,4 +1,4 @@
-﻿use std::path::Path;
+use std::path::Path;
 use std::sync::Arc;
 
 use super::approval::{ApprovalPolicy, PermissionConfig};
@@ -112,8 +112,14 @@ mod tests {
 
     #[test]
     fn test_profile_kind_from_str() {
-        assert_eq!(ProfileKind::from_str(":read-only"), Some(ProfileKind::ReadOnly));
-        assert_eq!(ProfileKind::from_str(":workspace"), Some(ProfileKind::Workspace));
+        assert_eq!(
+            ProfileKind::from_str(":read-only"),
+            Some(ProfileKind::ReadOnly)
+        );
+        assert_eq!(
+            ProfileKind::from_str(":workspace"),
+            Some(ProfileKind::Workspace)
+        );
         assert_eq!(
             ProfileKind::from_str(":danger-full-access"),
             Some(ProfileKind::DangerFullAccess)

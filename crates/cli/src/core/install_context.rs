@@ -1,6 +1,5 @@
 //! Install method detection for Pick.
 
-
 use std::path::PathBuf;
 use std::sync::OnceLock;
 
@@ -53,9 +52,7 @@ impl InstallContext {
         // Check if installed in npm global prefix
         if let Some(npm_prefix) = get_npm_prefix() {
             let npm_bin = PathBuf::from(&npm_prefix).join("bin");
-            if exe_path.starts_with(&npm_bin)
-                || exe_str.contains("node_modules")
-            {
+            if exe_path.starts_with(&npm_bin) || exe_str.contains("node_modules") {
                 return InstallMethod::Npm;
             }
         }
@@ -97,10 +94,14 @@ impl std::fmt::Display for InstallMethod {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             InstallMethod::Npm => write!(f, "npm ({PICK_NPM_PACKAGE})"),
-            InstallMethod::GitHub { platform: StandalonePlatform::Unix } => {
+            InstallMethod::GitHub {
+                platform: StandalonePlatform::Unix,
+            } => {
                 write!(f, "standalone (Unix)")
             }
-            InstallMethod::GitHub { platform: StandalonePlatform::Windows } => {
+            InstallMethod::GitHub {
+                platform: StandalonePlatform::Windows,
+            } => {
                 write!(f, "standalone (Windows)")
             }
             InstallMethod::Cargo => write!(f, "cargo install"),

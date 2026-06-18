@@ -1,9 +1,9 @@
-﻿//! Shell utilities
+//! Shell utilities
 
+use std::collections::HashSet;
 use std::process::Stdio;
 use std::sync::LazyLock;
 use std::sync::Mutex;
-use std::collections::HashSet;
 
 /// Shell configuration (path and arguments)
 pub struct ShellConfig {
@@ -26,30 +26,51 @@ pub fn get_shell_config(custom_shell_path: Option<&str>) -> Result<ShellConfig, 
     #[cfg(windows)]
     {
         // Try Git Bash
-        for base in [std::env::var("ProgramFiles"), std::env::var("ProgramFiles(x86)")] {
+        for base in [
+            std::env::var("ProgramFiles"),
+            std::env::var("ProgramFiles(x86)"),
+        ] {
             if let Ok(b) = base {
                 let path = format!("{}\\Git\\bin\\bash.exe", b);
                 if std::path::Path::new(&path).exists() {
-                    return Ok(ShellConfig { shell: path, args: vec!["-c".to_string()] });
+                    return Ok(ShellConfig {
+                        shell: path,
+                        args: vec!["-c".to_string()],
+                    });
                 }
             }
         }
         // Try PATH
         if let Some(path) = find_bash_on_path() {
-            return Ok(ShellConfig { shell: path, args: vec!["-c".to_string()] });
+            return Ok(ShellConfig {
+                shell: path,
+                args: vec!["-c".to_string()],
+            });
         }
-        Err("No bash shell found. Install Git for Windows or set shellPath in settings.".to_string())
+        Err(
+            "No bash shell found. Install Git for Windows or set shellPath in settings."
+                .to_string(),
+        )
     }
 
     #[cfg(not(windows))]
     {
         if std::path::Path::new("/bin/bash").exists() {
-            return Ok(ShellConfig { shell: "/bin/bash".to_string(), args: vec!["-c".to_string()] });
+            return Ok(ShellConfig {
+                shell: "/bin/bash".to_string(),
+                args: vec!["-c".to_string()],
+            });
         }
         if let Some(path) = find_bash_on_path() {
-            return Ok(ShellConfig { shell: path, args: vec!["-c".to_string()] });
+            return Ok(ShellConfig {
+                shell: path,
+                args: vec!["-c".to_string()],
+            });
         }
-        Ok(ShellConfig { shell: "sh".to_string(), args: vec!["-c".to_string()] })
+        Ok(ShellConfig {
+            shell: "sh".to_string(),
+            args: vec!["-c".to_string()],
+        })
     }
 }
 
@@ -150,7 +171,7 @@ pub fn kill_process_tree(pid: u32) {
     }
     #[cfg(not(windows))]
     {
-        use nix::sys::signal::{killpg, Signal};
+        use nix::sys::signal::{Signal, killpg};
         use nix::unistd::Pid;
         // Try process group first, then individual process
         if killpg(Pid::from_raw(pid as i32), Signal::SIGKILL).is_err() {

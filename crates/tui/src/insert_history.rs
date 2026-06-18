@@ -1,4 +1,4 @@
-﻿//! Inserts finalized history rows into terminal scrollback.
+//! Inserts finalized history rows into terminal scrollback.
 //!
 //! Uses escape-sequence operations directly (bypassing ratatui buffer) to write
 //! finalized chat history into the terminal scrollback above the viewport.
@@ -41,10 +41,7 @@ pub enum HistoryLineWrapPolicy {
 
 /// Insert `lines` above the viewport using the terminal's backend writer.
 /// Returns the number of wrapped rows actually inserted.
-pub fn insert_history_lines<B>(
-    terminal: &mut Terminal<B>,
-    lines: Vec<Line>,
-) -> io::Result<u16>
+pub fn insert_history_lines<B>(terminal: &mut Terminal<B>, lines: Vec<Line>) -> io::Result<u16>
 where
     B: Backend + Write,
     io::Error: From<B::Error>,

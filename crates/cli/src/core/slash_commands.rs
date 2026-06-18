@@ -1,4 +1,4 @@
-﻿use crate::core::source_info::SourceInfo;
+use crate::core::source_info::SourceInfo;
 
 /// Source of a slash command
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -149,17 +149,37 @@ pub const BUILTIN_SLASH_COMMANDS: &[BuiltinSlashCommand] = &[
 /// New commands added beyond the original built-in list
 const _NEW_SLASH_COMMANDS: &[&str] = &["plan", "build", "plan_exit"];
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     const PICK_ORIGINAL_COMMANDS: &[&str] = &[
-        "settings", "model", "scoped-models", "export", "import",
-        "share", "copy", "name", "session", "changelog",
-        "hotkeys", "fork", "clone", "tree", "login",
-        "logout", "new", "compact", "resume", "reload", "quit",
-        "plan", "build", "plan_exit", "skill", "mcp",
+        "settings",
+        "model",
+        "scoped-models",
+        "export",
+        "import",
+        "share",
+        "copy",
+        "name",
+        "session",
+        "changelog",
+        "hotkeys",
+        "fork",
+        "clone",
+        "tree",
+        "login",
+        "logout",
+        "new",
+        "compact",
+        "resume",
+        "reload",
+        "quit",
+        "plan",
+        "build",
+        "plan_exit",
+        "skill",
+        "mcp",
     ];
 
     #[test]
@@ -170,7 +190,11 @@ mod tests {
         original_names.sort();
 
         for name in &["plan", "build", "plan_exit", "goal"] {
-            assert!(pick_names.contains(name), "must contain new command {}", name);
+            assert!(
+                pick_names.contains(name),
+                "must contain new command {}",
+                name
+            );
         }
         // Original commands minus any that have been split into separate commands
         for name in &original_names {
@@ -191,7 +215,11 @@ mod tests {
     fn test_every_command_has_name_and_description() {
         for cmd in BUILTIN_SLASH_COMMANDS {
             assert!(!cmd.name.is_empty(), "command name must not be empty");
-            assert!(!cmd.description.is_empty(), "command /{} must have a description", cmd.name);
+            assert!(
+                !cmd.description.is_empty(),
+                "command /{} must have a description",
+                cmd.name
+            );
         }
     }
 

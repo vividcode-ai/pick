@@ -1,16 +1,16 @@
-﻿//! Pick-ai: AI types, provider abstraction, and streaming.
+//! Pick-ai: AI types, provider abstraction, and streaming.
 
-pub mod types;
-pub mod providers;
-pub mod registry;
+pub mod image_models;
 pub mod images;
 pub mod images_openrouter;
-pub mod image_models;
-pub mod utils;
-pub mod retry;
-pub mod sse;
 pub mod models;
 pub mod oauth;
+pub mod providers;
+pub mod registry;
+pub mod retry;
+pub mod sse;
+pub mod types;
+pub mod utils;
 
 // Re-export core types at crate level - this makes `pick_ai::Message`, etc. work
 pub use types::content::*;
@@ -51,7 +51,10 @@ pub async fn complete_simple(
             return SimpleCompletionResult {
                 content: vec![],
                 stop_reason: StopReason::Error,
-                error_message: Some(format!("No provider registered for API: {}", model.api.as_str())),
+                error_message: Some(format!(
+                    "No provider registered for API: {}",
+                    model.api.as_str()
+                )),
                 usage: Usage::zero(),
             };
         }
@@ -81,7 +84,11 @@ pub async fn complete_simple(
             }
             StreamEvent::Error { reason, error } => {
                 stop_reason = reason.clone();
-                error_message = Some(error.error_message.unwrap_or_else(|| format!("{:?}", reason)));
+                error_message = Some(
+                    error
+                        .error_message
+                        .unwrap_or_else(|| format!("{:?}", reason)),
+                );
                 content_parts = error.content;
                 usage = error.usage;
                 break;

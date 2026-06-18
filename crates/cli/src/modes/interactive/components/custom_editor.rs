@@ -1,11 +1,7 @@
-﻿//! Custom editor component with keybinding handler pattern
-
+//! Custom editor component with keybinding handler pattern
 
 /// Render a custom editor display with keybinding hints
-pub fn render_custom_editor(
-    text: &str,
-    width: usize,
-) -> Vec<String> {
+pub fn render_custom_editor(text: &str, width: usize) -> Vec<String> {
     let mut lines = Vec::new();
     let border = "─".repeat(std::cmp::max(1, width));
     lines.push(border.clone());

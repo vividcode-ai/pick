@@ -1,5 +1,4 @@
-﻿//! Model selector component with search
-
+//! Model selector component with search
 
 use crate::core::tools::render_utils::ToolTheme;
 
@@ -49,7 +48,10 @@ pub fn render_model_selector(
         ));
         lines.push(ToolTheme::fg("dim", "  Tab: scope (all/scoped)"));
     } else {
-        lines.push(ToolTheme::fg("warning", "Only showing models from configured providers. Use /login to add providers."));
+        lines.push(ToolTheme::fg(
+            "warning",
+            "Only showing models from configured providers. Use /login to add providers.",
+        ));
     }
     lines.push(String::new());
 
@@ -85,18 +87,32 @@ pub fn render_model_selector(
                 let prefix = ToolTheme::fg("accent", "→ ");
                 let model_text = ToolTheme::fg("accent", &model.id);
                 let provider_badge = ToolTheme::fg("muted", &format!("[{}]", model.provider));
-                let check = if model.is_current { format!(" {}", ToolTheme::fg("success", "✓")) } else { String::new() };
-                lines.push(format!("{}{} {}{}", prefix, model_text, provider_badge, check));
+                let check = if model.is_current {
+                    format!(" {}", ToolTheme::fg("success", "✓"))
+                } else {
+                    String::new()
+                };
+                lines.push(format!(
+                    "{}{} {}{}",
+                    prefix, model_text, provider_badge, check
+                ));
             } else {
                 let provider_badge = ToolTheme::fg("muted", &format!("[{}]", model.provider));
-                let check = if model.is_current { format!(" {}", ToolTheme::fg("success", "✓")) } else { String::new() };
+                let check = if model.is_current {
+                    format!(" {}", ToolTheme::fg("success", "✓"))
+                } else {
+                    String::new()
+                };
                 lines.push(format!("  {} {}{}", model.id, provider_badge, check));
             }
         }
     }
 
     if total > max_visible {
-        lines.push(ToolTheme::fg("muted", &format!("  ({}/{})", selected_index + 1, total)));
+        lines.push(ToolTheme::fg(
+            "muted",
+            &format!("  ({}/{})", selected_index + 1, total),
+        ));
     }
 
     // Error or extra info
@@ -107,7 +123,10 @@ pub fn render_model_selector(
     } else if !models.is_empty() {
         if let Some(model) = models.get(selected_index) {
             lines.push(String::new());
-            lines.push(ToolTheme::fg("muted", &format!("  Model Name: {}", model.name)));
+            lines.push(ToolTheme::fg(
+                "muted",
+                &format!("  Model Name: {}", model.name),
+            ));
         }
     } else {
         lines.push(ToolTheme::fg("muted", "  No matching models"));

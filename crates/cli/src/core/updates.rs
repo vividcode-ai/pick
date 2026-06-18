@@ -89,7 +89,11 @@ async fn fetch_latest_from_github() -> Option<String> {
     let data: serde_json::Value = response.json().await.ok()?;
     let tag = data.get("tag_name")?.as_str()?;
     let version = tag.trim_start_matches('v').trim_start_matches("v");
-    if version.is_empty() { None } else { Some(version.to_string()) }
+    if version.is_empty() {
+        None
+    } else {
+        Some(version.to_string())
+    }
 }
 
 /// Fetch the latest version from npm registry.
@@ -113,7 +117,11 @@ async fn fetch_latest_from_npm() -> Option<String> {
         .get("dist-tags")
         .and_then(|t| t.get("latest"))
         .and_then(|v| v.as_str())?;
-    if version.is_empty() { None } else { Some(version.to_string()) }
+    if version.is_empty() {
+        None
+    } else {
+        Some(version.to_string())
+    }
 }
 
 /// Fetch the latest version using the appropriate source for the install method.

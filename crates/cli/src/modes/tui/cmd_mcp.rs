@@ -4,16 +4,18 @@ use super::init;
 /// Handle /mcp slash command
 pub(crate) async fn handle_mcp(ctx: &mut TuiContext, args: &[String]) {
     if args.is_empty() {
-        ctx.tui.chat.add_system_message("\x1b[1mMCP Server Management\x1b[0m");
         ctx.tui
             .chat
-            .add_system_message("  \x1b[2m/mcp list\x1b[0m              List connected MCP servers");
-        ctx.tui
-            .chat
-            .add_system_message("  \x1b[2m/mcp connect <name> ...\x1b[0m   Connect a new MCP server");
-        ctx.tui
-            .chat
-            .add_system_message("  \x1b[2m/mcp disconnect <name>\x1b[0m    Disconnect an MCP server");
+            .add_system_message("\x1b[1mMCP Server Management\x1b[0m");
+        ctx.tui.chat.add_system_message(
+            "  \x1b[2m/mcp list\x1b[0m              List connected MCP servers",
+        );
+        ctx.tui.chat.add_system_message(
+            "  \x1b[2m/mcp connect <name> ...\x1b[0m   Connect a new MCP server",
+        );
+        ctx.tui.chat.add_system_message(
+            "  \x1b[2m/mcp disconnect <name>\x1b[0m    Disconnect an MCP server",
+        );
         return;
     }
 
@@ -21,13 +23,12 @@ pub(crate) async fn handle_mcp(ctx: &mut TuiContext, args: &[String]) {
         "list" => {
             let info = ctx.mcp_manager.list_connections().await;
             if info.is_empty() {
-                ctx.tui
-                    .chat
-                    .add_system_message("No MCP servers connected.");
+                ctx.tui.chat.add_system_message("No MCP servers connected.");
             } else {
-                ctx.tui
-                    .chat
-                    .add_system_message(&format!("\x1b[1m{} connected MCP server(s):\x1b[0m", info.len()));
+                ctx.tui.chat.add_system_message(&format!(
+                    "\x1b[1m{} connected MCP server(s):\x1b[0m",
+                    info.len()
+                ));
                 for srv in &info {
                     let names = srv.tool_names.join(", ");
                     ctx.tui.chat.add_system_message(&format!(

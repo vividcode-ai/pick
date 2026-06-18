@@ -5,15 +5,15 @@ use std::sync::{Arc, Mutex};
 use pick_ai::models::get_model;
 use pick_ai::types::{ContentBlock, JsonSchema, Message, Model, UserMessage};
 
-use crate::agent_config::{discover_agents, format_agent_list, AgentConfig, AgentSource};
+use crate::agent_config::{AgentConfig, AgentSource, discover_agents, format_agent_list};
 use crate::agent_registry::AgentRegistry;
 use crate::core::agent_loop::AgentLoopConfig;
 use crate::core::events::{AgentEvent, AgentEventHandler};
 use crate::core::state::{AgentTool, AgentToolResult, ToolContext, ToolExecutionMode};
 use crate::inter_agent::AgentStatus;
+use crate::permission::Ruleset;
 use crate::permission::manager::PermissionManager;
 use crate::permission::sandbox::Sandbox as SandboxTrait;
-use crate::permission::Ruleset;
 use crate::tools::registry::create_coding_tools;
 
 use super::stats::{SingleResult, SubagentStats};
@@ -63,7 +63,9 @@ fn build_subagent_loop_config(
         on_event: Some(child_event_handler),
         fs_policy,
         cwd,
-        permission_hooks: permission_manager.as_ref().map(|pm| pm.hook_registry.clone()),
+        permission_hooks: permission_manager
+            .as_ref()
+            .map(|pm| pm.hook_registry.clone()),
         mode_rulesets,
         permission_manager,
         sandbox,
@@ -88,8 +90,10 @@ fn setup_subagent_session(
     let model = match parent_model {
         Some(m) => m,
         None => {
-            let provider = std::env::var("pick_DEFAULT_PROVIDER").unwrap_or_else(|_| "deepseek".to_string());
-            let model_id = std::env::var("pick_DEFAULT_MODEL").unwrap_or_else(|_| "deepseek-v4-flash".to_string());
+            let provider =
+                std::env::var("pick_DEFAULT_PROVIDER").unwrap_or_else(|_| "deepseek".to_string());
+            let model_id = std::env::var("pick_DEFAULT_MODEL")
+                .unwrap_or_else(|_| "deepseek-v4-flash".to_string());
             match get_model(&provider, &model_id) {
                 Some(m) => m,
                 None => {
@@ -190,22 +194,24 @@ async fn run_subagent_turn(
 
     // Build the child agent's configuration — inherit permission context from parent
     let child_config = build_subagent_loop_config(
-        model, agent, tools, child_event_handler,
-        fs_policy, cwd, permission_manager, mode_rulesets, sandbox,
+        model,
+        agent,
+        tools,
+        child_event_handler,
+        fs_policy,
+        cwd,
+        permission_manager,
+        mode_rulesets,
+        sandbox,
     );
 
-    let initial_messages = vec![
-        Message::User(UserMessage::text(format!("Task: {}", task))),
-    ];
+    let initial_messages = vec![Message::User(UserMessage::text(format!("Task: {}", task)))];
 
     // Spawn the child agent in-process
     let agent_name = agent.name.clone();
-    let child_result = registry.spawn_child(
-        &agent_name,
-        child_config,
-        initial_messages,
-        parent_agent_id,
-    ).await;
+    let child_result = registry
+        .spawn_child(&agent_name, child_config, initial_messages, parent_agent_id)
+        .await;
 
     let (child_id, child) = match child_result {
         Ok((id, child)) => (id, child),
@@ -294,10 +300,21 @@ async fn run_single_agent(
     };
 
     run_subagent_turn(
-        agent, task, _cwd, progress, _agent_mode,
-        registry, parent_agent_id, model,
-        fs_policy, cwd, permission_manager, mode_rulesets, sandbox,
-    ).await
+        agent,
+        task,
+        _cwd,
+        progress,
+        _agent_mode,
+        registry,
+        parent_agent_id,
+        model,
+        fs_policy,
+        cwd,
+        permission_manager,
+        mode_rulesets,
+        sandbox,
+    )
+    .await
 }
 
 /// Execute a single subagent with event handling (progress, output formatting)
@@ -309,27 +326,42 @@ async fn execute_subagent_with_events(
     agent_mode: Option<&str>,
 ) -> Result<AgentToolResult, String> {
     if let Some(ref tx) = ctx.progress {
-        let _ = tx.send(format!("[subagent] Starting agent: {} ({})\n", agent.name, agent_source_str(agent)));
+        let _ = tx.send(format!(
+            "[subagent] Starting agent: {} ({})\n",
+            agent.name,
+            agent_source_str(agent)
+        ));
     }
 
     let parent_id = ctx.agent_id.as_deref().unwrap_or("root");
     let result = run_single_agent(
-        agent, task, task_cwd, ctx.progress.as_ref(), agent_mode,
-        ctx.agent_registry.as_ref(), parent_id, ctx.default_model.clone(),
-        ctx.fs_policy.clone(), ctx.cwd.clone(),
+        agent,
+        task,
+        task_cwd,
+        ctx.progress.as_ref(),
+        agent_mode,
+        ctx.agent_registry.as_ref(),
+        parent_id,
+        ctx.default_model.clone(),
+        ctx.fs_policy.clone(),
+        ctx.cwd.clone(),
         ctx.permission_manager.clone(),
-        ctx.permission_manager.as_ref().map(|_| {
-            Vec::new()
-        }),
+        ctx.permission_manager.as_ref().map(|_| Vec::new()),
         ctx.sandbox.clone(),
-    ).await;
+    )
+    .await;
 
     if result.exit_code != 0 {
         return Ok(AgentToolResult {
             content: vec![ContentBlock::text(format!(
                 "Agent {} failed (exit code: {}):\n{}",
-                agent.name, result.exit_code,
-                if result.error.is_empty() { result.output } else { result.error }
+                agent.name,
+                result.exit_code,
+                if result.error.is_empty() {
+                    result.output
+                } else {
+                    result.error
+                }
             ))],
             is_error: true,
             terminate: false,
@@ -340,7 +372,11 @@ async fn execute_subagent_with_events(
         let s = &result.stats;
         format!(
             "\n\n---\n*Turns: {} | Input: {} | Output: {} | Cache R/W: {}/{} | Model: {}*",
-            s.turns, s.input, s.output, s.cache_read, s.cache_write,
+            s.turns,
+            s.input,
+            s.output,
+            s.cache_read,
+            s.cache_write,
             s.model.as_deref().unwrap_or("default")
         )
     } else {
@@ -348,7 +384,10 @@ async fn execute_subagent_with_events(
     };
 
     Ok(AgentToolResult {
-        content: vec![ContentBlock::text(format!("{}{}", result.output, usage_footer))],
+        content: vec![ContentBlock::text(format!(
+            "{}{}",
+            result.output, usage_footer
+        ))],
         is_error: false,
         terminate: false,
     })
@@ -357,14 +396,28 @@ async fn execute_subagent_with_events(
 /// Aggregate subagent results into a formatted output string
 fn aggregate_subagent_results(results: &[SingleResult]) -> (String, bool) {
     let success_count = results.iter().filter(|r| r.exit_code == 0).count();
-    let mut output = format!("Parallel: {}/{} succeeded\n\n", success_count, results.len());
+    let mut output = format!(
+        "Parallel: {}/{} succeeded\n\n",
+        success_count,
+        results.len()
+    );
 
     for r in results {
-        let status = if r.exit_code == 0 { "completed" } else { "failed" };
+        let status = if r.exit_code == 0 {
+            "completed"
+        } else {
+            "failed"
+        };
         let usage_str = format_usage_summary(&r.stats);
-        output.push_str(&format!("### [{}] {}\n\n{}\n{}\n\n---\n\n",
-            r.agent, status,
-            if r.error.is_empty() { &r.output } else { &r.error },
+        output.push_str(&format!(
+            "### [{}] {}\n\n{}\n{}\n\n---\n\n",
+            r.agent,
+            status,
+            if r.error.is_empty() {
+                &r.output
+            } else {
+                &r.error
+            },
             usage_str
         ));
     }
@@ -411,10 +464,21 @@ async fn run_parallel_agents(
                 let (ref agent, ref task, ref cwd) = (*tasks)[i];
                 let model = parent_model.as_ref().map(|m| (**m).clone());
                 let result = run_single_agent(
-                    agent, task, cwd, None, agent_mode.as_deref(),
-                    registry.as_deref(), &parent_id, model, None, None,
-                    None, None, None,
-                ).await;
+                    agent,
+                    task,
+                    cwd,
+                    None,
+                    agent_mode.as_deref(),
+                    registry.as_deref(),
+                    &parent_id,
+                    model,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                )
+                .await;
                 let mut guard = results.lock().unwrap();
                 guard.push(result);
             }
@@ -435,7 +499,11 @@ fn format_usage_summary(stats: &SubagentStats) -> String {
     }
     format!(
         "*Turns: {} | Input: {} | Output: {} | Cache R/W: {}/{} | Model: {}*",
-        stats.turns, stats.input, stats.output, stats.cache_read, stats.cache_write,
+        stats.turns,
+        stats.input,
+        stats.output,
+        stats.cache_read,
+        stats.cache_write,
         stats.model.as_deref().unwrap_or("default")
     )
 }
@@ -556,8 +624,13 @@ pub fn create_subagent_tool_with_mode(agent_mode: Option<String>) -> AgentTool {
     }
 }
 
-async fn execute_subagent(args: serde_json::Value, ctx: ToolContext, agent_mode: Option<&str>) -> Result<AgentToolResult, String> {
-    let agent_scope = args.get("agent_scope")
+async fn execute_subagent(
+    args: serde_json::Value,
+    ctx: ToolContext,
+    agent_mode: Option<&str>,
+) -> Result<AgentToolResult, String> {
+    let agent_scope = args
+        .get("agent_scope")
         .and_then(|v| v.as_str())
         .unwrap_or("both");
 
@@ -567,12 +640,11 @@ async fn execute_subagent(args: serde_json::Value, ctx: ToolContext, agent_mode:
         _ => crate::agent_config::AgentScope::User,
     };
 
-    let cwd = args.get("cwd")
+    let cwd = args
+        .get("cwd")
         .and_then(|v| v.as_str())
         .map(std::path::PathBuf::from)
-        .unwrap_or_else(|| {
-            std::env::current_dir().unwrap_or_default()
-        });
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
 
     // Resolve agent directory using the crate config
     let agent_dir = {
@@ -584,15 +656,21 @@ async fn execute_subagent(args: serde_json::Value, ctx: ToolContext, agent_mode:
 
     // Confirm project-local agents if applicable
     if scope != crate::agent_config::AgentScope::User {
-        let confirm = args.get("confirm_project_agents").and_then(|v| v.as_bool()).unwrap_or(true);
+        let confirm = args
+            .get("confirm_project_agents")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(true);
         if confirm {
-            let project_agents: Vec<&AgentConfig> = discovery.agents.iter()
+            let project_agents: Vec<&AgentConfig> = discovery
+                .agents
+                .iter()
                 .filter(|a| matches!(a.source, AgentSource::Project))
                 .collect();
             if !project_agents.is_empty() {
                 if let Some(ref approve) = ctx.approve {
                     let names: Vec<&str> = project_agents.iter().map(|a| a.name.as_str()).collect();
-                    let dir = discovery.project_agents_dir
+                    let dir = discovery
+                        .project_agents_dir
                         .as_ref()
                         .map(|p| p.to_string_lossy().to_string())
                         .unwrap_or_else(|| "(unknown)".to_string());
@@ -605,7 +683,9 @@ async fn execute_subagent(args: serde_json::Value, ctx: ToolContext, agent_mode:
                     ).await;
                     if !ok {
                         return Ok(AgentToolResult {
-                            content: vec![ContentBlock::text("Canceled: project-local agents not approved.")],
+                            content: vec![ContentBlock::text(
+                                "Canceled: project-local agents not approved.",
+                            )],
                             is_error: true,
                             terminate: false,
                         });
@@ -615,12 +695,21 @@ async fn execute_subagent(args: serde_json::Value, ctx: ToolContext, agent_mode:
         }
     }
 
-    let has_chain = args.get("chain").and_then(|v| v.as_array()).map_or(false, |a| !a.is_empty());
-    let has_tasks = args.get("tasks").and_then(|v| v.as_array()).map_or(false, |a| !a.is_empty());
+    let has_chain = args
+        .get("chain")
+        .and_then(|v| v.as_array())
+        .map_or(false, |a| !a.is_empty());
+    let has_tasks = args
+        .get("tasks")
+        .and_then(|v| v.as_array())
+        .map_or(false, |a| !a.is_empty());
     let has_single = args.get("agent").and_then(|v| v.as_str()).is_some()
         && args.get("task").and_then(|v| v.as_str()).is_some();
 
-    let mode_count = [has_chain, has_tasks, has_single].iter().filter(|&&b| b).count();
+    let mode_count = [has_chain, has_tasks, has_single]
+        .iter()
+        .filter(|&&b| b)
+        .count();
 
     if mode_count != 1 {
         let (agent_text, remaining) = format_agent_list(&discovery.agents, 20);
@@ -644,12 +733,17 @@ async fn execute_subagent(args: serde_json::Value, ctx: ToolContext, agent_mode:
         args.get("agent").and_then(|v| v.as_str()),
         args.get("task").and_then(|v| v.as_str()),
     ) {
-        let task_cwd = args.get("cwd")
+        let task_cwd = args
+            .get("cwd")
             .and_then(|v| v.as_str())
             .map(std::path::PathBuf::from)
             .unwrap_or(cwd);
 
-        let agent = discovery.agents.iter().find(|a| a.name == agent_name).cloned();
+        let agent = discovery
+            .agents
+            .iter()
+            .find(|a| a.name == agent_name)
+            .cloned();
 
         let agent = match agent {
             Some(a) => a,
@@ -666,16 +760,16 @@ async fn execute_subagent(args: serde_json::Value, ctx: ToolContext, agent_mode:
             }
         };
 
-        return execute_subagent_with_events(
-            &agent, task, &task_cwd, &ctx, agent_mode,
-        ).await;
+        return execute_subagent_with_events(&agent, task, &task_cwd, &ctx, agent_mode).await;
     }
 
     // Parallel mode
     if let Some(tasks) = args.get("tasks").and_then(|v| v.as_array()) {
         if tasks.is_empty() {
             return Ok(AgentToolResult {
-                content: vec![ContentBlock::text("No tasks provided for parallel execution.")],
+                content: vec![ContentBlock::text(
+                    "No tasks provided for parallel execution.",
+                )],
                 is_error: true,
                 terminate: false,
             });
@@ -685,7 +779,8 @@ async fn execute_subagent(args: serde_json::Value, ctx: ToolContext, agent_mode:
             return Ok(AgentToolResult {
                 content: vec![ContentBlock::text(format!(
                     "Too many parallel tasks ({}). Max is {}.",
-                    tasks.len(), MAX_PARALLEL_TASKS
+                    tasks.len(),
+                    MAX_PARALLEL_TASKS
                 ))],
                 is_error: true,
                 terminate: false,
@@ -698,34 +793,57 @@ async fn execute_subagent(args: serde_json::Value, ctx: ToolContext, agent_mode:
             cwd: std::path::PathBuf,
         }
 
-        let task_defs: Vec<TaskDef> = tasks.iter().filter_map(|t| {
-            let agent = t.get("agent")?.as_str()?.to_string();
-            let task = t.get("task")?.as_str()?.to_string();
-            let cwd = t.get("cwd")
-                .and_then(|v| v.as_str())
-                .map(std::path::PathBuf::from)
-                .unwrap_or_else(|| cwd.clone());
-            Some(TaskDef { agent, task, cwd })
-        }).collect();
+        let task_defs: Vec<TaskDef> = tasks
+            .iter()
+            .filter_map(|t| {
+                let agent = t.get("agent")?.as_str()?.to_string();
+                let task = t.get("task")?.as_str()?.to_string();
+                let cwd = t
+                    .get("cwd")
+                    .and_then(|v| v.as_str())
+                    .map(std::path::PathBuf::from)
+                    .unwrap_or_else(|| cwd.clone());
+                Some(TaskDef { agent, task, cwd })
+            })
+            .collect();
 
-        let valid_defs: Vec<(AgentConfig, String, std::path::PathBuf)> = task_defs.into_iter().filter_map(|td| {
-            discovery.agents.iter().find(|a| a.name == td.agent)
-                .map(|a| (a.clone(), td.task, td.cwd))
-        }).collect();
+        let valid_defs: Vec<(AgentConfig, String, std::path::PathBuf)> = task_defs
+            .into_iter()
+            .filter_map(|td| {
+                discovery
+                    .agents
+                    .iter()
+                    .find(|a| a.name == td.agent)
+                    .map(|a| (a.clone(), td.task, td.cwd))
+            })
+            .collect();
 
         if valid_defs.is_empty() {
             return Ok(AgentToolResult {
-                content: vec![ContentBlock::text("No valid agent definitions found for parallel tasks.")],
+                content: vec![ContentBlock::text(
+                    "No valid agent definitions found for parallel tasks.",
+                )],
                 is_error: true,
                 terminate: false,
             });
         }
 
         if let Some(ref tx) = ctx.progress {
-            let _ = tx.send(format!("[subagent] Running {} parallel tasks...\n", valid_defs.len()));
+            let _ = tx.send(format!(
+                "[subagent] Running {} parallel tasks...\n",
+                valid_defs.len()
+            ));
         }
 
-        let results = run_parallel_agents(valid_defs, MAX_CONCURRENCY, agent_mode.map(|s| s.to_string()), ctx.agent_registry.clone(), ctx.agent_id.unwrap_or_else(|| "root".to_string()), ctx.default_model.clone()).await;
+        let results = run_parallel_agents(
+            valid_defs,
+            MAX_CONCURRENCY,
+            agent_mode.map(|s| s.to_string()),
+            ctx.agent_registry.clone(),
+            ctx.agent_id.unwrap_or_else(|| "root".to_string()),
+            ctx.default_model.clone(),
+        )
+        .await;
 
         let (output, has_errors) = aggregate_subagent_results(&results);
 
@@ -754,7 +872,10 @@ async fn execute_subagent(args: serde_json::Value, ctx: ToolContext, agent_mode:
                 Some(n) => n,
                 None => {
                     return Ok(AgentToolResult {
-                        content: vec![ContentBlock::text(format!("Chain step {}: missing agent name", i + 1))],
+                        content: vec![ContentBlock::text(format!(
+                            "Chain step {}: missing agent name",
+                            i + 1
+                        ))],
                         is_error: true,
                         terminate: false,
                     });
@@ -765,28 +886,38 @@ async fn execute_subagent(args: serde_json::Value, ctx: ToolContext, agent_mode:
                 Some(t) => t,
                 None => {
                     return Ok(AgentToolResult {
-                        content: vec![ContentBlock::text(format!("Chain step {}: missing task", i + 1))],
+                        content: vec![ContentBlock::text(format!(
+                            "Chain step {}: missing task",
+                            i + 1
+                        ))],
                         is_error: true,
                         terminate: false,
                     });
                 }
             };
 
-            let step_cwd = step.get("cwd")
+            let step_cwd = step
+                .get("cwd")
                 .and_then(|v| v.as_str())
                 .map(std::path::PathBuf::from)
                 .unwrap_or_else(|| cwd.clone());
 
             let task_with_context = task.replace("{previous}", &previous_output);
 
-            let agent = discovery.agents.iter().find(|a| a.name == agent_name).cloned();
+            let agent = discovery
+                .agents
+                .iter()
+                .find(|a| a.name == agent_name)
+                .cloned();
 
             let agent = match agent {
                 Some(a) => a,
                 None => {
                     return Ok(AgentToolResult {
                         content: vec![ContentBlock::text(format!(
-                            "Chain step {}: unknown agent \"{}\"", i + 1, agent_name
+                            "Chain step {}: unknown agent \"{}\"",
+                            i + 1,
+                            agent_name
                         ))],
                         is_error: true,
                         terminate: false,
@@ -795,22 +926,34 @@ async fn execute_subagent(args: serde_json::Value, ctx: ToolContext, agent_mode:
             };
 
             let result = execute_subagent_with_events(
-                &agent, &task_with_context, &step_cwd, &ctx, agent_mode,
-            ).await?;
+                &agent,
+                &task_with_context,
+                &step_cwd,
+                &ctx,
+                agent_mode,
+            )
+            .await?;
 
             let r = match &result.content[0] {
                 ContentBlock::Text(t) => t.text.clone(),
                 _ => String::new(),
             };
 
-            chain_output.push_str(&format!("### Step {}/{}: {}\n\n{}\n\n",
-                i + 1, chain.len(), agent.name, r));
+            chain_output.push_str(&format!(
+                "### Step {}/{}: {}\n\n{}\n\n",
+                i + 1,
+                chain.len(),
+                agent.name,
+                r
+            ));
 
             if result.is_error {
                 return Ok(AgentToolResult {
                     content: vec![ContentBlock::text(format!(
                         "Chain stopped at step {} ({})\n\n{}",
-                        i + 1, agent.name, chain_output
+                        i + 1,
+                        agent.name,
+                        chain_output
                     ))],
                     is_error: true,
                     terminate: false,

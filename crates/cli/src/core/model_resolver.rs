@@ -1,5 +1,4 @@
-﻿//! Model resolution, scoping, and initial selection
-
+//! Model resolution, scoping, and initial selection
 
 use crate::core::defaults::DEFAULT_THINKING_LEVEL;
 use crate::core::model_registry::{Model, ModelRegistry};
@@ -51,7 +50,8 @@ pub fn find_exact_model_reference_match<'a>(
     let normalized = trimmed.to_lowercase();
 
     // Canonical: provider/model
-    let canonical_matches: Vec<&Model> = available_models.iter()
+    let canonical_matches: Vec<&Model> = available_models
+        .iter()
         .filter(|m| format!("{}/{}", m.provider.to_lowercase(), m.id.to_lowercase()) == normalized)
         .collect();
     if canonical_matches.len() == 1 {
@@ -66,9 +66,12 @@ pub fn find_exact_model_reference_match<'a>(
         let provider = trimmed[..slash_idx].trim();
         let model_id = trimmed[slash_idx + 1..].trim();
         if !provider.is_empty() && !model_id.is_empty() {
-            let provider_matches: Vec<&Model> = available_models.iter()
-                .filter(|m| m.provider.to_lowercase() == provider.to_lowercase()
-                    && m.id.to_lowercase() == model_id.to_lowercase())
+            let provider_matches: Vec<&Model> = available_models
+                .iter()
+                .filter(|m| {
+                    m.provider.to_lowercase() == provider.to_lowercase()
+                        && m.id.to_lowercase() == model_id.to_lowercase()
+                })
                 .collect();
             if provider_matches.len() == 1 {
                 return Some(provider_matches[0]);
@@ -77,7 +80,8 @@ pub fn find_exact_model_reference_match<'a>(
     }
 
     // Bare model ID match
-    let id_matches: Vec<&Model> = available_models.iter()
+    let id_matches: Vec<&Model> = available_models
+        .iter()
         .filter(|m| m.id.to_lowercase() == normalized)
         .collect();
     if id_matches.len() == 1 {
@@ -93,9 +97,9 @@ fn try_match_model<'a>(model_pattern: &str, available_models: &'a [Model]) -> Op
     }
 
     let lower = model_pattern.to_lowercase();
-    let matches: Vec<&Model> = available_models.iter()
-        .filter(|m| m.id.to_lowercase().contains(&lower)
-            || m.name.to_lowercase().contains(&lower))
+    let matches: Vec<&Model> = available_models
+        .iter()
+        .filter(|m| m.id.to_lowercase().contains(&lower) || m.name.to_lowercase().contains(&lower))
         .collect();
 
     if matches.is_empty() {
@@ -146,7 +150,13 @@ pub fn parse_model_pattern<'a>(
     let last_colon = pattern.rfind(':');
     let last_colon = match last_colon {
         Some(i) => i,
-        None => return ParsedModelResult { model: None, thinking_level: None, warning: None },
+        None => {
+            return ParsedModelResult {
+                model: None,
+                thinking_level: None,
+                warning: None,
+            };
+        }
     };
 
     let prefix = &pattern[..last_colon];
@@ -157,7 +167,11 @@ pub fn parse_model_pattern<'a>(
     if valid_levels.contains(&suffix) {
         let result = parse_model_pattern(prefix, available_models);
         if let Some(model) = result.model {
-            let tl = if result.warning.is_none() { Some(suffix.to_string()) } else { None };
+            let tl = if result.warning.is_none() {
+                Some(suffix.to_string())
+            } else {
+                None
+            };
             return ParsedModelResult {
                 model: Some(model),
                 thinking_level: tl,
@@ -187,7 +201,10 @@ pub fn parse_model_pattern<'a>(
 // ============================================================================
 
 /// Resolve model patterns to actual Model objects with optional thinking levels
-pub async fn resolve_model_scope(patterns: &[String], model_registry: &ModelRegistry) -> Vec<ScopedModel> {
+pub async fn resolve_model_scope(
+    patterns: &[String],
+    model_registry: &ModelRegistry,
+) -> Vec<ScopedModel> {
     let available_models = model_registry.get_available();
     let mut scoped_models: Vec<ScopedModel> = Vec::new();
 
@@ -208,7 +225,8 @@ pub async fn resolve_model_scope(patterns: &[String], model_registry: &ModelRegi
         // Check for glob characters
         if glob_pattern.contains('*') || glob_pattern.contains('?') || glob_pattern.contains('[') {
             let lower_glob = glob_pattern.to_lowercase();
-            let matching: Vec<&Model> = available_models.iter()
+            let matching: Vec<&Model> = available_models
+                .iter()
                 .filter(|m| {
                     let full_id = format!("{}/{}", m.provider.to_lowercase(), m.id.to_lowercase());
                     let id_only = m.id.to_lowercase();
@@ -222,7 +240,10 @@ pub async fn resolve_model_scope(patterns: &[String], model_registry: &ModelRegi
             }
 
             for model in matching {
-                if !scoped_models.iter().any(|sm| sm.model.id == model.id && sm.model.provider == model.provider) {
+                if !scoped_models
+                    .iter()
+                    .any(|sm| sm.model.id == model.id && sm.model.provider == model.provider)
+                {
                     scoped_models.push(ScopedModel {
                         model: model.clone(),
                         thinking_level: tl.clone(),
@@ -240,7 +261,10 @@ pub async fn resolve_model_scope(patterns: &[String], model_registry: &ModelRegi
 
         match result.model {
             Some(model) => {
-                if !scoped_models.iter().any(|sm| sm.model.id == model.id && sm.model.provider == model.provider) {
+                if !scoped_models
+                    .iter()
+                    .any(|sm| sm.model.id == model.id && sm.model.provider == model.provider)
+                {
                     scoped_models.push(ScopedModel {
                         model: model.clone(),
                         thinking_level: result.thinking_level.or(tl),
@@ -275,7 +299,14 @@ pub fn resolve_cli_model(
 ) -> ResolveCliModelResult {
     let cli_model = match cli_model {
         Some(m) => m,
-        None => return ResolveCliModelResult { model: None, thinking_level: None, warning: None, error: None },
+        None => {
+            return ResolveCliModelResult {
+                model: None,
+                thinking_level: None,
+                warning: None,
+                error: None,
+            };
+        }
     };
 
     let available_models = model_registry.get_all();
@@ -284,16 +315,19 @@ pub fn resolve_cli_model(
             model: None,
             thinking_level: None,
             warning: None,
-            error: Some("No models available. Check your installation or add models to models.json.".to_string()),
+            error: Some(
+                "No models available. Check your installation or add models to models.json."
+                    .to_string(),
+            ),
         };
     }
 
-    let provider_map: std::collections::HashMap<String, String> = available_models.iter()
+    let provider_map: std::collections::HashMap<String, String> = available_models
+        .iter()
         .map(|m| (m.provider.to_lowercase(), m.provider.clone()))
         .collect();
 
-    let provider = cli_provider
-        .and_then(|p| provider_map.get(&p.to_lowercase()).cloned());
+    let provider = cli_provider.and_then(|p| provider_map.get(&p.to_lowercase()).cloned());
 
     if cli_provider.is_some() && provider.is_none() {
         return ResolveCliModelResult {
@@ -326,7 +360,8 @@ pub fn resolve_cli_model(
     if resolved_provider.is_none() {
         let lower = cli_model.to_lowercase();
         if let Some(exact) = available_models.iter().find(|m| {
-            m.id.to_lowercase() == lower || format!("{}/{}", m.provider.to_lowercase(), m.id.to_lowercase()) == lower
+            m.id.to_lowercase() == lower
+                || format!("{}/{}", m.provider.to_lowercase(), m.id.to_lowercase()) == lower
         }) {
             return ResolveCliModelResult {
                 model: Some(exact.clone()),
@@ -338,7 +373,11 @@ pub fn resolve_cli_model(
     }
 
     let candidates: Vec<Model> = match &resolved_provider {
-        Some(p) => available_models.iter().filter(|m| m.provider == *p).cloned().collect(),
+        Some(p) => available_models
+            .iter()
+            .filter(|m| m.provider == *p)
+            .cloned()
+            .collect(),
         None => available_models.iter().cloned().collect(),
     };
 
@@ -357,7 +396,8 @@ pub fn resolve_cli_model(
     if inferred_provider {
         let lower = cli_model.to_lowercase();
         if let Some(exact) = available_models.iter().find(|m| {
-            m.id.to_lowercase() == lower || format!("{}/{}", m.provider.to_lowercase(), m.id.to_lowercase()) == lower
+            m.id.to_lowercase() == lower
+                || format!("{}/{}", m.provider.to_lowercase(), m.id.to_lowercase()) == lower
         }) {
             return ResolveCliModelResult {
                 model: Some(exact.clone()),
@@ -372,7 +412,10 @@ pub fn resolve_cli_model(
         model: None,
         thinking_level: None,
         warning: None,
-        error: Some(format!("Model \"{}\" not found. Use --list-models to see available models.", cli_model)),
+        error: Some(format!(
+            "Model \"{}\" not found. Use --list-models to see available models.",
+            cli_model
+        )),
     }
 }
 
@@ -419,7 +462,10 @@ pub async fn find_initial_model(
     if !scoped_models.is_empty() && !is_continuing {
         return InitialModelResult {
             model: Some(scoped_models[0].model.clone()),
-            thinking_level: scoped_models[0].thinking_level.clone().unwrap_or_else(|| tl.to_string()),
+            thinking_level: scoped_models[0]
+                .thinking_level
+                .clone()
+                .unwrap_or_else(|| tl.to_string()),
             fallback_message: None,
         };
     }
@@ -439,7 +485,10 @@ pub async fn find_initial_model(
     let available_models = model_registry.get_available();
     if !available_models.is_empty() {
         for (provider, default_id) in DEFAULT_MODEL_PER_PROVIDER {
-            if let Some(m) = available_models.iter().find(|m| m.provider == *provider && m.id == *default_id) {
+            if let Some(m) = available_models
+                .iter()
+                .find(|m| m.provider == *provider && m.id == *default_id)
+            {
                 return InitialModelResult {
                     model: Some(m.clone()),
                     thinking_level: DEFAULT_THINKING_LEVEL.to_string(),
@@ -472,8 +521,13 @@ fn glob_match(text: &str, pattern: &str) -> bool {
     if !pattern.contains('*') && !pattern.contains('?') {
         return text == pattern;
     }
-    let re_str = format!("^{}$", regex::escape(pattern)
-        .replace("\\*", ".*")
-        .replace("\\?", "."));
-    regex::Regex::new(&re_str).map(|re| re.is_match(text)).unwrap_or(false)
+    let re_str = format!(
+        "^{}$",
+        regex::escape(pattern)
+            .replace("\\*", ".*")
+            .replace("\\?", ".")
+    );
+    regex::Regex::new(&re_str)
+        .map(|re| re.is_match(text))
+        .unwrap_or(false)
 }

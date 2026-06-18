@@ -97,9 +97,7 @@ impl Writer {
                 self.flush_pending();
                 let width = self.wrap_width.unwrap_or(80);
                 let rule = "─".repeat(width.min(80));
-                self.emit_line_inner(vec![
-                    Span::styled(rule, self.styles.hr)
-                ]);
+                self.emit_line_inner(vec![Span::styled(rule, self.styles.hr)]);
             }
             _ => {}
         }
@@ -138,13 +136,14 @@ impl Writer {
             Tag::Item => {
                 self.flush_pending();
                 let indent = self.current_indent().to_string();
-                let bullet = if let Some(idx) = self.list_indices.last_mut().and_then(|i| i.as_mut()) {
-                    let s = format!("{}.  ", *idx);
-                    *idx += 1;
-                    s
-                } else {
-                    "• ".to_string()
-                };
+                let bullet =
+                    if let Some(idx) = self.list_indices.last_mut().and_then(|i| i.as_mut()) {
+                        let s = format!("{}.  ", *idx);
+                        *idx += 1;
+                        s
+                    } else {
+                        "• ".to_string()
+                    };
                 self.push_indent(&format!("{}{}", indent, bullet), false);
             }
             Tag::Table(alignments) => {
@@ -269,9 +268,10 @@ impl Writer {
                         } else {
                             link.dest.clone()
                         };
-                        self.emit_line_inner(vec![
-                            Span::styled(format!(" ({})", display_dest), self.styles.link_url),
-                        ]);
+                        self.emit_line_inner(vec![Span::styled(
+                            format!(" ({})", display_dest),
+                            self.styles.link_url,
+                        )]);
                     }
                 }
             }
@@ -296,13 +296,15 @@ impl Writer {
     }
 
     fn handle_code(&mut self, text: &str) {
-        self.pending_spans.push(
-            Span::styled(format!("`{}`", text), self.styles.code)
-        );
+        self.pending_spans
+            .push(Span::styled(format!("`{}`", text), self.styles.code));
     }
 
     fn current_indent(&self) -> &str {
-        self.indent_stack.last().map(|ic| ic.prefix.as_str()).unwrap_or("")
+        self.indent_stack
+            .last()
+            .map(|ic| ic.prefix.as_str())
+            .unwrap_or("")
     }
 
     fn push_indent(&mut self, prefix: &str, hanging: bool) {
@@ -349,12 +351,17 @@ impl Writer {
             if let Some(first) = spans.first_mut() {
                 let content = first.content.as_ref().to_string();
                 if let Some(rest) = content.strip_prefix("• ") {
-                    first.content = std::borrow::Cow::Owned(
-                        if rest.is_empty() { String::new() } else { rest.to_string() }
-                    );
+                    first.content = std::borrow::Cow::Owned(if rest.is_empty() {
+                        String::new()
+                    } else {
+                        rest.to_string()
+                    });
                 }
             }
-            let filtered: Vec<_> = spans.into_iter().filter(|s| !s.content.as_ref().is_empty()).collect();
+            let filtered: Vec<_> = spans
+                .into_iter()
+                .filter(|s| !s.content.as_ref().is_empty())
+                .collect();
             if !filtered.is_empty() {
                 self.emit_line_inner(filtered);
             }
@@ -400,7 +407,9 @@ impl Writer {
                 return lines;
             }
         }
-        code.lines().map(|l| Line::from(Span::styled(l.to_string(), self.styles.code_block))).collect()
+        code.lines()
+            .map(|l| Line::from(Span::styled(l.to_string(), self.styles.code_block)))
+            .collect()
     }
 
     pub(crate) fn has_table_state(&self) -> bool {
@@ -416,7 +425,10 @@ impl Writer {
         }
 
         let width = self.wrap_width.unwrap_or(80).saturating_sub(4);
-        let col_count = ts.headers.len().max(ts.rows.iter().map(|r| r.len()).max().unwrap_or(0));
+        let col_count = ts
+            .headers
+            .len()
+            .max(ts.rows.iter().map(|r| r.len()).max().unwrap_or(0));
         if col_count == 0 {
             return;
         }
@@ -436,29 +448,43 @@ impl Writer {
         let total_min = col_widths.len() * 3 + 1;
         let available = width.max(total_min);
         for w in &mut col_widths {
-            let max_col = available.saturating_sub(total_min.saturating_sub(*w + 2)) / col_count.max(1);
+            let max_col =
+                available.saturating_sub(total_min.saturating_sub(*w + 2)) / col_count.max(1);
             *w = (*w).min(max_col.max(3));
         }
 
         let separator = format!(
             "┌{}┐",
-            col_widths.iter().map(|w| "─".repeat(*w + 2)).collect::<Vec<_>>().join("┬")
+            col_widths
+                .iter()
+                .map(|w| "─".repeat(*w + 2))
+                .collect::<Vec<_>>()
+                .join("┬")
         );
         self.emit_line(vec![Span::styled(separator, self.styles.code_block_border)]);
 
         if !ts.headers.is_empty() {
             let header_row = format!(
                 "│{}│",
-                ts.headers.iter().enumerate().map(|(i, h)| {
-                    let w = col_widths.get(i).copied().unwrap_or(3);
-                    format!(" {:<w$} ", h, w = w)
-                }).collect::<Vec<_>>().join("│")
+                ts.headers
+                    .iter()
+                    .enumerate()
+                    .map(|(i, h)| {
+                        let w = col_widths.get(i).copied().unwrap_or(3);
+                        format!(" {:<w$} ", h, w = w)
+                    })
+                    .collect::<Vec<_>>()
+                    .join("│")
             );
             self.emit_line(vec![Span::styled(header_row, self.styles.code_block)]);
 
             let sep = format!(
                 "├{}┤",
-                col_widths.iter().map(|w| "─".repeat(*w + 2)).collect::<Vec<_>>().join("┼")
+                col_widths
+                    .iter()
+                    .map(|w| "─".repeat(*w + 2))
+                    .collect::<Vec<_>>()
+                    .join("┼")
             );
             self.emit_line(vec![Span::styled(sep, self.styles.code_block_border)]);
         }
@@ -466,18 +492,25 @@ impl Writer {
         for row in &ts.rows {
             let row_str = format!(
                 "│{}│",
-                (0..col_count).map(|i| {
-                    let cell = row.get(i).map(|s| s.as_str()).unwrap_or("");
-                    let w = col_widths[i];
-                    format!(" {:<w$} ", cell, w = w)
-                }).collect::<Vec<_>>().join("│")
+                (0..col_count)
+                    .map(|i| {
+                        let cell = row.get(i).map(|s| s.as_str()).unwrap_or("");
+                        let w = col_widths[i];
+                        format!(" {:<w$} ", cell, w = w)
+                    })
+                    .collect::<Vec<_>>()
+                    .join("│")
             );
             self.emit_line(vec![Span::styled(row_str, self.styles.code_block)]);
         }
 
         let bottom = format!(
             "└{}┘",
-            col_widths.iter().map(|w| "─".repeat(*w + 2)).collect::<Vec<_>>().join("┴")
+            col_widths
+                .iter()
+                .map(|w| "─".repeat(*w + 2))
+                .collect::<Vec<_>>()
+                .join("┴")
         );
         self.emit_line(vec![Span::styled(bottom, self.styles.code_block_border)]);
     }

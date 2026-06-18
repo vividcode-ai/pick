@@ -1,4 +1,4 @@
-﻿use std::collections::HashMap;
+use std::collections::HashMap;
 
 /// Authentication configuration for MCP HTTP transport
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -47,7 +47,11 @@ pub struct McpServerConfig {
 
 impl McpServerConfig {
     pub fn transport_type(&self) -> &str {
-        if self.url.is_some() { "streamable-http" } else { "stdio" }
+        if self.url.is_some() {
+            "streamable-http"
+        } else {
+            "stdio"
+        }
     }
 }
 
@@ -59,22 +63,37 @@ pub fn parse_mcp_configs_from_value(value: &serde_json::Value) -> Vec<McpServerC
 
     let mut configs = Vec::new();
     for (name, cfg) in obj {
-        let Some(cfg_obj) = cfg.as_object() else { continue };
+        let Some(cfg_obj) = cfg.as_object() else {
+            continue;
+        };
 
-        let command = cfg_obj.get("command").and_then(|v| v.as_str()).map(String::from);
-        let args = cfg_obj.get("args")
-            .and_then(|v| v.as_array())
-            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect());
-        let env = cfg_obj.get("env")
-            .and_then(|v| v.as_object())
-            .map(|o| o.iter().map(|(k, v)| (k.clone(), v.as_str().unwrap_or("").to_string())).collect());
-        let url = cfg_obj.get("url").and_then(|v| v.as_str()).map(String::from);
-        let tool_name_prefix = cfg_obj.get("tool_name_prefix").and_then(|v| v.as_str()).map(String::from);
+        let command = cfg_obj
+            .get("command")
+            .and_then(|v| v.as_str())
+            .map(String::from);
+        let args = cfg_obj.get("args").and_then(|v| v.as_array()).map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
+        });
+        let env = cfg_obj.get("env").and_then(|v| v.as_object()).map(|o| {
+            o.iter()
+                .map(|(k, v)| (k.clone(), v.as_str().unwrap_or("").to_string()))
+                .collect()
+        });
+        let url = cfg_obj
+            .get("url")
+            .and_then(|v| v.as_str())
+            .map(String::from);
+        let tool_name_prefix = cfg_obj
+            .get("tool_name_prefix")
+            .and_then(|v| v.as_str())
+            .map(String::from);
 
         // Parse auth config
-        let auth = cfg_obj.get("auth").and_then(|v| {
-            serde_json::from_value::<McpAuthConfig>(v.clone()).ok()
-        });
+        let auth = cfg_obj
+            .get("auth")
+            .and_then(|v| serde_json::from_value::<McpAuthConfig>(v.clone()).ok());
 
         if command.is_none() && url.is_none() {
             continue;

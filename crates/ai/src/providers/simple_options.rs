@@ -1,4 +1,4 @@
-﻿//! Simple stream options helpers
+//! Simple stream options helpers
 
 use std::collections::HashMap;
 
@@ -41,7 +41,10 @@ pub fn adjust_max_tokens_for_thinking(
         ("low", 2048),
         ("medium", 8192),
         ("high", 16384),
-    ].iter().cloned().collect();
+    ]
+    .iter()
+    .cloned()
+    .collect();
 
     let min_output_tokens: u64 = 1024;
     let level = clamp_reasoning(Some(reasoning_level)).unwrap_or("medium");

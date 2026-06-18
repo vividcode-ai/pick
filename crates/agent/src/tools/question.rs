@@ -1,9 +1,11 @@
-﻿//! Question tool - asks the user for input
+//! Question tool - asks the user for input
 //! Maps to opencode packages/opencode/src/tool/question.ts
 
 use pick_ai::types::ContentBlock;
 
-use crate::core::state::{AgentTool, AgentToolResult, QuestionPrompt, ToolContext, ToolExecutionMode};
+use crate::core::state::{
+    AgentTool, AgentToolResult, QuestionPrompt, ToolContext, ToolExecutionMode,
+};
 
 /// Create the question tool
 pub fn create_question_tool() -> AgentTool {
@@ -64,7 +66,8 @@ pub fn create_question_tool() -> AgentTool {
         parameters: params,
         execute: std::sync::Arc::new(move |_tool_call_id, args, ctx: ToolContext| {
             Box::pin(async move {
-                let questions_val = args.get("questions")
+                let questions_val = args
+                    .get("questions")
                     .ok_or_else(|| "Missing 'questions' argument".to_string())?;
 
                 let prompts: Vec<QuestionPrompt> = serde_json::from_value(questions_val.clone())
@@ -79,11 +82,13 @@ pub fn create_question_tool() -> AgentTool {
                 }
 
                 let answers = match ctx.question {
-                    Some(ref q_fn) => q_fn(prompts.clone()).await.map_err(|e| format!("Question error: {}", e))?,
+                    Some(ref q_fn) => q_fn(prompts.clone())
+                        .await
+                        .map_err(|e| format!("Question error: {}", e))?,
                     None => {
                         return Ok(AgentToolResult {
                             content: vec![ContentBlock::text(
-                                "Error: question tool is not available in this mode (no interactive input)"
+                                "Error: question tool is not available in this mode (no interactive input)",
                             )],
                             is_error: true,
                             terminate: false,
@@ -91,7 +96,9 @@ pub fn create_question_tool() -> AgentTool {
                     }
                 };
 
-                let formatted = prompts.iter().zip(answers.iter())
+                let formatted = prompts
+                    .iter()
+                    .zip(answers.iter())
                     .map(|(q, a)| format!("\"{}\"=\"{}\"", q.question, a.join(", ")))
                     .collect::<Vec<_>>()
                     .join(", ");

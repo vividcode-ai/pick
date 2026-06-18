@@ -1,4 +1,4 @@
-﻿//! Process @file CLI arguments into text content and image attachments
+//! Process @file CLI arguments into text content and image attachments
 
 use serde_json::Value;
 use std::path::Path;
@@ -17,7 +17,9 @@ pub struct ProcessFileOptions {
 
 impl Default for ProcessFileOptions {
     fn default() -> Self {
-        Self { auto_resize_images: true }
+        Self {
+            auto_resize_images: true,
+        }
     }
 }
 
@@ -44,7 +46,11 @@ pub async fn process_file_arguments(
         }
 
         // Check if file is empty
-        if absolute_path.metadata().map(|m| m.len() == 0).unwrap_or(false) {
+        if absolute_path
+            .metadata()
+            .map(|m| m.len() == 0)
+            .unwrap_or(false)
+        {
             continue;
         }
 
@@ -52,7 +58,8 @@ pub async fn process_file_arguments(
 
         if let Some(mime) = mime_type {
             // Handle image file
-            let content = tokio::fs::read(absolute_path).await
+            let content = tokio::fs::read(absolute_path)
+                .await
                 .map_err(|e| format!("Failed to read image: {}", e))?;
 
             let resized_data = if options.auto_resize_images {
@@ -73,7 +80,8 @@ pub async fn process_file_arguments(
             text.push('\n');
         } else {
             // Handle text file
-            let content = tokio::fs::read_to_string(absolute_path).await
+            let content = tokio::fs::read_to_string(absolute_path)
+                .await
                 .map_err(|e| format!("Could not read file {}: {}", absolute_path_str, e))?;
             text.push_str(&format!(r#"<file name="{}">"#, absolute_path_str));
             text.push('\n');

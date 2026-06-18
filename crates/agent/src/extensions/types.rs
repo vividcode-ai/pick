@@ -1,4 +1,4 @@
-﻿//! Extension type definitions
+//! Extension type definitions
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -499,7 +499,15 @@ impl std::fmt::Debug for Extension {
 
 impl Extension {
     pub fn new(path: String, resolved_path: String) -> Self {
-        Self { path, resolved_path, handlers: HashMap::new(), tools: HashMap::new(), commands: HashMap::new(), flags: HashMap::new(), shortcuts: HashMap::new() }
+        Self {
+            path,
+            resolved_path,
+            handlers: HashMap::new(),
+            tools: HashMap::new(),
+            commands: HashMap::new(),
+            flags: HashMap::new(),
+            shortcuts: HashMap::new(),
+        }
     }
 }
 
@@ -570,5 +578,11 @@ pub trait ExtensionAPI: Send + Sync {
     fn register_tool(&self, tool: ToolDefinition);
     fn register_command(&self, name: &str, description: Option<String>);
     fn register_shortcut(&self, shortcut: &str, description: Option<String>);
-    fn register_flag(&self, name: &str, description: Option<String>, flag_type: FlagType, default: Option<FlagValue>);
+    fn register_flag(
+        &self,
+        name: &str,
+        description: Option<String>,
+        flag_type: FlagType,
+        default: Option<FlagValue>,
+    );
 }

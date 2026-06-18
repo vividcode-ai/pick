@@ -4,15 +4,16 @@ use pick_ai::types::{
     AssistantMessage, ContentBlock, Context, Message, ToolCall, ToolDefinition, Usage,
 };
 
-use super::{AgentLoopConfig, AgentRunResult, MAX_CONSECUTIVE_TOOL_ERRORS, PLAN_RECOVERY_THRESHOLD};
-use super::stream::call_llm;
-use super::tools::validate_tool_arguments;
 use super::super::events::AgentEvent;
 use super::super::state::{AgentState, ToolContext, ToolExecutionMode};
+use super::stream::call_llm;
+use super::tools::validate_tool_arguments;
+use super::{
+    AgentLoopConfig, AgentRunResult, MAX_CONSECUTIVE_TOOL_ERRORS, PLAN_RECOVERY_THRESHOLD,
+};
 use crate::extensions::types::{
-    AgentEndEvent, AgentStartEvent, BeforeAgentStartEvent, ExtensionEvent,
-    MessageEndEvent, ToolCallEvent, ToolResultEvent,
-    TurnEndEvent, TurnStartEvent,
+    AgentEndEvent, AgentStartEvent, BeforeAgentStartEvent, ExtensionEvent, MessageEndEvent,
+    ToolCallEvent, ToolResultEvent, TurnEndEvent, TurnStartEvent,
 };
 use crate::permission::guardian::GuardianAction;
 use crate::permission::{Action, Ruleset};
@@ -26,11 +27,7 @@ enum ContinueTurn {
 
 // ===== Helper functions =====
 
-fn check_token_limit(
-    config: &AgentLoopConfig,
-    state: &mut AgentState,
-    accumulated_usage: &Usage,
-) {
+fn check_token_limit(config: &AgentLoopConfig, state: &mut AgentState, accumulated_usage: &Usage) {
     if let Some(ref follow_up_hook) = config.get_follow_up_messages {
         let follow_up_msgs = follow_up_hook(&AgentRunResult {
             messages: state.messages.clone(),
@@ -45,7 +42,12 @@ fn check_token_limit(
 fn setup_initial_state(
     config: &AgentLoopConfig,
     initial_messages: Vec<Message>,
-) -> (AgentState, Usage, usize, std::sync::Arc<tokio::sync::watch::Receiver<bool>>) {
+) -> (
+    AgentState,
+    Usage,
+    usize,
+    std::sync::Arc<tokio::sync::watch::Receiver<bool>>,
+) {
     let tools = config.tools.clone();
     let state = AgentState {
         system_prompt: config.system_prompt.clone(),
@@ -79,7 +81,12 @@ fn setup_initial_state(
 fn prepare_continue_state(
     config: &AgentLoopConfig,
     existing_messages: Vec<Message>,
-) -> (AgentState, Usage, usize, std::sync::Arc<tokio::sync::watch::Receiver<bool>>) {
+) -> (
+    AgentState,
+    Usage,
+    usize,
+    std::sync::Arc<tokio::sync::watch::Receiver<bool>>,
+) {
     let tools = config.tools.clone();
     let state = AgentState {
         system_prompt: config.system_prompt.clone(),
@@ -135,13 +142,16 @@ async fn process_llm_stream(
     let api_key_override = config.get_api_key.as_ref().and_then(|f| f());
 
     let assistant_msg = call_llm(
-        &state.model, context, config.on_event.as_ref(),
+        &state.model,
+        context,
+        config.on_event.as_ref(),
         Some(cancel_rx),
         state.thinking_level,
         api_key_override,
         config.provider_max_retries,
         config.provider_max_retry_delay_ms,
-    ).await?;
+    )
+    .await?;
 
     accumulated_usage.input += assistant_msg.usage.input;
     accumulated_usage.output += assistant_msg.usage.output;
@@ -182,7 +192,8 @@ async fn handle_tool_execution(
             if pm.is_guardian_circuit_broken() {
                 if let Some(msg) = pm.guardian_circuit_message() {
                     let error_msg = pick_ai::types::ToolResultMessage::new(
-                        &tc.id, &tc.name,
+                        &tc.id,
+                        &tc.name,
                         vec![ContentBlock::text(format!("Error: {}", msg))],
                         true,
                     );
@@ -195,7 +206,10 @@ async fn handle_tool_execution(
 
         // Permission pre-tool-use hooks + permission request hooks
         if let Some(ref hook_registry) = config.permission_hooks {
-            if hook_registry.has_pre_hooks() || hook_registry.has_permission_hooks() || config.mode_rulesets.is_some() {
+            if hook_registry.has_pre_hooks()
+                || hook_registry.has_permission_hooks()
+                || config.mode_rulesets.is_some()
+            {
                 let pre_ctx = crate::permission::hooks::PreToolUseContext {
                     tool_name: tc.name.clone(),
                     tool_call_id: tc.id.clone(),
@@ -217,7 +231,8 @@ async fn handle_tool_execution(
                         });
                     }
                     let error_msg = pick_ai::types::ToolResultMessage::new(
-                        &tc.id, &tc.name,
+                        &tc.id,
+                        &tc.name,
                         vec![ContentBlock::text(format!("Error: {}", reason))],
                         true,
                     );
@@ -228,9 +243,15 @@ async fn handle_tool_execution(
                         if let Some(ref guard) = pm.guardian {
                             guard.record_result(GuardianAction::Deny);
                         }
-                        pm.audit(&tc.name, "pre_hook", &tc.arguments.to_string(),
+                        pm.audit(
+                            &tc.name,
+                            "pre_hook",
+                            &tc.arguments.to_string(),
                             crate::permission::audit::AuditDecision::Deny,
-                            crate::permission::audit::AuditLayer::PreHook, &reason, None);
+                            crate::permission::audit::AuditLayer::PreHook,
+                            &reason,
+                            None,
+                        );
                     }
                     continue;
                 }
@@ -241,7 +262,9 @@ async fn handle_tool_execution(
                     let tool_args_str = crate::permission::evaluate::extract_tool_args(tc);
                     let ruleset_refs: Vec<&Ruleset> = rulesets.iter().collect();
                     ruleset_action = Some(crate::permission::evaluate::evaluate_tool(
-                        &tc.name, &tool_args_str, &ruleset_refs,
+                        &tc.name,
+                        &tool_args_str,
+                        &ruleset_refs,
                     ));
                 }
 
@@ -249,47 +272,62 @@ async fn handle_tool_execution(
                     Some(Action::Allow) => {}
                     Some(Action::Deny) => {
                         all_terminate = false;
-    if let Some(ref handler) = config.on_event {
-        handler(AgentEvent::ToolExecutionStart {
-            tool_call_id: tc.id.clone(),
-            tool_name: tc.name.clone(),
-            args: tc.arguments.clone(),
-        });
-        handler(AgentEvent::ToolExecutionEnd {
-            tool_call_id: tc.id.clone(),
-            tool_name: tc.name.clone(),
-            result: serde_json::json!({"error": "Permission denied by mode ruleset"}),
-            is_error: true,
-        });
-    }
-    let msg = "Error: Permission denied by mode ruleset";
-    let error_msg = pick_ai::types::ToolResultMessage::new(
-        &tc.id, &tc.name, vec![ContentBlock::text(msg)], true,
-    );
-    state.messages.push(Message::ToolResult(error_msg.clone()));
-    tool_results.push(error_msg);
-    if let Some(ref pm) = config.permission_manager {
-        pm.audit(&tc.name, "mode_ruleset", "",
-            crate::permission::audit::AuditDecision::Deny,
-            crate::permission::audit::AuditLayer::ModeRuleset, msg, None);
-    }
-    continue;
+                        if let Some(ref handler) = config.on_event {
+                            handler(AgentEvent::ToolExecutionStart {
+                                tool_call_id: tc.id.clone(),
+                                tool_name: tc.name.clone(),
+                                args: tc.arguments.clone(),
+                            });
+                            handler(AgentEvent::ToolExecutionEnd {
+                                tool_call_id: tc.id.clone(),
+                                tool_name: tc.name.clone(),
+                                result: serde_json::json!({"error": "Permission denied by mode ruleset"}),
+                                is_error: true,
+                            });
+                        }
+                        let msg = "Error: Permission denied by mode ruleset";
+                        let error_msg = pick_ai::types::ToolResultMessage::new(
+                            &tc.id,
+                            &tc.name,
+                            vec![ContentBlock::text(msg)],
+                            true,
+                        );
+                        state.messages.push(Message::ToolResult(error_msg.clone()));
+                        tool_results.push(error_msg);
+                        if let Some(ref pm) = config.permission_manager {
+                            pm.audit(
+                                &tc.name,
+                                "mode_ruleset",
+                                "",
+                                crate::permission::audit::AuditDecision::Deny,
+                                crate::permission::audit::AuditLayer::ModeRuleset,
+                                msg,
+                                None,
+                            );
+                        }
+                        continue;
                     }
                     _ => {
                         if hook_registry.has_permission_hooks() {
                             let perm_ctx = crate::permission::hooks::PermissionRequestContext {
                                 tool_name: tc.name.clone(),
                                 tool_args: crate::permission::evaluate::extract_tool_args(tc),
-                                permission: crate::permission::tool_to_permission_key(&tc.name).to_string(),
+                                permission: crate::permission::tool_to_permission_key(&tc.name)
+                                    .to_string(),
                                 reason: None,
                             };
                             match hook_registry.run_permission_hooks(&perm_ctx).await {
                                 Some(true) => {
                                     if let Some(ref pm) = config.permission_manager {
-                                        pm.audit(&tc.name, &perm_ctx.permission, &perm_ctx.tool_args,
+                                        pm.audit(
+                                            &tc.name,
+                                            &perm_ctx.permission,
+                                            &perm_ctx.tool_args,
                                             crate::permission::audit::AuditDecision::Allow,
                                             crate::permission::audit::AuditLayer::PermissionHook,
-                                            "Approved by user", None);
+                                            "Approved by user",
+                                            None,
+                                        );
                                     }
                                 }
                                 Some(false) => {
@@ -309,7 +347,10 @@ async fn handle_tool_execution(
                                     }
                                     let msg = "Error: Tool call was denied by permission policy";
                                     let error_msg = pick_ai::types::ToolResultMessage::new(
-                                        &tc.id, &tc.name, vec![ContentBlock::text(msg)], true,
+                                        &tc.id,
+                                        &tc.name,
+                                        vec![ContentBlock::text(msg)],
+                                        true,
                                     );
                                     state.messages.push(Message::ToolResult(error_msg.clone()));
                                     tool_results.push(error_msg);
@@ -317,10 +358,15 @@ async fn handle_tool_execution(
                                         if let Some(ref guard) = pm.guardian {
                                             guard.record_result(GuardianAction::Deny);
                                         }
-                                        pm.audit(&tc.name, &perm_ctx.permission, &perm_ctx.tool_args,
+                                        pm.audit(
+                                            &tc.name,
+                                            &perm_ctx.permission,
+                                            &perm_ctx.tool_args,
                                             crate::permission::audit::AuditDecision::Deny,
                                             crate::permission::audit::AuditLayer::PermissionHook,
-                                            "Denied by user", None);
+                                            "Denied by user",
+                                            None,
+                                        );
                                     }
                                     continue;
                                 }
@@ -336,13 +382,19 @@ async fn handle_tool_execution(
             let ruleset_refs: Vec<&Ruleset> = rulesets.iter().collect();
             let perm_key = crate::permission::tool_to_permission_key(&tc.name);
             match crate::permission::evaluate::evaluate_tool(
-                &tc.name, &tool_args_str, &ruleset_refs,
+                &tc.name,
+                &tool_args_str,
+                &ruleset_refs,
             ) {
                 crate::permission::Action::Allow => {}
                 crate::permission::Action::Deny => {
                     all_terminate = false;
                     if let Some(ref handler) = config.on_event {
-                        handler(AgentEvent::ToolExecutionStart { tool_call_id: tc.id.clone(), tool_name: tc.name.clone(), args: tc.arguments.clone() });
+                        handler(AgentEvent::ToolExecutionStart {
+                            tool_call_id: tc.id.clone(),
+                            tool_name: tc.name.clone(),
+                            args: tc.arguments.clone(),
+                        });
                         handler(AgentEvent::ToolExecutionEnd {
                             tool_call_id: tc.id.clone(),
                             tool_name: tc.name.clone(),
@@ -352,14 +404,23 @@ async fn handle_tool_execution(
                     }
                     let msg = "Error: Permission denied by mode ruleset";
                     let error_msg = pick_ai::types::ToolResultMessage::new(
-                        &tc.id, &tc.name, vec![ContentBlock::text(msg)], true,
+                        &tc.id,
+                        &tc.name,
+                        vec![ContentBlock::text(msg)],
+                        true,
                     );
                     state.messages.push(Message::ToolResult(error_msg.clone()));
                     tool_results.push(error_msg);
                     if let Some(ref pm) = config.permission_manager {
-                        pm.audit(&tc.name, perm_key, &tool_args_str,
+                        pm.audit(
+                            &tc.name,
+                            perm_key,
+                            &tool_args_str,
                             crate::permission::audit::AuditDecision::Deny,
-                            crate::permission::audit::AuditLayer::ModeRuleset, msg, None);
+                            crate::permission::audit::AuditLayer::ModeRuleset,
+                            msg,
+                            None,
+                        );
                     }
                     continue;
                 }
@@ -367,7 +428,11 @@ async fn handle_tool_execution(
                     all_terminate = false;
                     let msg = "Error: Tool requires approval but no permission hooks configured";
                     if let Some(ref handler) = config.on_event {
-                        handler(AgentEvent::ToolExecutionStart { tool_call_id: tc.id.clone(), tool_name: tc.name.clone(), args: tc.arguments.clone() });
+                        handler(AgentEvent::ToolExecutionStart {
+                            tool_call_id: tc.id.clone(),
+                            tool_name: tc.name.clone(),
+                            args: tc.arguments.clone(),
+                        });
                         handler(AgentEvent::ToolExecutionEnd {
                             tool_call_id: tc.id.clone(),
                             tool_name: tc.name.clone(),
@@ -376,14 +441,23 @@ async fn handle_tool_execution(
                         });
                     }
                     let error_msg = pick_ai::types::ToolResultMessage::new(
-                        &tc.id, &tc.name, vec![ContentBlock::text(msg)], true,
+                        &tc.id,
+                        &tc.name,
+                        vec![ContentBlock::text(msg)],
+                        true,
                     );
                     state.messages.push(Message::ToolResult(error_msg.clone()));
                     tool_results.push(error_msg);
                     if let Some(ref pm) = config.permission_manager {
-                        pm.audit(&tc.name, perm_key, &tool_args_str,
+                        pm.audit(
+                            &tc.name,
+                            perm_key,
+                            &tool_args_str,
                             crate::permission::audit::AuditDecision::Ask,
-                            crate::permission::audit::AuditLayer::ModeRuleset, msg, None);
+                            crate::permission::audit::AuditLayer::ModeRuleset,
+                            msg,
+                            None,
+                        );
                     }
                     continue;
                 }
@@ -408,7 +482,8 @@ async fn handle_tool_execution(
                     });
                 }
                 let error_msg = pick_ai::types::ToolResultMessage::new(
-                    &tc.id, &tc.name,
+                    &tc.id,
+                    &tc.name,
                     vec![ContentBlock::text(format!("Error: {}", error))],
                     true,
                 );
@@ -441,8 +516,12 @@ async fn handle_tool_execution(
                     });
                 }
                 let error_msg = pick_ai::types::ToolResultMessage::new(
-                    &tc.id, &tc.name,
-                    vec![ContentBlock::text(format!("Error: Unknown tool: {}", tc.name))],
+                    &tc.id,
+                    &tc.name,
+                    vec![ContentBlock::text(format!(
+                        "Error: Unknown tool: {}",
+                        tc.name
+                    ))],
                     true,
                 );
                 state.messages.push(Message::ToolResult(error_msg.clone()));
@@ -463,7 +542,9 @@ async fn handle_tool_execution(
             });
             if block_result.block {
                 all_terminate = false;
-                let reason = block_result.reason.unwrap_or_else(|| "Blocked by extension".to_string());
+                let reason = block_result
+                    .reason
+                    .unwrap_or_else(|| "Blocked by extension".to_string());
                 if let Some(ref handler) = config.on_event {
                     handler(AgentEvent::ToolExecutionStart {
                         tool_call_id: tc.id.clone(),
@@ -479,7 +560,8 @@ async fn handle_tool_execution(
                 }
 
                 let error_msg = pick_ai::types::ToolResultMessage::new(
-                    &tc.id, &tc.name,
+                    &tc.id,
+                    &tc.name,
                     vec![ContentBlock::text(format!("Error: {}", reason))],
                     true,
                 );
@@ -524,7 +606,8 @@ async fn handle_tool_execution(
             while let Some(partial) = progress_rx.recv().await {
                 if let Some(ref handler) = progress_handler {
                     // Check if progress data contains todo items
-                    let todo_value = serde_json::from_str::<serde_json::Value>(&partial).ok()
+                    let todo_value = serde_json::from_str::<serde_json::Value>(&partial)
+                        .ok()
                         .and_then(|v| v.get("todos").cloned());
 
                     handler(AgentEvent::ToolExecutionUpdate {
@@ -556,7 +639,8 @@ async fn handle_tool_execution(
                         });
                     }
                     let error_msg = pick_ai::types::ToolResultMessage::new(
-                        &tc.id, &tc.name,
+                        &tc.id,
+                        &tc.name,
                         vec![ContentBlock::text(format!("Error: {}", e))],
                         true,
                     );
@@ -573,9 +657,8 @@ async fn handle_tool_execution(
             let tool_call_id = tc.id.clone();
             let args = validated_args;
             let tool_name = tc.name.clone();
-            match tokio::spawn(async move {
-                execute_fn(tool_call_id, args, tool_ctx).await
-            }).await {
+            match tokio::spawn(async move { execute_fn(tool_call_id, args, tool_ctx).await }).await
+            {
                 Ok(r) => r,
                 Err(join_err) => {
                     let panic_msg = if join_err.is_panic() {
@@ -605,10 +688,15 @@ async fn handle_tool_execution(
                     if let Some(ref guard) = pm.guardian {
                         guard.record_result(GuardianAction::Allow);
                     }
-                    pm.audit(&tc.name, "tool", "",
+                    pm.audit(
+                        &tc.name,
+                        "tool",
+                        "",
                         crate::permission::audit::AuditDecision::Allow,
                         crate::permission::audit::AuditLayer::ModeRuleset,
-                        "Tool execution completed", None);
+                        "Tool execution completed",
+                        None,
+                    );
                 }
                 if !tool_result.terminate {
                     all_terminate = false;
@@ -641,7 +729,9 @@ async fn handle_tool_execution(
 
                 // Extension: emit tool_result event
                 if let Some(ref ext) = config.extension_runner {
-                    let result_blocks: Vec<serde_json::Value> = tool_result.content.iter()
+                    let result_blocks: Vec<serde_json::Value> = tool_result
+                        .content
+                        .iter()
                         .filter_map(|c| serde_json::to_value(c).ok())
                         .collect();
                     ext.emit_tool_result(&ToolResultEvent {
@@ -668,9 +758,14 @@ async fn handle_tool_execution(
                 }
 
                 let tool_result_msg = pick_ai::types::ToolResultMessage::new(
-                    &tc.id, &tc.name, tool_result.content.clone(), tool_result.is_error,
+                    &tc.id,
+                    &tc.name,
+                    tool_result.content.clone(),
+                    tool_result.is_error,
                 );
-                state.messages.push(Message::ToolResult(tool_result_msg.clone()));
+                state
+                    .messages
+                    .push(Message::ToolResult(tool_result_msg.clone()));
                 tool_results.push(tool_result_msg);
             }
             Err(e) => {
@@ -697,7 +792,8 @@ async fn handle_tool_execution(
                 }
 
                 let error_msg = pick_ai::types::ToolResultMessage::new(
-                    &tc.id, &tc.name,
+                    &tc.id,
+                    &tc.name,
                     vec![ContentBlock::text(format!("Error: {}", e))],
                     true,
                 );
@@ -742,16 +838,20 @@ async fn handle_tool_execution(
                     permission_manager: permission_manager.clone(),
                     sandbox: None,
                 };
-                let validated_args = match validate_tool_arguments(&tool, &tc.arguments, &tc.arguments) {
-                    Ok(v) => v,
-                    Err(e) => return (tc, Err(e)),
-                };
+                let validated_args =
+                    match validate_tool_arguments(&tool, &tc.arguments, &tc.arguments) {
+                        Ok(v) => v,
+                        Err(e) => return (tc, Err(e)),
+                    };
                 let result = (tool.execute)(tc.id.clone(), validated_args, tool_ctx).await;
                 (tc, result)
             }));
         }
 
-        for (handle, (tool_name, tool_id)) in parallel_handles.into_iter().zip(parallel_tool_infos.into_iter()) {
+        for (handle, (tool_name, tool_id)) in parallel_handles
+            .into_iter()
+            .zip(parallel_tool_infos.into_iter())
+        {
             match handle.await {
                 Ok((tc, Ok(tool_result))) => {
                     state.consecutive_tool_errors = 0;
@@ -759,7 +859,9 @@ async fn handle_tool_execution(
                         all_terminate = false;
                     }
                     if let Some(ref handler) = config.on_event {
-                        let result_texts: Vec<String> = tool_result.content.iter()
+                        let result_texts: Vec<String> = tool_result
+                            .content
+                            .iter()
                             .filter_map(|c| match c {
                                 ContentBlock::Text(t) => Some(t.text.clone()),
                                 _ => None,
@@ -773,7 +875,9 @@ async fn handle_tool_execution(
                         });
                     }
                     if let Some(ref ext) = config.extension_runner {
-                        let result_blocks: Vec<serde_json::Value> = tool_result.content.iter()
+                        let result_blocks: Vec<serde_json::Value> = tool_result
+                            .content
+                            .iter()
                             .filter_map(|c| serde_json::to_value(c).ok())
                             .collect();
                         ext.emit_tool_result(&ToolResultEvent {
@@ -785,9 +889,14 @@ async fn handle_tool_execution(
                         });
                     }
                     let tool_result_msg = pick_ai::types::ToolResultMessage::new(
-                        &tc.id, &tc.name, tool_result.content.clone(), tool_result.is_error,
+                        &tc.id,
+                        &tc.name,
+                        tool_result.content.clone(),
+                        tool_result.is_error,
                     );
-                    state.messages.push(Message::ToolResult(tool_result_msg.clone()));
+                    state
+                        .messages
+                        .push(Message::ToolResult(tool_result_msg.clone()));
                     tool_results.push(tool_result_msg);
                 }
                 Ok((tc, Err(e))) => {
@@ -802,7 +911,8 @@ async fn handle_tool_execution(
                         });
                     }
                     let error_msg = pick_ai::types::ToolResultMessage::new(
-                        &tc.id, &tc.name,
+                        &tc.id,
+                        &tc.name,
                         vec![ContentBlock::text(format!("Error: {}", e))],
                         true,
                     );
@@ -833,7 +943,8 @@ async fn handle_tool_execution(
                         });
                     }
                     let error_msg = pick_ai::types::ToolResultMessage::new(
-                        &tool_id, &tool_name,
+                        &tool_id,
+                        &tool_name,
                         vec![ContentBlock::text(format!("Error: {}", error_text))],
                         true,
                     );
@@ -877,9 +988,8 @@ async fn execute_turn(
         }));
     }
 
-    let (assistant_msg, tool_calls) = process_llm_stream(
-        config, state, accumulated_usage, cancel_rx.clone(),
-    ).await?;
+    let (assistant_msg, tool_calls) =
+        process_llm_stream(config, state, accumulated_usage, cancel_rx.clone()).await?;
 
     if tool_calls.is_empty() {
         state.consecutive_tool_errors = 0;
@@ -889,7 +999,9 @@ async fn execute_turn(
             });
         }
 
-        state.messages.push(Message::Assistant(assistant_msg.clone()));
+        state
+            .messages
+            .push(Message::Assistant(assistant_msg.clone()));
 
         if let Some(ref handler) = config.on_event {
             handler(AgentEvent::MessageEnd {
@@ -898,7 +1010,8 @@ async fn execute_turn(
         }
         if let Some(ref ext) = config.extension_runner {
             ext.emit_message_end(&MessageEndEvent {
-                message: serde_json::to_value(&Message::Assistant(assistant_msg.clone())).unwrap_or_default(),
+                message: serde_json::to_value(&Message::Assistant(assistant_msg.clone()))
+                    .unwrap_or_default(),
             });
         }
 
@@ -909,7 +1022,9 @@ async fn execute_turn(
             });
         }
         if let Some(ref ext) = config.extension_runner {
-            ext.emit(&ExtensionEvent::TurnEnd(TurnEndEvent { turn_index: *turn_index }));
+            ext.emit(&ExtensionEvent::TurnEnd(TurnEndEvent {
+                turn_index: *turn_index,
+            }));
         }
         if let Some(ref persist) = config.on_turn_complete {
             persist(&state.messages).await;
@@ -924,7 +1039,9 @@ async fn execute_turn(
             message: Message::Assistant(assistant_msg.clone()),
         });
     }
-    state.messages.push(Message::Assistant(assistant_msg.clone()));
+    state
+        .messages
+        .push(Message::Assistant(assistant_msg.clone()));
 
     if let Some(ref handler) = config.on_event {
         handler(AgentEvent::MessageEnd {
@@ -933,18 +1050,16 @@ async fn execute_turn(
     }
     if let Some(ref ext) = config.extension_runner {
         ext.emit_message_end(&MessageEndEvent {
-            message: serde_json::to_value(&Message::Assistant(assistant_msg.clone())).unwrap_or_default(),
+            message: serde_json::to_value(&Message::Assistant(assistant_msg.clone()))
+                .unwrap_or_default(),
         });
     }
 
-    let (tool_results, all_terminate) = handle_tool_execution(
-        config, state, &tool_calls, cancel_rx.clone(),
-    ).await;
+    let (tool_results, all_terminate) =
+        handle_tool_execution(config, state, &tool_calls, cancel_rx.clone()).await;
 
     // Plan-aware recovery: at moderate error count, suggest plan review
-    if state.consecutive_tool_errors >= PLAN_RECOVERY_THRESHOLD
-        && !state.plan_awareness_triggered
-    {
+    if state.consecutive_tool_errors >= PLAN_RECOVERY_THRESHOLD && !state.plan_awareness_triggered {
         state.plan_awareness_triggered = true;
         let recovery_msg = format!(
             "[System] The last {} tool calls failed. If you were following a multi-step plan, \
@@ -952,13 +1067,14 @@ async fn execute_turn(
              and proceeding to the next step. Review the todo_plan to see your remaining tasks.",
             state.consecutive_tool_errors
         );
-        state.messages.push(Message::ToolResult(
-            pick_ai::types::ToolResultMessage::new(
-                "", "",
+        state
+            .messages
+            .push(Message::ToolResult(pick_ai::types::ToolResultMessage::new(
+                "",
+                "",
                 vec![ContentBlock::text(recovery_msg)],
                 false,
-            )
-        ));
+            )));
     }
 
     // If consecutive tool errors exceed hard threshold, force text-only mode
@@ -967,13 +1083,14 @@ async fn execute_turn(
             "[System] The agent has encountered {} consecutive tool errors. Switching to text-only mode. Please respond directly without using tools.",
             state.consecutive_tool_errors
         );
-        state.messages.push(Message::ToolResult(
-            pick_ai::types::ToolResultMessage::new(
-                "", "",
+        state
+            .messages
+            .push(Message::ToolResult(pick_ai::types::ToolResultMessage::new(
+                "",
+                "",
                 vec![ContentBlock::text(fallback_msg)],
                 false,
-            )
-        ));
+            )));
         if let Some(ref handler) = config.on_event {
             handler(AgentEvent::TurnEnd {
                 message: Message::Assistant(assistant_msg),
@@ -981,7 +1098,9 @@ async fn execute_turn(
             });
         }
         if let Some(ref ext) = config.extension_runner {
-            ext.emit(&ExtensionEvent::TurnEnd(TurnEndEvent { turn_index: *turn_index }));
+            ext.emit(&ExtensionEvent::TurnEnd(TurnEndEvent {
+                turn_index: *turn_index,
+            }));
         }
         if let Some(ref persist) = config.on_turn_complete {
             persist(&state.messages).await;
@@ -997,7 +1116,9 @@ async fn execute_turn(
             });
         }
         if let Some(ref ext) = config.extension_runner {
-            ext.emit(&ExtensionEvent::TurnEnd(TurnEndEvent { turn_index: *turn_index }));
+            ext.emit(&ExtensionEvent::TurnEnd(TurnEndEvent {
+                turn_index: *turn_index,
+            }));
         }
         if let Some(ref persist) = config.on_turn_complete {
             persist(&state.messages).await;
@@ -1005,9 +1126,16 @@ async fn execute_turn(
         return Ok(ContinueTurn::Break);
     }
 
-    let should_stop = config.should_stop_after_turn
+    let should_stop = config
+        .should_stop_after_turn
         .as_ref()
-        .and_then(|stop_hook| if stop_hook(&assistant_msg) { Some(true) } else { None })
+        .and_then(|stop_hook| {
+            if stop_hook(&assistant_msg) {
+                Some(true)
+            } else {
+                None
+            }
+        })
         .is_some();
 
     if let Some(ref handler) = config.on_event {
@@ -1017,7 +1145,9 @@ async fn execute_turn(
         });
     }
     if let Some(ref ext) = config.extension_runner {
-        ext.emit(&ExtensionEvent::TurnEnd(TurnEndEvent { turn_index: *turn_index }));
+        ext.emit(&ExtensionEvent::TurnEnd(TurnEndEvent {
+            turn_index: *turn_index,
+        }));
     }
     if let Some(ref persist) = config.on_turn_complete {
         persist(&state.messages).await;
@@ -1048,9 +1178,8 @@ async fn execute_continue_turn(
         }));
     }
 
-    let (assistant_msg, tool_calls) = process_llm_stream(
-        config, state, accumulated_usage, cancel_rx.clone(),
-    ).await?;
+    let (assistant_msg, tool_calls) =
+        process_llm_stream(config, state, accumulated_usage, cancel_rx.clone()).await?;
 
     if tool_calls.is_empty() {
         state.consecutive_tool_errors = 0;
@@ -1060,7 +1189,9 @@ async fn execute_continue_turn(
             });
         }
 
-        state.messages.push(Message::Assistant(assistant_msg.clone()));
+        state
+            .messages
+            .push(Message::Assistant(assistant_msg.clone()));
 
         if let Some(ref handler) = config.on_event {
             handler(AgentEvent::MessageEnd {
@@ -1069,7 +1200,8 @@ async fn execute_continue_turn(
         }
         if let Some(ref ext) = config.extension_runner {
             ext.emit_message_end(&MessageEndEvent {
-                message: serde_json::to_value(&Message::Assistant(assistant_msg.clone())).unwrap_or_default(),
+                message: serde_json::to_value(&Message::Assistant(assistant_msg.clone()))
+                    .unwrap_or_default(),
             });
         }
 
@@ -1080,7 +1212,9 @@ async fn execute_continue_turn(
             });
         }
         if let Some(ref ext) = config.extension_runner {
-            ext.emit(&ExtensionEvent::TurnEnd(TurnEndEvent { turn_index: *turn_index }));
+            ext.emit(&ExtensionEvent::TurnEnd(TurnEndEvent {
+                turn_index: *turn_index,
+            }));
         }
         if let Some(ref persist) = config.on_turn_complete {
             persist(&state.messages).await;
@@ -1094,7 +1228,9 @@ async fn execute_continue_turn(
             message: Message::Assistant(assistant_msg.clone()),
         });
     }
-    state.messages.push(Message::Assistant(assistant_msg.clone()));
+    state
+        .messages
+        .push(Message::Assistant(assistant_msg.clone()));
 
     if let Some(ref handler) = config.on_event {
         handler(AgentEvent::MessageEnd {
@@ -1103,18 +1239,16 @@ async fn execute_continue_turn(
     }
     if let Some(ref ext) = config.extension_runner {
         ext.emit_message_end(&MessageEndEvent {
-            message: serde_json::to_value(&Message::Assistant(assistant_msg.clone())).unwrap_or_default(),
+            message: serde_json::to_value(&Message::Assistant(assistant_msg.clone()))
+                .unwrap_or_default(),
         });
     }
 
-    let (tool_results, all_terminate) = handle_tool_execution(
-        config, state, &tool_calls, cancel_rx.clone(),
-    ).await;
+    let (tool_results, all_terminate) =
+        handle_tool_execution(config, state, &tool_calls, cancel_rx.clone()).await;
 
     // Plan-aware recovery
-    if state.consecutive_tool_errors >= PLAN_RECOVERY_THRESHOLD
-        && !state.plan_awareness_triggered
-    {
+    if state.consecutive_tool_errors >= PLAN_RECOVERY_THRESHOLD && !state.plan_awareness_triggered {
         state.plan_awareness_triggered = true;
         let recovery_msg = format!(
             "[System] The last {} tool calls failed. If you were following a multi-step plan, \
@@ -1122,13 +1256,14 @@ async fn execute_continue_turn(
              and proceeding to the next step. Review the todo_plan to see your remaining tasks.",
             state.consecutive_tool_errors
         );
-        state.messages.push(Message::ToolResult(
-            pick_ai::types::ToolResultMessage::new(
-                "", "",
+        state
+            .messages
+            .push(Message::ToolResult(pick_ai::types::ToolResultMessage::new(
+                "",
+                "",
                 vec![ContentBlock::text(recovery_msg)],
                 false,
-            )
-        ));
+            )));
     }
 
     // If consecutive tool errors exceed hard threshold, force text-only mode
@@ -1137,13 +1272,14 @@ async fn execute_continue_turn(
             "[System] The agent has encountered {} consecutive tool errors. Switching to text-only mode. Please respond directly without using tools.",
             state.consecutive_tool_errors
         );
-        state.messages.push(Message::ToolResult(
-            pick_ai::types::ToolResultMessage::new(
-                "", "",
+        state
+            .messages
+            .push(Message::ToolResult(pick_ai::types::ToolResultMessage::new(
+                "",
+                "",
                 vec![ContentBlock::text(fallback_msg)],
                 false,
-            )
-        ));
+            )));
         if let Some(ref handler) = config.on_event {
             handler(AgentEvent::TurnEnd {
                 message: Message::Assistant(assistant_msg),
@@ -1151,7 +1287,9 @@ async fn execute_continue_turn(
             });
         }
         if let Some(ref ext) = config.extension_runner {
-            ext.emit(&ExtensionEvent::TurnEnd(TurnEndEvent { turn_index: *turn_index }));
+            ext.emit(&ExtensionEvent::TurnEnd(TurnEndEvent {
+                turn_index: *turn_index,
+            }));
         }
         if let Some(ref persist) = config.on_turn_complete {
             persist(&state.messages).await;
@@ -1167,7 +1305,9 @@ async fn execute_continue_turn(
             });
         }
         if let Some(ref ext) = config.extension_runner {
-            ext.emit(&ExtensionEvent::TurnEnd(TurnEndEvent { turn_index: *turn_index }));
+            ext.emit(&ExtensionEvent::TurnEnd(TurnEndEvent {
+                turn_index: *turn_index,
+            }));
         }
         if let Some(ref persist) = config.on_turn_complete {
             persist(&state.messages).await;
@@ -1175,9 +1315,16 @@ async fn execute_continue_turn(
         return Ok(ContinueTurn::Break);
     }
 
-    let should_stop = config.should_stop_after_turn
+    let should_stop = config
+        .should_stop_after_turn
         .as_ref()
-        .and_then(|stop_hook| if stop_hook(&assistant_msg) { Some(true) } else { None })
+        .and_then(|stop_hook| {
+            if stop_hook(&assistant_msg) {
+                Some(true)
+            } else {
+                None
+            }
+        })
         .is_some();
 
     if let Some(ref handler) = config.on_event {
@@ -1187,7 +1334,9 @@ async fn execute_continue_turn(
         });
     }
     if let Some(ref ext) = config.extension_runner {
-        ext.emit(&ExtensionEvent::TurnEnd(TurnEndEvent { turn_index: *turn_index }));
+        ext.emit(&ExtensionEvent::TurnEnd(TurnEndEvent {
+            turn_index: *turn_index,
+        }));
     }
     if let Some(ref persist) = config.on_turn_complete {
         persist(&state.messages).await;
@@ -1213,8 +1362,14 @@ pub async fn run_agent_loop(
 
     loop {
         match execute_turn(
-            &config, &mut state, &mut accumulated_usage, &mut turn_index, cancel_rx.clone(),
-        ).await? {
+            &config,
+            &mut state,
+            &mut accumulated_usage,
+            &mut turn_index,
+            cancel_rx.clone(),
+        )
+        .await?
+        {
             ContinueTurn::Break => break,
             ContinueTurn::Continue => {}
         }
@@ -1229,10 +1384,14 @@ pub async fn run_agent_loop(
         });
     }
     if let Some(ref ext) = config.extension_runner {
-        let messages_val: Vec<serde_json::Value> = state.messages.iter()
+        let messages_val: Vec<serde_json::Value> = state
+            .messages
+            .iter()
             .filter_map(|m| serde_json::to_value(m).ok())
             .collect();
-        ext.emit(&ExtensionEvent::AgentEnd(AgentEndEvent { messages: messages_val }));
+        ext.emit(&ExtensionEvent::AgentEnd(AgentEndEvent {
+            messages: messages_val,
+        }));
     }
 
     Ok(AgentRunResult {
@@ -1253,8 +1412,14 @@ pub async fn run_agent_loop_continue(
 
     loop {
         match execute_continue_turn(
-            &config, &mut state, &mut accumulated_usage, &mut turn_index, cancel_rx.clone(),
-        ).await? {
+            &config,
+            &mut state,
+            &mut accumulated_usage,
+            &mut turn_index,
+            cancel_rx.clone(),
+        )
+        .await?
+        {
             ContinueTurn::Break => break,
             ContinueTurn::Continue => {}
         }
@@ -1269,10 +1434,14 @@ pub async fn run_agent_loop_continue(
         });
     }
     if let Some(ref ext) = config.extension_runner {
-        let messages_val: Vec<serde_json::Value> = state.messages.iter()
+        let messages_val: Vec<serde_json::Value> = state
+            .messages
+            .iter()
             .filter_map(|m| serde_json::to_value(m).ok())
             .collect();
-        ext.emit(&ExtensionEvent::AgentEnd(AgentEndEvent { messages: messages_val }));
+        ext.emit(&ExtensionEvent::AgentEnd(AgentEndEvent {
+            messages: messages_val,
+        }));
     }
 
     Ok(AgentRunResult {

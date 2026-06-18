@@ -1,4 +1,4 @@
-﻿//! Core CLI services
+//! Core CLI services
 
 pub mod auth_guidance;
 pub mod auth_storage;
@@ -32,18 +32,18 @@ pub mod telemetry;
 pub mod theme;
 pub mod timings;
 
+pub mod agent_mode;
+pub mod agent_session;
+pub mod compaction;
+pub mod env_api_keys;
+pub mod extensions;
+pub mod install_context;
 pub mod keybindings;
+pub mod plan_file;
 pub mod proxy;
-pub mod slash_commands;
 pub mod session_analysis;
 pub mod session_resources;
-pub mod agent_session;
-pub mod env_api_keys;
-pub mod compaction;
+pub mod slash_commands;
 pub mod tools;
-pub mod extensions;
-pub mod agent_mode;
-pub mod plan_file;
-pub mod install_context;
 pub mod update_action;
 pub mod updates;

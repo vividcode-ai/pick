@@ -1,11 +1,16 @@
-﻿//! Unicode sanitization utilities
+//! Unicode sanitization utilities
 
 /// Remove or replace invalid/control Unicode characters from a string
 pub fn sanitize_unicode(input: &str) -> String {
-    input.chars()
+    input
+        .chars()
         .map(|c| {
             // Allow normal printable characters, newlines, and tabs
-            if c.is_alphanumeric() || c.is_whitespace() || c.is_ascii_punctuation() || c.is_ascii_graphic() {
+            if c.is_alphanumeric()
+                || c.is_whitespace()
+                || c.is_ascii_punctuation()
+                || c.is_ascii_graphic()
+            {
                 return c;
             }
             // Allow common Unicode categories

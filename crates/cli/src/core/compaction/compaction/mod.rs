@@ -2,7 +2,10 @@ pub mod types;
 
 use serde_json::Value;
 
-use super::utils::{compute_file_lists, create_file_ops, extract_file_ops_from_message, format_file_operations, FileOperations};
+use super::utils::{
+    FileOperations, compute_file_lists, create_file_ops, extract_file_ops_from_message,
+    format_file_operations,
+};
 use crate::core::messages;
 pub use types::*;
 
@@ -11,7 +14,8 @@ struct UsageInfo {
     index: usize,
 }
 
-pub const SUMMARIZATION_SYSTEM_PROMPT: &str = "Summarize the conversation so far, preserving key decisions, file paths, and rationale.";
+pub const SUMMARIZATION_SYSTEM_PROMPT: &str =
+    "Summarize the conversation so far, preserving key decisions, file paths, and rationale.";
 
 pub fn estimate_tokens(message: &Value) -> usize {
     let role = message.get("role").and_then(|v| v.as_str()).unwrap_or("");
@@ -34,14 +38,27 @@ pub fn estimate_tokens(message: &Value) -> usize {
                 for block in content {
                     match block.get("type").and_then(|v| v.as_str()) {
                         Some("text") => {
-                            chars += block.get("text").and_then(|v| v.as_str()).map(|s| s.len()).unwrap_or(0);
+                            chars += block
+                                .get("text")
+                                .and_then(|v| v.as_str())
+                                .map(|s| s.len())
+                                .unwrap_or(0);
                         }
                         Some("thinking") => {
-                            chars += block.get("thinking").and_then(|v| v.as_str()).map(|s| s.len()).unwrap_or(0);
+                            chars += block
+                                .get("thinking")
+                                .and_then(|v| v.as_str())
+                                .map(|s| s.len())
+                                .unwrap_or(0);
                         }
                         Some("toolCall") => {
-                            let name_len = block.get("name").and_then(|v| v.as_str()).map(|s| s.len()).unwrap_or(0);
-                            let args_str = serde_json::to_string(&block.get("arguments")).unwrap_or_default();
+                            let name_len = block
+                                .get("name")
+                                .and_then(|v| v.as_str())
+                                .map(|s| s.len())
+                                .unwrap_or(0);
+                            let args_str =
+                                serde_json::to_string(&block.get("arguments")).unwrap_or_default();
                             chars += name_len + args_str.len();
                         }
                         _ => {}
@@ -50,30 +67,42 @@ pub fn estimate_tokens(message: &Value) -> usize {
             }
             chars
         }
-        "custom" | "toolResult" => {
-            match message.get("content") {
-                Some(Value::String(s)) => s.len(),
-                Some(Value::Array(arr)) => arr
-                    .iter()
-                    .map(|block| {
-                        let mut c = block.get("text").and_then(|v| v.as_str()).map(|s| s.len()).unwrap_or(0);
-                        if block.get("type").and_then(|v| v.as_str()) == Some("image") {
-                            c += 4800;
-                        }
-                        c
-                    })
-                    .sum(),
-                _ => 0,
-            }
-        }
+        "custom" | "toolResult" => match message.get("content") {
+            Some(Value::String(s)) => s.len(),
+            Some(Value::Array(arr)) => arr
+                .iter()
+                .map(|block| {
+                    let mut c = block
+                        .get("text")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.len())
+                        .unwrap_or(0);
+                    if block.get("type").and_then(|v| v.as_str()) == Some("image") {
+                        c += 4800;
+                    }
+                    c
+                })
+                .sum(),
+            _ => 0,
+        },
         "bashExecution" => {
-            let cmd_len = message.get("command").and_then(|v| v.as_str()).map(|s| s.len()).unwrap_or(0);
-            let out_len = message.get("output").and_then(|v| v.as_str()).map(|s| s.len()).unwrap_or(0);
+            let cmd_len = message
+                .get("command")
+                .and_then(|v| v.as_str())
+                .map(|s| s.len())
+                .unwrap_or(0);
+            let out_len = message
+                .get("output")
+                .and_then(|v| v.as_str())
+                .map(|s| s.len())
+                .unwrap_or(0);
             cmd_len + out_len
         }
-        "branchSummary" | "compactionSummary" => {
-            message.get("summary").and_then(|v| v.as_str()).map(|s| s.len()).unwrap_or(0)
-        }
+        "branchSummary" | "compactionSummary" => message
+            .get("summary")
+            .and_then(|v| v.as_str())
+            .map(|s| s.len())
+            .unwrap_or(0),
         _ => 0,
     };
     (chars + 3) / 4
@@ -108,7 +137,11 @@ pub fn estimate_context_tokens(messages: &[Value]) -> ContextUsageEstimate {
     }
 }
 
-pub fn should_compact(context_tokens: usize, context_window: usize, settings: &CompactionSettings) -> bool {
+pub fn should_compact(
+    context_tokens: usize,
+    context_window: usize,
+    settings: &CompactionSettings,
+) -> bool {
     if !settings.enabled {
         return false;
     }
@@ -166,7 +199,11 @@ pub fn find_cut_point(
 
     let cut_entry = &entries[cut_index];
     let is_user_message = cut_entry.get("type").and_then(|v| v.as_str()) == Some("message")
-        && cut_entry.get("message").and_then(|m| m.get("role")).and_then(|r| r.as_str()) == Some("user");
+        && cut_entry
+            .get("message")
+            .and_then(|m| m.get("role"))
+            .and_then(|r| r.as_str())
+            == Some("user");
     let turn_start_index = if is_user_message {
         None
     } else {
@@ -192,7 +229,8 @@ fn find_valid_cut_points(entries: &[Value], start_index: usize, end_index: usize
                     .and_then(|r| r.as_str())
                     .unwrap_or("");
                 match role {
-                    "bashExecution" | "custom" | "branchSummary" | "compactionSummary" | "user" | "assistant" => {
+                    "bashExecution" | "custom" | "branchSummary" | "compactionSummary" | "user"
+                    | "assistant" => {
                         cut_points.push(i);
                     }
                     "toolResult" => {}
@@ -208,7 +246,11 @@ fn find_valid_cut_points(entries: &[Value], start_index: usize, end_index: usize
     cut_points
 }
 
-fn find_turn_start_index(entries: &[Value], entry_index: usize, start_index: usize) -> Option<usize> {
+fn find_turn_start_index(
+    entries: &[Value],
+    entry_index: usize,
+    start_index: usize,
+) -> Option<usize> {
     for i in (start_index..=entry_index).rev() {
         let entry = &entries[i];
         match entry.get("type").and_then(|v| v.as_str()) {
@@ -246,7 +288,9 @@ fn extract_file_operations(
                         }
                     }
                 }
-                if let Some(modified_files) = details.get("modifiedFiles").and_then(|v| v.as_array()) {
+                if let Some(modified_files) =
+                    details.get("modifiedFiles").and_then(|v| v.as_array())
+                {
                     for f in modified_files {
                         if let Some(s) = f.as_str() {
                             file_ops.edited.insert(s.to_string());
@@ -286,14 +330,17 @@ pub fn prepare_compaction(
     let boundary_start: usize;
     if prev_compaction_index >= 0 {
         let prev_compaction = &path_entries[prev_compaction_index as usize];
-        previous_summary = prev_compaction.get("summary").and_then(|v| v.as_str()).map(String::from);
+        previous_summary = prev_compaction
+            .get("summary")
+            .and_then(|v| v.as_str())
+            .map(String::from);
         let first_kept_entry_id = prev_compaction
             .get("firstKeptEntryId")
             .and_then(|v| v.as_str())
             .unwrap_or("");
-        let first_kept_index = path_entries.iter().position(|e| {
-            e.get("id").and_then(|v| v.as_str()) == Some(first_kept_entry_id)
-        });
+        let first_kept_index = path_entries
+            .iter()
+            .position(|e| e.get("id").and_then(|v| v.as_str()) == Some(first_kept_entry_id));
         boundary_start = first_kept_index.unwrap_or(prev_compaction_index as usize + 1);
     } else {
         boundary_start = 0;
@@ -302,7 +349,12 @@ pub fn prepare_compaction(
 
     let tokens_before = 0;
 
-    let cut_point = find_cut_point(path_entries, boundary_start, boundary_end, settings.keep_recent_tokens);
+    let cut_point = find_cut_point(
+        path_entries,
+        boundary_start,
+        boundary_end,
+        settings.keep_recent_tokens,
+    );
     let first_kept_entry = &path_entries[cut_point.first_kept_entry_index];
     let first_kept_entry_id = first_kept_entry
         .get("id")
@@ -310,7 +362,9 @@ pub fn prepare_compaction(
         .map(String::from)?;
 
     let history_end = if cut_point.is_split_turn {
-        cut_point.turn_start_index.unwrap_or(cut_point.first_kept_entry_index)
+        cut_point
+            .turn_start_index
+            .unwrap_or(cut_point.first_kept_entry_index)
     } else {
         cut_point.first_kept_entry_index
     };
@@ -333,7 +387,8 @@ pub fn prepare_compaction(
         Vec::new()
     };
 
-    let mut file_ops = extract_file_operations(&messages_to_summarize, path_entries, prev_compaction_index);
+    let mut file_ops =
+        extract_file_operations(&messages_to_summarize, path_entries, prev_compaction_index);
     for msg in &turn_prefix_messages {
         extract_file_ops_from_message(msg, &mut file_ops);
     }
@@ -354,24 +409,47 @@ fn get_message_from_entry(entry: &Value) -> Option<Value> {
     match entry.get("type").and_then(|v| v.as_str()) {
         Some("message") => entry.get("message").cloned(),
         Some("custom_message") => {
-            let custom_type = entry.get("customType").and_then(|v| v.as_str()).unwrap_or("");
+            let custom_type = entry
+                .get("customType")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
             let content = entry.get("content").cloned().unwrap_or(Value::Null);
-            let display = entry.get("display").and_then(|v| v.as_bool()).unwrap_or(true);
+            let display = entry
+                .get("display")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(true);
             let details = entry.get("details").cloned();
             let timestamp = entry.get("timestamp").and_then(|v| v.as_i64()).unwrap_or(0);
-            Some(messages::create_custom_message(custom_type.to_string(), content, display, details, timestamp))
+            Some(messages::create_custom_message(
+                custom_type.to_string(),
+                content,
+                display,
+                details,
+                timestamp,
+            ))
         }
         Some("branch_summary") => {
             let summary = entry.get("summary").and_then(|v| v.as_str()).unwrap_or("");
             let from_id = entry.get("fromId").and_then(|v| v.as_str()).unwrap_or("");
             let timestamp = entry.get("timestamp").and_then(|v| v.as_i64()).unwrap_or(0);
-            Some(messages::create_branch_summary_message(summary.to_string(), from_id.to_string(), timestamp))
+            Some(messages::create_branch_summary_message(
+                summary.to_string(),
+                from_id.to_string(),
+                timestamp,
+            ))
         }
         Some("compaction") => {
             let summary = entry.get("summary").and_then(|v| v.as_str()).unwrap_or("");
-            let tokens_before = entry.get("tokensBefore").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+            let tokens_before = entry
+                .get("tokensBefore")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0) as usize;
             let timestamp = entry.get("timestamp").and_then(|v| v.as_i64()).unwrap_or(0);
-            Some(messages::create_compaction_summary_message(summary.to_string(), tokens_before, timestamp))
+            Some(messages::create_compaction_summary_message(
+                summary.to_string(),
+                tokens_before,
+                timestamp,
+            ))
         }
         _ => None,
     }
@@ -385,13 +463,17 @@ fn get_message_from_entry_for_compaction(entry: &Value) -> Option<Value> {
 }
 
 pub fn calculate_context_tokens(usage: &Value) -> usize {
-    usage.get("totalTokens")
+    usage
+        .get("totalTokens")
         .and_then(|v| v.as_u64())
         .or_else(|| {
             let input = usage.get("input").and_then(|v| v.as_u64()).unwrap_or(0);
             let output = usage.get("output").and_then(|v| v.as_u64()).unwrap_or(0);
             let cache_read = usage.get("cacheRead").and_then(|v| v.as_u64()).unwrap_or(0);
-            let cache_write = usage.get("cacheWrite").and_then(|v| v.as_u64()).unwrap_or(0);
+            let cache_write = usage
+                .get("cacheWrite")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
             Some(input + output + cache_read + cache_write)
         })
         .unwrap_or(0) as usize
@@ -499,7 +581,8 @@ Use this EXACT format:
 
 Keep each section concise. Preserve exact file paths, function names, and error messages.";
 
-const TURN_PREFIX_SUMMARIZATION_PROMPT: &str = "This is the PREFIX of a turn that was too large to keep. The SUFFIX (recent work) is retained.
+const TURN_PREFIX_SUMMARIZATION_PROMPT: &str =
+    "This is the PREFIX of a turn that was too large to keep. The SUFFIX (recent work) is retained.
 
 Summarize the prefix to provide context for the retained suffix:
 
@@ -526,7 +609,11 @@ pub async fn generate_summary(
 ) -> Result<String, CompactionError> {
     let max_tokens = Some(std::cmp::min(
         (reserve_tokens as f64 * 0.8) as u64,
-        if model.max_tokens > 0 { model.max_tokens } else { u64::MAX },
+        if model.max_tokens > 0 {
+            model.max_tokens
+        } else {
+            u64::MAX
+        },
     ));
 
     let base_prompt = if previous_summary.is_some() {
@@ -544,13 +631,16 @@ pub async fn generate_summary(
     let conversation_text = super::utils::serialize_conversation(current_messages);
     let mut prompt_text = format!("<conversation>\n{}</conversation>\n\n", conversation_text);
     if let Some(prev) = previous_summary {
-        prompt_text.push_str(&format!("<previous-summary>\n{}</previous-summary>\n\n", prev));
+        prompt_text.push_str(&format!(
+            "<previous-summary>\n{}</previous-summary>\n\n",
+            prev
+        ));
     }
     prompt_text.push_str(&prompt);
 
-    let summarization_messages = vec![pick_ai::Message::User(pick_ai::UserMessage::new(
-        vec![pick_ai::ContentBlock::text(prompt_text)],
-    ))];
+    let summarization_messages = vec![pick_ai::Message::User(pick_ai::UserMessage::new(vec![
+        pick_ai::ContentBlock::text(prompt_text),
+    ]))];
 
     let context = pick_ai::Context {
         system_prompt: Some(SUMMARIZATION_SYSTEM_PROMPT.to_string()),
@@ -578,14 +668,22 @@ pub async fn generate_summary(
     match result.stop_reason {
         pick_ai::StopReason::Aborted => Err(CompactionError {
             code: "aborted".to_string(),
-            message: result.error_message.unwrap_or_else(|| "Summarization aborted".to_string()),
+            message: result
+                .error_message
+                .unwrap_or_else(|| "Summarization aborted".to_string()),
         }),
         pick_ai::StopReason::Error => Err(CompactionError {
             code: "summarization_failed".to_string(),
-            message: format!("Summarization failed: {}", result.error_message.unwrap_or_else(|| "Unknown error".to_string())),
+            message: format!(
+                "Summarization failed: {}",
+                result
+                    .error_message
+                    .unwrap_or_else(|| "Unknown error".to_string())
+            ),
         }),
         _ => {
-            let text: String = result.content
+            let text: String = result
+                .content
                 .iter()
                 .filter_map(|c| match c {
                     pick_ai::ContentBlock::Text(t) => Some(t.text.clone()),
@@ -608,7 +706,11 @@ async fn generate_turn_prefix_summary(
 ) -> Result<String, CompactionError> {
     let max_tokens = Some(std::cmp::min(
         (reserve_tokens as f64 * 0.5) as u64,
-        if model.max_tokens > 0 { model.max_tokens } else { u64::MAX },
+        if model.max_tokens > 0 {
+            model.max_tokens
+        } else {
+            u64::MAX
+        },
     ));
 
     let conversation_text = super::utils::serialize_conversation(messages);
@@ -617,9 +719,9 @@ async fn generate_turn_prefix_summary(
         conversation_text, TURN_PREFIX_SUMMARIZATION_PROMPT
     );
 
-    let summarization_messages = vec![pick_ai::Message::User(pick_ai::UserMessage::new(
-        vec![pick_ai::ContentBlock::text(prompt_text)],
-    ))];
+    let summarization_messages = vec![pick_ai::Message::User(pick_ai::UserMessage::new(vec![
+        pick_ai::ContentBlock::text(prompt_text),
+    ]))];
 
     let context = pick_ai::Context {
         system_prompt: Some(SUMMARIZATION_SYSTEM_PROMPT.to_string()),
@@ -647,14 +749,22 @@ async fn generate_turn_prefix_summary(
     match result.stop_reason {
         pick_ai::StopReason::Aborted => Err(CompactionError {
             code: "aborted".to_string(),
-            message: result.error_message.unwrap_or_else(|| "Turn prefix summarization aborted".to_string()),
+            message: result
+                .error_message
+                .unwrap_or_else(|| "Turn prefix summarization aborted".to_string()),
         }),
         pick_ai::StopReason::Error => Err(CompactionError {
             code: "summarization_failed".to_string(),
-            message: format!("Turn prefix summarization failed: {}", result.error_message.unwrap_or_else(|| "Unknown error".to_string())),
+            message: format!(
+                "Turn prefix summarization failed: {}",
+                result
+                    .error_message
+                    .unwrap_or_else(|| "Unknown error".to_string())
+            ),
         }),
         _ => {
-            let text: String = result.content
+            let text: String = result
+                .content
                 .iter()
                 .filter_map(|c| match c {
                     pick_ai::ContentBlock::Text(t) => Some(t.text.clone()),
@@ -702,7 +812,10 @@ pub async fn compact(
         )
         .await?;
 
-        format!("{}\n\n---\n\n**Turn Context (split turn):**\n\n{}", history_result, turn_prefix_result)
+        format!(
+            "{}\n\n---\n\n**Turn Context (split turn):**\n\n{}",
+            history_result, turn_prefix_result
+        )
     } else {
         generate_summary(
             &preparation.messages_to_summarize,

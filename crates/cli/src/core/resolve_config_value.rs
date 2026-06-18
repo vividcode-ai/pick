@@ -1,5 +1,4 @@
-﻿//! Resolve configuration values that may be shell commands, environment variables, or literals
-
+//! Resolve configuration values that may be shell commands, environment variables, or literals
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -15,7 +14,9 @@ pub fn resolve_config_value(config: &str) -> Option<String> {
     if config.starts_with('!') {
         return execute_command_cached(config);
     }
-    std::env::var(config).ok().or_else(|| Some(config.to_string()))
+    std::env::var(config)
+        .ok()
+        .or_else(|| Some(config.to_string()))
 }
 
 /// Resolve without using the cache
@@ -23,7 +24,9 @@ pub fn resolve_config_value_uncached(config: &str) -> Option<String> {
     if config.starts_with('!') {
         return execute_command_uncached(config);
     }
-    std::env::var(config).ok().or_else(|| Some(config.to_string()))
+    std::env::var(config)
+        .ok()
+        .or_else(|| Some(config.to_string()))
 }
 
 /// Resolve a config value or return an error message
@@ -46,7 +49,9 @@ pub fn resolve_config_value_or_throw(config: &str, description: &str) -> Result<
 }
 
 /// Resolve all header values
-pub fn resolve_headers(headers: Option<&HashMap<String, String>>) -> Option<HashMap<String, String>> {
+pub fn resolve_headers(
+    headers: Option<&HashMap<String, String>>,
+) -> Option<HashMap<String, String>> {
     let headers = headers?;
     let mut resolved = HashMap::new();
     for (key, value) in headers {
@@ -54,7 +59,11 @@ pub fn resolve_headers(headers: Option<&HashMap<String, String>>) -> Option<Hash
             resolved.insert(key.clone(), resolved_value);
         }
     }
-    if resolved.is_empty() { None } else { Some(resolved) }
+    if resolved.is_empty() {
+        None
+    } else {
+        Some(resolved)
+    }
 }
 
 /// Resolve all header values or throw on failure
@@ -68,10 +77,15 @@ pub fn resolve_headers_or_throw(
     };
     let mut resolved = HashMap::new();
     for (key, value) in headers {
-        let resolved_value = resolve_config_value_or_throw(value, &format!("{} header \"{}\"", description, key))?;
+        let resolved_value =
+            resolve_config_value_or_throw(value, &format!("{} header \"{}\"", description, key))?;
         resolved.insert(key.clone(), resolved_value);
     }
-    if resolved.is_empty() { Ok(None) } else { Ok(Some(resolved)) }
+    if resolved.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(resolved))
+    }
 }
 
 /// Clear the config value command cache
@@ -156,8 +170,14 @@ fn execute_shell_command(shell: &str, args: &[&str], command: &str) -> ShellResu
                             value: if value.is_empty() { None } else { Some(value) },
                         }
                     }
-                    Ok(_) => ShellResult { executed: true, value: None },
-                    Err(_) => ShellResult { executed: false, value: None },
+                    Ok(_) => ShellResult {
+                        executed: true,
+                        value: None,
+                    },
+                    Err(_) => ShellResult {
+                        executed: false,
+                        value: None,
+                    },
                 }
             });
             result
@@ -180,8 +200,14 @@ fn execute_shell_command(shell: &str, args: &[&str], command: &str) -> ShellResu
                         value: if value.is_empty() { None } else { Some(value) },
                     }
                 }
-                Ok(_) => ShellResult { executed: true, value: None },
-                Err(_) => ShellResult { executed: false, value: None },
+                Ok(_) => ShellResult {
+                    executed: true,
+                    value: None,
+                },
+                Err(_) => ShellResult {
+                    executed: false,
+                    value: None,
+                },
             }
         }
     }

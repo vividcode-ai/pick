@@ -1,8 +1,10 @@
-﻿use super::edit_diff::*;
+use super::edit_diff::*;
 use super::file_mutation_queue::with_file_mutation_queue;
 use super::path_utils::resolve_to_cwd;
-use super::render_utils::{ToolRenderContext, ToolRenderOptions, ToolRenderOutput, ToolTheme,
-    shorten_path, invalid_arg_text};
+use super::render_utils::{
+    ToolRenderContext, ToolRenderOptions, ToolRenderOutput, ToolTheme, invalid_arg_text,
+    shorten_path,
+};
 
 /// Create an edit tool definition
 pub fn create_edit_tool_definition() -> EditToolDefinition {
@@ -30,7 +32,10 @@ impl EditToolDefinition {
 
         with_file_mutation_queue(&absolute_path, async || {
             // Check if file exists
-            if !tokio::fs::try_exists(&absolute_path).await.map_err(|e| e.to_string())? {
+            if !tokio::fs::try_exists(&absolute_path)
+                .await
+                .map_err(|e| e.to_string())?
+            {
                 return Err(format!("Could not edit file: {}. File not found.", path));
             }
 
@@ -46,7 +51,11 @@ impl EditToolDefinition {
 
             let result = apply_edits_to_normalized_content(&normalized_content, edits, path)?;
 
-            let final_content = format!("{}{}", bom, restore_line_endings(&result.new_content, original_ending));
+            let final_content = format!(
+                "{}{}",
+                bom,
+                restore_line_endings(&result.new_content, original_ending)
+            );
             tokio::fs::write(&absolute_path, &final_content)
                 .await
                 .map_err(|e| format!("Failed to write file: {}", e))?;
@@ -63,7 +72,8 @@ impl EditToolDefinition {
                     first_changed_line: diff_result.first_changed_line,
                 },
             })
-        }).await
+        })
+        .await
     }
 }
 
@@ -83,7 +93,9 @@ pub struct EditToolDetails {
 
 /// Render an edit tool call — `edit /path/to/file` with diff preview
 pub fn render_edit_call(args: &serde_json::Value, _ctx: &ToolRenderContext) -> ToolRenderOutput {
-    let path = args.get("path").and_then(|v| v.as_str())
+    let path = args
+        .get("path")
+        .and_then(|v| v.as_str())
         .or_else(|| args.get("file_path").and_then(|v| v.as_str()));
 
     let path_display = match path {
@@ -91,12 +103,16 @@ pub fn render_edit_call(args: &serde_json::Value, _ctx: &ToolRenderContext) -> T
         None => invalid_arg_text(&|s| ToolTheme::fg("error", s)),
     };
 
-    let label = format!("{} {}",
+    let label = format!(
+        "{} {}",
         ToolTheme::fg("toolTitle", &ToolTheme::bold("edit")),
         path_display,
     );
 
-    ToolRenderOutput { label, formatted: String::new() }
+    ToolRenderOutput {
+        label,
+        formatted: String::new(),
+    }
 }
 
 /// Render an edit tool result — diff output or error
@@ -106,7 +122,8 @@ pub fn render_edit_result(
     ctx: &ToolRenderContext,
 ) -> ToolRenderOutput {
     if ctx.is_error {
-        let error_text: String = output.content
+        let error_text: String = output
+            .content
             .iter()
             .filter_map(|c| c.get("text").and_then(|v| v.as_str()))
             .collect::<Vec<_>>()
@@ -117,12 +134,18 @@ pub fn render_edit_result(
                 formatted: format!("\n{}", ToolTheme::fg("error", &error_text)),
             };
         }
-        return ToolRenderOutput { label: String::new(), formatted: String::new() };
+        return ToolRenderOutput {
+            label: String::new(),
+            formatted: String::new(),
+        };
     }
 
     let diff = &output.details.diff;
     if diff.is_empty() {
-        return ToolRenderOutput { label: String::new(), formatted: String::new() };
+        return ToolRenderOutput {
+            label: String::new(),
+            formatted: String::new(),
+        };
     }
 
     ToolRenderOutput {
