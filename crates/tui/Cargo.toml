@@ -1,0 +1,34 @@
+﻿[package]
+name = "pick-tui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+futures.workspace = true
+async-trait.workspace = true
+regex.workspace = true
+crossterm = { workspace = true, features = ["bracketed-paste", "event-stream"] }
+base64.workspace = true
+dirs = "5.0"
+unicode-width.workspace = true
+ratatui = { workspace = true, features = [
+    "scrolling-regions",
+    "unstable-backend-writer",
+    "unstable-rendered-line-info",
+    "unstable-widget-ref",
+] }
+pulldown-cmark.workspace = true
+textwrap.workspace = true
+itertools.workspace = true
+derive_more.workspace = true
+url.workspace = true
+syntect.workspace = true
+pathdiff.workspace = true
+ansi-to-tui = "8.0.1"

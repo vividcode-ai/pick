@@ -1,0 +1,29 @@
+﻿[package]
+name = "pick-agent"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+pick-ai = { path = "../ai" }
+pick-tui = { path = "../tui" }
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+reqwest.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+futures.workspace = true
+async-trait.workspace = true
+indexmap.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+regex.workspace = true
+base64.workspace = true
+walkdir.workspace = true
+dunce.workspace = true
+url.workspace = true
+dirs = "6"
+libloading = "0.8"
+scraper = "0.22"

@@ -1,0 +1,57 @@
+{
+  "mcp_servers": {
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "D:\\workspace",
+        "D:\\projects"
+      ],
+      "tool_name_prefix": "fs_"
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_TOKEN": "ghp_your_token_here"
+      },
+      "tool_name_prefix": "gh_"
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp"],
+      "env": {
+        "PLAYWRIGHT_BROWSER_PATH": "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+      }
+    },
+    "sqlite": {
+      "command": "uvx",
+      "args": [
+        "mcp-server-sqlite",
+        "--db-path",
+        "D:\\data\\app.db"
+      ]
+    },
+    "internal-api": {
+      "url": "https://api.internal.company.com/mcp",
+      "auth": {
+        "type": "bearer",
+        "token": "sk-your-bearer-token"
+      },
+      "tool_name_prefix": "api_"
+    },
+    "docker": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "mcp/docker-server"]
+    },
+    "custom-server": {
+      "command": "node",
+      "args": ["./path/to/mcp-server.js"],
+      "env": {
+        "NODE_ENV": "production",
+        "LOG_LEVEL": "debug"
+      }
+    }
+  }
+}

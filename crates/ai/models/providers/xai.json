@@ -1,0 +1,137 @@
+{
+  "provider_id": "xai",
+  "api": "openai-completions",
+  "base_url": "https://api.x.ai/v1",
+  "models": [
+    {
+      "id": "grok-3",
+      "name": "Grok 3",
+      "api": "openai-completions",
+      "base_url": "https://api.x.ai/v1",
+      "reasoning": false,
+      "input_capabilities": [
+        "text"
+      ],
+      "cost": {
+        "input": 3,
+        "output": 15,
+        "cache_read": 0.75,
+        "cache_write": 0
+      },
+      "context_window": 131072,
+      "max_tokens": 8192
+    },
+    {
+      "id": "grok-3-fast",
+      "name": "Grok 3 Fast",
+      "api": "openai-completions",
+      "base_url": "https://api.x.ai/v1",
+      "reasoning": false,
+      "input_capabilities": [
+        "text"
+      ],
+      "cost": {
+        "input": 5,
+        "output": 25,
+        "cache_read": 1.25,
+        "cache_write": 0
+      },
+      "context_window": 131072,
+      "max_tokens": 8192
+    },
+    {
+      "id": "grok-4.20-0309-non-reasoning",
+      "name": "Grok 4.20 (Non-Reasoning)",
+      "api": "openai-completions",
+      "base_url": "https://api.x.ai/v1",
+      "reasoning": false,
+      "input_capabilities": [
+        "text",
+        "image"
+      ],
+      "cost": {
+        "input": 1.25,
+        "output": 2.5,
+        "cache_read": 0.2,
+        "cache_write": 0
+      },
+      "context_window": 2000000,
+      "max_tokens": 30000
+    },
+    {
+      "id": "grok-4.20-0309-reasoning",
+      "name": "Grok 4.20 (Reasoning)",
+      "api": "openai-completions",
+      "base_url": "https://api.x.ai/v1",
+      "reasoning": true,
+      "input_capabilities": [
+        "text",
+        "image"
+      ],
+      "cost": {
+        "input": 1.25,
+        "output": 2.5,
+        "cache_read": 0.2,
+        "cache_write": 0
+      },
+      "context_window": 2000000,
+      "max_tokens": 30000
+    },
+    {
+      "id": "grok-4.3",
+      "name": "Grok 4.3",
+      "api": "openai-completions",
+      "base_url": "https://api.x.ai/v1",
+      "reasoning": true,
+      "input_capabilities": [
+        "text",
+        "image"
+      ],
+      "cost": {
+        "input": 1.25,
+        "output": 2.5,
+        "cache_read": 0.2,
+        "cache_write": 0
+      },
+      "context_window": 1000000,
+      "max_tokens": 30000
+    },
+    {
+      "id": "grok-build-0.1",
+      "name": "Grok Build 0.1",
+      "api": "openai-completions",
+      "base_url": "https://api.x.ai/v1",
+      "reasoning": true,
+      "input_capabilities": [
+        "text",
+        "image"
+      ],
+      "cost": {
+        "input": 1,
+        "output": 2,
+        "cache_read": 0.2,
+        "cache_write": 0
+      },
+      "context_window": 256000,
+      "max_tokens": 256000
+    },
+    {
+      "id": "grok-code-fast-1",
+      "name": "Grok Code Fast 1",
+      "api": "openai-completions",
+      "base_url": "https://api.x.ai/v1",
+      "reasoning": false,
+      "input_capabilities": [
+        "text"
+      ],
+      "cost": {
+        "input": 0.2,
+        "output": 1.5,
+        "cache_read": 0.02,
+        "cache_write": 0
+      },
+      "context_window": 32768,
+      "max_tokens": 8192
+    }
+  ]
+}

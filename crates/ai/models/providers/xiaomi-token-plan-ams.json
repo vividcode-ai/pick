@@ -1,0 +1,99 @@
+{
+  "provider_id": "xiaomi-token-plan-ams",
+  "api": "openai-completions",
+  "base_url": "https://token-plan-ams.xiaomimimo.com/v1",
+  "models": [
+    {
+      "id": "mimo-v2-flash",
+      "name": "MiMo-V2-Flash",
+      "api": "openai-completions",
+      "base_url": "https://token-plan-ams.xiaomimimo.com/v1",
+      "reasoning": true,
+      "input_capabilities": [
+        "text"
+      ],
+      "cost": {
+        "input": 0.1,
+        "output": 0.3,
+        "cache_read": 0.01,
+        "cache_write": 0
+      },
+      "context_window": 262144,
+      "max_tokens": 65536
+    },
+    {
+      "id": "mimo-v2-omni",
+      "name": "MiMo-V2-Omni",
+      "api": "openai-completions",
+      "base_url": "https://token-plan-ams.xiaomimimo.com/v1",
+      "reasoning": true,
+      "input_capabilities": [
+        "text",
+        "image"
+      ],
+      "cost": {
+        "input": 0.4,
+        "output": 2,
+        "cache_read": 0.08,
+        "cache_write": 0
+      },
+      "context_window": 262144,
+      "max_tokens": 131072
+    },
+    {
+      "id": "mimo-v2-pro",
+      "name": "MiMo-V2-Pro",
+      "api": "openai-completions",
+      "base_url": "https://token-plan-ams.xiaomimimo.com/v1",
+      "reasoning": true,
+      "input_capabilities": [
+        "text"
+      ],
+      "cost": {
+        "input": 1,
+        "output": 3,
+        "cache_read": 0.2,
+        "cache_write": 0
+      },
+      "context_window": 1048576,
+      "max_tokens": 131072
+    },
+    {
+      "id": "mimo-v2.5",
+      "name": "MiMo-V2.5",
+      "api": "openai-completions",
+      "base_url": "https://token-plan-ams.xiaomimimo.com/v1",
+      "reasoning": true,
+      "input_capabilities": [
+        "text",
+        "image"
+      ],
+      "cost": {
+        "input": 0.4,
+        "output": 2,
+        "cache_read": 0.08,
+        "cache_write": 0
+      },
+      "context_window": 1048576,
+      "max_tokens": 131072
+    },
+    {
+      "id": "mimo-v2.5-pro",
+      "name": "MiMo-V2.5-Pro",
+      "api": "openai-completions",
+      "base_url": "https://token-plan-ams.xiaomimimo.com/v1",
+      "reasoning": true,
+      "input_capabilities": [
+        "text"
+      ],
+      "cost": {
+        "input": 1,
+        "output": 3,
+        "cache_read": 0.2,
+        "cache_write": 0
+      },
+      "context_window": 1048576,
+      "max_tokens": 131072
+    }
+  ]
+}

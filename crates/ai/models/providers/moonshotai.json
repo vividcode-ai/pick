@@ -1,0 +1,135 @@
+{
+  "provider_id": "moonshotai",
+  "api": "openai-completions",
+  "base_url": "https://api.moonshot.ai/v1",
+  "models": [
+    {
+      "id": "kimi-k2-0711-preview",
+      "name": "Kimi K2 0711",
+      "api": "openai-completions",
+      "base_url": "https://api.moonshot.ai/v1",
+      "reasoning": false,
+      "input_capabilities": [
+        "text"
+      ],
+      "cost": {
+        "input": 0.6,
+        "output": 2.5,
+        "cache_read": 0.15,
+        "cache_write": 0
+      },
+      "context_window": 131072,
+      "max_tokens": 16384
+    },
+    {
+      "id": "kimi-k2-0905-preview",
+      "name": "Kimi K2 0905",
+      "api": "openai-completions",
+      "base_url": "https://api.moonshot.ai/v1",
+      "reasoning": false,
+      "input_capabilities": [
+        "text"
+      ],
+      "cost": {
+        "input": 0.6,
+        "output": 2.5,
+        "cache_read": 0.15,
+        "cache_write": 0
+      },
+      "context_window": 262144,
+      "max_tokens": 262144
+    },
+    {
+      "id": "kimi-k2-thinking",
+      "name": "Kimi K2 Thinking",
+      "api": "openai-completions",
+      "base_url": "https://api.moonshot.ai/v1",
+      "reasoning": true,
+      "input_capabilities": [
+        "text"
+      ],
+      "cost": {
+        "input": 0.6,
+        "output": 2.5,
+        "cache_read": 0.15,
+        "cache_write": 0
+      },
+      "context_window": 262144,
+      "max_tokens": 262144
+    },
+    {
+      "id": "kimi-k2-thinking-turbo",
+      "name": "Kimi K2 Thinking Turbo",
+      "api": "openai-completions",
+      "base_url": "https://api.moonshot.ai/v1",
+      "reasoning": true,
+      "input_capabilities": [
+        "text"
+      ],
+      "cost": {
+        "input": 1.15,
+        "output": 8,
+        "cache_read": 0.15,
+        "cache_write": 0
+      },
+      "context_window": 262144,
+      "max_tokens": 262144
+    },
+    {
+      "id": "kimi-k2-turbo-preview",
+      "name": "Kimi K2 Turbo",
+      "api": "openai-completions",
+      "base_url": "https://api.moonshot.ai/v1",
+      "reasoning": false,
+      "input_capabilities": [
+        "text"
+      ],
+      "cost": {
+        "input": 2.4,
+        "output": 10,
+        "cache_read": 0.6,
+        "cache_write": 0
+      },
+      "context_window": 262144,
+      "max_tokens": 262144
+    },
+    {
+      "id": "kimi-k2.5",
+      "name": "Kimi K2.5",
+      "api": "openai-completions",
+      "base_url": "https://api.moonshot.ai/v1",
+      "reasoning": true,
+      "input_capabilities": [
+        "text",
+        "image"
+      ],
+      "cost": {
+        "input": 0.6,
+        "output": 3,
+        "cache_read": 0.1,
+        "cache_write": 0
+      },
+      "context_window": 262144,
+      "max_tokens": 262144
+    },
+    {
+      "id": "kimi-k2.6",
+      "name": "Kimi K2.6",
+      "api": "openai-completions",
+      "base_url": "https://api.moonshot.ai/v1",
+      "reasoning": true,
+      "input_capabilities": [
+        "text",
+        "image"
+      ],
+      "cost": {
+        "input": 0.95,
+        "output": 4,
+        "cache_read": 0.16,
+        "cache_write": 0
+      },
+      "context_window": 262144,
+      "max_tokens": 262144
+    }
+  ]
+}

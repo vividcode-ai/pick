@@ -1,0 +1,24 @@
+{
+  "provider_id": "faux",
+  "api": "faux",
+  "base_url": "http://localhost",
+  "models": [
+    {
+      "id": "faux-model",
+      "name": "Faux Model",
+      "api": "faux",
+      "provider": "faux",
+      "base_url": "http://localhost",
+      "reasoning": false,
+      "input_capabilities": ["text"],
+      "cost": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+      },
+      "context_window": 4096,
+      "max_tokens": 1024
+    }
+  ]
+}

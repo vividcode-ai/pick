@@ -1,0 +1,53 @@
+﻿[workspace]
+resolver = "2"
+members = [
+    "crates/ai",
+    "crates/agent",
+    "crates/tui",
+    "crates/cli",
+    "crates/mcp",
+    "crates/sandbox",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", features = ["json", "stream"] }
+anyhow = "1"
+thiserror = "2"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+uuid = { version = "1", features = ["v7", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+base64 = "0.22"
+futures = "0.3"
+pin-project = "1"
+regex = "1"
+sha2 = "0.10"
+hmac = "0.12"
+hex = "0.4"
+url = "2"
+async-trait = "0.1"
+indexmap = { version = "2", features = ["serde"] }
+pathdiff = "0.2"
+similar = "2"
+dunce = "1"
+unicode-normalization = "0.1"
+syntect = { version = "5", features = ["default-syntaxes", "default-themes", "regex-fancy"] }
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp"] }
+kamadak-exif = "0.6"
+arboard = "3"
+ratatui = "0.30"
+crossterm = "0.29"
+unicode-width = "0.2"
+pulldown-cmark = "0.13"
+textwrap = { version = "0.16", features = ["unicode-width"] }
+itertools = "0.14"
+derive_more = { version = "2", features = ["is_variant"] }
+walkdir = "2"
