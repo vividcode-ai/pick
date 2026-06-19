@@ -1,0 +1,21 @@
+{
+  "name": "@vividcodeai/pick",
+  "version": "0.0.0-dev",
+  "description": "Pick CLI - An AI coding assistant that runs locally on your computer",
+  "license": "MIT",
+  "bin": {
+    "pick": "bin/pick.js"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=16"
+  },
+  "files": [
+    "bin/pick.js"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vividcodeai/pick.git",
+    "directory": "npm/pick"
+  }
+}

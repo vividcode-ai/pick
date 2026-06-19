@@ -29,6 +29,34 @@ jobs:
       - name: Clippy
         run: cargo clippy --all-targets -- -D warnings
 
+  tag-check:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.validate.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate tag
+        id: validate
+        run: |
+          [[ "${GITHUB_REF_TYPE}" == "tag" ]] \
+            || { echo "Not a tag push"; exit 1; }
+
+          TAG_REGEX='^v[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta)(\.[0-9]+)?)?$'
+          [[ "${GITHUB_REF_NAME}" =~ $TAG_REGEX ]] \
+            || { echo "Invalid tag format: ${GITHUB_REF_NAME}"; exit 1; }
+
+          tag_ver="${GITHUB_REF_NAME#v}"
+
+          cargo_ver="$(grep -m1 '^version' Cargo.toml \
+                       | sed -E 's/version *= *"([^"]+)".*/\1/')"
+
+          [[ "${tag_ver}" == "${cargo_ver}" ]] \
+            || { echo "Tag version ${tag_ver} != Cargo.toml ${cargo_ver}"; exit 1; }
+
+          echo "version=${tag_ver}" >> "$GITHUB_OUTPUT"
+
   build:
     needs: [check]
     strategy:
@@ -37,11 +65,20 @@ jobs:
           - os: ubuntu-latest
             target: linux-x86_64
             archive_ext: tar.gz
-          - os: macos-latest
+          - os: ubuntu-24.04-arm
+            target: linux-aarch64
+            archive_ext: tar.gz
+          - os: macos-13
             target: macos-x86_64
+            archive_ext: tar.gz
+          - os: macos-latest
+            target: macos-aarch64
             archive_ext: tar.gz
           - os: windows-latest
             target: windows-x86_64
+            archive_ext: tar.gz
+          - os: windows-11-arm
+            target: windows-aarch64
             archive_ext: tar.gz
     runs-on: ${{ matrix.os }}
     steps:
@@ -62,11 +99,11 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist
-          BINARY="target/release/pick${{ matrix.os == 'windows-latest' && '.exe' || '' }}"
-          cp "$BINARY" "dist/pick${{ matrix.os == 'windows-latest' && '.exe' || '' }}"
+          BINARY="target/release/pick${{ contains(matrix.os, 'windows') && '.exe' || '' }}"
+          cp "$BINARY" "dist/pick${{ contains(matrix.os, 'windows') && '.exe' || '' }}"
           cd dist
           tar -czf "../pick-package-${{ matrix.target }}.tar.gz" \
-            pick${{ matrix.os == 'windows-latest' && '.exe' || '' }}
+            pick${{ contains(matrix.os, 'windows') && '.exe' || '' }}
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v4
@@ -78,12 +115,32 @@ jobs:
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build]
+    needs: [build, tag-check]
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.extract_version.outputs.version }}
+      npm_tag: ${{ steps.npm_settings.outputs.npm_tag }}
+      should_publish: ${{ steps.npm_settings.outputs.should_publish }}
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
+
+      - id: extract_version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - id: npm_settings
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          if [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "should_publish=true"  >> "$GITHUB_OUTPUT"
+            echo "npm_tag="             >> "$GITHUB_OUTPUT"
+          elif [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+-alpha\.[0-9]+$ ]]; then
+            echo "should_publish=true"  >> "$GITHUB_OUTPUT"
+            echo "npm_tag=alpha"        >> "$GITHUB_OUTPUT"
+          else
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -98,9 +155,115 @@ jobs:
         with:
           files: |
             pick-package-linux-x86_64/*.tar.gz
+            pick-package-linux-aarch64/*.tar.gz
             pick-package-macos-x86_64/*.tar.gz
+            pick-package-macos-aarch64/*.tar.gz
             pick-package-windows-x86_64/*.tar.gz
+            pick-package-windows-aarch64/*.tar.gz
             pick-package_SHA256SUMS
             scripts/install/install.sh
             scripts/install/install.ps1
           generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          make_latest: ${{ !contains(github.ref_name, '-') }}
+
+  package-npm:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build, tag-check]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Extract binaries from packages
+        shell: bash
+        run: |
+          mkdir -p _binaries
+          for archive in pick-package-*/pick-package-*.tar.gz; do
+            target=$(echo "$archive" | sed 's|pick-package-\(.*\)/pick-package-\(.*\)\.tar.gz|\1|')
+            echo "Extracting binary for ${target}"
+            mkdir -p "_binaries/${target}"
+            tar -xzf "$archive" -C "_binaries/${target}"
+          done
+          ls -la _binaries/*/
+
+      - name: Stage npm packages
+        env:
+          RELEASE_VERSION: ${{ needs.tag-check.outputs.version }}
+        run: |
+          python scripts/stage_npm_packages.py \
+            --release-version "$RELEASE_VERSION" \
+            --binary-dir "$(pwd)/_binaries" \
+            --output-dir "$(pwd)/dist/npm"
+
+      - name: Upload npm tarballs
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-packages
+          path: dist/npm/*.tgz
+          compression-level: 0
+          if-no-files-found: error
+
+  publish-npm:
+    if: startsWith(github.ref, 'refs/tags/v') && needs.release.outputs.should_publish == 'true'
+    needs: [release, package-npm]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: npm-packages
+          path: npm-packages
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Publish to npm
+        env:
+          VERSION: ${{ needs.release.outputs.version }}
+          NPM_TAG: ${{ needs.release.outputs.npm_tag }}
+        shell: bash
+        run: |
+          shopt -s nullglob
+          for tarball in npm-packages/*.tgz; do
+            filename=$(basename "$tarball")
+            echo "Publishing: ${filename}"
+
+            tag=""
+            case "${filename}" in
+              pick-npm-linux-*-${VERSION}.tgz|pick-npm-darwin-*-${VERSION}.tgz|pick-npm-win32-*-${VERSION}.tgz)
+                platform="${filename#pick-npm-}"
+                platform="${platform%-${VERSION}.tgz}"
+                tag="${NPM_TAG:+${NPM_TAG}-}${platform}"
+                ;;
+              pick-npm-${VERSION}.tgz)
+                tag="${NPM_TAG}"
+                ;;
+            esac
+
+            publish_cmd="npm publish '${tarball}' --access public --provenance"
+            if [[ -n "${tag}" ]]; then
+              publish_cmd="${publish_cmd} --tag '${tag}'"
+            fi
+
+            echo "  cmd: ${publish_cmd}"
+            if eval "${publish_cmd}"; then
+              echo "  Published (tag: ${tag:-latest})"
+            else
+              echo "  Skipped (may already exist)"
+            fi
+          done
