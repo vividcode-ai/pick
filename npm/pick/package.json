@@ -17,5 +17,9 @@
     "type": "git",
     "url": "git+https://github.com/vividcodeai/pick.git",
     "directory": "npm/pick"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
   }
 }

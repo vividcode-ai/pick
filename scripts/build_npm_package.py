@@ -182,6 +182,10 @@ def stage_sources(staging_dir: Path, version: str, package: str, binary_src: Pat
                 "type": "git",
                 "url": "git+https://github.com/vividcodeai/pick.git",
             },
+            "publishConfig": {
+                "registry": "https://registry.npmjs.org",
+                "access": "public",
+            },
         }
 
         if binary_src is not None:

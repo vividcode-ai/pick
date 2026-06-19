@@ -263,7 +263,8 @@ jobs:
         shell: bash
         run: |
           if [[ -n "${NPM_TOKEN}" ]]; then
-            echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
+            # Append (don't overwrite) to preserve @vividcodeai scope registry mapping from setup-node
+            echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> ~/.npmrc
             echo "-> Using NPM_TOKEN authentication"
           else
             echo "-> No NPM_TOKEN, using OIDC trusted publishing"
@@ -286,7 +287,7 @@ jobs:
                 ;;
             esac
 
-            publish_cmd="npm publish '${tarball}' --access public"
+            publish_cmd="npm publish './${tarball}' --access public --registry 'https://registry.npmjs.org'"
             if [[ -n "${tag}" ]]; then
               publish_cmd="${publish_cmd} --tag '${tag}'"
             fi
