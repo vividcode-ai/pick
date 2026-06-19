@@ -41,17 +41,16 @@ impl Sandbox for LinuxBwrapSandbox {
             None => return Ok((req.program.clone(), req.args.clone())),
         };
 
-        let mut bwrap_args: Vec<String> = Vec::new();
-
-        // Essential isolation flags
-        bwrap_args.push("--new-session".into());
-        bwrap_args.push("--die-with-parent".into());
-        bwrap_args.push("--unshare-user".into());
-        bwrap_args.push("--unshare-pid".into());
-        bwrap_args.push("--dev".into());
-        bwrap_args.push("/dev".into());
-        bwrap_args.push("--proc".into());
-        bwrap_args.push("/proc".into());
+        let mut bwrap_args: Vec<String> = vec![
+            "--new-session".into(),
+            "--die-with-parent".into(),
+            "--unshare-user".into(),
+            "--unshare-pid".into(),
+            "--dev".into(),
+            "/dev".into(),
+            "--proc".into(),
+            "/proc".into(),
+        ];
 
         // Network isolation: block network when not explicitly set to Full
         if req.network_access != NetworkAccess::Full {
