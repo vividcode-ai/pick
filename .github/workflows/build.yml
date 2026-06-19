@@ -94,6 +94,7 @@ jobs:
         run: rustup target add x86_64-apple-darwin
 
       - name: Build
+        shell: bash
         run: |
           if [ "macos-x86_64" = "${{ matrix.target }}" ]; then
             cargo build --release --target x86_64-apple-darwin
@@ -102,6 +103,7 @@ jobs:
           fi
 
       - name: Test
+        shell: bash
         run: |
           if [ "macos-x86_64" = "${{ matrix.target }}" ]; then
             cargo test --release --target x86_64-apple-darwin
