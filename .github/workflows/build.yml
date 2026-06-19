@@ -253,6 +253,7 @@ jobs:
         with:
           node-version: "20"
           registry-url: "https://registry.npmjs.org"
+          scope: "@vividcodeai"
 
       - name: Publish to npm
         env:
@@ -264,10 +265,8 @@ jobs:
           if [[ -n "${NPM_TOKEN}" ]]; then
             echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
             echo "-> Using NPM_TOKEN authentication"
-            PROVENANCE=""
           else
             echo "-> No NPM_TOKEN, using OIDC trusted publishing"
-            PROVENANCE="--provenance"
           fi
 
           shopt -s nullglob
@@ -287,7 +286,7 @@ jobs:
                 ;;
             esac
 
-            publish_cmd="npm publish '${tarball}' --access public ${PROVENANCE}"
+            publish_cmd="npm publish '${tarball}' --access public"
             if [[ -n "${tag}" ]]; then
               publish_cmd="${publish_cmd} --tag '${tag}'"
             fi
