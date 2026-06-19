@@ -71,7 +71,7 @@ fn migrate_auth_to_auth_json() -> Vec<String> {
     }
 
     if !migrated.is_empty()
-        && let Ok(content) = serde_json::to_string_pretty(&migrated)
+        && let Ok(_content) = serde_json::to_string_pretty(&migrated)
     {
         if let Some(parent) = auth_path.parent() {
             let _ = std::fs::create_dir_all(parent);
@@ -90,7 +90,7 @@ fn migrate_auth_to_auth_json() -> Vec<String> {
         }
         #[cfg(not(unix))]
         {
-            let _ = std::fs::write(&auth_path, &content);
+            let _ = std::fs::write(&auth_path, &_content);
         }
     }
 

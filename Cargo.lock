@@ -2295,6 +2295,7 @@ dependencies = [
  "futures",
  "image",
  "kamadak-exif",
+ "nix 0.29.0",
  "pathdiff",
  "pick-agent",
  "pick-ai",
