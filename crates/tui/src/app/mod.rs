@@ -24,6 +24,8 @@ mod tests {
     use ratatui::style::{Color, Modifier};
     use ratatui::text::Line;
 
+    const TEST_VERSION: &str = env!("CARGO_PKG_VERSION");
+
     /// Helper: get plain text from a ratatui Line.
     fn line_text(line: &Line<'static>) -> String {
         line.spans.iter().map(|s| s.content.as_ref()).collect()
@@ -41,7 +43,7 @@ mod tests {
         fn new(context: Vec<String>, skills: Vec<String>) -> Self {
             Self {
                 app_name: "Pick".to_string(),
-                version: "0.1.0".to_string(),
+                version: TEST_VERSION.to_string(),
                 context_file_names: context,
                 skill_names: skills,
             }
@@ -339,7 +341,7 @@ mod tests {
             "anthropic",
             "claude-sonnet-4-20250514",
             "Pick",
-            "0.1.0",
+            TEST_VERSION,
             vec!["CLAUDE.md".to_string()],
             vec!["agent-browser".to_string()],
             "D:\\autoway\\Project\\agent\\vividCode",
@@ -429,7 +431,7 @@ mod tests {
             "anthropic",
             "claude-sonnet-4-20250514",
             "Pick",
-            "0.1.0",
+            TEST_VERSION,
             vec!["CLAUDE.md".to_string()],
             vec!["agent-browser".to_string()],
             "D:\\autoway\\Project\\agent\\vividCode",
@@ -462,7 +464,7 @@ mod tests {
             "anthropic",
             "claude-sonnet-4-20250514",
             "Pick",
-            "0.1.0",
+            TEST_VERSION,
             vec![],
             vec![],
             "/tmp",
@@ -498,7 +500,7 @@ mod tests {
             "anthropic",
             "claude-sonnet-4-20250514",
             "Pick",
-            "0.1.0",
+            TEST_VERSION,
             vec![],
             vec![],
             "/tmp",
@@ -553,7 +555,7 @@ mod tests {
             "anthropic",
             "claude-sonnet-4-20250514",
             "Pick",
-            "0.1.0",
+            TEST_VERSION,
             vec![],
             vec![],
             "/tmp",
@@ -859,7 +861,7 @@ mod tests {
             "anthropic",
             "claude-sonnet-4-20250514",
             "Pick",
-            "0.1.0",
+            TEST_VERSION,
             vec![],
             vec![],
             "/tmp",
@@ -901,7 +903,7 @@ mod tests {
             "anthropic",
             "claude-sonnet-4-20250514",
             "Pick",
-            "0.1.0",
+            TEST_VERSION,
             vec![],
             vec![],
             "/tmp",
@@ -952,7 +954,7 @@ mod tests {
             "faux",
             "faux-model",
             "Pick",
-            "0.1.0",
+            TEST_VERSION,
             vec![],
             vec![],
             "/tmp",
@@ -1051,7 +1053,7 @@ mod tests {
             "anthropic",
             "claude-sonnet-4-20250514",
             "Pick",
-            "0.1.0",
+            TEST_VERSION,
             vec![],
             vec![],
             "/tmp",
@@ -1092,7 +1094,7 @@ mod tests {
             "anthropic",
             "claude-sonnet-4-20250514",
             "Pick",
-            "0.1.0",
+            TEST_VERSION,
             vec!["CLAUDE.md".to_string()],
             vec![],
             "D:\\test",
@@ -1159,7 +1161,7 @@ mod tests {
             "anthropic",
             "claude-sonnet-4-20250514",
             "Pick",
-            "0.1.0",
+            TEST_VERSION,
             vec!["CLAUDE.md".to_string()],
             vec![],
             "D:\\test",
