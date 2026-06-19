@@ -90,7 +90,10 @@ mod tests {
         );
         let lines = data.build_header(80);
         assert_eq!(lines[0], "");
-        assert_eq!(lines[1], format!("\x1b[1mPick\x1b[0m\x1b[2m v{}\x1b[0m", TEST_VERSION));
+        assert_eq!(
+            lines[1],
+            format!("\x1b[1mPick\x1b[0m\x1b[2m v{}\x1b[0m", TEST_VERSION)
+        );
     }
 
     #[test]
