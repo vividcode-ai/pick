@@ -191,12 +191,11 @@ mod tests {
 
     #[test]
     fn test_footer_line1_cwd_with_home() {
-        let line = render_footer_line1_test(
-            "D:\\autoway\\Project\\agent\\vividCode",
-            Some("D:\\autoway"),
-            None,
-            120,
-        );
+        #[cfg(windows)]
+        let line =
+            render_footer_line1_test("D:\\home\\user\\project", Some("D:\\home\\user"), None, 120);
+        #[cfg(not(windows))]
+        let line = render_footer_line1_test("/home/user/project", Some("/home/user"), None, 120);
         assert!(line.starts_with("\x1b[2m~"));
         assert!(line.ends_with("\x1b[0m"));
     }
@@ -347,8 +346,16 @@ mod tests {
             TEST_VERSION,
             vec!["CLAUDE.md".to_string()],
             vec!["agent-browser".to_string()],
-            "D:\\autoway\\Project\\agent\\vividCode",
-            Some("D:\\autoway".to_string()),
+            &std::path::Path::new("D:")
+                .join("projects")
+                .join("pick")
+                .to_string_lossy(),
+            Some(
+                std::path::Path::new("D:")
+                    .join("projects")
+                    .to_string_lossy()
+                    .into_owned(),
+            ),
             "off",
             None,
             "test",
@@ -437,8 +444,16 @@ mod tests {
             TEST_VERSION,
             vec!["CLAUDE.md".to_string()],
             vec!["agent-browser".to_string()],
-            "D:\\autoway\\Project\\agent\\vividCode",
-            Some("D:\\autoway".to_string()),
+            &std::path::Path::new("D:")
+                .join("projects")
+                .join("pick")
+                .to_string_lossy(),
+            Some(
+                std::path::Path::new("D:")
+                    .join("projects")
+                    .to_string_lossy()
+                    .into_owned(),
+            ),
             "off",
             None,
             "test",
