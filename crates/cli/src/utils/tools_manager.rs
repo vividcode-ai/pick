@@ -138,8 +138,12 @@ fn get_asset_name(tool: &str, _config: &ToolCfg) -> Option<String> {
         ("fd", "linux", a) => Some(format!("fd-v{{version}}-{a}-unknown-linux-gnu.tar.gz")),
         ("fd", "win32", a) => Some(format!("fd-v{{version}}-{a}-pc-windows-msvc.zip")),
         ("rg", "darwin", a) => Some(format!("ripgrep-{{version}}-{a}-apple-darwin.tar.gz")),
-        ("rg", "linux", "x86_64") => Some("ripgrep-{version}-x86_64-unknown-linux-musl.tar.gz".to_string()),
-        ("rg", "linux", "arm64") => Some("ripgrep-{version}-aarch64-unknown-linux-gnu.tar.gz".to_string()),
+        ("rg", "linux", "x86_64") => {
+            Some("ripgrep-{version}-x86_64-unknown-linux-musl.tar.gz".to_string())
+        }
+        ("rg", "linux", "arm64") => {
+            Some("ripgrep-{version}-aarch64-unknown-linux-gnu.tar.gz".to_string())
+        }
         ("rg", "win32", a) => Some(format!("ripgrep-{{version}}-{a}-pc-windows-msvc.zip")),
         _ => None,
     }
@@ -238,9 +242,9 @@ fn extract_zip(archive: &Path, extract_dir: &Path) -> Result<(), String> {
                 ],
             )
             .is_ok()
-            {
-                return Ok(());
-            }
+        {
+            return Ok(());
+        }
         // Fallback: PowerShell Expand-Archive
         let script = "& { param($a,$d) $ErrorActionPreference='Stop'; Expand-Archive -LiteralPath $a -DestinationPath $d -Force }";
         run_extraction(
@@ -285,19 +289,20 @@ fn extract_zip(archive: &Path, extract_dir: &Path) -> Result<(), String> {
 
 fn find_binary(root: &Path, binary_name: &str) -> Option<PathBuf> {
     if root.is_dir()
-        && let Ok(entries) = std::fs::read_dir(root) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.is_file() && path.file_name().and_then(|n| n.to_str()) == Some(binary_name)
-                {
-                    return Some(path);
-                }
-                if path.is_dir()
-                    && let found @ Some(_) = find_binary(&path, binary_name) {
-                        return found;
-                    }
+        && let Ok(entries) = std::fs::read_dir(root)
+    {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file() && path.file_name().and_then(|n| n.to_str()) == Some(binary_name) {
+                return Some(path);
+            }
+            if path.is_dir()
+                && let found @ Some(_) = find_binary(&path, binary_name)
+            {
+                return found;
             }
         }
+    }
     None
 }
 
@@ -360,7 +365,8 @@ async fn download_tool(tool: &str, config: &ToolCfg) -> Result<PathBuf, String> 
             extract_dir.join(&binary_name),
         ];
         let found = candidates.iter().find(|p| p.exists());
-        let found = found.cloned()
+        let found = found
+            .cloned()
             .or_else(|| find_binary(&extract_dir, &binary_name));
 
         match found {

@@ -280,24 +280,23 @@ fn extract_file_operations(
     if prev_compaction_index >= 0 {
         let prev_compaction = &entries[prev_compaction_index as usize];
         if prev_compaction.get("fromHook") != Some(&Value::Bool(true))
-            && let Some(details) = prev_compaction.get("details") {
-                if let Some(read_files) = details.get("readFiles").and_then(|v| v.as_array()) {
-                    for f in read_files {
-                        if let Some(s) = f.as_str() {
-                            file_ops.read.insert(s.to_string());
-                        }
-                    }
-                }
-                if let Some(modified_files) =
-                    details.get("modifiedFiles").and_then(|v| v.as_array())
-                {
-                    for f in modified_files {
-                        if let Some(s) = f.as_str() {
-                            file_ops.edited.insert(s.to_string());
-                        }
+            && let Some(details) = prev_compaction.get("details")
+        {
+            if let Some(read_files) = details.get("readFiles").and_then(|v| v.as_array()) {
+                for f in read_files {
+                    if let Some(s) = f.as_str() {
+                        file_ops.read.insert(s.to_string());
                     }
                 }
             }
+            if let Some(modified_files) = details.get("modifiedFiles").and_then(|v| v.as_array()) {
+                for f in modified_files {
+                    if let Some(s) = f.as_str() {
+                        file_ops.edited.insert(s.to_string());
+                    }
+                }
+            }
+        }
     }
     for msg in messages {
         extract_file_ops_from_message(msg, &mut file_ops);
@@ -482,13 +481,15 @@ fn get_last_assistant_usage_info(messages: &[Value]) -> Option<UsageInfo> {
     for (i, msg) in messages.iter().enumerate().rev() {
         if msg.get("role").and_then(|v| v.as_str()) == Some("assistant") {
             let stop_reason = msg.get("stopReason").and_then(|v| v.as_str()).unwrap_or("");
-            if stop_reason != "aborted" && stop_reason != "error"
-                && let Some(usage) = msg.get("usage") {
-                    return Some(UsageInfo {
-                        usage: usage.clone(),
-                        index: i,
-                    });
-                }
+            if stop_reason != "aborted"
+                && stop_reason != "error"
+                && let Some(usage) = msg.get("usage")
+            {
+                return Some(UsageInfo {
+                    usage: usage.clone(),
+                    index: i,
+                });
+            }
         }
     }
     None
@@ -498,10 +499,12 @@ pub fn get_last_assistant_usage(entries: &[Value]) -> Option<Value> {
     for entry in entries.iter().rev() {
         let msg = entry.get("message")?;
         let stop_reason = msg.get("stopReason").and_then(|v| v.as_str()).unwrap_or("");
-        if stop_reason != "aborted" && stop_reason != "error"
-            && let Some(usage) = msg.get("usage") {
-                return Some(usage.clone());
-            }
+        if stop_reason != "aborted"
+            && stop_reason != "error"
+            && let Some(usage) = msg.get("usage")
+        {
+            return Some(usage.clone());
+        }
     }
     None
 }

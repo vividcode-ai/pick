@@ -725,9 +725,10 @@ fn ansi_to_color(ansi: &str, default: ratatui::style::Color) -> ratatui::style::
             parts[parts.len() - 3].parse::<u8>(),
             parts[parts.len() - 2].parse::<u8>(),
             parts[parts.len() - 1].parse::<u8>(),
-        ) {
-            return ratatui::style::Color::Rgb(r, g, b);
-        }
+        )
+    {
+        return ratatui::style::Color::Rgb(r, g, b);
+    }
     default
 }
 

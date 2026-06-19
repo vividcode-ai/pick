@@ -348,14 +348,15 @@ pub fn resolve_cli_model(
     let mut resolved_provider = provider;
 
     if resolved_provider.is_none()
-        && let Some(slash_idx) = cli_model.find('/') {
-            let maybe_provider = &cli_model[..slash_idx];
-            if let Some(canonical) = provider_map.get(&maybe_provider.to_lowercase()) {
-                resolved_provider = Some(canonical.clone());
-                pattern = &cli_model[slash_idx + 1..];
-                inferred_provider = true;
-            }
+        && let Some(slash_idx) = cli_model.find('/')
+    {
+        let maybe_provider = &cli_model[..slash_idx];
+        if let Some(canonical) = provider_map.get(&maybe_provider.to_lowercase()) {
+            resolved_provider = Some(canonical.clone());
+            pattern = &cli_model[slash_idx + 1..];
+            inferred_provider = true;
         }
+    }
 
     // Try exact match without provider inference
     if resolved_provider.is_none() {
@@ -473,13 +474,14 @@ pub async fn find_initial_model(
 
     // 3. Try saved default from settings
     if let (Some(provider), Some(model_id)) = (default_provider, default_model_id)
-        && let Some(found) = model_registry.find(provider, model_id) {
-            return InitialModelResult {
-                model: Some(found),
-                thinking_level: tl.to_string(),
-                fallback_message: None,
-            };
-        }
+        && let Some(found) = model_registry.find(provider, model_id)
+    {
+        return InitialModelResult {
+            model: Some(found),
+            thinking_level: tl.to_string(),
+            fallback_message: None,
+        };
+    }
 
     // 4. Try first available model with valid API key
     let available_models = model_registry.get_available();

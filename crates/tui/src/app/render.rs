@@ -134,7 +134,6 @@ impl TuiApp {
                 s != "completed" && s != "cancelled"
             });
         let todo_lines: u16 = if has_todo {
-            
             self.render_todo_lines(width as usize).len() as u16
         } else {
             0
@@ -254,26 +253,27 @@ impl TuiApp {
                         i += 1;
 
                         if i < chunks.len()
-                            && let Some(ref status) = self.status_text {
-                                let frame_idx = self.status_frame % Self::SPINNER_FRAMES.len();
-                                let spinner = Self::SPINNER_FRAMES[frame_idx];
-                                let display_text = if let Some(start) = self.agent_start_time {
-                                    let secs = start.elapsed().as_secs();
-                                    format!(
-                                        "{} {} ({} • esc to interrupt)",
-                                        spinner,
-                                        status,
-                                        Self::format_elapsed(secs)
-                                    )
-                                } else {
-                                    format!("{} {}", spinner, status)
-                                };
-                                let status_line = Line::from(Span::styled(
-                                    display_text,
-                                    Style::default().add_modifier(Modifier::DIM),
-                                ));
-                                frame.render_widget_ref(&status_line, chunks[i]);
-                            }
+                            && let Some(ref status) = self.status_text
+                        {
+                            let frame_idx = self.status_frame % Self::SPINNER_FRAMES.len();
+                            let spinner = Self::SPINNER_FRAMES[frame_idx];
+                            let display_text = if let Some(start) = self.agent_start_time {
+                                let secs = start.elapsed().as_secs();
+                                format!(
+                                    "{} {} ({} • esc to interrupt)",
+                                    spinner,
+                                    status,
+                                    Self::format_elapsed(secs)
+                                )
+                            } else {
+                                format!("{} {}", spinner, status)
+                            };
+                            let status_line = Line::from(Span::styled(
+                                display_text,
+                                Style::default().add_modifier(Modifier::DIM),
+                            ));
+                            frame.render_widget_ref(&status_line, chunks[i]);
+                        }
                         i += 1;
 
                         render_at!(i, Line::from(""));
@@ -625,25 +625,26 @@ impl TuiApp {
         }
 
         if pwd.width() > right_target
-            && let Some(sep_pos) = pwd.rfind(" \u{2022} ") {
-                let suffix = &pwd[sep_pos..];
-                let suffix_w = suffix.width();
-                let max_path = right_target.saturating_sub(suffix_w);
-                let path_part = &pwd[..sep_pos];
-                if path_part.width() > max_path && max_path >= 6 {
-                    let mut tail = String::new();
-                    let mut w = 4;
-                    for c in path_part.chars().rev() {
-                        let cw = c.to_string().width();
-                        if w + cw > max_path {
-                            break;
-                        }
-                        tail.insert(0, c);
-                        w += cw;
+            && let Some(sep_pos) = pwd.rfind(" \u{2022} ")
+        {
+            let suffix = &pwd[sep_pos..];
+            let suffix_w = suffix.width();
+            let max_path = right_target.saturating_sub(suffix_w);
+            let path_part = &pwd[..sep_pos];
+            if path_part.width() > max_path && max_path >= 6 {
+                let mut tail = String::new();
+                let mut w = 4;
+                for c in path_part.chars().rev() {
+                    let cw = c.to_string().width();
+                    if w + cw > max_path {
+                        break;
                     }
-                    pwd = format!("... {}{}", tail, suffix);
+                    tail.insert(0, c);
+                    w += cw;
                 }
+                pwd = format!("... {}{}", tail, suffix);
             }
+        }
         let pwd_w = pwd.width();
         if pwd_w < right_target {
             let pad = " ".repeat(right_target - pwd_w);

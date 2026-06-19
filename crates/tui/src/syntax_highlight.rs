@@ -36,9 +36,10 @@ fn theme_lock() -> &'static RwLock<Theme> {
 pub fn set_theme(name: &str) {
     let ts = ThemeSet::load_defaults();
     if let Some(theme) = ts.themes.get(name)
-        && let Ok(mut guard) = theme_lock().write() {
-            *guard = theme.clone();
-        }
+        && let Ok(mut guard) = theme_lock().write()
+    {
+        *guard = theme.clone();
+    }
 }
 
 fn convert_syntect_color(sc: syntect::highlighting::Color) -> Option<Color> {

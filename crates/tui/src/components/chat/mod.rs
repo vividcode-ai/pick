@@ -138,11 +138,12 @@ impl ChatView {
             self.next_stream_creates_new = false;
             // Commit any existing active streaming content first
             if let Some(existing) = self.active_streaming_content.take()
-                && !existing.is_empty() {
-                    self.entries
-                        .push(ChatEntry::Message(ChatMessage::new("assistant", existing)));
-                    self.invalidate_cache();
-                }
+                && !existing.is_empty()
+            {
+                self.entries
+                    .push(ChatEntry::Message(ChatMessage::new("assistant", existing)));
+                self.invalidate_cache();
+            }
             self.active_streaming_content = Some(text.to_string());
         } else if let Some(ref mut current) = self.active_streaming_content {
             // Streaming optimization: if the new text has the old content as a prefix,
@@ -164,21 +165,22 @@ impl ChatView {
     /// and sets the flag so the next `stream_assistant_content` creates a new message.
     pub fn mark_turn_end(&mut self) {
         if let Some(content) = self.active_streaming_content.take()
-            && !content.is_empty() {
-                // Guard: prevent committing the same content twice.
-                // The content may have been already committed via the next_stream_creates_new
-                // path in stream_assistant_content if a StreamContent arrived after an EndTurn.
-                let is_duplicate = self
+            && !content.is_empty()
+        {
+            // Guard: prevent committing the same content twice.
+            // The content may have been already committed via the next_stream_creates_new
+            // path in stream_assistant_content if a StreamContent arrived after an EndTurn.
+            let is_duplicate = self
                     .entries
                     .iter()
                     .rev()
                     .any(|e| matches!(e, ChatEntry::Message(m) if m.role == "assistant" && m.content == content));
-                if !is_duplicate {
-                    self.entries
-                        .push(ChatEntry::Message(ChatMessage::new("assistant", content)));
-                    self.invalidate_cache();
-                }
+            if !is_duplicate {
+                self.entries
+                    .push(ChatEntry::Message(ChatMessage::new("assistant", content)));
+                self.invalidate_cache();
             }
+        }
         self.next_stream_creates_new = true;
     }
 
@@ -321,16 +323,17 @@ impl ChatView {
     pub fn update_tool_execution_output(&mut self, tool_call_id: &str, partial: &str) {
         for entry in self.entries.iter_mut().rev() {
             if let ChatEntry::ToolExecution(te) = entry
-                && te.tool_call_id == tool_call_id {
-                    if !partial.is_empty() {
-                        if te.output.is_empty() {
-                            te.output = partial.to_string();
-                        } else {
-                            te.output.push_str(partial);
-                        }
+                && te.tool_call_id == tool_call_id
+            {
+                if !partial.is_empty() {
+                    if te.output.is_empty() {
+                        te.output = partial.to_string();
+                    } else {
+                        te.output.push_str(partial);
                     }
-                    break;
                 }
+                break;
+            }
         }
         self.invalidate_cache();
         self.scroll_to_bottom();
@@ -341,15 +344,16 @@ impl ChatView {
     pub fn update_tool_execution(&mut self, tool_call_id: &str, output: &str, is_error: bool) {
         for entry in self.entries.iter_mut().rev() {
             if let ChatEntry::ToolExecution(te) = entry
-                && te.tool_call_id == tool_call_id {
-                    te.status = if is_error {
-                        ToolStatus::Error
-                    } else {
-                        ToolStatus::Success
-                    };
-                    te.output = output.to_string();
-                    break;
-                }
+                && te.tool_call_id == tool_call_id
+            {
+                te.status = if is_error {
+                    ToolStatus::Error
+                } else {
+                    ToolStatus::Success
+                };
+                te.output = output.to_string();
+                break;
+            }
         }
         self.invalidate_cache();
         self.scroll_to_bottom();
@@ -359,10 +363,11 @@ impl ChatView {
     pub fn replace_tool_execution_output(&mut self, tool_call_id: &str, output: &str) {
         for entry in self.entries.iter_mut().rev() {
             if let ChatEntry::ToolExecution(te) = entry
-                && te.tool_call_id == tool_call_id {
-                    te.output = output.to_string();
-                    break;
-                }
+                && te.tool_call_id == tool_call_id
+            {
+                te.output = output.to_string();
+                break;
+            }
         }
         self.invalidate_cache();
         self.scroll_to_bottom();
@@ -1511,9 +1516,7 @@ mod tests {
         };
 
         eprintln!("\n{}", "=".repeat(80));
-        eprintln!(
-            "SIDE-BY-SIDE COMPARISON: canonical format vs Pick rendered"
-        );
+        eprintln!("SIDE-BY-SIDE COMPARISON: canonical format vs Pick rendered");
         eprintln!("{}", "=".repeat(80));
         eprintln!("{:<30} | {:<48}|", "canonical format", "Pick (plain text)");
         eprintln!("{}", "-".repeat(80));

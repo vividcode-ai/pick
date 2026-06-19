@@ -262,17 +262,19 @@ impl Writer {
             TagEnd::Link => {
                 self.flush_pending();
                 if let Some(link) = self.link.take()
-                    && link.show_dest && !link.local {
-                        let display_dest = if link.dest.len() > 60 {
-                            format!("…{}", &link.dest[link.dest.len().saturating_sub(59)..])
-                        } else {
-                            link.dest.clone()
-                        };
-                        self.emit_line_inner(vec![Span::styled(
-                            format!(" ({})", display_dest),
-                            self.styles.link_url,
-                        )]);
-                    }
+                    && link.show_dest
+                    && !link.local
+                {
+                    let display_dest = if link.dest.len() > 60 {
+                        format!("…{}", &link.dest[link.dest.len().saturating_sub(59)..])
+                    } else {
+                        link.dest.clone()
+                    };
+                    self.emit_line_inner(vec![Span::styled(
+                        format!(" ({})", display_dest),
+                        self.styles.link_url,
+                    )]);
+                }
             }
             _ => {}
         }
@@ -333,9 +335,10 @@ impl Writer {
     fn make_span(&self, content: impl Into<Cow<'static, str>>) -> Span<'static> {
         let mut span = Span::styled(content.into(), self.current_style());
         if let Some(ref link) = self.link
-            && link.show_dest {
-                span = span.style(self.styles.link);
-            }
+            && link.show_dest
+        {
+            span = span.style(self.styles.link);
+        }
         span
     }
 

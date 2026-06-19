@@ -1,0 +1,13 @@
+#!/bin/sh
+# Pre-commit hook: auto-format Rust files with cargo fmt
+
+set -e
+
+if git diff --cached --name-only --diff-filter=ACM | grep -q '\.rs$'; then
+    if ! cargo fmt --all --check > /dev/null 2>&1; then
+        echo "-> cargo fmt: formatting Rust files..."
+        cargo fmt --all
+        git diff --cached --name-only --diff-filter=ACM | grep '\.rs$' | xargs git add 2>/dev/null || true
+        echo "Rust files formatted and re-staged"
+    fi
+fi

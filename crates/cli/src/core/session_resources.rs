@@ -16,9 +16,10 @@ where
 
     move || {
         if let Ok(mut handlers) = CLEANUP_HANDLERS.lock()
-            && idx < handlers.len() {
-                drop(handlers.swap_remove(idx));
-            }
+            && idx < handlers.len()
+        {
+            drop(handlers.swap_remove(idx));
+        }
     }
 }
 

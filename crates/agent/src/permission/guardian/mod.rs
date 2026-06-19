@@ -1,4 +1,4 @@
-﻿use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU32, Ordering};
 
 const MAX_CONSECUTIVE_DENIALS: u32 = 3;
 const MAX_RECENT_DENIALS: u32 = 10;
@@ -10,15 +10,13 @@ pub enum GuardianAction {
     Deny,
 }
 
-#[derive(Debug, Clone)]
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub struct GuardianConfig {
     pub enabled: bool,
     pub model: Option<String>,
     pub provider: Option<String>,
     pub strict_auto_review: bool,
 }
-
 
 pub struct Guardian {
     config: GuardianConfig,

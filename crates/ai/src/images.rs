@@ -18,8 +18,7 @@ pub struct ProviderResponse {
 }
 
 /// Options for image generation requests.
-#[derive(Clone)]
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct ImagesOptions {
     /// API key override (falls back to env if not set)
     pub api_key: Option<String>,
@@ -36,7 +35,6 @@ pub struct ImagesOptions {
     /// Maximum retry attempts.
     pub max_retries: Option<u32>,
 }
-
 
 /// Image generation provider function signature (async).
 /// Takes owned values to allow the returned future to be 'static/'Send.

@@ -56,11 +56,12 @@ pub async fn run_rpc_mode(
         .await
         .or_else(|| std::env::var(&env_var).ok());
     if let Some(ref key) = api_key
-        && std::env::var(&env_var).is_err() {
-            unsafe {
-                std::env::set_var(&env_var, key);
-            }
+        && std::env::var(&env_var).is_err()
+    {
+        unsafe {
+            std::env::set_var(&env_var, key);
         }
+    }
 
     let tools = if args.no_tools { vec![] } else { tools };
 
@@ -191,13 +192,14 @@ pub async fn run_rpc_mode(
                         agent_registry: Some(agent_registry.clone()),
                         on_event: Some(Arc::new(move |event| {
                             if let AgentEvent::MessageUpdate { message, .. } = event
-                                && let Message::Assistant(msg) = message {
-                                    for block in &msg.content {
-                                        if let ContentBlock::Text(t) = block {
-                                            rt.lock().unwrap().push_str(&t.text);
-                                        }
+                                && let Message::Assistant(msg) = message
+                            {
+                                for block in &msg.content {
+                                    if let ContentBlock::Text(t) = block {
+                                        rt.lock().unwrap().push_str(&t.text);
                                     }
                                 }
+                            }
                         })),
                         fs_policy: permission_manager.fs_policy(),
                         cwd: Some(std::env::current_dir().unwrap_or_default()),

@@ -68,9 +68,10 @@ where
     {
         let mut queues = FILE_MUTATION_QUEUES.lock().unwrap();
         if let Some(entry) = queues.get(&key)
-            && entry.current.is_none() {
-                queues.remove(&key);
-            }
+            && entry.current.is_none()
+        {
+            queues.remove(&key);
+        }
     }
 
     result

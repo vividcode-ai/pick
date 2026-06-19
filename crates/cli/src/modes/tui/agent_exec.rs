@@ -37,7 +37,8 @@ pub(crate) fn build_agent_config(
                 &tc.name,
                 &tool_args_str,
                 &[&mode_rules_clone],
-            ).err()
+            )
+            .err()
         })
     };
 
@@ -101,10 +102,9 @@ pub(crate) fn build_agent_config(
                             remaining,
                         ))));
                     }
-                    "budget_limited"
-                        if !budget_injected.swap(true, Ordering::Relaxed) => {
-                            msgs.push(Message::User(UserMessage::text(format!(
-                                "<goal_context>\n\
+                    "budget_limited" if !budget_injected.swap(true, Ordering::Relaxed) => {
+                        msgs.push(Message::User(UserMessage::text(format!(
+                            "<goal_context>\n\
                                  The token budget for the goal has been reached.\n\
                                  Objective: {}\n\
                                  Tokens used: {} / {}\n\
@@ -112,11 +112,11 @@ pub(crate) fn build_agent_config(
                                  and identify any remaining work.\n\
                                  Do not start new substantive work.\n\
                                  </goal_context>",
-                                goal.objective,
-                                goal.tokens_used,
-                                goal.token_budget.unwrap_or(0),
-                            ))));
-                        }
+                            goal.objective,
+                            goal.tokens_used,
+                            goal.token_budget.unwrap_or(0),
+                        ))));
+                    }
                     _ => {}
                 }
             }
@@ -225,11 +225,12 @@ pub(crate) fn build_agent_config(
             let tx = cmd_tx_clone.clone();
             Box::pin(async move {
                 if tokens > 0
-                    && let Some(goal) = gm.add_token_usage(tokens) {
-                        let _ = tx.send(TuiCommand::GoalUpdated(
-                            serde_json::to_value(&goal).unwrap_or_default(),
-                        ));
-                    }
+                    && let Some(goal) = gm.add_token_usage(tokens)
+                {
+                    let _ = tx.send(TuiCommand::GoalUpdated(
+                        serde_json::to_value(&goal).unwrap_or_default(),
+                    ));
+                }
             })
                 as std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send + 'static>>
         }
@@ -493,11 +494,8 @@ pub(crate) async fn auto_compact_session(ctx: &mut TuiContext) {
                 let summary = compaction_result.summary;
                 let before = ctx.all_messages.len();
                 ctx.all_messages = vec![
-                    UserMessage::text(format!(
-                        "[Compacted conversation summary]\n\n{}",
-                        summary
-                    ))
-                    .into(),
+                    UserMessage::text(format!("[Compacted conversation summary]\n\n{}", summary))
+                        .into(),
                 ];
                 ctx.tui.chat.add_system_message(&format!(
                     "Auto-compacted ({} msgs → 1, {} tokens before).",

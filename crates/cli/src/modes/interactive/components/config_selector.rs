@@ -266,19 +266,20 @@ pub fn filter_entries(entries: &[FlatEntry], query: &str) -> Vec<FlatEntry> {
 
     for entry in entries {
         if let FlatEntry::Item(item) = entry
-            && matching_paths.contains(&item.path) {
-                let sub_key = format!("{}:{}", item.resource_type.label(), item.path);
-                matching_subgroups.insert(sub_key);
+            && matching_paths.contains(&item.path)
+        {
+            let sub_key = format!("{}:{}", item.resource_type.label(), item.path);
+            matching_subgroups.insert(sub_key);
 
-                let group_key = format!(
-                    "{}:{}:{}:{}",
-                    item.metadata.origin,
-                    item.metadata.scope,
-                    item.metadata.source,
-                    item.metadata.base_dir.as_deref().unwrap_or("")
-                );
-                matching_groups.insert(group_key);
-            }
+            let group_key = format!(
+                "{}:{}:{}:{}",
+                item.metadata.origin,
+                item.metadata.scope,
+                item.metadata.source,
+                item.metadata.base_dir.as_deref().unwrap_or("")
+            );
+            matching_groups.insert(group_key);
+        }
     }
 
     let mut result = Vec::new();

@@ -174,16 +174,15 @@ pub(crate) fn combine_content_blocks(content: &[ContentBlock]) -> String {
             ContentBlock::Text(t) => {
                 combined.push_str(&t.text);
             }
-            ContentBlock::Thinking(t)
-                if !t.thinking.is_empty() && !t.redacted => {
-                    if !combined.is_empty() && !combined.ends_with('\n') {
-                        combined.push('\n');
-                    }
-                    combined.push_str(&format!(
-                        "\x1b[3m\x1b[38;2;128;128;128m{}\x1b[23m\x1b[39m\n\n",
-                        t.thinking.trim_end()
-                    ));
+            ContentBlock::Thinking(t) if !t.thinking.is_empty() && !t.redacted => {
+                if !combined.is_empty() && !combined.ends_with('\n') {
+                    combined.push('\n');
                 }
+                combined.push_str(&format!(
+                    "\x1b[3m\x1b[38;2;128;128;128m{}\x1b[23m\x1b[39m\n\n",
+                    t.thinking.trim_end()
+                ));
+            }
             ContentBlock::Image(_) => {
                 if !combined.is_empty() && !combined.ends_with('\n') {
                     combined.push('\n');

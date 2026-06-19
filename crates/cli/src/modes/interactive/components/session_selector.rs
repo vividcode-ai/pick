@@ -293,10 +293,9 @@ pub fn render_session_list(
             let age = format_session_date(&session.modified);
             let msg_count = session.message_count.to_string();
             let mut right = format!("{} {}", msg_count, age);
-            if show_cwd
-                && let Some(ref cwd) = session.cwd {
-                    right = format!("{} {}", shorten_path(cwd), right);
-                }
+            if show_cwd && let Some(ref cwd) = session.cwd {
+                right = format!("{} {}", shorten_path(cwd), right);
+            }
             if show_path {
                 right = format!("{} {}", shorten_path(&session.path), right);
             }

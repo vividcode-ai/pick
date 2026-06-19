@@ -44,8 +44,6 @@ pub async fn exec_command(
         .and_then(|o| o.timeout_ms)
         .map(Duration::from_millis);
 
-    
-
     if let Some(dur) = timeout_dur {
         match timeout(dur, cmd.output()).await {
             Ok(Ok(output)) => ExecResult {

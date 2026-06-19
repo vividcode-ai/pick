@@ -782,7 +782,8 @@ pub async fn run_interactive_mode(
                                 &tc.name,
                                 &tool_args_str,
                                 &[&mode_rules],
-                            ).err()
+                            )
+                            .err()
                         }
                     })),
                     should_stop_after_turn: None,
@@ -798,16 +799,17 @@ pub async fn run_interactive_mode(
                                 AgentMode::Build => vec![],
                             };
                             if let Some(goal) = goal_manager.get()
-                                && goal.status == "active" {
-                                    let remaining = goal_manager
-                                        .remaining_tokens()
-                                        .map(|r| format!("\nRemaining token budget: {}", r))
-                                        .unwrap_or_default();
-                                    msgs.push(Message::User(UserMessage::text(format!(
+                                && goal.status == "active"
+                            {
+                                let remaining = goal_manager
+                                    .remaining_tokens()
+                                    .map(|r| format!("\nRemaining token budget: {}", r))
+                                    .unwrap_or_default();
+                                msgs.push(Message::User(UserMessage::text(format!(
                                         "<goal_context>\nCurrent goal: {}\nTokens used: {}{}\n</goal_context>",
                                         goal.objective, goal.tokens_used, remaining,
                                     ))));
-                                }
+                            }
                             msgs
                         }
                     })),
@@ -840,10 +842,12 @@ pub async fn run_interactive_mode(
                                     std::io::stdin().read_line(&mut input).ok();
                                     let trimmed = input.trim().to_string();
                                     if let Ok(num) = trimmed.parse::<usize>()
-                                        && num >= 1 && num <= q.options.len() {
-                                            answers.push(vec![q.options[num - 1].label.clone()]);
-                                            continue;
-                                        }
+                                        && num >= 1
+                                        && num <= q.options.len()
+                                    {
+                                        answers.push(vec![q.options[num - 1].label.clone()]);
+                                        continue;
+                                    }
                                     answers.push(vec![trimmed]);
                                 }
                                 Ok(answers)
@@ -924,13 +928,14 @@ pub async fn run_interactive_mode(
                                         let mut has_output = false;
                                         for t in texts {
                                             if let Some(text) = t.as_str()
-                                                && !text.is_empty() {
-                                                    if !has_output {
-                                                        println!();
-                                                        has_output = true;
-                                                    }
-                                                    print!("{}", ToolTheme::fg("toolOutput", text));
+                                                && !text.is_empty()
+                                            {
+                                                if !has_output {
+                                                    println!();
+                                                    has_output = true;
                                                 }
+                                                print!("{}", ToolTheme::fg("toolOutput", text));
+                                            }
                                         }
                                     }
                                 } else {
@@ -1030,7 +1035,9 @@ pub async fn run_interactive_mode(
 
                             let api_key =
                                 auth.get_api_key(provider, true).await.unwrap_or_default();
-                            if let Some(preparation) = prepare_compaction(&path_entries, &compact_settings) {
+                            if let Some(preparation) =
+                                prepare_compaction(&path_entries, &compact_settings)
+                            {
                                 match compact(&preparation, &model, &api_key, None, None, None)
                                     .await
                                 {
@@ -1050,17 +1057,12 @@ pub async fn run_interactive_mode(
                                             id: uuid::Uuid::now_v7().to_string(),
                                             parent_id: None,
                                             timestamp: chrono::Utc::now().timestamp_millis(),
-                                            kind: SessionEntryKind::Compaction(
-                                                CompactionEntry {
-                                                    summary: summary.clone(),
-                                                    token_count: Some(
-                                                        result.tokens_before as u64,
-                                                    ),
-                                                },
-                                            ),
+                                            kind: SessionEntryKind::Compaction(CompactionEntry {
+                                                summary: summary.clone(),
+                                                token_count: Some(result.tokens_before as u64),
+                                            }),
                                         };
-                                        if let Err(e) =
-                                            session_manager.append(compact_entry).await
+                                        if let Err(e) = session_manager.append(compact_entry).await
                                         {
                                             eprintln!(
                                                 "Warning: failed to persist compaction entry: {}",

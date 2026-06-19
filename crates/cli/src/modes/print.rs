@@ -59,12 +59,13 @@ pub async fn run_print_mode(
         std::process::exit(1);
     }
     if std::env::var(&env_var).is_err()
-        && let Some(ref key) = api_key {
-            // SAFETY: set_var is safe in single-threaded context at startup
-            unsafe {
-                std::env::set_var(&env_var, key);
-            }
+        && let Some(ref key) = api_key
+    {
+        // SAFETY: set_var is safe in single-threaded context at startup
+        unsafe {
+            std::env::set_var(&env_var, key);
         }
+    }
 
     let tools = if args.no_tools { vec![] } else { tools };
 
@@ -161,7 +162,8 @@ pub async fn run_print_mode(
                     &tc.name,
                     &tool_args_str,
                     &[&mode_rules],
-                ).err()
+                )
+                .err()
             },
         )),
         should_stop_after_turn: None,
@@ -199,14 +201,15 @@ pub async fn run_print_mode(
                 }
             }
             if let AgentEvent::MessageUpdate { message, .. } = event
-                && let Message::Assistant(msg) = message {
-                    for block in &msg.content {
-                        if let ContentBlock::Text(t) = block {
-                            let mut out = output_clone.lock().unwrap();
-                            out.push_str(&t.text);
-                        }
+                && let Message::Assistant(msg) = message
+            {
+                for block in &msg.content {
+                    if let ContentBlock::Text(t) = block {
+                        let mut out = output_clone.lock().unwrap();
+                        out.push_str(&t.text);
                     }
                 }
+            }
         })),
     };
 

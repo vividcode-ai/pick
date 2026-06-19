@@ -323,11 +323,12 @@ pub(crate) fn update_model(provider: &str, model_id: &str) -> (AiModel, String) 
 pub(crate) async fn update_api_key(auth: &AuthStorage, provider: &str) {
     let env_var = format!("{}_API_KEY", provider.to_uppercase().replace('-', "_"));
     if std::env::var(&env_var).is_err()
-        && let Some(key) = auth.get_api_key(provider, true).await {
-            unsafe {
-                std::env::set_var(&env_var, key);
-            }
+        && let Some(key) = auth.get_api_key(provider, true).await
+    {
+        unsafe {
+            std::env::set_var(&env_var, key);
         }
+    }
 }
 
 /// Save model/provider as default in global settings

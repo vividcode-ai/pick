@@ -489,20 +489,22 @@ fn matches_any_pattern(file_path: &str, patterns: &[String], base_dir: &str) -> 
         // Glob matching
         let re_str = format!("^{}$", regex::escape(&normalized).replace("\\*", ".*"));
         if let Ok(re) = regex::Regex::new(&re_str)
-            && (re.is_match(&rel) || re.is_match(&name)) {
-                return true;
-            }
+            && (re.is_match(&rel) || re.is_match(&name))
+        {
+            return true;
+        }
 
         // For skill files, also match parent directory
         if is_skill_file
-            && let (Some(p_rel), Some(p_name)) = (parent_rel.as_ref(), parent_name.as_ref()) {
-                if normalized == *p_rel || normalized == *p_name {
-                    return true;
-                }
-                if p_rel.ends_with(&format!("/{}", normalized)) {
-                    return true;
-                }
+            && let (Some(p_rel), Some(p_name)) = (parent_rel.as_ref(), parent_name.as_ref())
+        {
+            if normalized == *p_rel || normalized == *p_name {
+                return true;
             }
+            if p_rel.ends_with(&format!("/{}", normalized)) {
+                return true;
+            }
+        }
 
         false
     })
@@ -539,9 +541,10 @@ fn matches_any_exact_pattern(file_path: &str, patterns: &[String], base_dir: &st
         }
         if is_skill_file
             && let (Some(p_rel), Some(p_dir)) = (parent_rel.as_ref(), parent_dir_posix.as_ref())
-                && (normalized == *p_rel || normalized == *p_dir) {
-                    return true;
-                }
+            && (normalized == *p_rel || normalized == *p_dir)
+        {
+            return true;
+        }
         false
     })
 }

@@ -141,9 +141,10 @@ pub fn load_skill_from_file(path: &Path, source: SkillSource) -> Option<Skill> {
         return None;
     }
     if !description.is_empty()
-        && let Err(e) = validate_description(&description) {
-            tracing::warn!("Invalid skill description in {:?}: {}", path, e);
-        }
+        && let Err(e) = validate_description(&description)
+    {
+        tracing::warn!("Invalid skill description in {:?}: {}", path, e);
+    }
 
     let base_dir = path.parent()?.to_path_buf();
 
@@ -167,10 +168,11 @@ pub fn discover_skills_in_dir(dir: &Path, source: SkillSource) -> Vec<Skill> {
     // Check if this directory has a SKILL.md
     let skill_md = dir.join("SKILL.md");
     if skill_md.exists()
-        && let Some(skill) = load_skill_from_file(&skill_md, source) {
-            skills.push(skill);
-            return skills;
-        }
+        && let Some(skill) = load_skill_from_file(&skill_md, source)
+    {
+        skills.push(skill);
+        return skills;
+    }
 
     // Load .md files directly in the root
     if let Ok(entries) = std::fs::read_dir(dir) {
@@ -179,9 +181,10 @@ pub fn discover_skills_in_dir(dir: &Path, source: SkillSource) -> Vec<Skill> {
             if path.is_file() {
                 if let Some(ext) = path.extension()
                     && ext == "md"
-                        && let Some(skill) = load_skill_from_file(&path, source) {
-                            skills.push(skill);
-                        }
+                    && let Some(skill) = load_skill_from_file(&path, source)
+                {
+                    skills.push(skill);
+                }
             } else if path.is_dir() {
                 // Recurse into subdirectories to find SKILL.md files
                 skills.extend(discover_skills_in_dir(&path, source));
@@ -252,13 +255,13 @@ pub fn load_skills(agent_dir: &Path, cwd: &Path, extra_paths: &[PathBuf]) -> Loa
                 }
             }
         } else if path.is_file()
-            && let Some(skill) = load_skill_from_file(path, SkillSource::Configured) {
-                let canon = skill.file_path.canonicalize().unwrap_or_default();
-                if seen_paths.insert(canon)
-                    && seen_names.insert(skill.name.clone()) {
-                        skills.push(skill);
-                    }
+            && let Some(skill) = load_skill_from_file(path, SkillSource::Configured)
+        {
+            let canon = skill.file_path.canonicalize().unwrap_or_default();
+            if seen_paths.insert(canon) && seen_names.insert(skill.name.clone()) {
+                skills.push(skill);
             }
+        }
     }
 
     LoadSkillsResult {

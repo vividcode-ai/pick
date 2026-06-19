@@ -53,9 +53,10 @@ impl EventBus {
         let handlers = self.handlers.clone();
         Box::new(move || {
             if let Ok(mut h) = handlers.lock()
-                && let Some(ch) = h.get_mut(&channel) {
-                    ch.retain(|h| !Arc::ptr_eq(h, &wrapped));
-                }
+                && let Some(ch) = h.get_mut(&channel)
+            {
+                ch.retain(|h| !Arc::ptr_eq(h, &wrapped));
+            }
         })
     }
 

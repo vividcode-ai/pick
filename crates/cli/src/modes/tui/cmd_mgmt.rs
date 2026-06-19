@@ -139,38 +139,40 @@ pub(crate) fn handle_resume_selector(ctx: &mut TuiContext) {
     let mut session_files: Vec<(String, std::path::PathBuf)> = Vec::new();
 
     if session_dir.exists()
-        && let Ok(entries) = std::fs::read_dir(&session_dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.extension().map(|e| e == "jsonl").unwrap_or(false) {
-                    let name = path
-                        .file_stem()
-                        .and_then(|s| s.to_str())
-                        .unwrap_or("unknown")
-                        .to_string();
-                    session_files.push((name, path));
-                }
+        && let Ok(entries) = std::fs::read_dir(&session_dir)
+    {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().map(|e| e == "jsonl").unwrap_or(false) {
+                let name = path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("unknown")
+                    .to_string();
+                session_files.push((name, path));
             }
         }
+    }
 
     let global_sessions = dirs::home_dir().map(|h| h.join(".pick").join("sessions"));
     if let Some(ref global) = global_sessions
         && global.exists()
-            && let Ok(entries) = std::fs::read_dir(global) {
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    if path.extension().map(|e| e == "jsonl").unwrap_or(false) {
-                        let name = path
-                            .file_stem()
-                            .and_then(|s| s.to_str())
-                            .unwrap_or("unknown")
-                            .to_string();
-                        if !session_files.iter().any(|(n, _)| n == &name) {
-                            session_files.push((name, path));
-                        }
-                    }
+        && let Ok(entries) = std::fs::read_dir(global)
+    {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().map(|e| e == "jsonl").unwrap_or(false) {
+                let name = path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("unknown")
+                    .to_string();
+                if !session_files.iter().any(|(n, _)| n == &name) {
+                    session_files.push((name, path));
                 }
             }
+        }
+    }
 
     if session_files.is_empty() {
         ctx.tui.chat.add_system_message("No saved sessions found.");
@@ -406,20 +408,22 @@ pub(crate) async fn handle_reload(ctx: &mut TuiContext) {
 
     let settings = sm.get();
     if let Some(new_provider) = &settings.default_provider
-        && new_provider != &ctx.provider {
-            ctx.provider = new_provider.clone();
-            init::update_api_key(&ctx.auth, &ctx.provider).await;
-        }
+        && new_provider != &ctx.provider
+    {
+        ctx.provider = new_provider.clone();
+        init::update_api_key(&ctx.auth, &ctx.provider).await;
+    }
     if let Some(new_model) = &settings.default_model
-        && new_model != &ctx.model_id {
-            let (new_m, new_p) = init::update_model(&ctx.provider, new_model);
-            ctx.model = new_m;
-            ctx.model_id = new_model.clone();
-            ctx.provider = new_p;
-            ctx.tui.model_id = ctx.model_id.clone();
-            ctx.tui.provider = ctx.provider.clone();
-            init::update_api_key(&ctx.auth, &ctx.provider).await;
-        }
+        && new_model != &ctx.model_id
+    {
+        let (new_m, new_p) = init::update_model(&ctx.provider, new_model);
+        ctx.model = new_m;
+        ctx.model_id = new_model.clone();
+        ctx.provider = new_p;
+        ctx.tui.model_id = ctx.model_id.clone();
+        ctx.tui.provider = ctx.provider.clone();
+        init::update_api_key(&ctx.auth, &ctx.provider).await;
+    }
     if let Some(new_think_level) = &settings.default_thinking_level {
         ctx.thinking_level = match new_think_level.as_str() {
             "low" => pick_agent::core::state::ThinkingLevel::Low,

@@ -324,12 +324,13 @@ impl TuiApp {
             }
             KeyCode::Enter | KeyCode::Char(' ') => {
                 if let Some(ref sel) = self.selection
-                    && let Some(item) = sel.selected() {
-                        let idx = sel.selected_index;
-                        let value = item.value.clone();
-                        self.cancel_selection();
-                        return Some(TuiAction::SelectionResult(idx, value));
-                    }
+                    && let Some(item) = sel.selected()
+                {
+                    let idx = sel.selected_index;
+                    let value = item.value.clone();
+                    self.cancel_selection();
+                    return Some(TuiAction::SelectionResult(idx, value));
+                }
                 self.cancel_selection();
                 None
             }
@@ -511,11 +512,12 @@ impl TuiApp {
             }
             KeyCode::Enter => {
                 if let Some(ref tv) = self.tree_view
-                    && let Some(id) = tv.selected_entry_id() {
-                        let val = id.to_string();
-                        self.cancel_tree_view();
-                        return Some(TuiAction::SelectionResult(0, val));
-                    }
+                    && let Some(id) = tv.selected_entry_id()
+                {
+                    let val = id.to_string();
+                    self.cancel_tree_view();
+                    return Some(TuiAction::SelectionResult(0, val));
+                }
                 self.cancel_tree_view();
                 None
             }
@@ -565,33 +567,36 @@ impl TuiApp {
     /// Update the question dialog selection
     fn question_navigate(&mut self, delta: isize) {
         if let Some(ref mut dialog) = self.question_dialog
-            && let Some(q) = dialog.current() {
-                let current = q.selected.first().copied().unwrap_or(0);
-                let count = q.options.len();
-                let next = ((current as isize + delta).rem_euclid(count as isize)) as usize;
-                if let Some(ref mut d) = self.question_dialog
-                    && let Some(q) = d.questions.get_mut(d.current_index) {
-                        if q.multiple {
-                            q.selected.clear();
-                        }
-                        q.selected = vec![next];
-                    }
+            && let Some(q) = dialog.current()
+        {
+            let current = q.selected.first().copied().unwrap_or(0);
+            let count = q.options.len();
+            let next = ((current as isize + delta).rem_euclid(count as isize)) as usize;
+            if let Some(ref mut d) = self.question_dialog
+                && let Some(q) = d.questions.get_mut(d.current_index)
+            {
+                if q.multiple {
+                    q.selected.clear();
+                }
+                q.selected = vec![next];
             }
+        }
     }
 
     /// Toggle multiple selection for current option
     fn question_toggle(&mut self) {
         if let Some(ref mut dialog) = self.question_dialog
             && let Some(q) = dialog.questions.get_mut(dialog.current_index)
-                && q.multiple {
-                    let current = q.selected.first().copied().unwrap_or(0);
-                    if let Some(pos) = q.selected.iter().position(|&i| i == current) {
-                        q.selected.remove(pos);
-                    } else {
-                        q.selected.push(current);
-                        q.selected.sort();
-                    }
-                }
+            && q.multiple
+        {
+            let current = q.selected.first().copied().unwrap_or(0);
+            if let Some(pos) = q.selected.iter().position(|&i| i == current) {
+                q.selected.remove(pos);
+            } else {
+                q.selected.push(current);
+                q.selected.sort();
+            }
+        }
     }
 
     /// Confirm current question and advance to next, or complete
@@ -633,10 +638,7 @@ impl TuiApp {
             return None;
         }
 
-        let in_custom = self
-            .question_dialog
-            .as_ref()
-            .is_some_and(|d| d.custom_mode);
+        let in_custom = self.question_dialog.as_ref().is_some_and(|d| d.custom_mode);
 
         match code {
             KeyCode::Esc => {
@@ -683,9 +685,10 @@ impl TuiApp {
             }
             KeyCode::Backspace if in_custom => {
                 if let Some(ref mut dialog) = self.question_dialog
-                    && let Some(ref mut input) = dialog.custom_input {
-                        input.pop();
-                    }
+                    && let Some(ref mut input) = dialog.custom_input
+                {
+                    input.pop();
+                }
             }
             _ => {}
         }
@@ -741,14 +744,8 @@ impl TuiApp {
                 Some(TuiAction::UpdateResponse(false))
             }
             KeyCode::Enter => {
-                let should_update = self
-                    .update_prompt
-                    .as_ref()
-                    .is_some_and(|p| p.selected == 0);
-                let is_dismiss = self
-                    .update_prompt
-                    .as_ref()
-                    .is_some_and(|p| p.selected == 2);
+                let should_update = self.update_prompt.as_ref().is_some_and(|p| p.selected == 0);
+                let is_dismiss = self.update_prompt.as_ref().is_some_and(|p| p.selected == 2);
                 if is_dismiss {
                     self.update_prompt = None;
                     self.state = AppState::Input;
@@ -1111,18 +1108,19 @@ impl TuiApp {
             return true;
         }
         if let Some(t) = self.last_paste_time
-            && now.duration_since(t).as_millis() > 50 {
-                let text = std::mem::take(&mut self.paste_accumulator);
-                self.last_paste_time = None;
-                self.editor.insert_str(&text);
-                let trimmed = self.editor.text().trim_start();
-                if trimmed.starts_with('/') && !trimmed[1..].contains(' ') {
-                    self.editor.trigger_autocomplete();
-                } else {
-                    self.editor.cancel_autocomplete();
-                }
-                return true;
+            && now.duration_since(t).as_millis() > 50
+        {
+            let text = std::mem::take(&mut self.paste_accumulator);
+            self.last_paste_time = None;
+            self.editor.insert_str(&text);
+            let trimmed = self.editor.text().trim_start();
+            if trimmed.starts_with('/') && !trimmed[1..].contains(' ') {
+                self.editor.trigger_autocomplete();
+            } else {
+                self.editor.cancel_autocomplete();
             }
+            return true;
+        }
         false
     }
 

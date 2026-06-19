@@ -55,12 +55,13 @@ fn matches_any(s: &str, patterns: &[&str]) -> bool {
 pub fn is_context_overflow(message: &AssistantMessage, context_window: Option<u64>) -> bool {
     // Case 1: Check error message patterns
     if message.stop_reason == crate::types::StopReason::Error
-        && let Some(ref err_msg) = message.error_message {
-            let is_non_overflow = matches_any(err_msg, NON_OVERFLOW_PATTERNS);
-            if !is_non_overflow && matches_any(err_msg, OVERFLOW_PATTERNS) {
-                return true;
-            }
+        && let Some(ref err_msg) = message.error_message
+    {
+        let is_non_overflow = matches_any(err_msg, NON_OVERFLOW_PATTERNS);
+        if !is_non_overflow && matches_any(err_msg, OVERFLOW_PATTERNS) {
+            return true;
         }
+    }
 
     // Case 2: Silent overflow (z.ai style) - successful but usage exceeds context
     if let Some(cw) = context_window {

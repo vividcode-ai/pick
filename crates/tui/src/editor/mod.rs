@@ -151,9 +151,10 @@ impl Editor {
                 max_suffix = max_suffix.max(1);
             }
             if let Some(suffix) = pp.placeholder.strip_prefix(&format!("{} #", base))
-                && let Ok(v) = suffix.parse::<usize>() {
-                    max_suffix = max_suffix.max(v);
-                }
+                && let Ok(v) = suffix.parse::<usize>()
+            {
+                max_suffix = max_suffix.max(v);
+            }
         }
         if max_suffix == 0 {
             base.to_string()
@@ -272,9 +273,7 @@ impl Editor {
     pub fn cursor_right(&mut self) {
         if self.cursor < self.buffer.len() {
             self.cursor += 1;
-            while self.cursor < self.buffer.len()
-                && !self.buffer.is_char_boundary(self.cursor)
-            {
+            while self.cursor < self.buffer.len() && !self.buffer.is_char_boundary(self.cursor) {
                 self.cursor += 1;
             }
         }
@@ -796,22 +795,24 @@ impl Editor {
     /// Cycle autocomplete selection to the next item
     pub fn autocomplete_next(&mut self) {
         if let Some(ref suggestions) = self.autocomplete_suggestions
-            && suggestions.items.len() > 1 {
-                self.autocomplete_selection =
-                    (self.autocomplete_selection + 1) % suggestions.items.len();
-            }
+            && suggestions.items.len() > 1
+        {
+            self.autocomplete_selection =
+                (self.autocomplete_selection + 1) % suggestions.items.len();
+        }
     }
 
     /// Cycle autocomplete selection to the previous item
     pub fn autocomplete_previous(&mut self) {
         if let Some(ref suggestions) = self.autocomplete_suggestions
-            && suggestions.items.len() > 1 {
-                self.autocomplete_selection = if self.autocomplete_selection == 0 {
-                    suggestions.items.len() - 1
-                } else {
-                    self.autocomplete_selection - 1
-                };
-            }
+            && suggestions.items.len() > 1
+        {
+            self.autocomplete_selection = if self.autocomplete_selection == 0 {
+                suggestions.items.len() - 1
+            } else {
+                self.autocomplete_selection - 1
+            };
+        }
     }
 
     /// Apply the currently selected autocomplete completion.
@@ -1311,11 +1312,10 @@ impl Editor {
             }
         }
 
-        if !found_cursor
-            && self.cursor <= cursor_line_start + cursor_col_in_line {
-                cursor_row = 0;
-                cursor_col = 0;
-            }
+        if !found_cursor && self.cursor <= cursor_line_start + cursor_col_in_line {
+            cursor_row = 0;
+            cursor_col = 0;
+        }
 
         // Trim trailing empty lines
         if !self.buffer.ends_with('\n') {
@@ -1377,10 +1377,11 @@ impl Editor {
                         let mut earliest_pp = None;
                         for pp in &self.pending_pastes {
                             if let Some(pos) = remaining.find(&pp.placeholder)
-                                && earliest_pos.is_none_or(|p| pos < p) {
-                                    earliest_pos = Some(pos);
-                                    earliest_pp = Some(pp);
-                                }
+                                && earliest_pos.is_none_or(|p| pos < p)
+                            {
+                                earliest_pos = Some(pos);
+                                earliest_pp = Some(pp);
+                            }
                         }
                         match (earliest_pos, earliest_pp) {
                             (Some(pos), Some(pp)) => {

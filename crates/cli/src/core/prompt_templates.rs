@@ -210,13 +210,14 @@ fn load_templates_from_dir(
 
         if is_file
             && let Some(ext) = path.extension()
-                && ext == "md" {
-                    let file_path_str = path.to_string_lossy().to_string();
-                    let source_info = get_source_info(&file_path_str);
-                    if let Some(template) = load_template_from_file(&path, source_info) {
-                        templates.push(template);
-                    }
-                }
+            && ext == "md"
+        {
+            let file_path_str = path.to_string_lossy().to_string();
+            let source_info = get_source_info(&file_path_str);
+            if let Some(template) = load_template_from_file(&path, source_info) {
+                templates.push(template);
+            }
+        }
     }
 
     templates
@@ -313,13 +314,14 @@ pub fn load_prompt_templates(options: LoadPromptTemplatesOptions) -> Vec<PromptT
             templates.extend(load_templates_from_dir(&resolved_path, &get_source_info));
         } else if resolved_path.is_file()
             && let Some(ext) = resolved_path.extension()
-                && ext == "md" {
-                    let path_str = resolved_path.to_string_lossy().to_string();
-                    let source_info = get_source_info(&path_str);
-                    if let Some(template) = load_template_from_file(&resolved_path, source_info) {
-                        templates.push(template);
-                    }
-                }
+            && ext == "md"
+        {
+            let path_str = resolved_path.to_string_lossy().to_string();
+            let source_info = get_source_info(&path_str);
+            if let Some(template) = load_template_from_file(&resolved_path, source_info) {
+                templates.push(template);
+            }
+        }
     }
 
     templates

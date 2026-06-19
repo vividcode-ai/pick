@@ -168,9 +168,10 @@ fn should_proxy_hostname(hostname: &str, port: u16, no_proxy: &str) -> bool {
 
             // If port specified and doesn't match, not excluded
             if let Some(pp) = proxy_port
-                && pp != port {
-                    return true;
-                }
+                && pp != port
+            {
+                return true;
+            }
 
             let host_matches = if proxy_hostname.starts_with('*') {
                 hostname.ends_with(&proxy_hostname[1..])

@@ -159,10 +159,7 @@ where
         return items.to_vec();
     }
 
-    let tokens: Vec<&str> = query
-        .split_whitespace()
-        .filter(|t| !t.is_empty())
-        .collect();
+    let tokens: Vec<&str> = query.split_whitespace().filter(|t| !t.is_empty()).collect();
 
     if tokens.is_empty() {
         return items.to_vec();

@@ -24,10 +24,11 @@ pub fn calculate_context_tokens(usage: &Usage) -> u64 {
 fn get_entry_usage(entry: &SessionEntry) -> Option<Usage> {
     if let SessionEntryKind::Message(msg) = &entry.kind
         && msg.role == "assistant"
-            && let Some(usage_val) = &msg.usage
-                && let Ok(usage) = serde_json::from_value::<Usage>(usage_val.clone()) {
-                    return Some(usage);
-                }
+        && let Some(usage_val) = &msg.usage
+        && let Ok(usage) = serde_json::from_value::<Usage>(usage_val.clone())
+    {
+        return Some(usage);
+    }
     None
 }
 
@@ -36,10 +37,11 @@ pub fn get_last_assistant_usage(entries: &[SessionEntry]) -> Option<Usage> {
     for entry in entries.iter().rev() {
         if let SessionEntryKind::Message(msg) = &entry.kind
             && msg.role == "assistant"
-                && let Some(usage_val) = &msg.usage
-                    && let Ok(usage) = serde_json::from_value::<Usage>(usage_val.clone()) {
-                        return Some(usage);
-                    }
+            && let Some(usage_val) = &msg.usage
+            && let Ok(usage) = serde_json::from_value::<Usage>(usage_val.clone())
+        {
+            return Some(usage);
+        }
     }
     None
 }
@@ -193,9 +195,10 @@ pub fn find_turn_start_index(
     while i >= start_index as isize {
         match &entries[i as usize].kind {
             SessionEntryKind::Message(msg)
-                if (msg.role == "user" || msg.role == "bashExecution") => {
-                    return i;
-                }
+                if (msg.role == "user" || msg.role == "bashExecution") =>
+            {
+                return i;
+            }
             SessionEntryKind::BranchSummary(_) | SessionEntryKind::Custom(_) => {
                 return i;
             }
@@ -292,9 +295,10 @@ pub fn extract_file_operations(
     // Extract from tool calls in message entries
     for entry in entries {
         if let SessionEntryKind::Message(msg) = &entry.kind
-            && msg.role == "assistant" {
-                extract_file_ops_from_content(&msg.content, &mut file_ops);
-            }
+            && msg.role == "assistant"
+        {
+            extract_file_ops_from_content(&msg.content, &mut file_ops);
+        }
     }
 
     file_ops
@@ -306,34 +310,35 @@ fn extract_file_ops_from_content(content: &serde_json::Value, file_ops: &mut Fil
         for block in blocks {
             if let Some(block_type) = block.get("type").and_then(|t| t.as_str())
                 && (block_type == "toolCall" || block_type == "tool_use")
-                    && let Some(name) = block.get("name").and_then(|n| n.as_str()) {
-                        let args = block.get("arguments").or_else(|| block.get("input"));
-                        let paths = extract_paths_from_args(args);
-                        match name {
-                            "Read" | "read" | "Grep" | "grep" => {
-                                for p in paths {
-                                    if !file_ops.read.contains(&p) {
-                                        file_ops.read.push(p);
-                                    }
-                                }
+                && let Some(name) = block.get("name").and_then(|n| n.as_str())
+            {
+                let args = block.get("arguments").or_else(|| block.get("input"));
+                let paths = extract_paths_from_args(args);
+                match name {
+                    "Read" | "read" | "Grep" | "grep" => {
+                        for p in paths {
+                            if !file_ops.read.contains(&p) {
+                                file_ops.read.push(p);
                             }
-                            "Write" | "write" => {
-                                for p in paths {
-                                    if !file_ops.written.contains(&p) {
-                                        file_ops.written.push(p);
-                                    }
-                                }
-                            }
-                            "Edit" | "edit" => {
-                                for p in paths {
-                                    if !file_ops.edited.contains(&p) {
-                                        file_ops.edited.push(p);
-                                    }
-                                }
-                            }
-                            _ => {}
                         }
                     }
+                    "Write" | "write" => {
+                        for p in paths {
+                            if !file_ops.written.contains(&p) {
+                                file_ops.written.push(p);
+                            }
+                        }
+                    }
+                    "Edit" | "edit" => {
+                        for p in paths {
+                            if !file_ops.edited.contains(&p) {
+                                file_ops.edited.push(p);
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
         }
     }
 }
@@ -346,9 +351,9 @@ fn extract_paths_from_args(args: Option<&serde_json::Value>) -> Vec<String> {
             .get("file_path")
             .or_else(|| args.get("path"))
             .and_then(|v| v.as_str())
-        {
-            paths.push(file_path.to_string());
-        }
+    {
+        paths.push(file_path.to_string());
+    }
     paths
 }
 

@@ -216,9 +216,11 @@ fn run_fallback_selector<T>(
     let mut input = String::new();
     if std::io::stdin().read_line(&mut input).is_ok()
         && let Ok(n) = input.trim().parse::<usize>()
-            && n >= 1 && n <= items.len() {
-                return SelectResult::Selected(n - 1);
-            }
+        && n >= 1
+        && n <= items.len()
+    {
+        return SelectResult::Selected(n - 1);
+    }
     SelectResult::Cancelled
 }
 
@@ -743,7 +745,8 @@ fn render_extended_selector<T>(
 
     lines.push(String::new());
     let hint = "\x1b[2m\u{2191}\u{2193} navigate \u{b7} Enter select \u{b7} Esc cancel \u{b7} \
-         Tab scope \u{b7} Ctrl+E preview \u{b7} Delete remove\x1b[0m".to_string();
+         Tab scope \u{b7} Ctrl+E preview \u{b7} Delete remove\x1b[0m"
+        .to_string();
     lines.push(hint);
 
     let output = format!("{}{}", crossterm::cursor::MoveTo(0, 0), lines.join("\r\n"));

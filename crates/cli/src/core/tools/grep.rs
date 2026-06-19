@@ -101,35 +101,34 @@ impl GrepToolDefinition {
 
             if let Ok(event) = serde_json::from_str::<serde_json::Value>(line)
                 && event["type"] == "match"
-                    && let (Some(file_path), Some(line_number)) = (
-                        event["data"]["path"]["text"].as_str(),
-                        event["data"]["line_number"].as_u64(),
-                    ) {
-                        let rel_path = if file_path.starts_with(&search_path) {
-                            &file_path[search_path.len() + 1..]
-                        } else {
-                            file_path
-                        };
-                        let line_text = event["data"]["lines"]["text"]
-                            .as_str()
-                            .unwrap_or("")
-                            .trim_end_matches('\n');
+                && let (Some(file_path), Some(line_number)) = (
+                    event["data"]["path"]["text"].as_str(),
+                    event["data"]["line_number"].as_u64(),
+                )
+            {
+                let rel_path = if file_path.starts_with(&search_path) {
+                    &file_path[search_path.len() + 1..]
+                } else {
+                    file_path
+                };
+                let line_text = event["data"]["lines"]["text"]
+                    .as_str()
+                    .unwrap_or("")
+                    .trim_end_matches('\n');
 
-                        let (truncated_text, was_truncated) =
-                            truncate_line(line_text, GREP_MAX_LINE_LENGTH);
-                        if was_truncated {
-                            lines_truncated = true;
-                        }
+                let (truncated_text, was_truncated) =
+                    truncate_line(line_text, GREP_MAX_LINE_LENGTH);
+                if was_truncated {
+                    lines_truncated = true;
+                }
 
-                        if context_value > 0 {
-                            match_lines
-                                .push(format!("{}:{}: {}", rel_path, line_number, truncated_text));
-                        } else {
-                            match_lines
-                                .push(format!("{}:{}: {}", rel_path, line_number, truncated_text));
-                        }
-                        match_count += 1;
-                    }
+                if context_value > 0 {
+                    match_lines.push(format!("{}:{}: {}", rel_path, line_number, truncated_text));
+                } else {
+                    match_lines.push(format!("{}:{}: {}", rel_path, line_number, truncated_text));
+                }
+                match_count += 1;
+            }
         }
 
         if match_lines.is_empty() {
@@ -272,9 +271,10 @@ pub fn render_grep_result(
             warnings.push(format!("{} matches limit", ml));
         }
         if let Some(ref truncation) = details.truncation
-            && truncation.truncated {
-                warnings.push(format!("{} limit", format_size(truncation.max_bytes)));
-            }
+            && truncation.truncated
+        {
+            warnings.push(format!("{} limit", format_size(truncation.max_bytes)));
+        }
         if details.lines_truncated.unwrap_or(false) {
             warnings.push("some lines truncated".to_string());
         }

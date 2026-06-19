@@ -26,7 +26,6 @@ pub struct BashExecutorOptions<'a> {
     pub cancelled: bool,
 }
 
-
 const DEFAULT_MAX_BYTES: usize = 512_000;
 const MAX_OUTPUT_BYTES: usize = DEFAULT_MAX_BYTES * 2;
 

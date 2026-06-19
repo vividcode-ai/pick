@@ -235,9 +235,11 @@ async fn process_mistral_line(
     }
     if output.response_model.is_none()
         && let Some(model_str) = chunk.get("model").and_then(|v| v.as_str())
-            && !model_str.is_empty() && model_str != output.model {
-                output.response_model = Some(model_str.to_string());
-            }
+        && !model_str.is_empty()
+        && model_str != output.model
+    {
+        output.response_model = Some(model_str.to_string());
+    }
 
     // Parse usage if present
     if let Some(usage) = chunk.get("usage") {
@@ -259,9 +261,11 @@ async fn process_mistral_line(
 
     // Check finish reason
     if let Some(finish) = choice.get("finish_reason").and_then(|v| v.as_str())
-        && !finish.is_empty() && finish != "null" {
-            output.stop_reason = map_mistral_finish_reason(finish);
-        }
+        && !finish.is_empty()
+        && finish != "null"
+    {
+        output.stop_reason = map_mistral_finish_reason(finish);
+    }
 
     // Process delta content
     let delta = match choice.get("delta") {
@@ -271,32 +275,33 @@ async fn process_mistral_line(
 
     // Text content
     if let Some(content) = delta.get("content").and_then(|v| v.as_str())
-        && !content.is_empty() {
-            let idx = if let Some(idx) = text_block_idx {
-                *idx
-            } else {
-                let idx = output.content.len();
-                output.content.push(ContentBlock::text(""));
-                *text_block_idx = Some(idx);
-                let _ = tx
-                    .send(StreamEvent::TextStart {
-                        content_index: idx,
-                        partial: partial_from_output(output),
-                    })
-                    .await;
-                idx
-            };
-            if let ContentBlock::Text(ref mut tc) = output.content[idx] {
-                tc.text.push_str(content);
-            }
+        && !content.is_empty()
+    {
+        let idx = if let Some(idx) = text_block_idx {
+            *idx
+        } else {
+            let idx = output.content.len();
+            output.content.push(ContentBlock::text(""));
+            *text_block_idx = Some(idx);
             let _ = tx
-                .send(StreamEvent::TextDelta {
+                .send(StreamEvent::TextStart {
                     content_index: idx,
-                    delta: content.to_string(),
                     partial: partial_from_output(output),
                 })
                 .await;
+            idx
+        };
+        if let ContentBlock::Text(ref mut tc) = output.content[idx] {
+            tc.text.push_str(content);
         }
+        let _ = tx
+            .send(StreamEvent::TextDelta {
+                content_index: idx,
+                delta: content.to_string(),
+                partial: partial_from_output(output),
+            })
+            .await;
+    }
 
     // Tool calls
     if let Some(tool_calls) = delta.get("tool_calls").and_then(|v| v.as_array()) {
@@ -381,22 +386,23 @@ async fn process_mistral_tool_call(
             .get("function")
             .and_then(|f| f.get("arguments"))
             .and_then(|v| v.as_str())
-            && !args.is_empty() {
-                let pos = tool_blocks.len() - 1;
-                tool_blocks[pos].3.push_str(args);
-                let arguments: serde_json::Value =
-                    serde_json::from_str(&tool_blocks[pos].3).unwrap_or(serde_json::Value::Null);
-                if let ContentBlock::ToolCall(ref mut tc) = output.content[content_idx] {
-                    tc.arguments = arguments;
-                }
-                let _ = tx
-                    .send(StreamEvent::ToolCallDelta {
-                        content_index: content_idx,
-                        delta: args.to_string(),
-                        partial: partial_from_output(output),
-                    })
-                    .await;
+            && !args.is_empty()
+        {
+            let pos = tool_blocks.len() - 1;
+            tool_blocks[pos].3.push_str(args);
+            let arguments: serde_json::Value =
+                serde_json::from_str(&tool_blocks[pos].3).unwrap_or(serde_json::Value::Null);
+            if let ContentBlock::ToolCall(ref mut tc) = output.content[content_idx] {
+                tc.arguments = arguments;
             }
+            let _ = tx
+                .send(StreamEvent::ToolCallDelta {
+                    content_index: content_idx,
+                    delta: args.to_string(),
+                    partial: partial_from_output(output),
+                })
+                .await;
+        }
     }
 }
 

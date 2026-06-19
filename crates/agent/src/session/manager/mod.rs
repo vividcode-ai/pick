@@ -165,13 +165,13 @@ impl SessionManager {
         if let Some(idx) = entries
             .iter()
             .rposition(|e| matches!(&e.kind, SessionEntryKind::SessionInfo(_)))
-            && let SessionEntryKind::SessionInfo(ref info) = entries[idx].kind.clone() {
-                let forked_name = Self::forked_title(&info.name);
-                entries[idx].kind =
-                    SessionEntryKind::SessionInfo(super::entries::SessionInfoEntry {
-                        name: forked_name,
-                    });
-            }
+            && let SessionEntryKind::SessionInfo(ref info) = entries[idx].kind.clone()
+        {
+            let forked_name = Self::forked_title(&info.name);
+            entries[idx].kind = SessionEntryKind::SessionInfo(super::entries::SessionInfoEntry {
+                name: forked_name,
+            });
+        }
 
         let goal_manager = Arc::new(GoalManager::new());
         Self::restore_goal_from_entries(&goal_manager, &entries);
@@ -609,9 +609,10 @@ impl SessionManager {
     fn forked_title(title: &str) -> String {
         if let Some(pos) = title.rfind(" (fork #")
             && let Some(end) = title[pos + 8..].find(')')
-                && let Ok(num) = title[pos + 8..pos + 8 + end].parse::<u32>() {
-                    return format!("{} (fork #{})", &title[..pos], num + 1);
-                }
+            && let Ok(num) = title[pos + 8..pos + 8 + end].parse::<u32>()
+        {
+            return format!("{} (fork #{})", &title[..pos], num + 1);
+        }
         format!("{} (fork #1)", title)
     }
 }

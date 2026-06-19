@@ -356,18 +356,19 @@ async fn process_responses_event(
         "response.output_text.delta" => {
             if let Some(delta) = data.get("delta").and_then(|v| v.as_str())
                 && let Some(idx) = *text_block_idx
-                    && idx < output.content.len() {
-                        if let ContentBlock::Text(ref mut tc) = output.content[idx] {
-                            tc.text.push_str(delta);
-                        }
-                        let _ = tx
-                            .send(StreamEvent::TextDelta {
-                                content_index: idx,
-                                delta: delta.to_string(),
-                                partial: partial_from_output(output),
-                            })
-                            .await;
-                    }
+                && idx < output.content.len()
+            {
+                if let ContentBlock::Text(ref mut tc) = output.content[idx] {
+                    tc.text.push_str(delta);
+                }
+                let _ = tx
+                    .send(StreamEvent::TextDelta {
+                        content_index: idx,
+                        delta: delta.to_string(),
+                        partial: partial_from_output(output),
+                    })
+                    .await;
+            }
         }
         "response.function_call_arguments.delta" => {
             if let Some(delta) = data.get("delta").and_then(|v| v.as_str()) {
@@ -382,11 +383,12 @@ async fn process_responses_event(
                         if let Some(existing) = tc.arguments.as_object() {
                             let mut merged = existing.clone();
                             if let Ok(new_val) = serde_json::from_str::<serde_json::Value>(delta)
-                                && let Some(obj) = new_val.as_object() {
-                                    for (k, v) in obj {
-                                        merged.insert(k.clone(), v.clone());
-                                    }
+                                && let Some(obj) = new_val.as_object()
+                            {
+                                for (k, v) in obj {
+                                    merged.insert(k.clone(), v.clone());
                                 }
+                            }
                             tc.arguments = serde_json::Value::Object(merged);
                         } else if tc.arguments.is_null() {
                             tc.arguments =

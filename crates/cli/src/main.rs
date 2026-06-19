@@ -276,9 +276,10 @@ async fn main() {
 
     // Set runtime API key from --api-key flag
     if let Some(ref api_key) = args.api_key
-        && let Some(ref provider) = args.provider {
-            auth.set_runtime_api_key(provider, api_key.clone());
-        }
+        && let Some(ref provider) = args.provider
+    {
+        auth.set_runtime_api_key(provider, api_key.clone());
+    }
 
     // Discover and load extensions (skipped if --no-extensions)
     let load_result = if args.no_extensions {
@@ -394,9 +395,10 @@ async fn main() {
             if !bg_cancel.load(std::sync::atomic::Ordering::Relaxed) {
                 let count = tools.len();
                 if count > 0
-                    && let Ok(mut locked) = bg_tools.write() {
-                        locked.extend(tools);
-                    }
+                    && let Ok(mut locked) = bg_tools.write()
+                {
+                    locked.extend(tools);
+                }
                 bg_done.send(true).ok();
             }
         });
@@ -569,7 +571,8 @@ async fn main() {
 
     // Execute pending update action after TUI exits
     if let Some(action) = update_action
-        && let Err(e) = run_update_action(action) {
-            eprintln!("Error updating Pick: {}", e);
-        }
+        && let Err(e) = run_update_action(action)
+    {
+        eprintln!("Error updating Pick: {}", e);
+    }
 }

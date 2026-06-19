@@ -83,9 +83,10 @@ pub async fn generate_images_openrouter(
 
     // Allow on_payload callback to inspect/modify the payload
     if let Some(ref on_payload_fn) = on_payload
-        && let Some(modified) = on_payload_fn(&request_body, &model) {
-            request_body = modified;
-        }
+        && let Some(modified) = on_payload_fn(&request_body, &model)
+    {
+        request_body = modified;
+    }
 
     // Build HTTP client and request
     let client = reqwest::Client::new();
@@ -152,49 +153,55 @@ pub async fn generate_images_openrouter(
 
     // Parse choices
     if let Some(choices) = json.get("choices").and_then(|v| v.as_array())
-        && let Some(choice) = choices.first() {
-            let message = match choice.get("message") {
-                Some(m) => m,
-                None => {
-                    output.stop_reason = ImagesStopReason::Error;
-                    output.error_message = Some("No message in response".to_string());
-                    return Ok(output);
-                }
-            };
+        && let Some(choice) = choices.first()
+    {
+        let message = match choice.get("message") {
+            Some(m) => m,
+            None => {
+                output.stop_reason = ImagesStopReason::Error;
+                output.error_message = Some("No message in response".to_string());
+                return Ok(output);
+            }
+        };
 
-            // Extract text content
-            if let Some(content) = message.get("content").and_then(|c| c.as_str())
-                && !content.is_empty() {
+        // Extract text content
+        if let Some(content) = message.get("content").and_then(|c| c.as_str())
+            && !content.is_empty()
+        {
+            output
+                .output
+                .push(ImagesOutputContent::Text(ImagesTextContent {
+                    text: content.to_string(),
+                }));
+        }
+
+        // Extract images from the OpenRouter-specific images field
+        if let Some(images) = message.get("images").and_then(|v| v.as_array()) {
+            for image_val in images {
+                let image_url = image_val.get("image_url").and_then(|iu| {
+                    if let Some(s) = iu.as_str() {
+                        Some(s.to_string())
+                    } else {
+                        iu.get("url")
+                            .and_then(|u| u.as_str())
+                            .map(|s| s.to_string())
+                    }
+                });
+
+                if let Some(url) = image_url
+                    && url.starts_with("data:")
+                    && let Some((mime_type, data)) = parse_data_url(&url)
+                {
                     output
                         .output
-                        .push(ImagesOutputContent::Text(ImagesTextContent {
-                            text: content.to_string(),
+                        .push(ImagesOutputContent::Image(ImagesImageContent {
+                            mime_type,
+                            data,
                         }));
-                }
-
-            // Extract images from the OpenRouter-specific images field
-            if let Some(images) = message.get("images").and_then(|v| v.as_array()) {
-                for image_val in images {
-                    let image_url = image_val.get("image_url").and_then(|iu| {
-                        if let Some(s) = iu.as_str() {
-                            Some(s.to_string())
-                        } else {
-                            iu.get("url")
-                                .and_then(|u| u.as_str())
-                                .map(|s| s.to_string())
-                        }
-                    });
-
-                    if let Some(url) = image_url
-                        && url.starts_with("data:")
-                            && let Some((mime_type, data)) = parse_data_url(&url) {
-                                output.output.push(ImagesOutputContent::Image(
-                                    ImagesImageContent { mime_type, data },
-                                ));
-                            }
                 }
             }
         }
+    }
 
     Ok(output)
 }

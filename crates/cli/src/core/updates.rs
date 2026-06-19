@@ -160,9 +160,10 @@ pub async fn get_upgrade_version(check_dismissed: bool) -> Option<String> {
     // Check if dismissed
     if check_dismissed
         && let Some(ref dismissed) = cache.dismissed_version
-            && dismissed == &cache.latest_version {
-                return None;
-            }
+        && dismissed == &cache.latest_version
+    {
+        return None;
+    }
 
     // Refresh cache if stale
     if cache.is_stale() {

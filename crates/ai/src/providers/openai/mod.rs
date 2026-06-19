@@ -17,10 +17,9 @@ pub fn convert_to_openai_messages(messages: &[Message]) -> Vec<serde_json::Value
                 for block in &a.content {
                     match block {
                         ContentBlock::Text(t) => text_parts.push(t.text.clone()),
-                        ContentBlock::Thinking(t)
-                            if !t.thinking.is_empty() => {
-                                text_parts.push(t.thinking.clone());
-                            }
+                        ContentBlock::Thinking(t) if !t.thinking.is_empty() => {
+                            text_parts.push(t.thinking.clone());
+                        }
                         ContentBlock::ToolCall(tc) => {
                             tool_calls.push(serde_json::json!({
                                 "id": tc.id,
@@ -92,13 +91,12 @@ pub fn convert_to_openai_messages(messages: &[Message]) -> Vec<serde_json::Value
                                 }
                             }));
                         }
-                        ContentBlock::Thinking(t)
-                            if !t.thinking.is_empty() => {
-                                json_blocks.push(serde_json::json!({
-                                    "type": "text",
-                                    "text": t.thinking,
-                                }));
-                            }
+                        ContentBlock::Thinking(t) if !t.thinking.is_empty() => {
+                            json_blocks.push(serde_json::json!({
+                                "type": "text",
+                                "text": t.thinking,
+                            }));
+                        }
                         _ => {}
                     }
                 }

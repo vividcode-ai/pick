@@ -1,4 +1,4 @@
-﻿pub const DEFAULT_MAX_LINES: usize = 2000;
+pub const DEFAULT_MAX_LINES: usize = 2000;
 pub const DEFAULT_MAX_BYTES: usize = 50 * 1024; // 50KB
 pub const GREP_MAX_LINE_LENGTH: usize = 500;
 
@@ -23,13 +23,11 @@ pub enum TruncationType {
     Bytes,
 }
 
-#[derive(Debug, Clone)]
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub struct TruncationOptions {
     pub max_lines: Option<usize>,
     pub max_bytes: Option<usize>,
 }
-
 
 fn split_lines_for_counting(content: &str) -> Vec<&str> {
     if content.is_empty() {

@@ -44,13 +44,14 @@ impl PermissionManager {
             for path in rules_files {
                 let p = std::path::Path::new(path);
                 if p.exists()
-                    && let Err(e) = ep.load_rules_from_file(p) {
-                        eprintln!(
-                            "[Pick] Warning: failed to load rules file '{}': {}",
-                            p.display(),
-                            e
-                        );
-                    }
+                    && let Err(e) = ep.load_rules_from_file(p)
+                {
+                    eprintln!(
+                        "[Pick] Warning: failed to load rules file '{}': {}",
+                        p.display(),
+                        e
+                    );
+                }
             }
             Some(Arc::new(ep))
         } else {

@@ -190,17 +190,18 @@ async fn handle_tool_execution(
         // Guardian circuit breaker: if too many consecutive denials, interrupt
         if let Some(ref pm) = config.permission_manager
             && pm.is_guardian_circuit_broken()
-                && let Some(msg) = pm.guardian_circuit_message() {
-                    let error_msg = pick_ai::types::ToolResultMessage::new(
-                        &tc.id,
-                        &tc.name,
-                        vec![ContentBlock::text(format!("Error: {}", msg))],
-                        true,
-                    );
-                    state.messages.push(Message::ToolResult(error_msg.clone()));
-                    tool_results.push(error_msg);
-                    continue;
-                }
+            && let Some(msg) = pm.guardian_circuit_message()
+        {
+            let error_msg = pick_ai::types::ToolResultMessage::new(
+                &tc.id,
+                &tc.name,
+                vec![ContentBlock::text(format!("Error: {}", msg))],
+                true,
+            );
+            state.messages.push(Message::ToolResult(error_msg.clone()));
+            tool_results.push(error_msg);
+            continue;
+        }
 
         // Permission pre-tool-use hooks + permission request hooks
         if let Some(ref hook_registry) = config.permission_hooks {
@@ -464,31 +465,32 @@ async fn handle_tool_execution(
 
         // before_tool_call hook
         if let Some(ref before_hook) = config.before_tool_call
-            && let Some(error) = before_hook(tc) {
-                all_terminate = false;
-                if let Some(ref handler) = config.on_event {
-                    handler(AgentEvent::ToolExecutionStart {
-                        tool_call_id: tc.id.clone(),
-                        tool_name: tc.name.clone(),
-                        args: tc.arguments.clone(),
-                    });
-                    handler(AgentEvent::ToolExecutionEnd {
-                        tool_call_id: tc.id.clone(),
-                        tool_name: tc.name.clone(),
-                        result: serde_json::json!({"error": error}),
-                        is_error: true,
-                    });
-                }
-                let error_msg = pick_ai::types::ToolResultMessage::new(
-                    &tc.id,
-                    &tc.name,
-                    vec![ContentBlock::text(format!("Error: {}", error))],
-                    true,
-                );
-                state.messages.push(Message::ToolResult(error_msg.clone()));
-                tool_results.push(error_msg);
-                continue;
+            && let Some(error) = before_hook(tc)
+        {
+            all_terminate = false;
+            if let Some(ref handler) = config.on_event {
+                handler(AgentEvent::ToolExecutionStart {
+                    tool_call_id: tc.id.clone(),
+                    tool_name: tc.name.clone(),
+                    args: tc.arguments.clone(),
+                });
+                handler(AgentEvent::ToolExecutionEnd {
+                    tool_call_id: tc.id.clone(),
+                    tool_name: tc.name.clone(),
+                    result: serde_json::json!({"error": error}),
+                    is_error: true,
+                });
             }
+            let error_msg = pick_ai::types::ToolResultMessage::new(
+                &tc.id,
+                &tc.name,
+                vec![ContentBlock::text(format!("Error: {}", error))],
+                true,
+            );
+            state.messages.push(Message::ToolResult(error_msg.clone()));
+            tool_results.push(error_msg);
+            continue;
+        }
 
         match state.tools.iter().find(|t| t.name == tc.name) {
             Some(t) if t.execution_mode == ToolExecutionMode::Parallel => {
@@ -714,9 +716,10 @@ async fn handle_tool_execution(
                         result: {
                             let mut m = serde_json::json!({ "content": result_texts });
                             if tool_result.is_error
-                                && let Some(err) = result_texts.first() {
-                                    m["error"] = serde_json::json!(err);
-                                }
+                                && let Some(err) = result_texts.first()
+                            {
+                                m["error"] = serde_json::json!(err);
+                            }
                             m
                         },
                         is_error: tool_result.is_error,
@@ -741,16 +744,17 @@ async fn handle_tool_execution(
 
                 // PostToolUse hooks
                 if let Some(ref hook_registry) = config.permission_hooks
-                    && hook_registry.has_post_hooks() {
-                        let post_ctx = crate::permission::hooks::PostToolUseContext {
-                            tool_name: tc.name.clone(),
-                            tool_call_id: tc.id.clone(),
-                            input: tc.arguments.clone(),
-                            output: serde_json::json!({"content": tool_result.content}),
-                            is_error: tool_result.is_error,
-                        };
-                        hook_registry.run_post_hooks(&post_ctx);
-                    }
+                    && hook_registry.has_post_hooks()
+                {
+                    let post_ctx = crate::permission::hooks::PostToolUseContext {
+                        tool_name: tc.name.clone(),
+                        tool_call_id: tc.id.clone(),
+                        input: tc.arguments.clone(),
+                        output: serde_json::json!({"content": tool_result.content}),
+                        is_error: tool_result.is_error,
+                    };
+                    hook_registry.run_post_hooks(&post_ctx);
+                }
 
                 let tool_result_msg = pick_ai::types::ToolResultMessage::new(
                     &tc.id,
@@ -843,9 +847,7 @@ async fn handle_tool_execution(
             }));
         }
 
-        for (handle, (tool_name, tool_id)) in parallel_handles
-            .into_iter()
-            .zip(parallel_tool_infos)
+        for (handle, (tool_name, tool_id)) in parallel_handles.into_iter().zip(parallel_tool_infos)
         {
             match handle.await {
                 Ok((tc, Ok(tool_result))) => {
@@ -967,9 +969,10 @@ async fn execute_turn(
             system_prompt: state.system_prompt.clone(),
         };
         if let Some(result) = ext.emit_before_agent_start(&bevent)
-            && let Some(ref sp) = result.system_prompt {
-                state.system_prompt = sp.clone();
-            }
+            && let Some(ref sp) = result.system_prompt
+        {
+            state.system_prompt = sp.clone();
+        }
     }
 
     if let Some(ref handler) = config.on_event {

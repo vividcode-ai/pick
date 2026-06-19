@@ -674,11 +674,7 @@ mod tests {
             "selected arrow should be cyan"
         );
 
-        let all_text: String = lines
-            .iter()
-            .map(line_text)
-            .collect::<Vec<_>>()
-            .join(" ");
+        let all_text: String = lines.iter().map(line_text).collect::<Vec<_>>().join(" ");
         assert!(
             all_text.contains("First option"),
             "should contain description 'First option', got: {}",

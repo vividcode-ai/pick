@@ -98,9 +98,10 @@ pub fn read_single_key() -> Option<char> {
         match crossterm::event::read().ok()? {
             Event::Key(key) => {
                 if key.kind == KeyEventKind::Press
-                    && let KeyCode::Char(c) = key.code {
-                        return Some(c);
-                    }
+                    && let KeyCode::Char(c) = key.code
+                {
+                    return Some(c);
+                }
                 continue;
             }
             _ => continue,

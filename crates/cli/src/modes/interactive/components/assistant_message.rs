@@ -12,12 +12,14 @@ pub fn render_assistant_message(
 
     // Thinking block
     if let Some(thinking) = thinking_text
-        && !hide_thinking && !thinking.is_empty() {
-            output.push_str(&ToolTheme::fg(
-                "dim",
-                &format!("[thinking]\n{}\n[/thinking]\n", thinking),
-            ));
-        }
+        && !hide_thinking
+        && !thinking.is_empty()
+    {
+        output.push_str(&ToolTheme::fg(
+            "dim",
+            &format!("[thinking]\n{}\n[/thinking]\n", thinking),
+        ));
+    }
 
     // Main content
     if !text.is_empty() {

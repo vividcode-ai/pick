@@ -184,9 +184,10 @@ async fn build_session_info(file_path: &Path) -> Option<SessionInfo> {
             && let (Some(p), Some(m)) = (
                 entry.get("from").and_then(|v| v.as_str()),
                 entry.get("to").and_then(|v| v.as_str()),
-            ) {
-                model = format!("{}/{}", p, m);
-            }
+            )
+        {
+            model = format!("{}/{}", p, m);
+        }
 
         if type_ != Some("message") {
             continue;
@@ -198,28 +199,32 @@ async fn build_session_info(file_path: &Path) -> Option<SessionInfo> {
             continue;
         }
 
-        if model.is_empty() && role == "assistant"
+        if model.is_empty()
+            && role == "assistant"
             && let (Some(p), Some(m)) = (
                 entry.get("provider").and_then(|v| v.as_str()),
                 entry.get("model").and_then(|v| v.as_str()),
-            ) {
-                model = format!("{}/{}", p, m);
-            }
+            )
+        {
+            model = format!("{}/{}", p, m);
+        }
 
         // Extract text content from content blocks
         if let Some(content) = entry.get("content")
-            && let Some(blocks) = content.as_array() {
-                for block in blocks {
-                    if block.get("type").and_then(|v| v.as_str()) == Some("text")
-                        && let Some(text) = block.get("text").and_then(|v| v.as_str())
-                            && !text.is_empty() {
-                                all_messages.push(text.to_string());
-                                if first_message.is_empty() && role == "user" {
-                                    first_message = text.to_string();
-                                }
-                            }
+            && let Some(blocks) = content.as_array()
+        {
+            for block in blocks {
+                if block.get("type").and_then(|v| v.as_str()) == Some("text")
+                    && let Some(text) = block.get("text").and_then(|v| v.as_str())
+                    && !text.is_empty()
+                {
+                    all_messages.push(text.to_string());
+                    if first_message.is_empty() && role == "user" {
+                        first_message = text.to_string();
+                    }
                 }
             }
+        }
     }
 
     let git_branch = detect_git_branch_for_cwd(&cwd);

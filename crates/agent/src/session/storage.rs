@@ -1,4 +1,4 @@
-﻿//! Session storage backends
+//! Session storage backends
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -77,9 +77,10 @@ impl SessionStorage for JsonlStorage {
         }
         let content = tokio::fs::read_to_string(&self.path).await?;
         if let Some(first_line) = content.lines().next()
-            && let Ok(header) = serde_json::from_str::<SessionHeader>(first_line) {
-                return Ok(Some(header));
-            }
+            && let Ok(header) = serde_json::from_str::<SessionHeader>(first_line)
+        {
+            return Ok(Some(header));
+        }
         Ok(None)
     }
 

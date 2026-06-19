@@ -22,7 +22,6 @@ pub struct CreateAgentSessionOptions {
     pub settings_manager: Option<SettingsManager>,
 }
 
-
 /// Result from creating an agent session
 pub struct CreateAgentSessionResult {
     /// The created session ID

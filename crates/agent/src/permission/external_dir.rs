@@ -67,11 +67,11 @@ impl ExternalDirectoryAuth {
         for entry in entries.iter() {
             if let Some((entry_tool, entry_pattern)) = parse_permission_string(&entry.entry)
                 && entry_tool == tool
-                    && (match_pattern(entry_pattern, &norm_path)
-                        || match_pattern(entry_pattern, &real_path))
-                {
-                    return Some(entry.auth_type);
-                }
+                && (match_pattern(entry_pattern, &norm_path)
+                    || match_pattern(entry_pattern, &real_path))
+            {
+                return Some(entry.auth_type);
+            }
         }
         None
     }
@@ -112,10 +112,11 @@ impl ExternalDirectoryAuth {
 
     pub fn save(&self) -> Result<(), String> {
         if let Some(parent) = self.file_path.parent()
-            && !parent.exists() {
-                std::fs::create_dir_all(parent)
-                    .map_err(|e| format!("Failed to create auth dir: {}", e))?;
-            }
+            && !parent.exists()
+        {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed to create auth dir: {}", e))?;
+        }
         let entries = self.entries.lock().unwrap();
         let auth_file = AuthFile {
             permissions: PermissionsBlock {

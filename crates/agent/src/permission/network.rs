@@ -1,8 +1,7 @@
 use std::collections::HashSet;
 use std::net::IpAddr;
 
-#[derive(Debug, Clone)]
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub struct NetworkPolicy {
     pub blocked_domains: HashSet<String>,
     pub blocked_cidrs: Vec<(u32, u32)>, // (network_bits, mask_bits) for IPv4 CIDR matching
@@ -10,7 +9,6 @@ pub struct NetworkPolicy {
     pub allow_all: bool,
     pub block_all: bool,
 }
-
 
 impl NetworkPolicy {
     pub fn new_full_access() -> Self {
@@ -111,14 +109,15 @@ impl NetworkPolicy {
 
         // Check CIDR blocklist (only for IP addresses)
         if let Ok(ip) = domain.parse::<IpAddr>()
-            && let IpAddr::V4(ipv4) = ip {
-                let ip_bits = u32::from(ipv4);
-                for &(network, mask) in &self.blocked_cidrs {
-                    if mask == 0 || (ip_bits & (!0u32 << (32 - mask))) == network {
-                        return true;
-                    }
+            && let IpAddr::V4(ipv4) = ip
+        {
+            let ip_bits = u32::from(ipv4);
+            for &(network, mask) in &self.blocked_cidrs {
+                if mask == 0 || (ip_bits & (!0u32 << (32 - mask))) == network {
+                    return true;
                 }
             }
+        }
 
         false
     }

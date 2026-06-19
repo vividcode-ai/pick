@@ -70,16 +70,18 @@ pub async fn create_session_manager(
             let mut all: Vec<(PathBuf, std::time::SystemTime)> = Vec::new();
             for dir in [&project_dir, &global_dir] {
                 if dir.exists()
-                    && let Ok(entries) = std::fs::read_dir(dir) {
-                        for e in entries.flatten() {
-                            let p = e.path();
-                            if p.extension().is_some_and(|ext| ext == "jsonl")
-                                && let Ok(meta) = p.metadata()
-                                    && let Ok(t) = meta.modified() {
-                                        all.push((p, t));
-                                    }
+                    && let Ok(entries) = std::fs::read_dir(dir)
+                {
+                    for e in entries.flatten() {
+                        let p = e.path();
+                        if p.extension().is_some_and(|ext| ext == "jsonl")
+                            && let Ok(meta) = p.metadata()
+                            && let Ok(t) = meta.modified()
+                        {
+                            all.push((p, t));
                         }
                     }
+                }
             }
             all.sort_by_key(|(_, t)| *t);
             if let Some((latest, _)) = all.last() {
@@ -172,14 +174,14 @@ fn find_session_file(id: &str, search_dir: &PathBuf) -> Option<PathBuf> {
                 // Verify by reading the header
                 if let Ok(content) = std::fs::read_to_string(&path)
                     && let Some(first_line) = content.lines().next()
-                        && let Ok(header) = serde_json::from_str::<serde_json::Value>(first_line)
-                            && header
-                                .get("id")
-                                .and_then(|v| v.as_str())
-                                .is_some_and(|hid| hid.starts_with(id))
-                            {
-                                return Some(path);
-                            }
+                    && let Ok(header) = serde_json::from_str::<serde_json::Value>(first_line)
+                    && header
+                        .get("id")
+                        .and_then(|v| v.as_str())
+                        .is_some_and(|hid| hid.starts_with(id))
+                {
+                    return Some(path);
+                }
             }
         }
     }

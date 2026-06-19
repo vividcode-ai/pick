@@ -61,9 +61,10 @@ impl ExtensionRunner {
         if let Ok(extensions) = self.extensions.read() {
             for ext in extensions.iter() {
                 if let Some(handlers) = ext.handlers.get(event_type)
-                    && !handlers.is_empty() {
-                        return true;
-                    }
+                    && !handlers.is_empty()
+                {
+                    return true;
+                }
             }
         }
         false

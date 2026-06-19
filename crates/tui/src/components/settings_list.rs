@@ -97,14 +97,15 @@ impl SettingsList {
         };
 
         if let Some(ref values) = item.values.clone()
-            && !values.is_empty() {
-                let current_idx = values.iter().position(|v| v == &item.current_value);
-                let next_idx = match current_idx {
-                    Some(idx) => (idx + 1) % values.len(),
-                    None => 0,
-                };
-                item.current_value = values[next_idx].clone();
-            }
+            && !values.is_empty()
+        {
+            let current_idx = values.iter().position(|v| v == &item.current_value);
+            let next_idx = match current_idx {
+                Some(idx) => (idx + 1) % values.len(),
+                None => 0,
+            };
+            item.current_value = values[next_idx].clone();
+        }
     }
 
     pub fn render(&self, width: usize) -> Vec<String> {
@@ -176,10 +177,11 @@ impl SettingsList {
 
         // Description for selected item
         if let Some(item) = self.selected_item()
-            && let Some(ref desc) = item.description {
-                lines.push(String::new());
-                lines.push(format!("  {}", desc));
-            }
+            && let Some(ref desc) = item.description
+        {
+            lines.push(String::new());
+            lines.push(format!("  {}", desc));
+        }
 
         lines.push(String::new());
         lines.push("  ↑↓: navigate · Enter/Space: toggle".to_string());

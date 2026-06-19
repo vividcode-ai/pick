@@ -1,4 +1,4 @@
-﻿//! HTML entity utilities
+//! HTML entity utilities
 
 /// Decode a single HTML entity at position in string
 pub fn decode_html_entity_at(text: &str, index: usize) -> Option<(String, usize)> {
@@ -47,11 +47,12 @@ pub fn decode_html_entities(text: &str) -> String {
     let bytes = text.as_bytes();
     while i < text.len() {
         if bytes[i] == b'&'
-            && let Some((decoded, consumed)) = decode_html_entity_at(text, i) {
-                result.push_str(&decoded);
-                i += consumed;
-                continue;
-            }
+            && let Some((decoded, consumed)) = decode_html_entity_at(text, i)
+        {
+            result.push_str(&decoded);
+            i += consumed;
+            continue;
+        }
         result.push(text[i..].chars().next().unwrap_or_default());
         i += text[i..].chars().next().map_or(1, |c| c.len_utf8());
     }

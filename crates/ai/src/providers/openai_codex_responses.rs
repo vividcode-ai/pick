@@ -326,18 +326,19 @@ async fn process_codex_event(
         "response.output_text.delta" => {
             if let Some(delta) = data.get("delta").and_then(|v| v.as_str())
                 && let Some(idx) = *text_block_idx
-                    && idx < output.content.len() {
-                        if let crate::types::ContentBlock::Text(ref mut tc) = output.content[idx] {
-                            tc.text.push_str(delta);
-                        }
-                        let _ = tx
-                            .send(StreamEvent::TextDelta {
-                                content_index: idx,
-                                delta: delta.to_string(),
-                                partial: partial_from_output(output),
-                            })
-                            .await;
-                    }
+                && idx < output.content.len()
+            {
+                if let crate::types::ContentBlock::Text(ref mut tc) = output.content[idx] {
+                    tc.text.push_str(delta);
+                }
+                let _ = tx
+                    .send(StreamEvent::TextDelta {
+                        content_index: idx,
+                        delta: delta.to_string(),
+                        partial: partial_from_output(output),
+                    })
+                    .await;
+            }
         }
         "response.completed" => {
             if let Some(response) = data.get("response") {

@@ -38,59 +38,61 @@ fn migrate_auth_to_auth_json() -> Vec<String> {
     // Migrate oauth.json
     if oauth_path.exists()
         && let Ok(content) = std::fs::read_to_string(&oauth_path)
-            && let Ok(oauth) = serde_json::from_str::<serde_json::Value>(&content)
-                && let Some(obj) = oauth.as_object() {
-                    for (provider, cred) in obj {
-                        let entry = serde_json::json!({"type": "oauth", "cred": cred});
-                        migrated.insert(provider.clone(), entry);
-                        providers.push(provider.clone());
-                    }
-                    let _ =
-                        std::fs::rename(&oauth_path, oauth_path.with_extension("json.migrated"));
-                }
+        && let Ok(oauth) = serde_json::from_str::<serde_json::Value>(&content)
+        && let Some(obj) = oauth.as_object()
+    {
+        for (provider, cred) in obj {
+            let entry = serde_json::json!({"type": "oauth", "cred": cred});
+            migrated.insert(provider.clone(), entry);
+            providers.push(provider.clone());
+        }
+        let _ = std::fs::rename(&oauth_path, oauth_path.with_extension("json.migrated"));
+    }
 
     // Migrate settings.json apiKeys
     if settings_path.exists()
         && let Ok(content) = std::fs::read_to_string(&settings_path)
-            && let Ok(mut settings) = serde_json::from_str::<serde_json::Value>(&content)
-                && let Some(api_keys) = settings.get("apiKeys").and_then(|v| v.as_object()) {
-                    for (provider, key) in api_keys {
-                        if !migrated.contains_key(provider) && key.is_string() {
-                            let entry = serde_json::json!({"type": "api_key", "key": key});
-                            migrated.insert(provider.clone(), entry);
-                            providers.push(provider.clone());
-                        }
-                    }
-                    if let Some(obj) = settings.as_object_mut() {
-                        obj.remove("apiKeys");
-                        if let Ok(new_content) = serde_json::to_string_pretty(&settings) {
-                            let _ = std::fs::write(&settings_path, new_content);
-                        }
-                    }
-                }
-
-    if !migrated.is_empty()
-        && let Ok(content) = serde_json::to_string_pretty(&migrated) {
-            if let Some(parent) = auth_path.parent() {
-                let _ = std::fs::create_dir_all(parent);
-            }
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                if let Ok(content) = serde_json::to_string_pretty(&migrated) {
-                    if let Ok(_) = std::fs::write(&auth_path, &content) {
-                        let _ = std::fs::set_permissions(
-                            &auth_path,
-                            std::fs::Permissions::from_mode(0o600),
-                        );
-                    }
-                }
-            }
-            #[cfg(not(unix))]
-            {
-                let _ = std::fs::write(&auth_path, &content);
+        && let Ok(mut settings) = serde_json::from_str::<serde_json::Value>(&content)
+        && let Some(api_keys) = settings.get("apiKeys").and_then(|v| v.as_object())
+    {
+        for (provider, key) in api_keys {
+            if !migrated.contains_key(provider) && key.is_string() {
+                let entry = serde_json::json!({"type": "api_key", "key": key});
+                migrated.insert(provider.clone(), entry);
+                providers.push(provider.clone());
             }
         }
+        if let Some(obj) = settings.as_object_mut() {
+            obj.remove("apiKeys");
+            if let Ok(new_content) = serde_json::to_string_pretty(&settings) {
+                let _ = std::fs::write(&settings_path, new_content);
+            }
+        }
+    }
+
+    if !migrated.is_empty()
+        && let Ok(content) = serde_json::to_string_pretty(&migrated)
+    {
+        if let Some(parent) = auth_path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            if let Ok(content) = serde_json::to_string_pretty(&migrated) {
+                if let Ok(_) = std::fs::write(&auth_path, &content) {
+                    let _ = std::fs::set_permissions(
+                        &auth_path,
+                        std::fs::Permissions::from_mode(0o600),
+                    );
+                }
+            }
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = std::fs::write(&auth_path, &content);
+        }
+    }
 
     providers
 }
@@ -227,9 +229,10 @@ fn migrate_keybindings_config_file() {
     let result = crate::core::keybindings::migrate_keybindings_config(raw);
 
     if result.migrated
-        && let Ok(new_content) = serde_json::to_string_pretty(&result.config) {
-            let _ = std::fs::write(&config_path, format!("{}\n", new_content));
-        }
+        && let Ok(new_content) = serde_json::to_string_pretty(&result.config)
+    {
+        let _ = std::fs::write(&config_path, format!("{}\n", new_content));
+    }
 }
 
 /// Migrate commands/ to prompts/
@@ -270,25 +273,26 @@ fn check_deprecated_extension_dirs(base_dir: &Path, label: &str) -> Vec<String> 
 
     let tools_dir = base_dir.join("tools");
     if tools_dir.exists()
-        && let Ok(entries) = std::fs::read_dir(&tools_dir) {
-            let custom_tools: Vec<_> = entries
-                .flatten()
-                .filter(|e| {
-                    let lower = e.file_name().to_string_lossy().to_lowercase();
-                    lower != "fd"
-                        && lower != "rg"
-                        && lower != "fd.exe"
-                        && lower != "rg.exe"
-                        && !e.file_name().to_string_lossy().starts_with('.')
-                })
-                .collect();
-            if !custom_tools.is_empty() {
-                warnings.push(format!(
+        && let Ok(entries) = std::fs::read_dir(&tools_dir)
+    {
+        let custom_tools: Vec<_> = entries
+            .flatten()
+            .filter(|e| {
+                let lower = e.file_name().to_string_lossy().to_lowercase();
+                lower != "fd"
+                    && lower != "rg"
+                    && lower != "fd.exe"
+                    && lower != "rg.exe"
+                    && !e.file_name().to_string_lossy().starts_with('.')
+            })
+            .collect();
+        if !custom_tools.is_empty() {
+            warnings.push(format!(
                     "{} tools/ directory contains custom tools. Custom tools have been merged into extensions.",
                     label
                 ));
-            }
         }
+    }
 
     warnings
 }

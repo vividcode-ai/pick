@@ -111,24 +111,25 @@ pub fn stream_anthropic(
 
         for attempt in 0..=max_retries {
             if let Some(signal) = opts.and_then(|o| o.signal.as_ref())
-                && *signal.borrow() {
-                    let mut msg = AssistantMessage::new(
-                        vec![],
-                        "anthropic-messages".to_string(),
-                        "anthropic".to_string(),
-                        model.id.clone(),
-                        Usage::zero(),
-                        StopReason::Aborted,
-                    );
-                    msg.error_message = Some("LLM call cancelled before request".to_string());
-                    let _ = tx
-                        .send(StreamEvent::Error {
-                            reason: StopReason::Aborted,
-                            error: msg,
-                        })
-                        .await;
-                    return;
-                }
+                && *signal.borrow()
+            {
+                let mut msg = AssistantMessage::new(
+                    vec![],
+                    "anthropic-messages".to_string(),
+                    "anthropic".to_string(),
+                    model.id.clone(),
+                    Usage::zero(),
+                    StopReason::Aborted,
+                );
+                msg.error_message = Some("LLM call cancelled before request".to_string());
+                let _ = tx
+                    .send(StreamEvent::Error {
+                        reason: StopReason::Aborted,
+                        error: msg,
+                    })
+                    .await;
+                return;
+            }
 
             if attempt > 0 {
                 let delay = crate::retry::retry_delay(attempt, 1000, max_delay);
@@ -195,16 +196,17 @@ pub fn stream_anthropic(
                     use futures::StreamExt;
                     while let Some(chunk_result) = chunk_stream.next().await {
                         if let Some(signal) = opts.and_then(|o| o.signal.as_ref())
-                            && *signal.borrow() {
-                                emit_error(
-                                    &tx,
-                                    &mut output,
-                                    &model,
-                                    "LLM call cancelled during streaming",
-                                )
-                                .await;
-                                return;
-                            }
+                            && *signal.borrow()
+                        {
+                            emit_error(
+                                &tx,
+                                &mut output,
+                                &model,
+                                "LLM call cancelled during streaming",
+                            )
+                            .await;
+                            return;
+                        }
 
                         match chunk_result {
                             Ok(chunk) => {

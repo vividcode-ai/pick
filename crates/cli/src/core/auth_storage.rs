@@ -349,9 +349,10 @@ impl AuthStorage {
             return true;
         }
         if let Some(ref resolver) = *self.fallback_resolver.lock().unwrap()
-            && resolver(provider).is_some() {
-                return true;
-            }
+            && resolver(provider).is_some()
+        {
+            return true;
+        }
         false
     }
 
@@ -383,13 +384,14 @@ impl AuthStorage {
             };
         }
         if let Some(ref resolver) = *self.fallback_resolver.lock().unwrap()
-            && resolver(provider).is_some() {
-                return AuthStatus {
-                    configured: false,
-                    source: Some("fallback".to_string()),
-                    label: Some("custom provider config".to_string()),
-                };
-            }
+            && resolver(provider).is_some()
+        {
+            return AuthStatus {
+                configured: false,
+                source: Some("fallback".to_string()),
+                label: Some("custom provider config".to_string()),
+            };
+        }
         AuthStatus {
             configured: false,
             source: None,
@@ -435,10 +437,9 @@ impl AuthStorage {
         }
 
         // Fallback resolver
-        if include_fallback
-            && let Some(ref resolver) = *self.fallback_resolver.lock().unwrap() {
-                return resolver(provider_id);
-            }
+        if include_fallback && let Some(ref resolver) = *self.fallback_resolver.lock().unwrap() {
+            return resolver(provider_id);
+        }
 
         None
     }

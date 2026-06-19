@@ -71,10 +71,7 @@ fn get_session_search_text(session: &SessionSearchInfo) -> String {
 }
 
 pub fn has_session_name(session: &SessionSearchInfo) -> bool {
-    session
-        .name
-        .as_ref()
-        .is_some_and(|n| !n.trim().is_empty())
+    session.name.as_ref().is_some_and(|n| !n.trim().is_empty())
 }
 
 fn matches_name_filter(session: &SessionSearchInfo, filter: NameFilter) -> bool {

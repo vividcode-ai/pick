@@ -24,15 +24,16 @@ pub fn filter_tree_nodes(
             if node.entry_type == "message"
                 && node.role.as_deref() == Some("assistant")
                 && !is_current
-                && !has_text_content(node.content_text.as_deref()) {
-                    let is_error = node
-                        .stop_reason
-                        .as_deref()
-                        .is_some_and(|r| r != "stop" && r != "toolUse");
-                    if !is_error {
-                        return false;
-                    }
+                && !has_text_content(node.content_text.as_deref())
+            {
+                let is_error = node
+                    .stop_reason
+                    .as_deref()
+                    .is_some_and(|r| r != "stop" && r != "toolUse");
+                if !is_error {
+                    return false;
                 }
+            }
 
             match filter_mode {
                 TreeFilterMode::UserOnly => {
@@ -91,9 +92,10 @@ pub fn filter_tree_nodes(
             let node = &nodes[fnode.node_idx];
             let id = &node.entry_id;
             if let Some(parent) = parent_map.get(id.as_str())
-                && (folded_nodes.contains(*parent) || skip.contains(*parent)) {
-                    skip.insert(id.clone());
-                }
+                && (folded_nodes.contains(*parent) || skip.contains(*parent))
+            {
+                skip.insert(id.clone());
+            }
         }
         skip
     };

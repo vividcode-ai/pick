@@ -100,10 +100,11 @@ pub fn load_json_themes_from_dir(dir: &Path) -> Vec<(String, ThemeJson)> {
             let path = entry.path();
             if path.extension().and_then(|e| e.to_str()) == Some("json")
                 && let Ok(content) = std::fs::read_to_string(&path)
-                    && let Ok(json) = serde_json::from_str::<ThemeJson>(&content) {
-                        let name = json.name.clone();
-                        themes.push((name, json));
-                    }
+                && let Ok(json) = serde_json::from_str::<ThemeJson>(&content)
+            {
+                let name = json.name.clone();
+                themes.push((name, json));
+            }
         }
     }
 
@@ -187,19 +188,20 @@ pub fn detect_terminal_background() -> TerminalThemeDetection {
     if let Ok(colorfgbg) = std::env::var("COLORFGBG") {
         let parts: Vec<&str> = colorfgbg.split(';').collect();
         if let Some(last) = parts.last()
-            && let Ok(bg) = last.trim().parse::<u8>() {
-                let luminance = ansi256_luminance(bg);
-                return TerminalThemeDetection {
-                    theme: if luminance >= 0.5 {
-                        TerminalTheme::Light
-                    } else {
-                        TerminalTheme::Dark
-                    },
-                    source: "COLORFGBG".to_string(),
-                    detail: format!("background color index {}", bg),
-                    confidence: "high".to_string(),
-                };
-            }
+            && let Ok(bg) = last.trim().parse::<u8>()
+        {
+            let luminance = ansi256_luminance(bg);
+            return TerminalThemeDetection {
+                theme: if luminance >= 0.5 {
+                    TerminalTheme::Light
+                } else {
+                    TerminalTheme::Dark
+                },
+                source: "COLORFGBG".to_string(),
+                detail: format!("background color index {}", bg),
+                confidence: "high".to_string(),
+            };
+        }
     }
 
     TerminalThemeDetection {
@@ -291,13 +293,15 @@ fn start_theme_watcher() {
         let theme_path_str = theme_path.to_string_lossy().to_string();
         if let Ok(reloaded) = load_theme_from_path(&theme_path_str, None) {
             if let Some(global) = GLOBAL_THEME.get()
-                && let Ok(mut t) = global.lock() {
-                    *t = reloaded;
-                }
+                && let Ok(mut t) = global.lock()
+            {
+                *t = reloaded;
+            }
             if let Ok(guard) = get_on_theme_change_lock().lock()
-                && let Some(ref cb) = *guard {
-                    cb();
-                }
+                && let Some(ref cb) = *guard
+            {
+                cb();
+            }
         }
     };
 
@@ -308,16 +312,18 @@ fn start_theme_watcher() {
 
     if let Some(watcher) =
         crate::utils::fs_watch::watch_with_error_handler(&theme_file, callback, on_error)
-        && let Ok(mut guard) = get_theme_watcher_lock().lock() {
-            *guard = Some(watcher);
-        }
+        && let Ok(mut guard) = get_theme_watcher_lock().lock()
+    {
+        *guard = Some(watcher);
+    }
 }
 
 fn stop_theme_watcher() {
     if let Ok(mut guard) = get_theme_watcher_lock().lock()
-        && let Some(watcher) = guard.take() {
-            let _ = watcher.shutdown.send(());
-        }
+        && let Some(watcher) = guard.take()
+    {
+        let _ = watcher.shutdown.send(());
+    }
 }
 
 pub fn global_theme() -> Arc<Mutex<Theme>> {
@@ -380,9 +386,10 @@ pub fn set_theme(name: &str, enable_watcher: bool) -> Result<(), String> {
         *current = name.to_string();
     }
     if let Some(global) = GLOBAL_THEME.get()
-        && let Ok(mut t) = global.lock() {
-            *t = theme;
-        }
+        && let Ok(mut t) = global.lock()
+    {
+        *t = theme;
+    }
 
     if enable_watcher {
         start_theme_watcher();

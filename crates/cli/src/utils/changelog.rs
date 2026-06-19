@@ -32,14 +32,15 @@ pub fn parse_changelog(path: &Path) -> Vec<ChangelogEntry> {
         if line.starts_with("## ") {
             // Save previous entry if exists
             if let Some((major, minor, patch)) = current_version
-                && !current_lines.is_empty() {
-                    entries.push(ChangelogEntry {
-                        major,
-                        minor,
-                        patch,
-                        content: current_lines.join("\n").trim().to_string(),
-                    });
-                }
+                && !current_lines.is_empty()
+            {
+                entries.push(ChangelogEntry {
+                    major,
+                    minor,
+                    patch,
+                    content: current_lines.join("\n").trim().to_string(),
+                });
+            }
 
             // Try to parse version from this header
             if let Some(caps) = re.captures(line) {
@@ -59,14 +60,15 @@ pub fn parse_changelog(path: &Path) -> Vec<ChangelogEntry> {
 
     // Save last entry
     if let Some((major, minor, patch)) = current_version
-        && !current_lines.is_empty() {
-            entries.push(ChangelogEntry {
-                major,
-                minor,
-                patch,
-                content: current_lines.join("\n").trim().to_string(),
-            });
-        }
+        && !current_lines.is_empty()
+    {
+        entries.push(ChangelogEntry {
+            major,
+            minor,
+            patch,
+            content: current_lines.join("\n").trim().to_string(),
+        });
+    }
 
     entries
 }

@@ -176,9 +176,10 @@ impl ModelRegistry {
             .and_then(|p| self.load_custom_models(p));
 
         if let Some(ref result) = custom_result
-            && let Some(ref error) = result.error {
-                *self.load_error.lock().unwrap() = Some(error.clone());
-            }
+            && let Some(ref error) = result.error
+        {
+            *self.load_error.lock().unwrap() = Some(error.clone());
+        }
 
         let mut combined = self.load_builtin_models();
 
@@ -256,13 +257,15 @@ impl ModelRegistry {
                     let api = model_def
                         .api
                         .as_ref()
-                        .or(provider_config.api.as_ref()).cloned()
+                        .or(provider_config.api.as_ref())
+                        .cloned()
                         .unwrap_or_else(|| "openai-completions".to_string());
 
                     let base_url = model_def
                         .base_url
                         .as_ref()
-                        .or(provider_config.base_url.as_ref()).cloned()
+                        .or(provider_config.base_url.as_ref())
+                        .cloned()
                         .unwrap_or_default();
 
                     let raw_cost = model_def.cost.as_ref().or(provider_config.cost());
@@ -500,9 +503,10 @@ fn strip_json_comments(input: &str) -> String {
             ',' if !in_string => {
                 // Skip trailing comma before ] or }
                 if let Some(&(_, next)) = chars.peek()
-                    && (next == '}' || next == ']') {
-                        continue;
-                    }
+                    && (next == '}' || next == ']')
+                {
+                    continue;
+                }
                 result.push(',');
             }
             _ => result.push(c),

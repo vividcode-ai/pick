@@ -240,45 +240,44 @@ pub fn render_read_result(
 
     if let Some(ref details) = output.details
         && let Some(ref truncation) = details.truncation
-            && truncation.truncated {
-                if truncation.first_line_exceeds_limit {
-                    formatted.push_str(&format!(
-                        "\n{}",
-                        ToolTheme::fg(
-                            "warning",
-                            &format!(
-                                "[First line exceeds {} limit]",
-                                format_size(truncation.max_bytes)
-                            )
-                        )
-                    ));
-                } else if truncation.truncated_by == Some(TruncationType::Lines) {
-                    formatted.push_str(&format!(
-                        "\n{}",
-                        ToolTheme::fg(
-                            "warning",
-                            &format!(
-                                "[Truncated: showing {} of {} lines ({} line limit)]",
-                                truncation.output_lines,
-                                truncation.total_lines,
-                                truncation.max_lines
-                            )
-                        )
-                    ));
-                } else {
-                    formatted.push_str(&format!(
-                        "\n{}",
-                        ToolTheme::fg(
-                            "warning",
-                            &format!(
-                                "[Truncated: {} lines shown ({} limit)]",
-                                truncation.output_lines,
-                                format_size(truncation.max_bytes)
-                            )
-                        )
-                    ));
-                }
-            }
+        && truncation.truncated
+    {
+        if truncation.first_line_exceeds_limit {
+            formatted.push_str(&format!(
+                "\n{}",
+                ToolTheme::fg(
+                    "warning",
+                    &format!(
+                        "[First line exceeds {} limit]",
+                        format_size(truncation.max_bytes)
+                    )
+                )
+            ));
+        } else if truncation.truncated_by == Some(TruncationType::Lines) {
+            formatted.push_str(&format!(
+                "\n{}",
+                ToolTheme::fg(
+                    "warning",
+                    &format!(
+                        "[Truncated: showing {} of {} lines ({} line limit)]",
+                        truncation.output_lines, truncation.total_lines, truncation.max_lines
+                    )
+                )
+            ));
+        } else {
+            formatted.push_str(&format!(
+                "\n{}",
+                ToolTheme::fg(
+                    "warning",
+                    &format!(
+                        "[Truncated: {} lines shown ({} limit)]",
+                        truncation.output_lines,
+                        format_size(truncation.max_bytes)
+                    )
+                )
+            ));
+        }
+    }
 
     ToolRenderOutput {
         label: String::new(),

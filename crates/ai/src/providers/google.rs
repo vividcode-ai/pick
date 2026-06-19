@@ -81,17 +81,15 @@ pub fn stream_google(
                     let mut parts = Vec::new();
                     for block in &a.content {
                         match block {
-                            ContentBlock::Text(t)
-                                if !t.text.trim().is_empty() => {
-                                    parts.push(serde_json::json!({"text": t.text}));
-                                }
-                            ContentBlock::Thinking(th)
-                                if !th.thinking.trim().is_empty() => {
-                                    parts.push(serde_json::json!({
-                                        "thought": true,
-                                        "text": th.thinking,
-                                    }));
-                                }
+                            ContentBlock::Text(t) if !t.text.trim().is_empty() => {
+                                parts.push(serde_json::json!({"text": t.text}));
+                            }
+                            ContentBlock::Thinking(th) if !th.thinking.trim().is_empty() => {
+                                parts.push(serde_json::json!({
+                                    "thought": true,
+                                    "text": th.thinking,
+                                }));
+                            }
                             ContentBlock::ToolCall(tc) => {
                                 parts.push(serde_json::json!({
                                     "functionCall": {
@@ -346,9 +344,10 @@ async fn process_google_response(
     // Capture response ID
     if output.response_id.is_none()
         && let Some(id) = data.get("responseId").and_then(|v| v.as_str())
-            && !id.is_empty() {
-                output.response_id = Some(id.to_string());
-            }
+        && !id.is_empty()
+    {
+        output.response_id = Some(id.to_string());
+    }
 
     // Process usage metadata
     if let Some(usage) = data.get("usageMetadata") {
@@ -451,9 +450,10 @@ async fn process_google_response(
                         tc.thinking.push_str(text);
                         // Preserve thought signature
                         if let Some(sig) = part.get("thoughtSignature").and_then(|v| v.as_str())
-                            && !sig.is_empty() {
-                                tc.thinking_signature = Some(sig.to_string());
-                            }
+                            && !sig.is_empty()
+                        {
+                            tc.thinking_signature = Some(sig.to_string());
+                        }
                     }
                     let _ = tx
                         .send(StreamEvent::ThinkingDelta {
@@ -480,9 +480,10 @@ async fn process_google_response(
                     if let ContentBlock::Text(ref mut tc) = output.content[idx] {
                         tc.text.push_str(text);
                         if let Some(sig) = part.get("thoughtSignature").and_then(|v| v.as_str())
-                            && !sig.is_empty() {
-                                tc.text_signature = Some(sig.to_string());
-                            }
+                            && !sig.is_empty()
+                        {
+                            tc.text_signature = Some(sig.to_string());
+                        }
                     }
                     let _ = tx
                         .send(StreamEvent::TextDelta {

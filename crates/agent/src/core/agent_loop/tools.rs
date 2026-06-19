@@ -36,9 +36,10 @@ pub fn validate_tool_arguments(
     let mut coerced = args.clone();
     if let Some(obj) = coerced.as_object_mut()
         && !obj.contains_key("path")
-            && let Some(fp) = obj.get("file_path") {
-                obj.insert("path".to_string(), fp.clone());
-            }
+        && let Some(fp) = obj.get("file_path")
+    {
+        obj.insert("path".to_string(), fp.clone());
+    }
 
     // Check required fields
     if let Some(required) = &params.required {
@@ -55,30 +56,32 @@ pub fn validate_tool_arguments(
 
     // Attempt type coercion for known properties
     if let Some(props) = properties
-        && let Some(obj) = coerced.as_object_mut() {
-            for (key, schema) in props {
-                if let Some(expected_type) = schema.get("type").and_then(|t| t.as_str())
-                    && let Some(val) = obj.get(key) {
-                        let coerced_val = match (expected_type, val) {
-                            ("number", serde_json::Value::String(s)) => {
-                                s.parse::<f64>().ok().map(serde_json::Value::from)
-                            }
-                            ("integer", serde_json::Value::String(s)) => {
-                                s.parse::<i64>().ok().map(serde_json::Value::from)
-                            }
-                            ("boolean", serde_json::Value::String(s)) => match s.as_str() {
-                                "true" => Some(serde_json::Value::Bool(true)),
-                                "false" => Some(serde_json::Value::Bool(false)),
-                                _ => None,
-                            },
-                            _ => None,
-                        };
-                        if let Some(cv) = coerced_val {
-                            obj.insert(key.clone(), cv);
-                        }
+        && let Some(obj) = coerced.as_object_mut()
+    {
+        for (key, schema) in props {
+            if let Some(expected_type) = schema.get("type").and_then(|t| t.as_str())
+                && let Some(val) = obj.get(key)
+            {
+                let coerced_val = match (expected_type, val) {
+                    ("number", serde_json::Value::String(s)) => {
+                        s.parse::<f64>().ok().map(serde_json::Value::from)
                     }
+                    ("integer", serde_json::Value::String(s)) => {
+                        s.parse::<i64>().ok().map(serde_json::Value::from)
+                    }
+                    ("boolean", serde_json::Value::String(s)) => match s.as_str() {
+                        "true" => Some(serde_json::Value::Bool(true)),
+                        "false" => Some(serde_json::Value::Bool(false)),
+                        _ => None,
+                    },
+                    _ => None,
+                };
+                if let Some(cv) = coerced_val {
+                    obj.insert(key.clone(), cv);
+                }
             }
         }
+    }
 
     Ok(coerced)
 }

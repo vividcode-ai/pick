@@ -197,9 +197,10 @@ pub fn render_ls_result(
             warnings.push(format!("{} entries limit", el));
         }
         if let Some(ref truncation) = details.truncation
-            && truncation.truncated {
-                warnings.push(format!("{} limit", format_size(truncation.max_bytes)));
-            }
+            && truncation.truncated
+        {
+            warnings.push(format!("{} limit", format_size(truncation.max_bytes)));
+        }
         if !warnings.is_empty() {
             formatted.push_str(&format!(
                 "\n{}",

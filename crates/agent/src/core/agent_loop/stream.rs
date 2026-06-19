@@ -66,9 +66,10 @@ pub async fn call_llm(
     while let Some(event) = receiver.recv().await {
         // Check for cancellation request during streaming
         if let Some(ref sig) = cancel_signal
-            && *sig.borrow() {
-                return Err("LLM call cancelled".to_string());
-            }
+            && *sig.borrow()
+        {
+            return Err("LLM call cancelled".to_string());
+        }
 
         match event {
             StreamEvent::Done { message, .. } => {
@@ -83,12 +84,13 @@ pub async fn call_llm(
             other => {
                 // Forward intermediate stream events as MessageUpdate for UI streaming
                 if let Some(handler) = on_event
-                    && let Some(msg) = partial_event_to_message(&other) {
-                        handler(AgentEvent::MessageUpdate {
-                            message: msg,
-                            assistant_message_event: None,
-                        });
-                    }
+                    && let Some(msg) = partial_event_to_message(&other)
+                {
+                    handler(AgentEvent::MessageUpdate {
+                        message: msg,
+                        assistant_message_event: None,
+                    });
+                }
             }
         }
     }

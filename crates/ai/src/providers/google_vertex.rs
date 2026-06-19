@@ -106,17 +106,15 @@ pub fn stream_google_vertex(
                     let mut parts = Vec::new();
                     for block in &a.content {
                         match block {
-                            ContentBlock::Text(t)
-                                if !t.text.trim().is_empty() => {
-                                    parts.push(serde_json::json!({"text": t.text}));
-                                }
-                            ContentBlock::Thinking(th)
-                                if !th.thinking.trim().is_empty() => {
-                                    parts.push(serde_json::json!({
-                                        "thought": true,
-                                        "text": th.thinking,
-                                    }));
-                                }
+                            ContentBlock::Text(t) if !t.text.trim().is_empty() => {
+                                parts.push(serde_json::json!({"text": t.text}));
+                            }
+                            ContentBlock::Thinking(th) if !th.thinking.trim().is_empty() => {
+                                parts.push(serde_json::json!({
+                                    "thought": true,
+                                    "text": th.thinking,
+                                }));
+                            }
                             ContentBlock::ToolCall(tc) => {
                                 parts.push(serde_json::json!({
                                     "functionCall": {
@@ -359,9 +357,10 @@ async fn process_vertex_chunk(
         // Capture response ID
         if output.response_id.is_none()
             && let Some(id) = item.get("responseId").and_then(|v| v.as_str())
-                && !id.is_empty() {
-                    output.response_id = Some(id.to_string());
-                }
+            && !id.is_empty()
+        {
+            output.response_id = Some(id.to_string());
+        }
 
         // Process usage metadata
         if let Some(usage) = item.get("usageMetadata") {

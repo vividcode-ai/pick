@@ -137,9 +137,10 @@ async fn run_subagent_turn(
     let mut tools = create_coding_tools();
     tools.retain(|t| t.name != "subagent");
     if let Some(ref tool_names) = agent.tools
-        && !tool_names.is_empty() {
-            tools.retain(|t| tool_names.contains(&t.name));
-        }
+        && !tool_names.is_empty()
+    {
+        tools.retain(|t| tool_names.contains(&t.name));
+    }
 
     // Capture output text and usage from child's on_event
     let output = Arc::new(Mutex::new(String::new()));
@@ -178,13 +179,14 @@ async fn run_subagent_turn(
             }
             AgentEvent::MessageUpdate { message, .. } => {
                 if let Some(ref tx) = on_event_progress
-                    && let Message::Assistant(msg) = message {
-                        for block in &msg.content {
-                            if let ContentBlock::Text(t) = block {
-                                let _ = tx.send(t.text.clone());
-                            }
+                    && let Message::Assistant(msg) = message
+                {
+                    for block in &msg.content {
+                        if let ContentBlock::Text(t) = block {
+                            let _ = tx.send(t.text.clone());
                         }
                     }
+                }
             }
             _ => {}
         }
@@ -665,30 +667,31 @@ async fn execute_subagent(
                 .filter(|a| matches!(a.source, AgentSource::Project))
                 .collect();
             if !project_agents.is_empty()
-                && let Some(ref approve) = ctx.approve {
-                    let names: Vec<&str> = project_agents.iter().map(|a| a.name.as_str()).collect();
-                    let dir = discovery
-                        .project_agents_dir
-                        .as_ref()
-                        .map(|p| p.to_string_lossy().to_string())
-                        .unwrap_or_else(|| "(unknown)".to_string());
-                    let ok = approve(
+                && let Some(ref approve) = ctx.approve
+            {
+                let names: Vec<&str> = project_agents.iter().map(|a| a.name.as_str()).collect();
+                let dir = discovery
+                    .project_agents_dir
+                    .as_ref()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_else(|| "(unknown)".to_string());
+                let ok = approve(
                         "Run project-local agents?".to_string(),
                         format!(
                             "Agents: {}\nSource: {}\n\nProject agents are repo-controlled. Only continue for trusted repositories.",
                             names.join(", "), dir
                         ),
                     ).await;
-                    if !ok {
-                        return Ok(AgentToolResult {
-                            content: vec![ContentBlock::text(
-                                "Canceled: project-local agents not approved.",
-                            )],
-                            is_error: true,
-                            terminate: false,
-                        });
-                    }
+                if !ok {
+                    return Ok(AgentToolResult {
+                        content: vec![ContentBlock::text(
+                            "Canceled: project-local agents not approved.",
+                        )],
+                        is_error: true,
+                        terminate: false,
+                    });
                 }
+            }
         }
     }
 

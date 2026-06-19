@@ -150,7 +150,6 @@ impl std::fmt::Debug for ToolContext {
     }
 }
 
-
 /// Result from a tool execution
 #[derive(Debug, Clone)]
 pub struct AgentToolResult {

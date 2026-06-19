@@ -150,38 +150,35 @@ fn execute_with_default_shell(command: &str) -> Option<String> {
 fn execute_shell_command(shell: &str, args: &[&str], command: &str) -> ShellResult {
     let rt = tokio::runtime::Handle::try_current();
     match rt {
-        Ok(handle) => {
-            
-            handle.block_on(async {
-                let output = Command::new(shell)
-                    .args(args)
-                    .arg(command)
-                    .stdin(std::process::Stdio::null())
-                    .stdout(std::process::Stdio::piped())
-                    .stderr(std::process::Stdio::null())
-                    .kill_on_drop(true)
-                    .output()
-                    .await;
+        Ok(handle) => handle.block_on(async {
+            let output = Command::new(shell)
+                .args(args)
+                .arg(command)
+                .stdin(std::process::Stdio::null())
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::null())
+                .kill_on_drop(true)
+                .output()
+                .await;
 
-                match output {
-                    Ok(out) if out.status.success() => {
-                        let value = String::from_utf8_lossy(&out.stdout).trim().to_string();
-                        ShellResult {
-                            executed: true,
-                            value: if value.is_empty() { None } else { Some(value) },
-                        }
-                    }
-                    Ok(_) => ShellResult {
+            match output {
+                Ok(out) if out.status.success() => {
+                    let value = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                    ShellResult {
                         executed: true,
-                        value: None,
-                    },
-                    Err(_) => ShellResult {
-                        executed: false,
-                        value: None,
-                    },
+                        value: if value.is_empty() { None } else { Some(value) },
+                    }
                 }
-            })
-        }
+                Ok(_) => ShellResult {
+                    executed: true,
+                    value: None,
+                },
+                Err(_) => ShellResult {
+                    executed: false,
+                    value: None,
+                },
+            }
+        }),
         Err(_) => {
             // No runtime available, fall back to sync execution
             let output = std::process::Command::new(shell)

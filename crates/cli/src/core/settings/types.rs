@@ -101,8 +101,7 @@ pub struct McpServerConfigJson {
     pub tool_name_prefix: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct Settings {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_changelog_version: Option<String>,
@@ -189,4 +188,3 @@ pub struct Settings {
     #[serde(flatten)]
     pub extra: HashMap<String, serde_json::Value>,
 }
-

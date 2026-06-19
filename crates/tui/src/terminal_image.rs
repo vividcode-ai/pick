@@ -32,8 +32,7 @@ pub struct ImageDimensions {
 }
 
 /// Image render options
-#[derive(Debug, Clone)]
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub struct ImageRenderOptions {
     pub max_width_cells: Option<u32>,
     pub max_height_cells: Option<u32>,
@@ -41,7 +40,6 @@ pub struct ImageRenderOptions {
     pub image_id: Option<u32>,
     pub move_cursor: Option<bool>,
 }
-
 
 static CACHED_CAPABILITIES: OnceLock<TerminalCapabilities> = OnceLock::new();
 

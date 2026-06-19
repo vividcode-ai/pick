@@ -56,31 +56,29 @@ fn build_bedrock_request(model: &Model, context: &Context, region: &str) -> (Str
                 let mut content_blocks: Vec<serde_json::Value> = Vec::new();
                 for block in &a.content {
                     match block {
-                        ContentBlock::Text(t)
-                            if !t.text.trim().is_empty() => {
-                                content_blocks.push(serde_json::json!({"text": t.text}));
-                            }
-                        ContentBlock::Thinking(th)
-                            if !th.thinking.trim().is_empty() => {
-                                if let Some(sig) = &th.thinking_signature {
-                                    content_blocks.push(serde_json::json!({
-                                        "reasoningContent": {
-                                            "reasoningText": {
-                                                "text": th.thinking,
-                                                "signature": sig,
-                                            }
+                        ContentBlock::Text(t) if !t.text.trim().is_empty() => {
+                            content_blocks.push(serde_json::json!({"text": t.text}));
+                        }
+                        ContentBlock::Thinking(th) if !th.thinking.trim().is_empty() => {
+                            if let Some(sig) = &th.thinking_signature {
+                                content_blocks.push(serde_json::json!({
+                                    "reasoningContent": {
+                                        "reasoningText": {
+                                            "text": th.thinking,
+                                            "signature": sig,
                                         }
-                                    }));
-                                } else {
-                                    content_blocks.push(serde_json::json!({
-                                        "reasoningContent": {
-                                            "reasoningText": {
-                                                "text": th.thinking,
-                                            }
+                                    }
+                                }));
+                            } else {
+                                content_blocks.push(serde_json::json!({
+                                    "reasoningContent": {
+                                        "reasoningText": {
+                                            "text": th.thinking,
                                         }
-                                    }));
-                                }
+                                    }
+                                }));
                             }
+                        }
                         ContentBlock::ToolCall(tc) => {
                             content_blocks.push(serde_json::json!({
                                 "toolUse": {

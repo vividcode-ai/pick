@@ -108,7 +108,6 @@ pub fn build_active_path(
 pub fn build_tool_call_map(
     _nodes: &[TreeNodeInfo],
 ) -> std::collections::HashMap<String, ToolCallInfo> {
-    
     std::collections::HashMap::new()
 }
 
