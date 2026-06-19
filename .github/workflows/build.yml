@@ -236,8 +236,18 @@ jobs:
         env:
           VERSION: ${{ needs.release.outputs.version }}
           NPM_TAG: ${{ needs.release.outputs.npm_tag }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         shell: bash
         run: |
+          if [[ -n "${NPM_TOKEN}" ]]; then
+            echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
+            echo "-> Using NPM_TOKEN authentication"
+            PROVENANCE=""
+          else
+            echo "-> No NPM_TOKEN, using OIDC trusted publishing"
+            PROVENANCE="--provenance"
+          fi
+
           shopt -s nullglob
           for tarball in npm-packages/*.tgz; do
             filename=$(basename "$tarball")
@@ -255,7 +265,7 @@ jobs:
                 ;;
             esac
 
-            publish_cmd="npm publish '${tarball}' --access public --provenance"
+            publish_cmd="npm publish '${tarball}' --access public ${PROVENANCE}"
             if [[ -n "${tag}" ]]; then
               publish_cmd="${publish_cmd} --tag '${tag}'"
             fi
