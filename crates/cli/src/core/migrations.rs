@@ -80,7 +80,7 @@ fn migrate_auth_to_auth_json() -> Vec<String> {
         {
             use std::os::unix::fs::PermissionsExt;
             if let Ok(content) = serde_json::to_string_pretty(&migrated) {
-                if let Ok(_) = std::fs::write(&auth_path, &content) {
+                if std::fs::write(&auth_path, &content).is_ok() {
                     let _ = std::fs::set_permissions(
                         &auth_path,
                         std::fs::Permissions::from_mode(0o600),
