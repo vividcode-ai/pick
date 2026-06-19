@@ -68,20 +68,19 @@ pub fn parse_git_url(source: &str) -> Option<GitSource> {
 /// Split a git URL into repo and ref components
 fn split_ref(url: &str) -> (String, Option<String>) {
     // Handle SCP-like syntax: git@host:path@ref
-    if let Some(scp) = url.strip_prefix("git@") {
-        if let Some(colon_idx) = scp.find(':') {
+    if let Some(scp) = url.strip_prefix("git@")
+        && let Some(colon_idx) = scp.find(':') {
             let after_colon = &scp[colon_idx + 1..];
             if let Some(at_idx) = after_colon.rfind('@') {
                 let repo = format!("git@{}:{}", &scp[..colon_idx], &after_colon[..at_idx]);
                 return (repo, Some(after_colon[at_idx + 1..].to_string()));
             }
         }
-    }
 
     // Handle URL-like syntax
-    if url.contains("://") {
-        if let Some(at_idx) = url.rfind('@') {
-            if let Some(slash_before_at) = url[..at_idx].rfind('/') {
+    if url.contains("://")
+        && let Some(at_idx) = url.rfind('@')
+            && let Some(slash_before_at) = url[..at_idx].rfind('/') {
                 let repo = format!(
                     "{}{}",
                     &url[..=slash_before_at],
@@ -89,16 +88,13 @@ fn split_ref(url: &str) -> (String, Option<String>) {
                 );
                 return (repo, Some(url[at_idx + 1..].to_string()));
             }
-        }
-    }
 
     // Handle host/path@ref
-    if let Some(at_idx) = url.rfind('@') {
-        if let Some(_slash_idx) = url[..at_idx].find('/') {
+    if let Some(at_idx) = url.rfind('@')
+        && let Some(_slash_idx) = url[..at_idx].find('/') {
             let repo = url[..at_idx].to_string();
             return (repo, Some(url[at_idx + 1..].to_string()));
         }
-    }
 
     (url.to_string(), None)
 }

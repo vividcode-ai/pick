@@ -63,6 +63,12 @@ pub struct PermissionHookRegistry {
     permission_hooks: std::sync::Mutex<Vec<BoxedPermissionHook>>,
 }
 
+impl Default for PermissionHookRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PermissionHookRegistry {
     pub fn new() -> Self {
         Self {
@@ -116,7 +122,7 @@ impl PermissionHookRegistry {
     pub async fn run_permission_hooks(&self, ctx: &PermissionRequestContext) -> Option<bool> {
         let hook_refs = {
             let hooks = self.permission_hooks.lock().ok()?;
-            hooks.iter().map(|h| Arc::clone(h)).collect::<Vec<_>>()
+            hooks.iter().map(Arc::clone).collect::<Vec<_>>()
         };
         for hook in hook_refs.iter() {
             match hook.on_permission_request(ctx).await {
@@ -153,6 +159,12 @@ impl PermissionHookRegistry {
 /// Simple CLI approval hook that asks the user via stdin
 pub struct CliApprovalHook {
     pub name: String,
+}
+
+impl Default for CliApprovalHook {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl CliApprovalHook {

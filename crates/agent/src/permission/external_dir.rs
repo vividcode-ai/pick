@@ -65,14 +65,13 @@ impl ExternalDirectoryAuth {
             .unwrap_or(norm_path.clone());
 
         for entry in entries.iter() {
-            if let Some((entry_tool, entry_pattern)) = parse_permission_string(&entry.entry) {
-                if entry_tool == tool
-                    && (match_pattern(&entry_pattern, &norm_path)
-                        || match_pattern(&entry_pattern, &real_path))
+            if let Some((entry_tool, entry_pattern)) = parse_permission_string(&entry.entry)
+                && entry_tool == tool
+                    && (match_pattern(entry_pattern, &norm_path)
+                        || match_pattern(entry_pattern, &real_path))
                 {
                     return Some(entry.auth_type);
                 }
-            }
         }
         None
     }
@@ -104,7 +103,7 @@ impl ExternalDirectoryAuth {
         let mut entries = self.entries.lock().unwrap();
         entries.retain(|e| {
             if let Some((entry_tool, entry_pattern)) = parse_permission_string(&e.entry) {
-                !(entry_tool == tool && match_pattern(&entry_pattern, &norm_path))
+                !(entry_tool == tool && match_pattern(entry_pattern, &norm_path))
             } else {
                 true
             }
@@ -112,12 +111,11 @@ impl ExternalDirectoryAuth {
     }
 
     pub fn save(&self) -> Result<(), String> {
-        if let Some(parent) = self.file_path.parent() {
-            if !parent.exists() {
+        if let Some(parent) = self.file_path.parent()
+            && !parent.exists() {
                 std::fs::create_dir_all(parent)
                     .map_err(|e| format!("Failed to create auth dir: {}", e))?;
             }
-        }
         let entries = self.entries.lock().unwrap();
         let auth_file = AuthFile {
             permissions: PermissionsBlock {
@@ -146,8 +144,8 @@ impl ExternalDirectoryAuth {
             if let Some((entry_tool, entry_pattern)) = parse_permission_string(&e.entry) {
                 entry_tool == tool
                     && e.auth_type == AuthType::Once
-                    && (match_pattern(&entry_pattern, &norm_path)
-                        || match_pattern(&entry_pattern, &real_path))
+                    && (match_pattern(entry_pattern, &norm_path)
+                        || match_pattern(entry_pattern, &real_path))
             } else {
                 false
             }
@@ -175,7 +173,7 @@ impl ExternalDirectoryAuth {
             if let Some((entry_tool, entry_pattern)) = parse_permission_string(&e.entry) {
                 !(entry_tool == tool
                     && e.auth_type == AuthType::Permanent
-                    && match_pattern(&entry_pattern, &norm_pattern))
+                    && match_pattern(entry_pattern, &norm_pattern))
             } else {
                 true
             }
@@ -221,7 +219,7 @@ pub async fn check_authorization(
         return Ok(true);
     }
 
-    if let Some(ref ask) = question {
+    if let Some(ask) = question {
         let answers = ask(vec![QuestionPrompt {
             header: "External Directory Access".into(),
             question: format!(

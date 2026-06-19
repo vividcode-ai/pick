@@ -144,12 +144,12 @@ fn key_code_matches(actual: &KeyCode, expected: &str) -> bool {
         KeyCode::Down => expected == "down",
         KeyCode::Left => expected == "left",
         KeyCode::Right => expected == "right",
-        KeyCode::F(n) => expected == &format!("f{}", n),
+        KeyCode::F(n) => expected == format!("f{}", n),
         KeyCode::Char(c) => {
             if c == &' ' {
                 expected == "space"
             } else {
-                expected.len() == 1 && expected.chars().next().map_or(false, |ec| ec == *c)
+                expected.len() == 1 && expected.starts_with(*c)
             }
         }
         _ => false,

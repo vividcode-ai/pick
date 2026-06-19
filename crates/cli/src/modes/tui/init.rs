@@ -193,7 +193,7 @@ pub(crate) async fn init_tui_mode(
     });
 
     // Enable bracketed paste mode
-    let _ = print!("\x1b[?2004h");
+    print!("\x1b[?2004h");
     let _ = std::io::Write::flush(&mut std::io::stdout());
 
     // Tool tracking state
@@ -322,13 +322,12 @@ pub(crate) fn update_model(provider: &str, model_id: &str) -> (AiModel, String) 
 /// Set API key env var for a given provider
 pub(crate) async fn update_api_key(auth: &AuthStorage, provider: &str) {
     let env_var = format!("{}_API_KEY", provider.to_uppercase().replace('-', "_"));
-    if std::env::var(&env_var).is_err() {
-        if let Some(key) = auth.get_api_key(provider, true).await {
+    if std::env::var(&env_var).is_err()
+        && let Some(key) = auth.get_api_key(provider, true).await {
             unsafe {
                 std::env::set_var(&env_var, key);
             }
         }
-    }
 }
 
 /// Save model/provider as default in global settings

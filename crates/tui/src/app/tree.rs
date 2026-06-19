@@ -413,14 +413,13 @@ impl TuiApp {
                 spans.push(Span::raw(display));
 
                 // Label timestamp
-                if tv.show_label_timestamps {
-                    if let Some(ref ts) = item.label_timestamp {
+                if tv.show_label_timestamps
+                    && let Some(ref ts) = item.label_timestamp {
                         let ts_secs = ts.parse::<i64>().unwrap_or(0) / 1000;
                         let hours = (ts_secs / 3600) % 24;
                         let mins = (ts_secs / 60) % 60;
                         spans.push(Span::styled(format!(" {:02}:{:02}", hours, mins), dim));
                     }
-                }
 
                 let line = Line::from(spans);
                 result.push(if selected {

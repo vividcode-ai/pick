@@ -81,7 +81,7 @@ pub async fn select_session(
                 if let Some(session) = sessions.get(idx) {
                     let path = &session.path;
                     // Confirm deletion
-                    if confirm_deletion(&session) {
+                    if confirm_deletion(session) {
                         let _ = std::fs::remove_file(path);
                     }
                 }
@@ -120,7 +120,7 @@ fn render_session_item(idx: usize, session: &SessionInfo) -> Vec<String> {
 
     // Short ID
     let short_id = if session.id.len() > 8 {
-        format!("{}", &session.id[..8])
+        session.id[..8].to_string()
     } else {
         session.id.clone()
     };

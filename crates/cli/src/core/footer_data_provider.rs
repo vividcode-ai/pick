@@ -244,7 +244,7 @@ impl FooterDataProvider {
         };
 
         let mut cache = self.cached_branch.lock().unwrap();
-        if cache.as_ref().map(|c| c.as_deref()).flatten() != branch.as_deref() {
+        if cache.as_ref().and_then(|c| c.as_deref()) != branch.as_deref() {
             *cache = Some(branch);
             drop(cache);
             self.notify_branch_change();

@@ -23,8 +23,8 @@ pub fn slice_with_width(line: &str, start_col: usize, length: usize) -> SliceRes
 
     let bytes = line.as_bytes();
     while i < bytes.len() {
-        if bytes[i] == 0x1b {
-            if let Some(m) = extract_ansi_code(line, i) {
+        if bytes[i] == 0x1b
+            && let Some(m) = extract_ansi_code(line, i) {
                 if current_col >= start_col && current_col < end_col {
                     result.push_str(&m.code);
                 } else if current_col < start_col {
@@ -33,7 +33,6 @@ pub fn slice_with_width(line: &str, start_col: usize, length: usize) -> SliceRes
                 i += m.length;
                 continue;
             }
-        }
 
         let c = line[i..].chars().next().unwrap_or(' ');
         let c_width = UnicodeWidthStr::width(c.to_string().as_str());
@@ -93,8 +92,8 @@ pub fn extract_segments(
 
     let bytes = line.as_bytes();
     while i < bytes.len() {
-        if bytes[i] == 0x1b {
-            if let Some(m) = extract_ansi_code(line, i) {
+        if bytes[i] == 0x1b
+            && let Some(m) = extract_ansi_code(line, i) {
                 style_tracker.process(&m.code);
                 if current_col < before_end {
                     pending_ansi_before.push_str(&m.code);
@@ -104,7 +103,6 @@ pub fn extract_segments(
                 i += m.length;
                 continue;
             }
-        }
 
         let c = line[i..].chars().next().unwrap_or(' ');
         let c_width = UnicodeWidthStr::width(c.to_string().as_str());

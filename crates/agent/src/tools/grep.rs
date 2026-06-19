@@ -147,8 +147,7 @@ pub fn create_grep_tool() -> AgentTool {
 
                 // Build glob filter regex if specified
                 let glob_re = glob_filter
-                    .map(|g| regex::Regex::new(&glob_to_regex(g)).ok())
-                    .flatten();
+                    .and_then(|g| regex::Regex::new(&glob_to_regex(g)).ok());
 
                 let mut results: Vec<String> = Vec::new();
                 let mut count = 0;

@@ -60,11 +60,10 @@ impl ExtensionRunner {
     pub fn has_handlers(&self, event_type: &str) -> bool {
         if let Ok(extensions) = self.extensions.read() {
             for ext in extensions.iter() {
-                if let Some(handlers) = ext.handlers.get(event_type) {
-                    if !handlers.is_empty() {
+                if let Some(handlers) = ext.handlers.get(event_type)
+                    && !handlers.is_empty() {
                         return true;
                     }
-                }
             }
         }
         false

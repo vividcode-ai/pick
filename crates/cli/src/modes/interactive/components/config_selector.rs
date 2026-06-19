@@ -265,8 +265,8 @@ pub fn filter_entries(entries: &[FlatEntry], query: &str) -> Vec<FlatEntry> {
     let mut matching_subgroups = std::collections::HashSet::new();
 
     for entry in entries {
-        if let FlatEntry::Item(item) = entry {
-            if matching_paths.contains(&item.path) {
+        if let FlatEntry::Item(item) = entry
+            && matching_paths.contains(&item.path) {
                 let sub_key = format!("{}:{}", item.resource_type.label(), item.path);
                 matching_subgroups.insert(sub_key);
 
@@ -279,7 +279,6 @@ pub fn filter_entries(entries: &[FlatEntry], query: &str) -> Vec<FlatEntry> {
                 );
                 matching_groups.insert(group_key);
             }
-        }
     }
 
     let mut result = Vec::new();

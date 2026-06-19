@@ -22,6 +22,12 @@ pub struct McpManager {
     executor: Arc<Mutex<McpToolExecutor>>,
 }
 
+impl Default for McpManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl McpManager {
     pub fn new() -> Self {
         Self {

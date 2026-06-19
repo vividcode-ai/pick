@@ -720,15 +720,14 @@ fn ansi_to_color(ansi: &str, default: ratatui::style::Color) -> ratatui::style::
         return default;
     }
     let parts: Vec<&str> = ansi.trim_end_matches('m').split(';').collect();
-    if parts.len() >= 3 {
-        if let (Ok(r), Ok(g), Ok(b)) = (
+    if parts.len() >= 3
+        && let (Ok(r), Ok(g), Ok(b)) = (
             parts[parts.len() - 3].parse::<u8>(),
             parts[parts.len() - 2].parse::<u8>(),
             parts[parts.len() - 1].parse::<u8>(),
         ) {
             return ratatui::style::Color::Rgb(r, g, b);
         }
-    }
     default
 }
 

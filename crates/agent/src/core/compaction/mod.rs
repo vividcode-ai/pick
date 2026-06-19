@@ -22,30 +22,24 @@ pub fn calculate_context_tokens(usage: &Usage) -> u64 {
 
 /// Get usage from an assistant message entry
 fn get_entry_usage(entry: &SessionEntry) -> Option<Usage> {
-    if let SessionEntryKind::Message(msg) = &entry.kind {
-        if msg.role == "assistant" {
-            if let Some(usage_val) = &msg.usage {
-                if let Ok(usage) = serde_json::from_value::<Usage>(usage_val.clone()) {
+    if let SessionEntryKind::Message(msg) = &entry.kind
+        && msg.role == "assistant"
+            && let Some(usage_val) = &msg.usage
+                && let Ok(usage) = serde_json::from_value::<Usage>(usage_val.clone()) {
                     return Some(usage);
                 }
-            }
-        }
-    }
     None
 }
 
 /// Find the last non-aborted assistant message usage from session entries
 pub fn get_last_assistant_usage(entries: &[SessionEntry]) -> Option<Usage> {
     for entry in entries.iter().rev() {
-        if let SessionEntryKind::Message(msg) = &entry.kind {
-            if msg.role == "assistant" {
-                if let Some(usage_val) = &msg.usage {
-                    if let Ok(usage) = serde_json::from_value::<Usage>(usage_val.clone()) {
+        if let SessionEntryKind::Message(msg) = &entry.kind
+            && msg.role == "assistant"
+                && let Some(usage_val) = &msg.usage
+                    && let Ok(usage) = serde_json::from_value::<Usage>(usage_val.clone()) {
                         return Some(usage);
                     }
-                }
-            }
-        }
     }
     None
 }
@@ -114,7 +108,7 @@ pub fn estimate_entry_tokens(entry: &SessionEntry) -> u64 {
 }
 
 fn ceil_div(a: u64, b: u64) -> u64 {
-    (a + b - 1) / b
+    a.div_ceil(b)
 }
 
 /// Estimate context tokens from session entries
@@ -198,11 +192,10 @@ pub fn find_turn_start_index(
     let mut i = entry_index as isize;
     while i >= start_index as isize {
         match &entries[i as usize].kind {
-            SessionEntryKind::Message(msg) => {
-                if msg.role == "user" || msg.role == "bashExecution" {
+            SessionEntryKind::Message(msg)
+                if (msg.role == "user" || msg.role == "bashExecution") => {
                     return i;
                 }
-            }
             SessionEntryKind::BranchSummary(_) | SessionEntryKind::Custom(_) => {
                 return i;
             }
@@ -298,11 +291,10 @@ pub fn extract_file_operations(
 
     // Extract from tool calls in message entries
     for entry in entries {
-        if let SessionEntryKind::Message(msg) = &entry.kind {
-            if msg.role == "assistant" {
+        if let SessionEntryKind::Message(msg) = &entry.kind
+            && msg.role == "assistant" {
                 extract_file_ops_from_content(&msg.content, &mut file_ops);
             }
-        }
     }
 
     file_ops
@@ -312,9 +304,9 @@ pub fn extract_file_operations(
 fn extract_file_ops_from_content(content: &serde_json::Value, file_ops: &mut FileOperations) {
     if let Some(blocks) = content.as_array() {
         for block in blocks {
-            if let Some(block_type) = block.get("type").and_then(|t| t.as_str()) {
-                if block_type == "toolCall" || block_type == "tool_use" {
-                    if let Some(name) = block.get("name").and_then(|n| n.as_str()) {
+            if let Some(block_type) = block.get("type").and_then(|t| t.as_str())
+                && (block_type == "toolCall" || block_type == "tool_use")
+                    && let Some(name) = block.get("name").and_then(|n| n.as_str()) {
                         let args = block.get("arguments").or_else(|| block.get("input"));
                         let paths = extract_paths_from_args(args);
                         match name {
@@ -342,8 +334,6 @@ fn extract_file_ops_from_content(content: &serde_json::Value, file_ops: &mut Fil
                             _ => {}
                         }
                     }
-                }
-            }
         }
     }
 }
@@ -351,15 +341,14 @@ fn extract_file_ops_from_content(content: &serde_json::Value, file_ops: &mut Fil
 /// Extract file paths from tool call arguments
 fn extract_paths_from_args(args: Option<&serde_json::Value>) -> Vec<String> {
     let mut paths = Vec::new();
-    if let Some(args) = args {
-        if let Some(file_path) = args
+    if let Some(args) = args
+        && let Some(file_path) = args
             .get("file_path")
             .or_else(|| args.get("path"))
             .and_then(|v| v.as_str())
         {
             paths.push(file_path.to_string());
         }
-    }
     paths
 }
 

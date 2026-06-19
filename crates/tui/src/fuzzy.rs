@@ -62,7 +62,7 @@ fn match_query(query: &str, text: &str) -> FuzzyMatch {
         }
         if tc == query_chars[query_idx] {
             let is_word_boundary = i == 0
-                || text_chars.get(i.wrapping_sub(1)).map_or(false, |&c| {
+                || text_chars.get(i.wrapping_sub(1)).is_some_and(|&c| {
                     c == ' ' || c == '-' || c == '_' || c == '.' || c == '/' || c == ':'
                 });
 
@@ -160,7 +160,6 @@ where
     }
 
     let tokens: Vec<&str> = query
-        .trim()
         .split_whitespace()
         .filter(|t| !t.is_empty())
         .collect();

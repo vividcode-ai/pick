@@ -106,11 +106,10 @@ pub(crate) async fn apply_tui_command_persist(
     match cmd {
         TuiCommand::SetSessionTitle(title) => {
             tui.set_session_name(title.clone());
-            if session_mgr.get_session_name() != Some(title.as_str()) {
-                if let Err(e) = session_mgr.append_session_info(&title).await {
+            if session_mgr.get_session_name() != Some(title.as_str())
+                && let Err(e) = session_mgr.append_session_info(&title).await {
                     tui.show_error(&format!("Failed to persist session title: {}", e));
                 }
-            }
         }
         other => apply_tui_command(tui, other),
     }

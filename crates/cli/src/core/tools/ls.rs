@@ -70,7 +70,7 @@ impl LsToolDefinition {
         }
 
         // Sort alphabetically, case-insensitive
-        results.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
+        results.sort_by_key(|a| a.to_lowercase());
 
         if results.is_empty() {
             return Ok(LsOutput {
@@ -196,11 +196,10 @@ pub fn render_ls_result(
         if let Some(el) = details.entry_limit_reached {
             warnings.push(format!("{} entries limit", el));
         }
-        if let Some(ref truncation) = details.truncation {
-            if truncation.truncated {
+        if let Some(ref truncation) = details.truncation
+            && truncation.truncated {
                 warnings.push(format!("{} limit", format_size(truncation.max_bytes)));
             }
-        }
         if !warnings.is_empty() {
             formatted.push_str(&format!(
                 "\n{}",

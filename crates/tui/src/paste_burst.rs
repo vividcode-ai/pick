@@ -110,7 +110,7 @@ impl PasteBurst {
                 CharAction::Passthrough
             }
             PasteBurstState::Watching => {
-                let is_fast = gap.map_or(false, |g| g < CHAR_INTERVAL_MS);
+                let is_fast = gap.is_some_and(|g| g < CHAR_INTERVAL_MS);
                 if is_fast {
                     self.consecutive_count += 1;
                     self.last_char_time = Some(now);
@@ -141,7 +141,7 @@ impl PasteBurst {
                 }
             }
             PasteBurstState::Buffering => {
-                let is_fast = gap.map_or(false, |g| g < CHAR_INTERVAL_MS);
+                let is_fast = gap.is_some_and(|g| g < CHAR_INTERVAL_MS);
                 if is_fast {
                     self.buffer.push(c);
                     self.last_char_time = Some(now);

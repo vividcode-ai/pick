@@ -165,7 +165,7 @@ fn add_ignore_rules(ig: &mut SkillIgnoreMatcher, dir: &Path, root_dir: &Path) {
         }
         if let Ok(content) = std::fs::read_to_string(&ignore_path) {
             let patterns: Vec<String> = content
-                .split(|c: char| c == '\r' || c == '\n')
+                .split(['\r', '\n'])
                 .filter_map(|line| prefix_ignore_pattern(line, &prefix))
                 .collect();
             if !patterns.is_empty() {

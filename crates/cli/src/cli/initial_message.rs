@@ -21,17 +21,15 @@ pub struct InitialMessageResult {
 pub fn build_initial_message(input: InitialMessageInput) -> InitialMessageResult {
     let mut parts: Vec<String> = Vec::new();
 
-    if let Some(stdin) = input.stdin_content {
-        if !stdin.is_empty() {
+    if let Some(stdin) = input.stdin_content
+        && !stdin.is_empty() {
             parts.push(stdin);
         }
-    }
 
-    if let Some(file_text) = input.file_text {
-        if !file_text.is_empty() {
+    if let Some(file_text) = input.file_text
+        && !file_text.is_empty() {
             parts.push(file_text);
         }
-    }
 
     // Consume the first message from parsed args
     let mut parsed = input.parsed;

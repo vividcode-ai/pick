@@ -102,6 +102,7 @@ pub struct McpServerConfigJson {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Default)]
 pub struct Settings {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_changelog_version: Option<String>,
@@ -189,51 +190,3 @@ pub struct Settings {
     pub extra: HashMap<String, serde_json::Value>,
 }
 
-impl Default for Settings {
-    fn default() -> Self {
-        Self {
-            last_changelog_version: None,
-            default_provider: None,
-            default_model: None,
-            default_thinking_level: None,
-            transport: None,
-            theme: None,
-            compaction: None,
-            branch_summary: None,
-            retry: None,
-            shell_path: None,
-            shell_command_prefix: None,
-            npm_command: None,
-            quiet_startup: None,
-            hide_thinking_block: None,
-            collapse_changelog: None,
-            enable_skill_commands: None,
-            steering_mode: None,
-            follow_up_mode: None,
-            double_escape_action: None,
-            tree_filter_mode: None,
-            show_hardware_cursor: None,
-            editor_padding_x: None,
-            autocomplete_max_visible: None,
-            http_idle_timeout_ms: None,
-            packages: None,
-            prompts: None,
-            themes: None,
-            markdown: None,
-            warnings: None,
-            terminal: None,
-            images: None,
-            thinking_budgets: None,
-            enabled_models: None,
-            extensions: None,
-            skills: None,
-            session_dir: None,
-            enable_install_telemetry: None,
-            mcp_servers: None,
-            permission: None,
-            check_for_update_on_startup: None,
-            dismissed_update_version: None,
-            extra: HashMap::new(),
-        }
-    }
-}

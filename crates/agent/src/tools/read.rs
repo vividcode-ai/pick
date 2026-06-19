@@ -154,8 +154,8 @@ pub fn create_read_tool() -> AgentTool {
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| "Missing path argument".to_string())?;
 
-                if let (Some(ref policy), Some(ref cwd)) = (ctx.fs_policy, ctx.cwd) {
-                    if let Err(_e) = policy.can_read(std::path::Path::new(file_path), cwd) {
+                if let (Some(ref policy), Some(ref cwd)) = (ctx.fs_policy, ctx.cwd)
+                    && let Err(_e) = policy.can_read(std::path::Path::new(file_path), cwd) {
                         // Protected paths (e.g. .git/**) are hard denied, not authorizable
                         if policy.is_path_protected(std::path::Path::new(file_path), cwd).unwrap_or(false) {
                             return Ok(AgentToolResult {
@@ -183,7 +183,6 @@ pub fn create_read_tool() -> AgentTool {
                             });
                         }
                     }
-                }
 
                 let content_blocks = read_file(file_path).await?;
 
@@ -191,8 +190,8 @@ pub fn create_read_tool() -> AgentTool {
                 let offset = args.get("offset").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
                 let limit = args.get("limit").and_then(|v| v.as_u64());
 
-                if (offset > 0 || limit.is_some()) && content_blocks.len() == 1 {
-                    if let ContentBlock::Text(ref tc) = content_blocks[0] {
+                if (offset > 0 || limit.is_some()) && content_blocks.len() == 1
+                    && let ContentBlock::Text(ref tc) = content_blocks[0] {
                         let lines: Vec<&str> = tc.text.split('\n').collect();
                         let start = offset.saturating_sub(1);
                         let selected: Vec<&str> = if let Some(lim) = limit {
@@ -206,7 +205,6 @@ pub fn create_read_tool() -> AgentTool {
                             terminate: false,
                         });
                     }
-                }
 
                 Ok(AgentToolResult {
                     content: content_blocks,

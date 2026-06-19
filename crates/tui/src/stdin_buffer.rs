@@ -144,13 +144,12 @@ fn extract_complete_sequences(buffer: &str) -> (Vec<String>, String) {
                     SequenceStatus::Complete => {
                         if candidate == "\x1b\x1b" {
                             let next = remaining.chars().nth(seq_end);
-                            if let Some(nc) = next {
-                                if nc == '[' || nc == ']' || nc == 'O' || nc == 'P' || nc == '_' {
+                            if let Some(nc) = next
+                                && (nc == '[' || nc == ']' || nc == 'O' || nc == 'P' || nc == '_') {
                                     sequences.push(ESC.to_string());
                                     pos += 1;
                                     break;
                                 }
-                            }
                         }
                         sequences.push(candidate);
                         pos += seq_end;
@@ -279,14 +278,12 @@ impl StdinBuffer {
     }
 
     fn emit_data_sequence(&mut self, sequence: &str) {
-        if sequence.len() == 1 {
-            if let Some(cp) = sequence.chars().next().map(|c| c as u32) {
-                if Some(cp) == self.pending_kitty_codepoint {
+        if sequence.len() == 1
+            && let Some(cp) = sequence.chars().next().map(|c| c as u32)
+                && Some(cp) == self.pending_kitty_codepoint {
                     self.pending_kitty_codepoint = None;
                     return;
                 }
-            }
-        }
         self.pending_kitty_codepoint = parse_kitty_printable_codepoint(sequence);
     }
 

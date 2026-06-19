@@ -76,11 +76,10 @@ impl SessionStorage for JsonlStorage {
             return Ok(None);
         }
         let content = tokio::fs::read_to_string(&self.path).await?;
-        if let Some(first_line) = content.lines().next() {
-            if let Ok(header) = serde_json::from_str::<SessionHeader>(first_line) {
+        if let Some(first_line) = content.lines().next()
+            && let Ok(header) = serde_json::from_str::<SessionHeader>(first_line) {
                 return Ok(Some(header));
             }
-        }
         Ok(None)
     }
 
@@ -112,6 +111,12 @@ impl SessionStorage for JsonlStorage {
 pub struct MemoryStorage {
     entries: Arc<Mutex<Vec<SessionEntry>>>,
     header: Arc<Mutex<Option<SessionHeader>>>,
+}
+
+impl Default for MemoryStorage {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl MemoryStorage {

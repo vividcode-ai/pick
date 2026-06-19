@@ -97,11 +97,10 @@ pub fn read_single_key() -> Option<char> {
     loop {
         match crossterm::event::read().ok()? {
             Event::Key(key) => {
-                if key.kind == KeyEventKind::Press {
-                    if let KeyCode::Char(c) = key.code {
+                if key.kind == KeyEventKind::Press
+                    && let KeyCode::Char(c) = key.code {
                         return Some(c);
                     }
-                }
                 continue;
             }
             _ => continue,
@@ -161,7 +160,7 @@ pub fn show_session_preview(
     }
 
     lines.push(String::new());
-    lines.push(format!("\x1b[2mPress any key to close preview\x1b[0m"));
+    lines.push("\x1b[2mPress any key to close preview\x1b[0m".to_string());
 
     let output = format!("{}{}", crossterm::cursor::MoveTo(0, 0), lines.join("\r\n"));
 

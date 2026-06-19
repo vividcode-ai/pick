@@ -100,6 +100,7 @@ pub type QuestionFn = std::sync::Arc<
 >;
 
 /// Context passed to tool execute functions, including cancellation and progress reporting.
+#[derive(Default)]
 pub struct ToolContext {
     pub cancel: Option<tokio::sync::watch::Receiver<bool>>,
     pub progress: Option<mpsc::UnboundedSender<String>>,
@@ -149,23 +150,6 @@ impl std::fmt::Debug for ToolContext {
     }
 }
 
-impl Default for ToolContext {
-    fn default() -> Self {
-        Self {
-            cancel: None,
-            progress: None,
-            approve: None,
-            question: None,
-            agent_id: None,
-            agent_registry: None,
-            default_model: None,
-            fs_policy: None,
-            cwd: None,
-            permission_manager: None,
-            sandbox: None,
-        }
-    }
-}
 
 /// Result from a tool execution
 #[derive(Debug, Clone)]

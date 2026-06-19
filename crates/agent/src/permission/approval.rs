@@ -2,12 +2,14 @@
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum ApprovalPolicy {
     /// Ask for approval of everything except known-safe commands
     UnlessTrusted,
     /// Auto-approve everything; escalate to user on sandbox failure
     OnFailure,
     /// Model decides when to ask
+    #[default]
     OnRequest,
     /// Fine-grained control via GranularApprovalConfig
     Granular,
@@ -15,11 +17,6 @@ pub enum ApprovalPolicy {
     Never,
 }
 
-impl Default for ApprovalPolicy {
-    fn default() -> Self {
-        Self::OnRequest
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct GranularApprovalConfig {

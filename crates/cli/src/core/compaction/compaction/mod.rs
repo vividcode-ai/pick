@@ -105,7 +105,7 @@ pub fn estimate_tokens(message: &Value) -> usize {
             .unwrap_or(0),
         _ => 0,
     };
-    (chars + 3) / 4
+    chars.div_ceil(4)
 }
 
 pub fn estimate_context_tokens(messages: &[Value]) -> ContextUsageEstimate {
@@ -113,7 +113,7 @@ pub fn estimate_context_tokens(messages: &[Value]) -> ContextUsageEstimate {
 
     match usage_info {
         None => {
-            let estimated: usize = messages.iter().map(|m| estimate_tokens(m)).sum();
+            let estimated: usize = messages.iter().map(estimate_tokens).sum();
             ContextUsageEstimate {
                 tokens: estimated,
                 usage_tokens: 0,
@@ -125,7 +125,7 @@ pub fn estimate_context_tokens(messages: &[Value]) -> ContextUsageEstimate {
             let usage_tokens = calculate_context_tokens(&info.usage);
             let trailing_tokens: usize = messages[(info.index + 1)..]
                 .iter()
-                .map(|m| estimate_tokens(m))
+                .map(estimate_tokens)
                 .sum();
             ContextUsageEstimate {
                 tokens: usage_tokens + trailing_tokens,
@@ -279,8 +279,8 @@ fn extract_file_operations(
     let mut file_ops = create_file_ops();
     if prev_compaction_index >= 0 {
         let prev_compaction = &entries[prev_compaction_index as usize];
-        if prev_compaction.get("fromHook") != Some(&Value::Bool(true)) {
-            if let Some(details) = prev_compaction.get("details") {
+        if prev_compaction.get("fromHook") != Some(&Value::Bool(true))
+            && let Some(details) = prev_compaction.get("details") {
                 if let Some(read_files) = details.get("readFiles").and_then(|v| v.as_array()) {
                     for f in read_files {
                         if let Some(s) = f.as_str() {
@@ -298,7 +298,6 @@ fn extract_file_operations(
                     }
                 }
             }
-        }
     }
     for msg in messages {
         extract_file_ops_from_message(msg, &mut file_ops);
@@ -371,14 +370,14 @@ pub fn prepare_compaction(
 
     let messages_to_summarize: Vec<Value> = path_entries[boundary_start..history_end]
         .iter()
-        .filter_map(|e| get_message_from_entry_for_compaction(e))
+        .filter_map(get_message_from_entry_for_compaction)
         .collect();
 
     let turn_prefix_messages: Vec<Value> = if cut_point.is_split_turn {
         if let Some(turn_start) = cut_point.turn_start_index {
             path_entries[turn_start..cut_point.first_kept_entry_index]
                 .iter()
-                .filter_map(|e| get_message_from_entry_for_compaction(e))
+                .filter_map(get_message_from_entry_for_compaction)
                 .collect()
         } else {
             Vec::new()
@@ -483,14 +482,13 @@ fn get_last_assistant_usage_info(messages: &[Value]) -> Option<UsageInfo> {
     for (i, msg) in messages.iter().enumerate().rev() {
         if msg.get("role").and_then(|v| v.as_str()) == Some("assistant") {
             let stop_reason = msg.get("stopReason").and_then(|v| v.as_str()).unwrap_or("");
-            if stop_reason != "aborted" && stop_reason != "error" {
-                if let Some(usage) = msg.get("usage") {
+            if stop_reason != "aborted" && stop_reason != "error"
+                && let Some(usage) = msg.get("usage") {
                     return Some(UsageInfo {
                         usage: usage.clone(),
                         index: i,
                     });
                 }
-            }
         }
     }
     None
@@ -500,11 +498,10 @@ pub fn get_last_assistant_usage(entries: &[Value]) -> Option<Value> {
     for entry in entries.iter().rev() {
         let msg = entry.get("message")?;
         let stop_reason = msg.get("stopReason").and_then(|v| v.as_str()).unwrap_or("");
-        if stop_reason != "aborted" && stop_reason != "error" {
-            if let Some(usage) = msg.get("usage") {
+        if stop_reason != "aborted" && stop_reason != "error"
+            && let Some(usage) = msg.get("usage") {
                 return Some(usage.clone());
             }
-        }
     }
     None
 }

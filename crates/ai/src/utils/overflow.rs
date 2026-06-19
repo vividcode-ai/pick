@@ -39,7 +39,7 @@ const NON_OVERFLOW_PATTERNS: &[&str] = &[
 fn matches_any(s: &str, patterns: &[&str]) -> bool {
     patterns
         .iter()
-        .any(|p| regex::Regex::new(p).map_or(false, |re| re.is_match(s)))
+        .any(|p| regex::Regex::new(p).is_ok_and(|re| re.is_match(s)))
 }
 
 /// Check if an assistant message represents a context overflow error.
@@ -54,14 +54,13 @@ fn matches_any(s: &str, patterns: &[&str]) -> bool {
 /// length-stop overflow (Xiaomi MiMo style).
 pub fn is_context_overflow(message: &AssistantMessage, context_window: Option<u64>) -> bool {
     // Case 1: Check error message patterns
-    if message.stop_reason == crate::types::StopReason::Error {
-        if let Some(ref err_msg) = message.error_message {
+    if message.stop_reason == crate::types::StopReason::Error
+        && let Some(ref err_msg) = message.error_message {
             let is_non_overflow = matches_any(err_msg, NON_OVERFLOW_PATTERNS);
             if !is_non_overflow && matches_any(err_msg, OVERFLOW_PATTERNS) {
                 return true;
             }
         }
-    }
 
     // Case 2: Silent overflow (z.ai style) - successful but usage exceeds context
     if let Some(cw) = context_window {

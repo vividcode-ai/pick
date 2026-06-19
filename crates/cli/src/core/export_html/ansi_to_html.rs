@@ -108,7 +108,7 @@ fn has_style(style: &TextStyle) -> bool {
 fn apply_sgr_code(params: &[u16], style: &mut TextStyle) {
     let mut i = 0;
     while i < params.len() {
-        let code = params[i] as u16;
+        let code = params[i];
 
         match code {
             0 => {

@@ -43,11 +43,10 @@ static PROVIDER_ENV_MAP: LazyLock<HashMap<&'static str, &'static [&'static str]>
 pub fn get_env_api_key(provider: &str) -> Option<String> {
     if let Some(env_vars) = PROVIDER_ENV_MAP.get(provider) {
         for &var in env_vars.iter() {
-            if let Ok(val) = std::env::var(var) {
-                if !val.is_empty() {
+            if let Ok(val) = std::env::var(var)
+                && !val.is_empty() {
                     return Some(val);
                 }
-            }
         }
     }
     None

@@ -15,36 +15,12 @@ fn normalise_for_fuzzy_match(text: &str) -> String {
         .collect::<Vec<_>>()
         .join("\n")
         // Smart quotes → ASCII
-        .replace('\u{2018}', "'")
-        .replace('\u{2019}', "'")
-        .replace('\u{201A}', "'")
-        .replace('\u{201B}', "'")
-        .replace('\u{201C}', "\"")
-        .replace('\u{201D}', "\"")
-        .replace('\u{201E}', "\"")
-        .replace('\u{201F}', "\"")
+        .replace(['\u{2018}', '\u{2019}', '\u{201A}', '\u{201B}'], "'")
+        .replace(['\u{201C}', '\u{201D}', '\u{201E}', '\u{201F}'], "\"")
         // Dashes → hyphen
-        .replace('\u{2010}', "-")
-        .replace('\u{2011}', "-")
-        .replace('\u{2012}', "-")
-        .replace('\u{2013}', "-")
-        .replace('\u{2014}', "-")
-        .replace('\u{2015}', "-")
-        .replace('\u{2212}', "-")
+        .replace(['\u{2010}', '\u{2011}', '\u{2012}', '\u{2013}', '\u{2014}', '\u{2015}', '\u{2212}'], "-")
         // Special spaces → regular space
-        .replace('\u{00A0}', " ")
-        .replace('\u{2002}', " ")
-        .replace('\u{2003}', " ")
-        .replace('\u{2004}', " ")
-        .replace('\u{2005}', " ")
-        .replace('\u{2006}', " ")
-        .replace('\u{2007}', " ")
-        .replace('\u{2008}', " ")
-        .replace('\u{2009}', " ")
-        .replace('\u{200A}', " ")
-        .replace('\u{202F}', " ")
-        .replace('\u{205F}', " ")
-        .replace('\u{3000}', " ")
+        .replace(['\u{00A0}', '\u{2002}', '\u{2003}', '\u{2004}', '\u{2005}', '\u{2006}', '\u{2007}', '\u{2008}', '\u{2009}', '\u{200A}', '\u{202F}', '\u{205F}', '\u{3000}'], " ")
 }
 
 /// Try to find old_text in content — exact match first, then fuzzy
@@ -319,8 +295,8 @@ pub fn create_edit_tool() -> AgentTool {
             Box::pin(async move {
                 let file_path = args.get("file_path").or_else(|| args.get("path")).and_then(|v| v.as_str()).ok_or_else(|| "Missing path".to_string())?;
 
-                if let (Some(ref policy), Some(ref cwd)) = (ctx.fs_policy, ctx.cwd) {
-                    if let Err(_e) = policy.can_write(std::path::Path::new(file_path), cwd) {
+                if let (Some(ref policy), Some(ref cwd)) = (ctx.fs_policy, ctx.cwd)
+                    && let Err(_e) = policy.can_write(std::path::Path::new(file_path), cwd) {
                         // Protected paths (e.g. .git/**) are hard denied, not authorizable
                         if policy.is_path_protected(std::path::Path::new(file_path), cwd).unwrap_or(false) {
                             return Ok(AgentToolResult {
@@ -348,7 +324,6 @@ pub fn create_edit_tool() -> AgentTool {
                             });
                         }
                     }
-                }
 
                 // Collect edits from either the single oldText/newText or the edits[] array
                 let mut edits: Vec<(String, String)> = Vec::new();

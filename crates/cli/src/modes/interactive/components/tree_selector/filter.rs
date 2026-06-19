@@ -19,22 +19,20 @@ pub fn filter_tree_nodes(
         .iter()
         .filter(|fnode| {
             let node = &nodes[fnode.node_idx];
-            let is_current = current_leaf_id.map_or(false, |id| id == node.entry_id);
+            let is_current = current_leaf_id.is_some_and(|id| id == node.entry_id);
 
             if node.entry_type == "message"
                 && node.role.as_deref() == Some("assistant")
                 && !is_current
-            {
-                if !has_text_content(node.content_text.as_deref()) {
+                && !has_text_content(node.content_text.as_deref()) {
                     let is_error = node
                         .stop_reason
                         .as_deref()
-                        .map_or(false, |r| r != "stop" && r != "toolUse");
+                        .is_some_and(|r| r != "stop" && r != "toolUse");
                     if !is_error {
                         return false;
                     }
                 }
-            }
 
             match filter_mode {
                 TreeFilterMode::UserOnly => {
@@ -92,11 +90,10 @@ pub fn filter_tree_nodes(
         for fnode in flat_nodes {
             let node = &nodes[fnode.node_idx];
             let id = &node.entry_id;
-            if let Some(parent) = parent_map.get(id.as_str()) {
-                if folded_nodes.contains(*parent) || skip.contains(*parent) {
+            if let Some(parent) = parent_map.get(id.as_str())
+                && (folded_nodes.contains(*parent) || skip.contains(*parent)) {
                     skip.insert(id.clone());
                 }
-            }
         }
         skip
     };
@@ -113,7 +110,7 @@ pub fn filter_tree_nodes(
 }
 
 fn has_text_content(content_text: Option<&str>) -> bool {
-    content_text.map_or(false, |t| !t.trim().is_empty())
+    content_text.is_some_and(|t| !t.trim().is_empty())
 }
 
 fn is_settings_entry(entry_type: &str) -> bool {

@@ -11,6 +11,7 @@ pub enum GuardianAction {
 }
 
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct GuardianConfig {
     pub enabled: bool,
     pub model: Option<String>,
@@ -18,16 +19,6 @@ pub struct GuardianConfig {
     pub strict_auto_review: bool,
 }
 
-impl Default for GuardianConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            model: None,
-            provider: None,
-            strict_auto_review: false,
-        }
-    }
-}
 
 pub struct Guardian {
     config: GuardianConfig,

@@ -271,7 +271,7 @@ pub fn render_session_list(
         if let Some(node) = sessions.get(i) {
             let session = &node.session;
             let is_selected = i == selected_index;
-            let is_confirming_delete = confirming_delete_path.map_or(false, |p| p == session.path);
+            let is_confirming_delete = confirming_delete_path.is_some_and(|p| p == session.path);
 
             // Tree prefix
             let tree_prefix = build_tree_prefix(node);
@@ -293,11 +293,10 @@ pub fn render_session_list(
             let age = format_session_date(&session.modified);
             let msg_count = session.message_count.to_string();
             let mut right = format!("{} {}", msg_count, age);
-            if show_cwd {
-                if let Some(ref cwd) = session.cwd {
+            if show_cwd
+                && let Some(ref cwd) = session.cwd {
                     right = format!("{} {}", shorten_path(cwd), right);
                 }
-            }
             if show_path {
                 right = format!("{} {}", shorten_path(&session.path), right);
             }

@@ -18,6 +18,7 @@ pub struct BashResult {
 }
 
 /// Options for bash execution
+#[derive(Default)]
 pub struct BashExecutorOptions<'a> {
     /// Callback for streaming output chunks
     pub on_chunk: Option<Box<dyn Fn(&str) + Send + 'a>>,
@@ -25,14 +26,6 @@ pub struct BashExecutorOptions<'a> {
     pub cancelled: bool,
 }
 
-impl Default for BashExecutorOptions<'_> {
-    fn default() -> Self {
-        Self {
-            on_chunk: None,
-            cancelled: false,
-        }
-    }
-}
 
 const DEFAULT_MAX_BYTES: usize = 512_000;
 const MAX_OUTPUT_BYTES: usize = DEFAULT_MAX_BYTES * 2;

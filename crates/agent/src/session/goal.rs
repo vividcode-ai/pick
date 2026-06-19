@@ -78,20 +78,18 @@ impl GoalManager {
     }
 
     pub fn add_token_usage(&self, tokens: i64) -> Option<GoalEntry> {
-        if let Ok(mut guard) = self.goal.write() {
-            if let Some(ref mut entry) = *guard {
+        if let Ok(mut guard) = self.goal.write()
+            && let Some(ref mut entry) = *guard {
                 entry.tokens_used += tokens;
                 entry.updated_at = chrono::Utc::now().timestamp_millis();
 
-                if let Some(budget) = entry.token_budget {
-                    if entry.tokens_used >= budget && entry.status == "active" {
+                if let Some(budget) = entry.token_budget
+                    && entry.tokens_used >= budget && entry.status == "active" {
                         entry.status = "budget_limited".to_string();
                         self.continuation_count.store(0, Ordering::Relaxed);
                     }
-                }
                 return Some(entry.clone());
             }
-        }
         None
     }
 

@@ -67,11 +67,10 @@ where
     let _ = tx.send(());
     {
         let mut queues = FILE_MUTATION_QUEUES.lock().unwrap();
-        if let Some(entry) = queues.get(&key) {
-            if entry.current.is_none() {
+        if let Some(entry) = queues.get(&key)
+            && entry.current.is_none() {
                 queues.remove(&key);
             }
-        }
     }
 
     result

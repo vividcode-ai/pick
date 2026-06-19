@@ -676,7 +676,7 @@ mod tests {
 
         let all_text: String = lines
             .iter()
-            .map(|l| line_text(l))
+            .map(line_text)
             .collect::<Vec<_>>()
             .join(" ");
         assert!(

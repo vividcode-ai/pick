@@ -11,8 +11,8 @@ async fn handle_content_block_start(
             .get("contentBlockIndex")
             .and_then(|v| v.as_u64())
             .unwrap_or(0) as usize;
-        if let Some(start) = cbs.get("start") {
-            if let Some(tool_use) = start.get("toolUse") {
+        if let Some(start) = cbs.get("start")
+            && let Some(tool_use) = start.get("toolUse") {
                 let tool_id = tool_use
                     .get("toolUseId")
                     .and_then(|v| v.as_str())
@@ -43,7 +43,6 @@ async fn handle_content_block_start(
                     .await;
                 return true;
             }
-        }
         return true;
     }
     false
@@ -93,8 +92,8 @@ async fn handle_content_block_delta(
             }
 
             if let Some(tool_use) = delta.get("toolUse") {
-                if let Some(input) = tool_use.get("input").and_then(|v| v.as_str()) {
-                    if let Some((_, _, partial)) = tool_blocks.get_mut(&block_index) {
+                if let Some(input) = tool_use.get("input").and_then(|v| v.as_str())
+                    && let Some((_, _, partial)) = tool_blocks.get_mut(&block_index) {
                         partial.push_str(input);
                         let partial_str = partial.clone();
                         if let Some(idx) =
@@ -114,13 +113,12 @@ async fn handle_content_block_delta(
                                 .await;
                         }
                     }
-                }
                 return true;
             }
 
-            if let Some(reasoning) = delta.get("reasoningContent") {
-                if let Some(reasoning_text) = reasoning.get("reasoningText") {
-                    if let Some(text) = reasoning_text.get("text").and_then(|v| v.as_str()) {
+            if let Some(reasoning) = delta.get("reasoningContent")
+                && let Some(reasoning_text) = reasoning.get("reasoningText")
+                    && let Some(text) = reasoning_text.get("text").and_then(|v| v.as_str()) {
                         let thinking_idx = output
                             .content
                             .iter()
@@ -148,12 +146,10 @@ async fn handle_content_block_delta(
                             tc.thinking.push_str(text);
                         }
                         if let Some(sig) = reasoning_text.get("signature").and_then(|v| v.as_str())
-                        {
-                            if let ContentBlock::Thinking(ref mut tc) = output.content[content_idx]
+                            && let ContentBlock::Thinking(ref mut tc) = output.content[content_idx]
                             {
                                 tc.thinking_signature = Some(sig.to_string());
                             }
-                        }
                         let _ = tx
                             .send(StreamEvent::ThinkingDelta {
                                 content_index: content_idx,
@@ -163,8 +159,6 @@ async fn handle_content_block_delta(
                             .await;
                         return true;
                     }
-                }
-            }
         }
         return true;
     }
@@ -201,9 +195,8 @@ pub(crate) async fn process_bedrock_event(
 
     if let Some(start) = data.get("messageStart") {
         *saw_message_start = true;
-        if let Some(role) = start.get("role").and_then(|v| v.as_str()) {
-            if role == "assistant" {}
-        }
+        if let Some(role) = start.get("role").and_then(|v| v.as_str())
+            && role == "assistant" {}
         let _ = tx
             .send(StreamEvent::Start {
                 partial: super::partial_from_output(output),
@@ -248,8 +241,8 @@ pub(crate) async fn process_bedrock_event(
         }
 
         if let Some(idx) = text_blocks.get(&block_index) {
-            if *idx < output.content.len() {
-                if let ContentBlock::Text(ref tc) = output.content[*idx] {
+            if *idx < output.content.len()
+                && let ContentBlock::Text(ref tc) = output.content[*idx] {
                     let _ = tx
                         .send(StreamEvent::TextEnd {
                             content_index: *idx,
@@ -258,7 +251,6 @@ pub(crate) async fn process_bedrock_event(
                         })
                         .await;
                 }
-            }
             return;
         }
 
@@ -266,8 +258,8 @@ pub(crate) async fn process_bedrock_event(
             .content
             .iter()
             .position(|c| matches!(c, ContentBlock::Thinking(_)));
-        if let Some(idx) = thinking_idx {
-            if let ContentBlock::Thinking(ref tc) = output.content[idx] {
+        if let Some(idx) = thinking_idx
+            && let ContentBlock::Thinking(ref tc) = output.content[idx] {
                 let _ = tx
                     .send(StreamEvent::ThinkingEnd {
                         content_index: idx,
@@ -276,7 +268,6 @@ pub(crate) async fn process_bedrock_event(
                     })
                     .await;
             }
-        }
         return;
     }
 
@@ -307,11 +298,9 @@ pub(crate) async fn process_bedrock_event(
             .get("requestId")
             .or_else(|| metadata.get("request_id"))
             .and_then(|v| v.as_str())
-        {
-            if output.response_id.is_none() {
+            && output.response_id.is_none() {
                 output.response_id = Some(id.to_string());
             }
-        }
         return;
     }
 

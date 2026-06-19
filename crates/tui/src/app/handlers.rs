@@ -214,11 +214,7 @@ impl TuiApp {
                     s != "completed" && s != "cancelled"
                 })
                 .count();
-            self.todo_scroll_offset = if active_before + 1 > 5 {
-                active_before + 1 - 5
-            } else {
-                0
-            };
+            self.todo_scroll_offset = (active_before + 1).saturating_sub(5);
             self.todo_scroll_offset = self.todo_scroll_offset.min(max_scroll);
         } else {
             self.todo_scroll_offset = self.todo_scroll_offset.min(max_scroll);
@@ -327,14 +323,13 @@ impl TuiApp {
                 None
             }
             KeyCode::Enter | KeyCode::Char(' ') => {
-                if let Some(ref sel) = self.selection {
-                    if let Some(item) = sel.selected() {
+                if let Some(ref sel) = self.selection
+                    && let Some(item) = sel.selected() {
                         let idx = sel.selected_index;
                         let value = item.value.clone();
                         self.cancel_selection();
                         return Some(TuiAction::SelectionResult(idx, value));
                     }
-                }
                 self.cancel_selection();
                 None
             }
@@ -355,7 +350,7 @@ impl TuiApp {
         if self
             .tree_view
             .as_ref()
-            .map_or(false, |tv| tv.edit_label_entry_id.is_some())
+            .is_some_and(|tv| tv.edit_label_entry_id.is_some())
         {
             match code {
                 KeyCode::Enter => {
@@ -515,13 +510,12 @@ impl TuiApp {
                 None
             }
             KeyCode::Enter => {
-                if let Some(ref tv) = self.tree_view {
-                    if let Some(id) = tv.selected_entry_id() {
+                if let Some(ref tv) = self.tree_view
+                    && let Some(id) = tv.selected_entry_id() {
                         let val = id.to_string();
                         self.cancel_tree_view();
                         return Some(TuiAction::SelectionResult(0, val));
                     }
-                }
                 self.cancel_tree_view();
                 None
             }
@@ -570,28 +564,26 @@ impl TuiApp {
 
     /// Update the question dialog selection
     fn question_navigate(&mut self, delta: isize) {
-        if let Some(ref mut dialog) = self.question_dialog {
-            if let Some(q) = dialog.current() {
+        if let Some(ref mut dialog) = self.question_dialog
+            && let Some(q) = dialog.current() {
                 let current = q.selected.first().copied().unwrap_or(0);
                 let count = q.options.len();
                 let next = ((current as isize + delta).rem_euclid(count as isize)) as usize;
-                if let Some(ref mut d) = self.question_dialog {
-                    if let Some(q) = d.questions.get_mut(d.current_index) {
+                if let Some(ref mut d) = self.question_dialog
+                    && let Some(q) = d.questions.get_mut(d.current_index) {
                         if q.multiple {
                             q.selected.clear();
                         }
                         q.selected = vec![next];
                     }
-                }
             }
-        }
     }
 
     /// Toggle multiple selection for current option
     fn question_toggle(&mut self) {
-        if let Some(ref mut dialog) = self.question_dialog {
-            if let Some(q) = dialog.questions.get_mut(dialog.current_index) {
-                if q.multiple {
+        if let Some(ref mut dialog) = self.question_dialog
+            && let Some(q) = dialog.questions.get_mut(dialog.current_index)
+                && q.multiple {
                     let current = q.selected.first().copied().unwrap_or(0);
                     if let Some(pos) = q.selected.iter().position(|&i| i == current) {
                         q.selected.remove(pos);
@@ -600,8 +592,6 @@ impl TuiApp {
                         q.selected.sort();
                     }
                 }
-            }
-        }
     }
 
     /// Confirm current question and advance to next, or complete
@@ -622,8 +612,7 @@ impl TuiApp {
         };
 
         if dialog.is_last() {
-            let mut all_answers = Vec::new();
-            all_answers.push(answers);
+            let all_answers = vec![answers];
             Some(all_answers)
         } else {
             dialog.current_index += 1;
@@ -647,7 +636,7 @@ impl TuiApp {
         let in_custom = self
             .question_dialog
             .as_ref()
-            .map_or(false, |d| d.custom_mode);
+            .is_some_and(|d| d.custom_mode);
 
         match code {
             KeyCode::Esc => {
@@ -667,7 +656,7 @@ impl TuiApp {
                 if self
                     .question_dialog
                     .as_ref()
-                    .map_or(false, |d| d.current().map_or(false, |q| q.multiple))
+                    .is_some_and(|d| d.current().is_some_and(|q| q.multiple))
                 {
                     self.question_toggle();
                 } else {
@@ -693,11 +682,10 @@ impl TuiApp {
                 }
             }
             KeyCode::Backspace if in_custom => {
-                if let Some(ref mut dialog) = self.question_dialog {
-                    if let Some(ref mut input) = dialog.custom_input {
+                if let Some(ref mut dialog) = self.question_dialog
+                    && let Some(ref mut input) = dialog.custom_input {
                         input.pop();
                     }
-                }
             }
             _ => {}
         }
@@ -707,17 +695,14 @@ impl TuiApp {
     /// Handle question confirmation: collect answers and advance/complete
     fn handle_question_confirm(&mut self) -> Option<TuiAction> {
         let answers = self.question_confirm();
-        match answers {
-            Some(all_answers) => {
-                if let Some(tx) = self.question_response_tx.take() {
-                    let _ = tx.send(Ok(all_answers));
-                }
-                self.question_dialog = None;
-                self.state = AppState::Input;
-                self.autocomplete_space_lines = 0;
-                self.chat.discard_active_stream();
+        if let Some(all_answers) = answers {
+            if let Some(tx) = self.question_response_tx.take() {
+                let _ = tx.send(Ok(all_answers));
             }
-            None => {}
+            self.question_dialog = None;
+            self.state = AppState::Input;
+            self.autocomplete_space_lines = 0;
+            self.chat.discard_active_stream();
         }
         None
     }
@@ -759,11 +744,11 @@ impl TuiApp {
                 let should_update = self
                     .update_prompt
                     .as_ref()
-                    .map_or(false, |p| p.selected == 0);
+                    .is_some_and(|p| p.selected == 0);
                 let is_dismiss = self
                     .update_prompt
                     .as_ref()
-                    .map_or(false, |p| p.selected == 2);
+                    .is_some_and(|p| p.selected == 2);
                 if is_dismiss {
                     self.update_prompt = None;
                     self.state = AppState::Input;
@@ -842,7 +827,7 @@ impl TuiApp {
                 let now = std::time::Instant::now();
                 let is_double = self
                     .last_escape_time
-                    .map_or(false, |t| now.duration_since(t).as_millis() < 500);
+                    .is_some_and(|t| now.duration_since(t).as_millis() < 500);
                 self.last_escape_time = Some(now);
                 if is_double {
                     self.last_escape_time = None;
@@ -959,7 +944,7 @@ impl TuiApp {
                     self.editor.autocomplete_previous();
                 } else if !self.pending_user_messages.is_empty() {
                     self.editor
-                        .pending_previous(&self.pending_user_messages.make_contiguous());
+                        .pending_previous(self.pending_user_messages.make_contiguous());
                 } else if self.editor.history_index.is_some() {
                     self.editor.history_previous();
                 } else if self.editor.buffer.is_empty() {
@@ -973,7 +958,7 @@ impl TuiApp {
                     self.editor.autocomplete_next();
                 } else if self.editor.pending_index.is_some() {
                     self.editor
-                        .pending_next(&self.pending_user_messages.make_contiguous());
+                        .pending_next(self.pending_user_messages.make_contiguous());
                 } else if self.editor.history_index.is_some() {
                     self.editor.history_next();
                 } else if self.editor.buffer.is_empty() {
@@ -1125,8 +1110,8 @@ impl TuiApp {
             self.editor.add_paste_placeholder(char_count, &text);
             return true;
         }
-        if let Some(t) = self.last_paste_time {
-            if now.duration_since(t).as_millis() > 50 {
+        if let Some(t) = self.last_paste_time
+            && now.duration_since(t).as_millis() > 50 {
                 let text = std::mem::take(&mut self.paste_accumulator);
                 self.last_paste_time = None;
                 self.editor.insert_str(&text);
@@ -1138,7 +1123,6 @@ impl TuiApp {
                 }
                 return true;
             }
-        }
         false
     }
 

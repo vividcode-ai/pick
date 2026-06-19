@@ -74,7 +74,7 @@ pub fn has_session_name(session: &SessionSearchInfo) -> bool {
     session
         .name
         .as_ref()
-        .map_or(false, |n| !n.trim().is_empty())
+        .is_some_and(|n| !n.trim().is_empty())
 }
 
 fn matches_name_filter(session: &SessionSearchInfo, filter: NameFilter) -> bool {

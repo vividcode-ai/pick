@@ -188,9 +188,9 @@ async fn handle_tool_execution(
 
     for tc in tool_calls {
         // Guardian circuit breaker: if too many consecutive denials, interrupt
-        if let Some(ref pm) = config.permission_manager {
-            if pm.is_guardian_circuit_broken() {
-                if let Some(msg) = pm.guardian_circuit_message() {
+        if let Some(ref pm) = config.permission_manager
+            && pm.is_guardian_circuit_broken()
+                && let Some(msg) = pm.guardian_circuit_message() {
                     let error_msg = pick_ai::types::ToolResultMessage::new(
                         &tc.id,
                         &tc.name,
@@ -201,8 +201,6 @@ async fn handle_tool_execution(
                     tool_results.push(error_msg);
                     continue;
                 }
-            }
-        }
 
         // Permission pre-tool-use hooks + permission request hooks
         if let Some(ref hook_registry) = config.permission_hooks {
@@ -465,8 +463,8 @@ async fn handle_tool_execution(
         }
 
         // before_tool_call hook
-        if let Some(ref before_hook) = config.before_tool_call {
-            if let Some(error) = before_hook(tc) {
+        if let Some(ref before_hook) = config.before_tool_call
+            && let Some(error) = before_hook(tc) {
                 all_terminate = false;
                 if let Some(ref handler) = config.on_event {
                     handler(AgentEvent::ToolExecutionStart {
@@ -491,7 +489,6 @@ async fn handle_tool_execution(
                 tool_results.push(error_msg);
                 continue;
             }
-        }
 
         match state.tools.iter().find(|t| t.name == tc.name) {
             Some(t) if t.execution_mode == ToolExecutionMode::Parallel => {
@@ -716,11 +713,10 @@ async fn handle_tool_execution(
                         tool_name: tc.name.clone(),
                         result: {
                             let mut m = serde_json::json!({ "content": result_texts });
-                            if tool_result.is_error {
-                                if let Some(err) = result_texts.first() {
+                            if tool_result.is_error
+                                && let Some(err) = result_texts.first() {
                                     m["error"] = serde_json::json!(err);
                                 }
-                            }
                             m
                         },
                         is_error: tool_result.is_error,
@@ -744,8 +740,8 @@ async fn handle_tool_execution(
                 }
 
                 // PostToolUse hooks
-                if let Some(ref hook_registry) = config.permission_hooks {
-                    if hook_registry.has_post_hooks() {
+                if let Some(ref hook_registry) = config.permission_hooks
+                    && hook_registry.has_post_hooks() {
                         let post_ctx = crate::permission::hooks::PostToolUseContext {
                             tool_name: tc.name.clone(),
                             tool_call_id: tc.id.clone(),
@@ -755,7 +751,6 @@ async fn handle_tool_execution(
                         };
                         hook_registry.run_post_hooks(&post_ctx);
                     }
-                }
 
                 let tool_result_msg = pick_ai::types::ToolResultMessage::new(
                     &tc.id,
@@ -850,7 +845,7 @@ async fn handle_tool_execution(
 
         for (handle, (tool_name, tool_id)) in parallel_handles
             .into_iter()
-            .zip(parallel_tool_infos.into_iter())
+            .zip(parallel_tool_infos)
         {
             match handle.await {
                 Ok((tc, Ok(tool_result))) => {
@@ -971,11 +966,10 @@ async fn execute_turn(
             prompt: String::new(),
             system_prompt: state.system_prompt.clone(),
         };
-        if let Some(result) = ext.emit_before_agent_start(&bevent) {
-            if let Some(ref sp) = result.system_prompt {
+        if let Some(result) = ext.emit_before_agent_start(&bevent)
+            && let Some(ref sp) = result.system_prompt {
                 state.system_prompt = sp.clone();
             }
-        }
     }
 
     if let Some(ref handler) = config.on_event {
@@ -1010,7 +1004,7 @@ async fn execute_turn(
         }
         if let Some(ref ext) = config.extension_runner {
             ext.emit_message_end(&MessageEndEvent {
-                message: serde_json::to_value(&Message::Assistant(assistant_msg.clone()))
+                message: serde_json::to_value(Message::Assistant(assistant_msg.clone()))
                     .unwrap_or_default(),
             });
         }
@@ -1050,7 +1044,7 @@ async fn execute_turn(
     }
     if let Some(ref ext) = config.extension_runner {
         ext.emit_message_end(&MessageEndEvent {
-            message: serde_json::to_value(&Message::Assistant(assistant_msg.clone()))
+            message: serde_json::to_value(Message::Assistant(assistant_msg.clone()))
                 .unwrap_or_default(),
         });
     }
@@ -1200,7 +1194,7 @@ async fn execute_continue_turn(
         }
         if let Some(ref ext) = config.extension_runner {
             ext.emit_message_end(&MessageEndEvent {
-                message: serde_json::to_value(&Message::Assistant(assistant_msg.clone()))
+                message: serde_json::to_value(Message::Assistant(assistant_msg.clone()))
                     .unwrap_or_default(),
             });
         }
@@ -1239,7 +1233,7 @@ async fn execute_continue_turn(
     }
     if let Some(ref ext) = config.extension_runner {
         ext.emit_message_end(&MessageEndEvent {
-            message: serde_json::to_value(&Message::Assistant(assistant_msg.clone()))
+            message: serde_json::to_value(Message::Assistant(assistant_msg.clone()))
                 .unwrap_or_default(),
         });
     }

@@ -223,13 +223,11 @@ impl FileSystemPolicy {
         match dunce::canonicalize(&normalized) {
             Ok(canonical) => Ok(canonical),
             Err(_) => {
-                if let Some(parent) = normalized.parent() {
-                    if let Ok(canonical_parent) = dunce::canonicalize(parent) {
-                        if let Some(file_name) = normalized.file_name() {
+                if let Some(parent) = normalized.parent()
+                    && let Ok(canonical_parent) = dunce::canonicalize(parent)
+                        && let Some(file_name) = normalized.file_name() {
                             return Ok(canonical_parent.join(file_name));
                         }
-                    }
-                }
                 Ok(normalized)
             }
         }

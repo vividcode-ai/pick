@@ -89,7 +89,7 @@ pub(crate) fn handle_scoped_models_command(ctx: &mut TuiContext) {
         } else {
             &format!("{} model(s) scoped", ctx.scoped_models.len())
         };
-        let select = SelectList::new(&format!("Scoped Models ({})", status), items);
+        let select = SelectList::new(format!("Scoped Models ({})", status), items);
         ctx.tui.start_selection(select);
     }
 }

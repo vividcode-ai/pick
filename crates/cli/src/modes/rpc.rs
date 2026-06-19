@@ -55,13 +55,12 @@ pub async fn run_rpc_mode(
         .get_api_key(&provider, true)
         .await
         .or_else(|| std::env::var(&env_var).ok());
-    if let Some(ref key) = api_key {
-        if std::env::var(&env_var).is_err() {
+    if let Some(ref key) = api_key
+        && std::env::var(&env_var).is_err() {
             unsafe {
                 std::env::set_var(&env_var, key);
             }
         }
-    }
 
     let tools = if args.no_tools { vec![] } else { tools };
 
@@ -132,7 +131,7 @@ pub async fn run_rpc_mode(
                 "ask" | "chat" | "generate" => {
                     let prompt = params
                         .and_then(|p| p.get("prompt"))
-                        .or_else(|| params)
+                        .or(params)
                         .and_then(|v| v.as_str())
                         .unwrap_or("");
 
@@ -191,15 +190,14 @@ pub async fn run_rpc_mode(
                         agent_id: None,
                         agent_registry: Some(agent_registry.clone()),
                         on_event: Some(Arc::new(move |event| {
-                            if let AgentEvent::MessageUpdate { message, .. } = event {
-                                if let Message::Assistant(msg) = message {
+                            if let AgentEvent::MessageUpdate { message, .. } = event
+                                && let Message::Assistant(msg) = message {
                                     for block in &msg.content {
                                         if let ContentBlock::Text(t) = block {
                                             rt.lock().unwrap().push_str(&t.text);
                                         }
                                     }
                                 }
-                            }
                         })),
                         fs_policy: permission_manager.fs_policy(),
                         cwd: Some(std::env::current_dir().unwrap_or_default()),

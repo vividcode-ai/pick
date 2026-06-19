@@ -19,6 +19,7 @@ pub struct ProviderResponse {
 
 /// Options for image generation requests.
 #[derive(Clone)]
+#[derive(Default)]
 pub struct ImagesOptions {
     /// API key override (falls back to env if not set)
     pub api_key: Option<String>,
@@ -36,18 +37,6 @@ pub struct ImagesOptions {
     pub max_retries: Option<u32>,
 }
 
-impl Default for ImagesOptions {
-    fn default() -> Self {
-        Self {
-            api_key: None,
-            on_payload: None,
-            on_response: None,
-            headers: None,
-            timeout_ms: None,
-            max_retries: None,
-        }
-    }
-}
 
 /// Image generation provider function signature (async).
 /// Takes owned values to allow the returned future to be 'static/'Send.

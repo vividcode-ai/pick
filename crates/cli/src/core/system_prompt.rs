@@ -110,7 +110,7 @@ pub fn build_system_prompt(options: BuildSystemPromptOptions) -> String {
 
     let visible_tools: Vec<&String> = tools
         .iter()
-        .filter(|name| tool_snippets.map_or(false, |s| s.contains_key(*name)))
+        .filter(|name| tool_snippets.is_some_and(|s| s.contains_key(*name)))
         .collect();
 
     let tools_list = if visible_tools.is_empty() {
@@ -303,7 +303,6 @@ pub fn build_context_file_refs(files: &[ContextFile]) -> Vec<ContextFileRef<'_>>
 
 /// Convenience wrapper that builds a system prompt from the most common inputs.
 /// Internally constructs tool snippets, context file refs, and guidelines.
-
 pub fn build_system_prompt_with_defaults(
     tools: &[AgentTool],
     skills: &[Skill],

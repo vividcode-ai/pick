@@ -329,24 +329,26 @@ pub fn resolve_cli_model(
 
     let provider = cli_provider.and_then(|p| provider_map.get(&p.to_lowercase()).cloned());
 
-    if cli_provider.is_some() && provider.is_none() {
-        return ResolveCliModelResult {
-            model: None,
-            thinking_level: None,
-            warning: None,
-            error: Some(format!(
-                "Unknown provider \"{}\". Use --list-models to see available providers/models.",
-                cli_provider.unwrap()
-            )),
-        };
+    if let Some(provider_name) = cli_provider {
+        if !provider_map.contains_key(&provider_name.to_lowercase()) {
+            return ResolveCliModelResult {
+                model: None,
+                thinking_level: None,
+                warning: None,
+                error: Some(format!(
+                    "Unknown provider \"{}\". Use --list-models to see available providers/models.",
+                    provider_name
+                )),
+            };
+        }
     }
 
     let mut pattern = cli_model;
     let mut inferred_provider = false;
     let mut resolved_provider = provider;
 
-    if resolved_provider.is_none() {
-        if let Some(slash_idx) = cli_model.find('/') {
+    if resolved_provider.is_none()
+        && let Some(slash_idx) = cli_model.find('/') {
             let maybe_provider = &cli_model[..slash_idx];
             if let Some(canonical) = provider_map.get(&maybe_provider.to_lowercase()) {
                 resolved_provider = Some(canonical.clone());
@@ -354,7 +356,6 @@ pub fn resolve_cli_model(
                 inferred_provider = true;
             }
         }
-    }
 
     // Try exact match without provider inference
     if resolved_provider.is_none() {
@@ -378,7 +379,7 @@ pub fn resolve_cli_model(
             .filter(|m| m.provider == *p)
             .cloned()
             .collect(),
-        None => available_models.iter().cloned().collect(),
+        None => available_models.to_vec(),
     };
 
     let result = parse_model_pattern(pattern, &candidates);
@@ -471,15 +472,14 @@ pub async fn find_initial_model(
     }
 
     // 3. Try saved default from settings
-    if let (Some(provider), Some(model_id)) = (default_provider, default_model_id) {
-        if let Some(found) = model_registry.find(provider, model_id) {
+    if let (Some(provider), Some(model_id)) = (default_provider, default_model_id)
+        && let Some(found) = model_registry.find(provider, model_id) {
             return InitialModelResult {
                 model: Some(found),
                 thinking_level: tl.to_string(),
                 fallback_message: None,
             };
         }
-    }
 
     // 4. Try first available model with valid API key
     let available_models = model_registry.get_available();

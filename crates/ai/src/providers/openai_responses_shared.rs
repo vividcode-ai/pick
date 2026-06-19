@@ -26,13 +26,11 @@ pub fn encode_text_signature_v1(id: &str, phase: Option<&str>) -> String {
 /// Parse a text signature string.
 pub fn parse_text_signature(signature: Option<&str>) -> Option<TextSignatureV1> {
     let signature = signature?;
-    if signature.starts_with('{') {
-        if let Ok(parsed) = serde_json::from_str::<TextSignatureV1>(signature) {
-            if parsed.v == 1 {
+    if signature.starts_with('{')
+        && let Ok(parsed) = serde_json::from_str::<TextSignatureV1>(signature)
+            && parsed.v == 1 {
                 return Some(parsed);
             }
-        }
-    }
     Some(TextSignatureV1 {
         v: 1,
         id: signature.to_string(),

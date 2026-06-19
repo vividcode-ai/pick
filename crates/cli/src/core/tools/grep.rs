@@ -99,9 +99,9 @@ impl GrepToolDefinition {
                 continue;
             }
 
-            if let Ok(event) = serde_json::from_str::<serde_json::Value>(line) {
-                if event["type"] == "match" {
-                    if let (Some(file_path), Some(line_number)) = (
+            if let Ok(event) = serde_json::from_str::<serde_json::Value>(line)
+                && event["type"] == "match"
+                    && let (Some(file_path), Some(line_number)) = (
                         event["data"]["path"]["text"].as_str(),
                         event["data"]["line_number"].as_u64(),
                     ) {
@@ -130,8 +130,6 @@ impl GrepToolDefinition {
                         }
                         match_count += 1;
                     }
-                }
-            }
         }
 
         if match_lines.is_empty() {
@@ -273,11 +271,10 @@ pub fn render_grep_result(
         if let Some(ml) = details.match_limit_reached {
             warnings.push(format!("{} matches limit", ml));
         }
-        if let Some(ref truncation) = details.truncation {
-            if truncation.truncated {
+        if let Some(ref truncation) = details.truncation
+            && truncation.truncated {
                 warnings.push(format!("{} limit", format_size(truncation.max_bytes)));
             }
-        }
         if details.lines_truncated.unwrap_or(false) {
             warnings.push("some lines truncated".to_string());
         }

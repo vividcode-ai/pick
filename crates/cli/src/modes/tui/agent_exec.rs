@@ -33,14 +33,11 @@ pub(crate) fn build_agent_config(
                 } else {
                     tc.arguments.to_string()
                 };
-            match pick_agent::permission::evaluate::check_permission(
+            pick_agent::permission::evaluate::check_permission(
                 &tc.name,
                 &tool_args_str,
                 &[&mode_rules_clone],
-            ) {
-                Ok(()) => None,
-                Err(msg) => Some(msg),
-            }
+            ).err()
         })
     };
 
@@ -104,8 +101,8 @@ pub(crate) fn build_agent_config(
                             remaining,
                         ))));
                     }
-                    "budget_limited" => {
-                        if !budget_injected.swap(true, Ordering::Relaxed) {
+                    "budget_limited"
+                        if !budget_injected.swap(true, Ordering::Relaxed) => {
                             msgs.push(Message::User(UserMessage::text(format!(
                                 "<goal_context>\n\
                                  The token budget for the goal has been reached.\n\
@@ -120,7 +117,6 @@ pub(crate) fn build_agent_config(
                                 goal.token_budget.unwrap_or(0),
                             ))));
                         }
-                    }
                     _ => {}
                 }
             }
@@ -228,13 +224,12 @@ pub(crate) fn build_agent_config(
             let gm = goal_manager.clone();
             let tx = cmd_tx_clone.clone();
             Box::pin(async move {
-                if tokens > 0 {
-                    if let Some(goal) = gm.add_token_usage(tokens) {
+                if tokens > 0
+                    && let Some(goal) = gm.add_token_usage(tokens) {
                         let _ = tx.send(TuiCommand::GoalUpdated(
                             serde_json::to_value(&goal).unwrap_or_default(),
                         ));
                     }
-                }
             })
                 as std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send + 'static>>
         }
@@ -290,7 +285,7 @@ pub(crate) fn spawn_title_generation(
             ctx: Context,
         ) -> (String, Option<String>) {
             let registry = pick_ai::registry::global_registry();
-            let provider = match registry.get(&mdl.api.as_str()) {
+            let provider = match registry.get(mdl.api.as_str()) {
                 Some(p) => p,
                 None => {
                     return (
@@ -371,7 +366,7 @@ pub(crate) fn spawn_title_generation(
         let ctx1 = Context {
             system_prompt: Some(title_prompt.clone()),
             messages: vec![
-                UserMessage::text(&format!(
+                UserMessage::text(format!(
                     "Generate a title in the SAME LANGUAGE as the user message below. \
                  Only output the title, nothing else.\n\n{}",
                     title_text
@@ -388,7 +383,7 @@ pub(crate) fn spawn_title_generation(
             let ctx2 = Context {
                 system_prompt: None,
                 messages: vec![
-                    UserMessage::text(&format!(
+                    UserMessage::text(format!(
                         "Generate a very short title in the SAME LANGUAGE as the user message. \
                      Max 40 characters, no quotes, no explanation.\n\n{}",
                         title_text
@@ -492,51 +487,48 @@ pub(crate) async fn auto_compact_session(ctx: &mut TuiContext) {
         .get_api_key(&ctx.provider, true)
         .await
         .unwrap_or_default();
-    match prepare_compaction(&path_entries, &compact_settings) {
-        Some(preparation) => {
-            match compact(&preparation, &ctx.model, &api_key, None, None, None).await {
-                Ok(compaction_result) => {
-                    let summary = compaction_result.summary;
-                    let before = ctx.all_messages.len();
-                    ctx.all_messages = vec![
-                        UserMessage::text(&format!(
-                            "[Compacted conversation summary]\n\n{}",
-                            summary
-                        ))
-                        .into(),
-                    ];
-                    ctx.tui.chat.add_system_message(&format!(
-                        "Auto-compacted ({} msgs → 1, {} tokens before).",
-                        before, compaction_result.tokens_before
-                    ));
-                    let compact_entry = SessionEntry {
-                        id: uuid::Uuid::now_v7().to_string(),
-                        parent_id: None,
-                        timestamp: chrono::Utc::now().timestamp_millis(),
-                        kind: SessionEntryKind::Compaction(CompactionEntry {
-                            summary: summary.clone(),
-                            token_count: Some(compaction_result.tokens_before as u64),
-                        }),
-                    };
-                    if let Err(e) = ctx.session_manager.append(compact_entry).await {
-                        tracing::warn!("Failed to persist compaction entry: {}", e);
-                    }
-                    if let Some(ref runner) = ctx.extension_runner {
-                        runner.emit(&ExtensionEvent::SessionCompact(SessionCompactEvent {
-                            compaction_entry: serde_json::json!({
-                                "summary": summary,
-                                "tokensBefore": compaction_result.tokens_before,
-                            }),
-                            from_extension: false,
-                        }));
-                    }
+    if let Some(preparation) = prepare_compaction(&path_entries, &compact_settings) {
+        match compact(&preparation, &ctx.model, &api_key, None, None, None).await {
+            Ok(compaction_result) => {
+                let summary = compaction_result.summary;
+                let before = ctx.all_messages.len();
+                ctx.all_messages = vec![
+                    UserMessage::text(format!(
+                        "[Compacted conversation summary]\n\n{}",
+                        summary
+                    ))
+                    .into(),
+                ];
+                ctx.tui.chat.add_system_message(&format!(
+                    "Auto-compacted ({} msgs → 1, {} tokens before).",
+                    before, compaction_result.tokens_before
+                ));
+                let compact_entry = SessionEntry {
+                    id: uuid::Uuid::now_v7().to_string(),
+                    parent_id: None,
+                    timestamp: chrono::Utc::now().timestamp_millis(),
+                    kind: SessionEntryKind::Compaction(CompactionEntry {
+                        summary: summary.clone(),
+                        token_count: Some(compaction_result.tokens_before as u64),
+                    }),
+                };
+                if let Err(e) = ctx.session_manager.append(compact_entry).await {
+                    tracing::warn!("Failed to persist compaction entry: {}", e);
                 }
-                Err(e) => {
-                    ctx.tui
-                        .show_error(&format!("Auto-compaction failed: {}", e.message));
+                if let Some(ref runner) = ctx.extension_runner {
+                    runner.emit(&ExtensionEvent::SessionCompact(SessionCompactEvent {
+                        compaction_entry: serde_json::json!({
+                            "summary": summary,
+                            "tokensBefore": compaction_result.tokens_before,
+                        }),
+                        from_extension: false,
+                    }));
                 }
             }
+            Err(e) => {
+                ctx.tui
+                    .show_error(&format!("Auto-compaction failed: {}", e.message));
+            }
         }
-        None => {}
     }
 }

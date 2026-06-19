@@ -150,11 +150,10 @@ impl Editor {
             if pp.placeholder == base {
                 max_suffix = max_suffix.max(1);
             }
-            if let Some(suffix) = pp.placeholder.strip_prefix(&format!("{} #", base)) {
-                if let Ok(v) = suffix.parse::<usize>() {
+            if let Some(suffix) = pp.placeholder.strip_prefix(&format!("{} #", base))
+                && let Ok(v) = suffix.parse::<usize>() {
                     max_suffix = max_suffix.max(v);
                 }
-            }
         }
         if max_suffix == 0 {
             base.to_string()
@@ -261,7 +260,7 @@ impl Editor {
     pub fn cursor_left(&mut self) {
         if self.cursor > 0 {
             self.cursor = self.cursor.saturating_sub(1);
-            while self.buffer.is_char_boundary(self.cursor) == false {
+            while !self.buffer.is_char_boundary(self.cursor) {
                 self.cursor = self.cursor.saturating_sub(1);
             }
         }
@@ -274,7 +273,7 @@ impl Editor {
         if self.cursor < self.buffer.len() {
             self.cursor += 1;
             while self.cursor < self.buffer.len()
-                && self.buffer.is_char_boundary(self.cursor) == false
+                && !self.buffer.is_char_boundary(self.cursor)
             {
                 self.cursor += 1;
             }
@@ -295,7 +294,7 @@ impl Editor {
             if self.buffer[prev..pos]
                 .chars()
                 .next()
-                .map_or(false, |c| c.is_alphanumeric() || c == '_')
+                .is_some_and(|c| c.is_alphanumeric() || c == '_')
             {
                 break;
             }
@@ -307,7 +306,7 @@ impl Editor {
             if !self.buffer[prev..pos]
                 .chars()
                 .next()
-                .map_or(false, |c| c.is_alphanumeric() || c == '_')
+                .is_some_and(|c| c.is_alphanumeric() || c == '_')
             {
                 break;
             }
@@ -796,25 +795,23 @@ impl Editor {
 
     /// Cycle autocomplete selection to the next item
     pub fn autocomplete_next(&mut self) {
-        if let Some(ref suggestions) = self.autocomplete_suggestions {
-            if suggestions.items.len() > 1 {
+        if let Some(ref suggestions) = self.autocomplete_suggestions
+            && suggestions.items.len() > 1 {
                 self.autocomplete_selection =
                     (self.autocomplete_selection + 1) % suggestions.items.len();
             }
-        }
     }
 
     /// Cycle autocomplete selection to the previous item
     pub fn autocomplete_previous(&mut self) {
-        if let Some(ref suggestions) = self.autocomplete_suggestions {
-            if suggestions.items.len() > 1 {
+        if let Some(ref suggestions) = self.autocomplete_suggestions
+            && suggestions.items.len() > 1 {
                 self.autocomplete_selection = if self.autocomplete_selection == 0 {
                     suggestions.items.len() - 1
                 } else {
                     self.autocomplete_selection - 1
                 };
             }
-        }
     }
 
     /// Apply the currently selected autocomplete completion.
@@ -1253,7 +1250,7 @@ impl Editor {
             if buf_pos >= self.buffer.len() {
                 // Add trailing empty line only if one doesn't already exist
                 if line_index >= visible_top && lines.len() < max_height {
-                    let last_empty = lines.last().map_or(true, |l| {
+                    let last_empty = lines.last().is_none_or(|l| {
                         l.spans.is_empty() || l.spans.iter().all(|s| s.content.as_ref().is_empty())
                     });
                     if !last_empty {
@@ -1314,17 +1311,16 @@ impl Editor {
             }
         }
 
-        if !found_cursor {
-            if self.cursor <= cursor_line_start + cursor_col_in_line {
+        if !found_cursor
+            && self.cursor <= cursor_line_start + cursor_col_in_line {
                 cursor_row = 0;
                 cursor_col = 0;
             }
-        }
 
         // Trim trailing empty lines
         if !self.buffer.ends_with('\n') {
             while lines.len() > 1 {
-                let is_empty = lines.last().map_or(true, |l| {
+                let is_empty = lines.last().is_none_or(|l| {
                     l.spans.is_empty() || l.spans.iter().all(|s| s.content.as_ref().is_empty())
                 });
                 if is_empty {
@@ -1380,12 +1376,11 @@ impl Editor {
                         let mut earliest_pos = None;
                         let mut earliest_pp = None;
                         for pp in &self.pending_pastes {
-                            if let Some(pos) = remaining.find(&pp.placeholder) {
-                                if earliest_pos.map_or(true, |p| pos < p) {
+                            if let Some(pos) = remaining.find(&pp.placeholder)
+                                && earliest_pos.is_none_or(|p| pos < p) {
                                     earliest_pos = Some(pos);
                                     earliest_pp = Some(pp);
                                 }
-                            }
                         }
                         match (earliest_pos, earliest_pp) {
                             (Some(pos), Some(pp)) => {
@@ -1436,7 +1431,7 @@ impl Editor {
             } else {
                 0
             };
-            let label_col = std::cmp::min(32, std::cmp::max(12, width.saturating_sub(20)));
+            let label_col = width.saturating_sub(20).clamp(12, 32);
             let desc_width = width.saturating_sub(label_col + 6);
             for i in scroll_offset..scroll_offset + count {
                 if i >= total_items {

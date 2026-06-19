@@ -122,8 +122,8 @@ fn display_paged(events: &[AuditEvent]) {
 
         // Header
         println!(
-            " {:<19} | {:<8} | {:<10} | {:<20} | {}",
-            "Timestamp", "Tool", "Decision", "Layer", "Target"
+            " {:<19} | {:<8} | {:<10} | {:<20} | Target",
+            "Timestamp", "Tool", "Decision", "Layer"
         );
         println!(
             " {:-<19}-+-{:-<8}-+-{:-<10}-+-{:-<20}-+-{:-<60}",
@@ -160,7 +160,7 @@ fn display_paged(events: &[AuditEvent]) {
         println!(
             " Page {}/{} (showing {}-{}, {} total) — [Up] next  [Down] prev  [Esc/q] quit",
             (offset / page_size) + 1,
-            (total + page_size - 1) / page_size,
+            total.div_ceil(page_size),
             offset + 1,
             end,
             total

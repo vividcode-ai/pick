@@ -55,7 +55,7 @@ pub fn render_thinking_selector(
             let line = if is_selected {
                 format!(
                     "  {} {}",
-                    ToolTheme::fg("accent", &format!("{}", cursor)),
+                    ToolTheme::fg("accent", cursor),
                     ToolTheme::fg("accent", level)
                 )
             } else {

@@ -43,15 +43,14 @@ impl PermissionManager {
             let mut ep = ExecPolicy::new();
             for path in rules_files {
                 let p = std::path::Path::new(path);
-                if p.exists() {
-                    if let Err(e) = ep.load_rules_from_file(p) {
+                if p.exists()
+                    && let Err(e) = ep.load_rules_from_file(p) {
                         eprintln!(
                             "[Pick] Warning: failed to load rules file '{}': {}",
                             p.display(),
                             e
                         );
                     }
-                }
             }
             Some(Arc::new(ep))
         } else {
@@ -74,7 +73,7 @@ impl PermissionManager {
             Some(Arc::new(Guardian::new(GuardianConfig {
                 enabled: true,
                 model: config
-                    .and_then(|_| None)
+                    .and(None)
                     .or_else(|| Some("claude-hy-4-20250514".to_string())),
                 provider: None,
                 strict_auto_review: false,

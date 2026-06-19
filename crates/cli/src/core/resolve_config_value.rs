@@ -151,7 +151,8 @@ fn execute_shell_command(shell: &str, args: &[&str], command: &str) -> ShellResu
     let rt = tokio::runtime::Handle::try_current();
     match rt {
         Ok(handle) => {
-            let result = handle.block_on(async {
+            
+            handle.block_on(async {
                 let output = Command::new(shell)
                     .args(args)
                     .arg(command)
@@ -179,8 +180,7 @@ fn execute_shell_command(shell: &str, args: &[&str], command: &str) -> ShellResu
                         value: None,
                     },
                 }
-            });
-            result
+            })
         }
         Err(_) => {
             // No runtime available, fall back to sync execution

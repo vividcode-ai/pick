@@ -105,7 +105,7 @@ fn convert_node_to_markdown(node: &scraper::ElementRef, md: &mut String, depth: 
             "li" => {
                 let prefix = if child
                     .parent_element()
-                    .map_or(false, |p| p.value().name() == "ol")
+                    .is_some_and(|p| p.value().name() == "ol")
                 {
                     "1. "
                 } else {
@@ -119,7 +119,7 @@ fn convert_node_to_markdown(node: &scraper::ElementRef, md: &mut String, depth: 
                 md.push('\n');
                 convert_node_to_markdown(&child, md, depth + 1);
             }
-            "br" => md.push_str("\n"),
+            "br" => md.push('\n'),
             "hr" | "hr/" => md.push_str("\n---\n\n"),
             "blockquote" => {
                 for t in child.text() {
@@ -138,11 +138,11 @@ fn convert_node_to_markdown(node: &scraper::ElementRef, md: &mut String, depth: 
                 md.push_str("**");
             }
             "em" | "i" => {
-                md.push_str("*");
+                md.push('*');
                 for t in child.text() {
                     md.push_str(t.trim());
                 }
-                md.push_str("*");
+                md.push('*');
             }
             _ => {
                 convert_node_to_markdown(&child, md, depth);
@@ -218,15 +218,14 @@ pub fn create_webfetch_tool() -> AgentTool {
                     pm.check_network(url).map_err(|e| format!("NetworkPolicy: {}", e))?;
                 } else {
                     // No network policy configured — ask user for permission
-                    if let Some(ref approve) = ctx.approve {
-                        if !approve("webfetch".to_string(), url.to_string()).await {
+                    if let Some(ref approve) = ctx.approve
+                        && !approve("webfetch".to_string(), url.to_string()).await {
                             return Ok(AgentToolResult {
                                 content: vec![ContentBlock::text("Permission denied for webfetch")],
                                 is_error: true,
                                 terminate: false,
                             });
                         }
-                    }
                 }
 
                 let format = args
@@ -263,15 +262,14 @@ pub fn create_webfetch_tool() -> AgentTool {
                     .to_string();
 
                 // Check content-length header
-                if let Some(len) = response.content_length() {
-                    if len > MAX_RESPONSE_SIZE as u64 {
+                if let Some(len) = response.content_length()
+                    && len > MAX_RESPONSE_SIZE as u64 {
                         return Ok(AgentToolResult {
                             content: vec![ContentBlock::text("Error: Response too large (exceeds 5MB limit)")],
                             is_error: true,
                             terminate: false,
                         });
                     }
-                }
 
                 let bytes = response.bytes().await
                     .map_err(|e| format!("Failed to read response body: {}", e))?;

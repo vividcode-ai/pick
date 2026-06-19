@@ -138,8 +138,8 @@ pub(crate) fn handle_resume_selector(ctx: &mut TuiContext) {
     let session_dir = cwd.join(".pick").join("sessions");
     let mut session_files: Vec<(String, std::path::PathBuf)> = Vec::new();
 
-    if session_dir.exists() {
-        if let Ok(entries) = std::fs::read_dir(&session_dir) {
+    if session_dir.exists()
+        && let Ok(entries) = std::fs::read_dir(&session_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
                 if path.extension().map(|e| e == "jsonl").unwrap_or(false) {
@@ -152,12 +152,11 @@ pub(crate) fn handle_resume_selector(ctx: &mut TuiContext) {
                 }
             }
         }
-    }
 
     let global_sessions = dirs::home_dir().map(|h| h.join(".pick").join("sessions"));
-    if let Some(ref global) = global_sessions {
-        if global.exists() {
-            if let Ok(entries) = std::fs::read_dir(global) {
+    if let Some(ref global) = global_sessions
+        && global.exists()
+            && let Ok(entries) = std::fs::read_dir(global) {
                 for entry in entries.flatten() {
                     let path = entry.path();
                     if path.extension().map(|e| e == "jsonl").unwrap_or(false) {
@@ -172,8 +171,6 @@ pub(crate) fn handle_resume_selector(ctx: &mut TuiContext) {
                     }
                 }
             }
-        }
-    }
 
     if session_files.is_empty() {
         ctx.tui.chat.add_system_message("No saved sessions found.");
@@ -278,7 +275,7 @@ pub(crate) async fn handle_compact(ctx: &mut TuiContext, args: &[String]) {
             {
                 Ok(compaction_result) => {
                     let summary = compaction_result.summary;
-                    ctx.all_messages = vec![Message::User(UserMessage::text(&format!(
+                    ctx.all_messages = vec![Message::User(UserMessage::text(format!(
                         "[Compacted conversation summary]\n\n{}",
                         summary
                     )))];
@@ -339,7 +336,7 @@ pub(crate) async fn handle_compact(ctx: &mut TuiContext, args: &[String]) {
             .await
             {
                 Ok(summary) => {
-                    ctx.all_messages = vec![Message::User(UserMessage::text(&format!(
+                    ctx.all_messages = vec![Message::User(UserMessage::text(format!(
                         "[Compacted conversation summary]\n\n{}",
                         summary
                     )))];
@@ -408,14 +405,13 @@ pub(crate) async fn handle_reload(ctx: &mut TuiContext) {
     let skills = super::types::build_skill_display_names(&ctx.resource_loader);
 
     let settings = sm.get();
-    if let Some(new_provider) = &settings.default_provider {
-        if new_provider != &ctx.provider {
+    if let Some(new_provider) = &settings.default_provider
+        && new_provider != &ctx.provider {
             ctx.provider = new_provider.clone();
             init::update_api_key(&ctx.auth, &ctx.provider).await;
         }
-    }
-    if let Some(new_model) = &settings.default_model {
-        if new_model != &ctx.model_id {
+    if let Some(new_model) = &settings.default_model
+        && new_model != &ctx.model_id {
             let (new_m, new_p) = init::update_model(&ctx.provider, new_model);
             ctx.model = new_m;
             ctx.model_id = new_model.clone();
@@ -424,7 +420,6 @@ pub(crate) async fn handle_reload(ctx: &mut TuiContext) {
             ctx.tui.provider = ctx.provider.clone();
             init::update_api_key(&ctx.auth, &ctx.provider).await;
         }
-    }
     if let Some(new_think_level) = &settings.default_thinking_level {
         ctx.thinking_level = match new_think_level.as_str() {
             "low" => pick_agent::core::state::ThinkingLevel::Low,

@@ -118,7 +118,7 @@ async fn handle_model_selection(ctx: &mut TuiContext, val: &str) {
         ctx.provider.clone()
     };
     let new_model_id = if val.contains('/') {
-        val.splitn(2, '/').nth(1).unwrap_or(val).to_string()
+        val.split_once('/').map(|x| x.1).unwrap_or(val).to_string()
     } else {
         val.to_string()
     };
@@ -188,7 +188,7 @@ fn handle_scoped_models_selection(ctx: &mut TuiContext, val: &str) {
         } else {
             &format!("{} model(s) scoped", ctx.scoped_models.len())
         };
-        let select = SelectList::new(&format!("Scoped Models ({})", status), items);
+        let select = SelectList::new(format!("Scoped Models ({})", status), items);
         ctx.tui.start_selection(select);
         ctx.pending_command = Some("scoped-models".to_string());
         ctx.tui.finalize_turn();
@@ -289,7 +289,7 @@ async fn handle_submit(
             .tui
             .session_name
             .as_deref()
-            .map_or(false, |n| !super::types::is_default_session_title(n));
+            .is_some_and(|n| !super::types::is_default_session_title(n));
         !is_custom
             && ctx
                 .all_messages
@@ -310,7 +310,7 @@ async fn handle_submit(
         };
         let api_key = ctx
             .auth
-            .get_api_key(&ctx.model.provider.as_str(), true)
+            .get_api_key(ctx.model.provider.as_str(), true)
             .await;
         agent_exec::spawn_title_generation(
             title_text,
@@ -397,13 +397,10 @@ async fn handle_submit(
                 match evt {
                     Some(crossterm::event::Event::Key(key)) => {
                         let now = Instant::now();
-                        match key_events::process_key_event_during_agent(&mut ctx.tui, key, now) {
-                            Some(TuiAction::Quit) => {
-                                should_quit = true;
-                                agent_handle.abort();
-                                break;
-                            }
-                            _ => {}
+                        if let Some(TuiAction::Quit) = key_events::process_key_event_during_agent(&mut ctx.tui, key, now) {
+                            should_quit = true;
+                            agent_handle.abort();
+                            break;
                         }
                         // Drain remaining events
                         let mut abort = false;

@@ -21,7 +21,7 @@ async fn read_stream<R: AsyncRead + Unpin>(
         }
         if let Ok(s) = String::from_utf8(buf.clone()) {
             output.push_str(&s);
-            if let Some(ref tx) = progress {
+            if let Some(tx) = progress {
                 let _ = tx.send(s);
             }
         }
@@ -104,12 +104,12 @@ pub fn create_bash_tool() -> AgentTool {
                         });
                     }
                     // If the exec policy returned Prompt (not a hard deny), ask the user
-                    if let Some(ref ep) = pm.exec_policy {
-                        if matches!(
+                    if let Some(ref ep) = pm.exec_policy
+                        && matches!(
                             ep.evaluate(command),
                             crate::permission::exec_policy::ExecDecision::Prompt
-                        ) {
-                            if let Some(ref approve) = ctx.approve {
+                        )
+                            && let Some(ref approve) = ctx.approve {
                                 let approved = approve(
                                     "Exec Policy".to_string(),
                                     format!("Command '{}' may be dangerous.", command),
@@ -125,8 +125,6 @@ pub fn create_bash_tool() -> AgentTool {
                                     });
                                 }
                             }
-                        }
-                    }
                 }
 
                 let shell_config = get_shell_config(None)
@@ -134,8 +132,8 @@ pub fn create_bash_tool() -> AgentTool {
 
                 // ---- Sandbox execution path ----
                 // Step 1: Try direct_spawn (Windows: CreateProcessAsUserW with restricted token)
-                if let Some(ref sandbox) = ctx.sandbox.as_ref() {
-                    if let Some(ref cwd) = ctx.cwd.as_ref() {
+                if let Some(sandbox) = ctx.sandbox.as_ref()
+                    && let Some(cwd) = ctx.cwd.as_ref() {
                         let mut shell_args = shell_config.args.clone();
                         shell_args.push(command.to_string());
                         let mut req = crate::permission::sandbox::SandboxRequest::new(
@@ -145,13 +143,12 @@ pub fn create_bash_tool() -> AgentTool {
                             ctx.fs_policy.clone(),
                             0,
                         );
-                        if let Some(ref pm) = ctx.permission_manager {
-                            if let Some(ref sc) = pm.sandbox_config {
+                        if let Some(ref pm) = ctx.permission_manager
+                            && let Some(ref sc) = pm.sandbox_config {
                                 req.network_access = sc.network_access.clone();
                             }
-                        }
-                        if sandbox.is_available() {
-                            if let Some(result) = sandbox.direct_spawn(command, &req) {
+                        if sandbox.is_available()
+                            && let Some(result) = sandbox.direct_spawn(command, &req) {
                                 match result {
                                     Ok((exit_code, stdout, stderr)) => {
                                         let mut output = stdout;
@@ -185,16 +182,14 @@ pub fn create_bash_tool() -> AgentTool {
                                     }
                                 }
                             }
-                        }
                     }
-                }
 
                 // Step 2: Try transform + spawn (Linux/macOS: bwrap/seatbelt wrapping)
                 let sandbox_prog: Option<String>;
                 let sandbox_args: Option<Vec<String>>;
                 let use_sandbox = 'sandbox: {
-                    if let Some(ref sandbox) = ctx.sandbox {
-                        if let Some(ref cwd) = ctx.cwd {
+                    if let Some(ref sandbox) = ctx.sandbox
+                        && let Some(ref cwd) = ctx.cwd {
                             let mut shell_args = shell_config.args.clone();
                             shell_args.push(command.to_string());
                             let req = crate::permission::sandbox::SandboxRequest::new(
@@ -217,15 +212,14 @@ pub fn create_bash_tool() -> AgentTool {
                                 }
                             }
                         }
-                    }
                     sandbox_prog = None;
                     sandbox_args = None;
                     false
                 };
 
                 // Pre-check: absolute path access control + external directory authorization
-                if let (Some(ref fp), Some(ref cwd)) = (ctx.fs_policy, ctx.cwd) {
-                    if !fp.allow_absolute_paths() {
+                if let (Some(ref fp), Some(ref cwd)) = (ctx.fs_policy, ctx.cwd)
+                    && !fp.allow_absolute_paths() {
                         let abs_paths =
                             crate::permission::fs_policy::extract_absolute_path_args(command);
                         for path_str in &abs_paths {
@@ -278,7 +272,6 @@ pub fn create_bash_tool() -> AgentTool {
                             }
                         }
                     }
-                }
 
                 let mut cmd = if use_sandbox {
                     let mut c = tokio::process::Command::new(sandbox_prog.as_ref().unwrap());

@@ -61,7 +61,7 @@ impl CombinedAutocompleteProvider {
     fn extract_path_prefix(&self, text: &str, force: bool) -> Option<String> {
         // Find the last space/delimiter to extract the current token
         let last_delim = text
-            .rfind(|c: char| c == ' ' || c == '\t' || c == '"' || c == '\'' || c == '=')
+            .rfind([' ', '\t', '"', '\'', '='])
             .map(|i| i + 1)
             .unwrap_or(0);
 

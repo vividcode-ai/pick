@@ -149,7 +149,7 @@ pub(crate) fn navigate_to(ctx: &mut TuiContext, target_id: &str) {
     let sm = &mut ctx.session_manager;
     let tui = &mut ctx.tui;
     let rt = tokio::runtime::Handle::current();
-    let _ = rt.block_on(async move {
+    rt.block_on(async move {
         if let Err(e) = sm.append_leaf_change(old, &tid).await {
             tui.show_error(&format!("Failed to record leaf change: {}", e));
         }

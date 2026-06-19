@@ -44,7 +44,9 @@ pub async fn exec_command(
         .and_then(|o| o.timeout_ms)
         .map(Duration::from_millis);
 
-    let result = if let Some(dur) = timeout_dur {
+    
+
+    if let Some(dur) = timeout_dur {
         match timeout(dur, cmd.output()).await {
             Ok(Ok(output)) => ExecResult {
                 stdout: String::from_utf8_lossy(&output.stdout).to_string(),
@@ -80,9 +82,7 @@ pub async fn exec_command(
                 killed: false,
             },
         }
-    };
-
-    result
+    }
 }
 
 /// Execute a shell command with timeout

@@ -208,27 +208,24 @@ fn order_keybindings_config(
 pub fn to_keybindings_config(value: serde_json::Value) -> KeybindingsConfig {
     let mut config = KeybindingsConfig::new();
 
-    match value {
-        serde_json::Value::Object(map) => {
-            for (key, val) in map {
-                match val {
-                    serde_json::Value::String(s) => {
-                        config.insert(key, KeybindingValue::Single(s));
-                    }
-                    serde_json::Value::Array(arr) => {
-                        let keys: Vec<String> = arr
-                            .into_iter()
-                            .filter_map(|v| v.as_str().map(String::from))
-                            .collect();
-                        if !keys.is_empty() {
-                            config.insert(key, KeybindingValue::Multiple(keys));
-                        }
-                    }
-                    _ => {}
+    if let serde_json::Value::Object(map) = value {
+        for (key, val) in map {
+            match val {
+                serde_json::Value::String(s) => {
+                    config.insert(key, KeybindingValue::Single(s));
                 }
+                serde_json::Value::Array(arr) => {
+                    let keys: Vec<String> = arr
+                        .into_iter()
+                        .filter_map(|v| v.as_str().map(String::from))
+                        .collect();
+                    if !keys.is_empty() {
+                        config.insert(key, KeybindingValue::Multiple(keys));
+                    }
+                }
+                _ => {}
             }
         }
-        _ => {}
     }
 
     config

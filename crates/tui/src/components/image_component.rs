@@ -7,6 +7,7 @@ use crate::terminal_image::{
 
 /// Options for image display
 #[derive(Clone)]
+#[derive(Default)]
 pub struct ImageOptions {
     pub max_width_cells: Option<u32>,
     pub max_height_cells: Option<u32>,
@@ -14,16 +15,6 @@ pub struct ImageOptions {
     pub image_id: Option<u32>,
 }
 
-impl Default for ImageOptions {
-    fn default() -> Self {
-        Self {
-            max_width_cells: None,
-            max_height_cells: None,
-            filename: None,
-            image_id: None,
-        }
-    }
-}
 
 /// Image component that renders an image in the terminal using Kitty or iTerm2 protocol
 pub struct Image {
@@ -73,11 +64,10 @@ impl Image {
     }
 
     pub fn render(&mut self, width: usize) -> Vec<String> {
-        if let (Some(lines), Some(cw)) = (self.cached_lines.as_ref(), self.cached_width.as_ref()) {
-            if *cw == width {
+        if let (Some(lines), Some(cw)) = (self.cached_lines.as_ref(), self.cached_width.as_ref())
+            && *cw == width {
                 return lines.clone();
             }
-        }
 
         let max_width = std::cmp::max(
             1,

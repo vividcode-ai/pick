@@ -15,11 +15,10 @@ where
     handlers.push(Box::new(cleanup));
 
     move || {
-        if let Ok(mut handlers) = CLEANUP_HANDLERS.lock() {
-            if idx < handlers.len() {
+        if let Ok(mut handlers) = CLEANUP_HANDLERS.lock()
+            && idx < handlers.len() {
                 drop(handlers.swap_remove(idx));
             }
-        }
     }
 }
 

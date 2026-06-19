@@ -26,18 +26,16 @@ pub fn get_shell_config(custom_shell_path: Option<&str>) -> Result<ShellConfig, 
     #[cfg(windows)]
     {
         // Try Git Bash
-        for base in [
+        for b in [
             std::env::var("ProgramFiles"),
             std::env::var("ProgramFiles(x86)"),
-        ] {
-            if let Ok(b) = base {
-                let path = format!("{}\\Git\\bin\\bash.exe", b);
-                if std::path::Path::new(&path).exists() {
-                    return Ok(ShellConfig {
-                        shell: path,
-                        args: vec!["-c".to_string()],
-                    });
-                }
+        ].into_iter().flatten() {
+            let path = format!("{}\\Git\\bin\\bash.exe", b);
+            if std::path::Path::new(&path).exists() {
+                return Ok(ShellConfig {
+                    shell: path,
+                    args: vec!["-c".to_string()],
+                });
             }
         }
         // Try PATH

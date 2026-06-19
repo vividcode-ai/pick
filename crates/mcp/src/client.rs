@@ -53,6 +53,12 @@ pub struct McpToolExecutor {
     clients: Vec<ConnectedClient>,
 }
 
+impl Default for McpToolExecutor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl McpToolExecutor {
     pub fn new() -> Self {
         Self {
@@ -244,8 +250,8 @@ async fn connect_stdio(config: &McpServerConfig) -> Result<McpClient, String> {
         cmd
     };
 
-    let args = config.args.as_ref().map(|a| a.as_slice()).unwrap_or(&[]);
-    let args_owned: Vec<String> = args.iter().cloned().collect();
+    let args = config.args.as_deref().unwrap_or(&[]);
+    let args_owned: Vec<String> = args.to_vec();
 
     /// Spawn an MCP child process with piped stdio and null stderr to prevent
     /// child process log output from leaking to the terminal (rmcp's default

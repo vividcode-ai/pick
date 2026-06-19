@@ -217,7 +217,7 @@ pub(crate) mod win_impl {
         let ok = CreateProcessAsUserW(
             token,
             ptr::null(),
-            cmd_ws.as_mut_ptr() as *mut u16,
+            cmd_ws.as_mut_ptr(),
             ptr::null(),
             ptr::null(),
             1,
@@ -242,7 +242,7 @@ pub(crate) mod win_impl {
                 let ok = unsafe {
                     ReadFile(
                         pipe,
-                        buf.as_mut_ptr() as *mut u8,
+                        buf.as_mut_ptr(),
                         buf.len() as u32,
                         &mut bytes_read,
                         ptr::null_mut(),

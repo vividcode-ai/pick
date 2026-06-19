@@ -10,21 +10,13 @@ pub type HighlightFormatter = Box<dyn Fn(&str) -> String + Send + Sync>;
 pub type HighlightTheme = HashMap<String, HighlightFormatter>;
 
 /// Options for syntax highlighting
+#[derive(Default)]
 pub struct HighlightOptions<'a> {
     pub language: Option<&'a str>,
     pub ignore_illegals: bool,
     pub theme: Option<&'a HighlightTheme>,
 }
 
-impl Default for HighlightOptions<'_> {
-    fn default() -> Self {
-        Self {
-            language: None,
-            ignore_illegals: false,
-            theme: None,
-        }
-    }
-}
 
 const SPAN_CLOSE: &str = "</span>";
 const HIGHLIGHT_CLASS_PREFIX: &str = "hljs-";
@@ -66,17 +58,15 @@ fn get_active_formatter<'a>(
                 return Some(f);
             }
             // Dot prefix
-            if let Some(dot) = s.find('.') {
-                if let Some(f) = theme.get(&s[..dot]) {
+            if let Some(dot) = s.find('.')
+                && let Some(f) = theme.get(&s[..dot]) {
                     return Some(f);
                 }
-            }
             // Dash prefix
-            if let Some(dash) = s.find('-') {
-                if let Some(f) = theme.get(&s[..dash]) {
+            if let Some(dash) = s.find('-')
+                && let Some(f) = theme.get(&s[..dash]) {
                     return Some(f);
                 }
-            }
         }
     }
     theme.get("default")
@@ -135,8 +125,8 @@ pub fn render_highlighted_html(html: &str, theme: &HighlightTheme) -> String {
         }
 
         // Check for <span open tag using byte comparison (no string slice needed)
-        if bytes[i] == b'<' && bytes[i..].starts_with(b"<span") {
-            if let Some(tag_end_offset) = html[i..].find('>') {
+        if bytes[i] == b'<' && bytes[i..].starts_with(b"<span")
+            && let Some(tag_end_offset) = html[i..].find('>') {
                 let tag_end = i + tag_end_offset + 1;
                 flush_text(&mut output, &mut text_buffer, &scopes, theme);
                 let tag = &html[i..tag_end];
@@ -144,7 +134,6 @@ pub fn render_highlighted_html(html: &str, theme: &HighlightTheme) -> String {
                 i = tag_end;
                 continue;
             }
-        }
 
         // Check for </span> close tag using byte comparison
         if bytes[i] == b'<' && bytes[i..].starts_with(span_close_start) {
@@ -155,13 +144,12 @@ pub fn render_highlighted_html(html: &str, theme: &HighlightTheme) -> String {
         }
 
         // Handle HTML entities - simplified (&amp; &lt; &gt; &quot; &#39; &#x27; &#x60; &#123; &#125;)
-        if bytes[i] == b'&' {
-            if let Some((decoded, consumed)) = decode_html_entity_at(html, i) {
+        if bytes[i] == b'&'
+            && let Some((decoded, consumed)) = decode_html_entity_at(html, i) {
                 text_buffer.push_str(&decoded);
                 i += consumed;
                 continue;
             }
-        }
 
         // Safe: push current char (handles multi-byte chars correctly since we're at a char boundary)
         if let Some((_, c)) = char_indices.iter().find(|(pos, _)| *pos == i) {
@@ -221,21 +209,19 @@ pub fn highlight(code: &str, options: &HighlightOptions) -> String {
 
     let mut output = String::new();
     for line in code.lines() {
-        if let Ok(ranges) = highlighter.highlight_line(line, &ss) {
-            if let Ok(html) =
+        if let Ok(ranges) = highlighter.highlight_line(line, &ss)
+            && let Ok(html) =
                 styled_line_to_highlighted_html(&ranges, syntect::html::IncludeBackground::No)
             {
                 output.push_str(&html);
             }
-        }
     }
 
     // If a custom theme is provided, apply it to the highlighted HTML
-    if let Some(theme) = options.theme {
-        if !theme.is_empty() {
+    if let Some(theme) = options.theme
+        && !theme.is_empty() {
             return render_highlighted_html(&output, theme);
         }
-    }
     output
 }
 
@@ -246,10 +232,10 @@ pub fn supports_language(name: &str) -> bool {
 }
 
 static SYNTAX_SET: LazyLock<syntect::parsing::SyntaxSet> =
-    LazyLock::new(|| syntect::parsing::SyntaxSet::load_defaults_newlines());
+    LazyLock::new(syntect::parsing::SyntaxSet::load_defaults_newlines);
 
 static THEME_SET: LazyLock<syntect::highlighting::ThemeSet> =
-    LazyLock::new(|| syntect::highlighting::ThemeSet::load_defaults());
+    LazyLock::new(syntect::highlighting::ThemeSet::load_defaults);
 
 /// Build a HighlightTheme from the 9 syntax* colors.
 /// Maps syntect scope categories to theme color ANSI formatters.
@@ -379,26 +365,24 @@ pub fn highlight_to_ansi_with_theme(
     };
 
     // If a custom highlight theme is provided, use the HTML intermediate + scope mapping
-    if let Some(theme) = highlight_theme {
-        if !theme.is_empty() {
+    if let Some(theme) = highlight_theme
+        && !theme.is_empty() {
             // Use syntect's HTML output then map scopes to theme colors
             let mut highlighter =
                 HighlightLines::new(syntax, &THEME_SET.themes["base16-ocean.dark"]);
             use syntect::html::styled_line_to_highlighted_html;
             let mut html_output = String::new();
             for line in code.lines() {
-                if let Ok(ranges) = highlighter.highlight_line(line, &SYNTAX_SET) {
-                    if let Ok(html) = styled_line_to_highlighted_html(
+                if let Ok(ranges) = highlighter.highlight_line(line, &SYNTAX_SET)
+                    && let Ok(html) = styled_line_to_highlighted_html(
                         &ranges,
                         syntect::html::IncludeBackground::No,
                     ) {
                         html_output.push_str(&html);
                     }
-                }
             }
             return render_highlighted_html(&html_output, theme);
         }
-    }
 
     // Fallback: direct ANSI from syntect's built-in base16-ocean.dark theme
     let mut highlighter = HighlightLines::new(syntax, &THEME_SET.themes["base16-ocean.dark"]);

@@ -125,11 +125,10 @@ pub async fn poll_device_code_flow(
             return Err("Device code expired".to_string());
         }
 
-        if let Some(ref sig) = signal {
-            if *sig.borrow() {
+        if let Some(ref sig) = signal
+            && *sig.borrow() {
                 return Err("Login cancelled".to_string());
             }
-        }
 
         tokio::time::sleep(Duration::from_secs(interval)).await;
 
@@ -627,13 +626,11 @@ fn extract_copilot_base_url(token: &str) -> String {
     if parts.len() >= 2 {
         use base64::Engine;
         let engine = base64::engine::general_purpose::URL_SAFE_NO_PAD;
-        if let Ok(decoded) = engine.decode(parts[1]) {
-            if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&decoded) {
-                if let Some(proxy_ep) = json.get("proxy_ep").and_then(|v| v.as_str()) {
+        if let Ok(decoded) = engine.decode(parts[1])
+            && let Ok(json) = serde_json::from_slice::<serde_json::Value>(&decoded)
+                && let Some(proxy_ep) = json.get("proxy_ep").and_then(|v| v.as_str()) {
                     return format!("https://{}/v1", proxy_ep);
                 }
-            }
-        }
     }
     String::new()
 }
@@ -795,15 +792,14 @@ fn extract_openai_account_id(token: &str) -> Option<String> {
     if parts.len() >= 2 {
         use base64::Engine;
         let engine = base64::engine::general_purpose::URL_SAFE_NO_PAD;
-        if let Ok(decoded) = engine.decode(parts[1]) {
-            if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&decoded) {
+        if let Ok(decoded) = engine.decode(parts[1])
+            && let Ok(json) = serde_json::from_slice::<serde_json::Value>(&decoded) {
                 return json
                     .pointer("/https://api.openai.com/auth")
                     .and_then(|v| v.get("account_id"))
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string());
             }
-        }
     }
     None
 }

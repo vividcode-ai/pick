@@ -19,11 +19,10 @@ pub(crate) fn process_key_event(
     if key.code == KeyCode::Char('v')
         && key.modifiers == (KeyModifiers::CONTROL | KeyModifiers::SHIFT)
     {
-        if let Ok(mut clipboard) = arboard::Clipboard::new() {
-            if let Ok(text) = clipboard.get_text() {
+        if let Ok(mut clipboard) = arboard::Clipboard::new()
+            && let Ok(text) = clipboard.get_text() {
                 tui.handle_paste(&text);
             }
-        }
         return None;
     }
 
@@ -72,11 +71,10 @@ pub(crate) fn process_key_event_during_agent(
     if key.code == KeyCode::Char('v')
         && key.modifiers == (KeyModifiers::CONTROL | KeyModifiers::SHIFT)
     {
-        if let Ok(mut clipboard) = arboard::Clipboard::new() {
-            if let Ok(text) = clipboard.get_text() {
+        if let Ok(mut clipboard) = arboard::Clipboard::new()
+            && let Ok(text) = clipboard.get_text() {
                 tui.handle_paste(&text);
             }
-        }
         return None;
     }
 
@@ -218,12 +216,11 @@ pub(crate) fn drain_key_events_during_agent(
                         }
                         KeyCode::Enter => {
                             tui.finalize_paste_accumulator(now);
-                            if let Some(a) = tui.handle_key(KeyCode::Enter, KeyModifiers::NONE) {
-                                if matches!(a, TuiAction::Quit) {
+                            if let Some(a) = tui.handle_key(KeyCode::Enter, KeyModifiers::NONE)
+                                && matches!(a, TuiAction::Quit) {
                                     action = Some(a);
                                     had_action = true;
                                 }
-                            }
                             continue;
                         }
                         _ => {
@@ -232,12 +229,11 @@ pub(crate) fn drain_key_events_during_agent(
                                 *abort_on_esc = true;
                                 break;
                             }
-                            if let Some(a) = tui.handle_key(key.code, key.modifiers) {
-                                if matches!(a, TuiAction::Quit) {
+                            if let Some(a) = tui.handle_key(key.code, key.modifiers)
+                                && matches!(a, TuiAction::Quit) {
                                     action = Some(a);
                                     had_action = true;
                                 }
-                            }
                             continue;
                         }
                     }
@@ -247,12 +243,11 @@ pub(crate) fn drain_key_events_during_agent(
                         && key.modifiers.intersects(KeyModifiers::CONTROL) =>
                 {
                     tui.finalize_paste_accumulator(now);
-                    if let Some(a) = tui.handle_key(key.code, key.modifiers) {
-                        if matches!(a, TuiAction::Quit) {
+                    if let Some(a) = tui.handle_key(key.code, key.modifiers)
+                        && matches!(a, TuiAction::Quit) {
                             action = Some(a);
                             had_action = true;
                         }
-                    }
                     continue;
                 }
                 Ok(crossterm::event::Event::Key(_)) => {

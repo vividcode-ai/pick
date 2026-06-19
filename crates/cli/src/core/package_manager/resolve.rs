@@ -62,14 +62,12 @@ impl IgnoreMatcher {
         }
 
         // Check if pattern matches as a suffix (dir/** pattern)
-        if pattern.ends_with("/*") {
-            let base = &pattern[..pattern.len() - 2];
+        if let Some(base) = pattern.strip_suffix("/*") {
             return path == base || path.starts_with(&format!("{}/", base));
         }
 
         // Check if pattern matches as globstar (**/pattern)
-        if pattern.starts_with("**/") {
-            let suffix = &pattern[3..];
+        if let Some(suffix) = pattern.strip_prefix("**/") {
             return path == suffix || path.ends_with(&format!("/{}", suffix));
         }
 
@@ -144,7 +142,7 @@ pub(crate) fn add_ignore_rules(ig: &mut IgnoreMatcher, dir: &Path, root_dir: &Pa
         }
         if let Ok(content) = std::fs::read_to_string(&ignore_path) {
             let patterns: Vec<String> = content
-                .split(|c: char| c == '\r' || c == '\n')
+                .split(['\r', '\n'])
                 .filter_map(|line| prefix_ignore_pattern(line, &prefix))
                 .collect();
             if !patterns.is_empty() {
@@ -230,7 +228,7 @@ pub(crate) fn collect_files(
                 &full_path,
                 file_pattern,
                 skip_node_modules,
-                ignore_matcher.as_mut().map(|r| &mut **r),
+                ignore_matcher.as_deref_mut(),
                 Some(root),
             ));
         } else if is_file && file_pattern.is_match(&name) {
@@ -347,7 +345,7 @@ pub(crate) fn collect_skill_entries(
         entries.extend(collect_skill_entries(
             &full_path,
             mode,
-            ignore_matcher.as_mut().map(|r| &mut **r),
+            ignore_matcher.as_deref_mut(),
             Some(root),
         ));
     }
@@ -490,15 +488,14 @@ fn matches_any_pattern(file_path: &str, patterns: &[String], base_dir: &str) -> 
 
         // Glob matching
         let re_str = format!("^{}$", regex::escape(&normalized).replace("\\*", ".*"));
-        if let Ok(re) = regex::Regex::new(&re_str) {
-            if re.is_match(&rel) || re.is_match(&name) {
+        if let Ok(re) = regex::Regex::new(&re_str)
+            && (re.is_match(&rel) || re.is_match(&name)) {
                 return true;
             }
-        }
 
         // For skill files, also match parent directory
-        if is_skill_file {
-            if let (Some(p_rel), Some(p_name)) = (parent_rel.as_ref(), parent_name.as_ref()) {
+        if is_skill_file
+            && let (Some(p_rel), Some(p_name)) = (parent_rel.as_ref(), parent_name.as_ref()) {
                 if normalized == *p_rel || normalized == *p_name {
                     return true;
                 }
@@ -506,7 +503,6 @@ fn matches_any_pattern(file_path: &str, patterns: &[String], base_dir: &str) -> 
                     return true;
                 }
             }
-        }
 
         false
     })
@@ -541,13 +537,11 @@ fn matches_any_exact_pattern(file_path: &str, patterns: &[String], base_dir: &st
         if normalized == rel || normalized == file_path.replace('\\', "/") {
             return true;
         }
-        if is_skill_file {
-            if let (Some(p_rel), Some(p_dir)) = (parent_rel.as_ref(), parent_dir_posix.as_ref()) {
-                if normalized == *p_rel || normalized == *p_dir {
+        if is_skill_file
+            && let (Some(p_rel), Some(p_dir)) = (parent_rel.as_ref(), parent_dir_posix.as_ref())
+                && (normalized == *p_rel || normalized == *p_dir) {
                     return true;
                 }
-            }
-        }
         false
     })
 }

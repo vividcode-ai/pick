@@ -54,7 +54,7 @@ impl SelectList {
         if self.items.is_empty() {
             return 1;
         }
-        (self.items.len() + self.page_size - 1) / self.page_size
+        self.items.len().div_ceil(self.page_size)
     }
 
     /// Global start index of the current page

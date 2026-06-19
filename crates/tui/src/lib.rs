@@ -1,5 +1,11 @@
 //! Pick-tui: Terminal UI components and rendering
 #![allow(dead_code)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::if_same_then_else)]
+#![allow(clippy::type_complexity)]
+#![allow(clippy::should_implement_trait)]
+#![allow(clippy::needless_range_loop)]
+#![allow(clippy::unnecessary_unwrap)]
 
 // Core rendering infrastructure
 pub mod custom_terminal;

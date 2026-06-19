@@ -55,7 +55,7 @@ fn run_selector_loop<T>(
                 *selected,
                 &search_query,
                 width,
-                height as u16,
+                height,
             );
             needs_render = false;
         }
@@ -142,7 +142,7 @@ fn render_selector<T>(
     lines.push(String::new());
 
     if search_query.is_empty() {
-        lines.push(format!("\x1b[2m  Type to search...\x1b[0m"));
+        lines.push("\x1b[2m  Type to search...\x1b[0m".to_string());
     } else {
         lines.push(format!("  {}", search_query));
     }
@@ -189,7 +189,7 @@ fn render_selector<T>(
         lines.push(styled);
     }
 
-    let hint = format!("\x1b[2m\x1b[3m↑↓ navigate · Enter select · Esc cancel\x1b[0m");
+    let hint = "\x1b[2m\x1b[3m↑↓ navigate · Enter select · Esc cancel\x1b[0m".to_string();
     lines.push(String::new());
     lines.push(hint);
 
@@ -214,13 +214,11 @@ fn run_fallback_selector<T>(
     println!("Enter number (1-{}), or 0 to cancel:", items.len());
 
     let mut input = String::new();
-    if std::io::stdin().read_line(&mut input).is_ok() {
-        if let Ok(n) = input.trim().parse::<usize>() {
-            if n >= 1 && n <= items.len() {
+    if std::io::stdin().read_line(&mut input).is_ok()
+        && let Ok(n) = input.trim().parse::<usize>()
+            && n >= 1 && n <= items.len() {
                 return SelectResult::Selected(n - 1);
             }
-        }
-    }
     SelectResult::Cancelled
 }
 
@@ -545,11 +543,7 @@ fn handle_selector_key_event<T>(
                     );
                     *visible_count = vcount.max(1);
                     if *selected < *scroll_offset || *selected >= *scroll_offset + *visible_count {
-                        *scroll_offset = if *selected >= *visible_count / 2 {
-                            *selected - *visible_count / 2
-                        } else {
-                            0
-                        };
+                        *scroll_offset = (*selected).saturating_sub(*visible_count / 2);
                     }
                 }
             }
@@ -649,7 +643,7 @@ fn render_extended_selector<T>(
     lines.push(String::new());
 
     if search_query.is_empty() {
-        lines.push(format!("\x1b[2m  Type to search...\x1b[0m"));
+        lines.push("\x1b[2m  Type to search...\x1b[0m".to_string());
     } else {
         lines.push(format!("  {}", search_query));
     }
@@ -748,10 +742,8 @@ fn render_extended_selector<T>(
     }
 
     lines.push(String::new());
-    let hint = format!(
-        "\x1b[2m\u{2191}\u{2193} navigate \u{b7} Enter select \u{b7} Esc cancel \u{b7} \
-         Tab scope \u{b7} Ctrl+E preview \u{b7} Delete remove\x1b[0m"
-    );
+    let hint = "\x1b[2m\u{2191}\u{2193} navigate \u{b7} Enter select \u{b7} Esc cancel \u{b7} \
+         Tab scope \u{b7} Ctrl+E preview \u{b7} Delete remove\x1b[0m".to_string();
     lines.push(hint);
 
     let output = format!("{}{}", crossterm::cursor::MoveTo(0, 0), lines.join("\r\n"));

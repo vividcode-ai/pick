@@ -105,7 +105,7 @@ pub(crate) fn handle_session_info(ctx: &mut TuiContext) {
 
     ctx.tui
         .chat
-        .add_system_message(&format!("\x1b[1mSession Info\x1b[0m"));
+        .add_system_message("\x1b[1mSession Info\x1b[0m");
     ctx.tui.chat.add_system_message(&format!(
         "  \x1b[2mName:\x1b[0m    \x1b[1m{}\x1b[0m",
         name_display
@@ -119,7 +119,7 @@ pub(crate) fn handle_session_info(ctx: &mut TuiContext) {
     ));
     ctx.tui
         .chat
-        .add_system_message(&format!("\x1b[1mMessages\x1b[0m"));
+        .add_system_message("\x1b[1mMessages\x1b[0m");
     ctx.tui
         .chat
         .add_system_message(&format!("  \x1b[2mUser:\x1b[0m      {}", user_msgs));
@@ -134,7 +134,7 @@ pub(crate) fn handle_session_info(ctx: &mut TuiContext) {
         .add_system_message(&format!("  \x1b[2mTotal:\x1b[0m      {}", msg_count));
     ctx.tui
         .chat
-        .add_system_message(&format!("\x1b[1mTokens\x1b[0m"));
+        .add_system_message("\x1b[1mTokens\x1b[0m");
     ctx.tui
         .chat
         .add_system_message(&format!("  \x1b[2mInput:\x1b[0m       {}", total_input));
@@ -159,7 +159,7 @@ pub(crate) fn handle_session_info(ctx: &mut TuiContext) {
     if total_cost > 0.0 {
         ctx.tui
             .chat
-            .add_system_message(&format!("\x1b[1mCost\x1b[0m"));
+            .add_system_message("\x1b[1mCost\x1b[0m");
         ctx.tui
             .chat
             .add_system_message(&format!("  \x1b[2mTotal:\x1b[0m       ${:.4}", total_cost));

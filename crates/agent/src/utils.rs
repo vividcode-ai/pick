@@ -22,18 +22,16 @@ pub fn get_shell_config(custom_shell_path: Option<&str>) -> Result<ShellConfig, 
     #[cfg(windows)]
     {
         // 1. Try Git Bash in ProgramFiles
-        for base in [
+        for b in [
             std::env::var("ProgramFiles"),
             std::env::var("ProgramFiles(x86)"),
-        ] {
-            if let Ok(b) = base {
-                let path = format!("{}\\Git\\bin\\bash.exe", b);
-                if std::path::Path::new(&path).exists() {
-                    return Ok(ShellConfig {
-                        shell: path,
-                        args: vec!["-c".to_string()],
-                    });
-                }
+        ].into_iter().flatten() {
+            let path = format!("{}\\Git\\bin\\bash.exe", b);
+            if std::path::Path::new(&path).exists() {
+                return Ok(ShellConfig {
+                    shell: path,
+                    args: vec!["-c".to_string()],
+                });
             }
         }
         // 2. Scan drive roots for Git\bin\bash.exe (catches D:\Git, C:\Git, etc.)

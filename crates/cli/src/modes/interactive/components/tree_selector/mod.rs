@@ -108,8 +108,8 @@ pub fn build_active_path(
 pub fn build_tool_call_map(
     _nodes: &[TreeNodeInfo],
 ) -> std::collections::HashMap<String, ToolCallInfo> {
-    let map = std::collections::HashMap::new();
-    map
+    
+    std::collections::HashMap::new()
 }
 
 pub fn compute_contains_active(
@@ -127,7 +127,7 @@ pub fn compute_contains_active(
         leaf_id: Option<&str>,
         contains: &mut [bool],
     ) -> bool {
-        let mut has = leaf_id.map_or(false, |id| nodes[idx].entry_id == id);
+        let mut has = leaf_id.is_some_and(|id| nodes[idx].entry_id == id);
         for &child in &children[idx] {
             if visit(child, nodes, children, leaf_id, contains) {
                 has = true;
@@ -145,7 +145,7 @@ pub fn compute_contains_active(
 }
 
 pub fn has_text_content(content_text: Option<&str>) -> bool {
-    content_text.map_or(false, |t| !t.trim().is_empty())
+    content_text.is_some_and(|t| !t.trim().is_empty())
 }
 
 pub fn is_settings_entry(entry_type: &str) -> bool {

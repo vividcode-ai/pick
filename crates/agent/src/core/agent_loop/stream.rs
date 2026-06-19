@@ -41,11 +41,7 @@ pub async fn call_llm(
 
     let thinking_budget = thinking_budget_from_level(thinking_level);
     // When thinking is enabled, max_tokens must include room for both thinking and visible output
-    let max_tokens = if let Some(budget) = thinking_budget {
-        Some(model.max_tokens + budget)
-    } else {
-        None
-    };
+    let max_tokens = thinking_budget.map(|budget| model.max_tokens + budget);
 
     let stream_options = StreamOptions {
         temperature: None,
@@ -69,11 +65,10 @@ pub async fn call_llm(
 
     while let Some(event) = receiver.recv().await {
         // Check for cancellation request during streaming
-        if let Some(ref sig) = cancel_signal {
-            if *sig.borrow() {
+        if let Some(ref sig) = cancel_signal
+            && *sig.borrow() {
                 return Err("LLM call cancelled".to_string());
             }
-        }
 
         match event {
             StreamEvent::Done { message, .. } => {
@@ -87,14 +82,13 @@ pub async fn call_llm(
             }
             other => {
                 // Forward intermediate stream events as MessageUpdate for UI streaming
-                if let Some(ref handler) = on_event {
-                    if let Some(msg) = partial_event_to_message(&other) {
+                if let Some(handler) = on_event
+                    && let Some(msg) = partial_event_to_message(&other) {
                         handler(AgentEvent::MessageUpdate {
                             message: msg,
                             assistant_message_event: None,
                         });
                     }
-                }
             }
         }
     }

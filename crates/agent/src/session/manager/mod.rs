@@ -151,7 +151,7 @@ impl SessionManager {
         let session_path = cwd
             .join(".pick")
             .join("sessions")
-            .join(&format!("{}.jsonl", new_header.id));
+            .join(format!("{}.jsonl", new_header.id));
         if let Some(parent) = session_path.parent() {
             tokio::fs::create_dir_all(parent)
                 .await
@@ -165,15 +165,13 @@ impl SessionManager {
         if let Some(idx) = entries
             .iter()
             .rposition(|e| matches!(&e.kind, SessionEntryKind::SessionInfo(_)))
-        {
-            if let SessionEntryKind::SessionInfo(ref info) = entries[idx].kind.clone() {
+            && let SessionEntryKind::SessionInfo(ref info) = entries[idx].kind.clone() {
                 let forked_name = Self::forked_title(&info.name);
                 entries[idx].kind =
                     SessionEntryKind::SessionInfo(super::entries::SessionInfoEntry {
                         name: forked_name,
                     });
             }
-        }
 
         let goal_manager = Arc::new(GoalManager::new());
         Self::restore_goal_from_entries(&goal_manager, &entries);
@@ -330,7 +328,7 @@ impl SessionManager {
             .iter()
             .filter(|e| e.parent_id.as_deref() == Some(parent_id))
             .collect();
-        children.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+        children.sort_by_key(|a| a.timestamp);
         children
     }
 
@@ -609,13 +607,11 @@ impl SessionManager {
 
     /// Generate a forked title by appending `(fork #N)` suffix
     fn forked_title(title: &str) -> String {
-        if let Some(pos) = title.rfind(" (fork #") {
-            if let Some(end) = title[pos + 8..].find(')') {
-                if let Ok(num) = title[pos + 8..pos + 8 + end].parse::<u32>() {
+        if let Some(pos) = title.rfind(" (fork #")
+            && let Some(end) = title[pos + 8..].find(')')
+                && let Ok(num) = title[pos + 8..pos + 8 + end].parse::<u32>() {
                     return format!("{} (fork #{})", &title[..pos], num + 1);
                 }
-            }
-        }
         format!("{} (fork #1)", title)
     }
 }

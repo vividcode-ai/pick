@@ -122,7 +122,7 @@ pub fn estimate_token_count(text: &str) -> u64 {
 pub fn command_key(command: &str) -> String {
     // Split by operators and take first command segment
     let first = command
-        .split(|c| c == '\n' || c == '&' || c == '|' || c == ';')
+        .split(['\n', '&', '|', ';'])
         .next()
         .map(|s| s.trim())
         .unwrap_or(command.trim());
@@ -184,7 +184,7 @@ pub fn encode_session_dir(cwd: &str) -> String {
     } else {
         cwd
     };
-    format!("--{}--", normalized.replace('/', "-").replace('\\', "-"))
+    format!("--{}--", normalized.replace(['/', '\\'], "-"))
 }
 
 /// Get a local date key string (YYYY-MM-DD) from a timestamp
@@ -372,7 +372,7 @@ pub fn analyze_session_costs(
                     .entry(day.clone())
                     .or_default()
                     .entry(provider)
-                    .or_insert_with(DayCost::default);
+                    .or_default();
                 day_entry.total += cost.total;
                 day_entry.input += cost.input;
                 day_entry.output += cost.output;

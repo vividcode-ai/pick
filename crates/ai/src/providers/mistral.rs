@@ -233,13 +233,11 @@ async fn process_mistral_line(
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
     }
-    if output.response_model.is_none() {
-        if let Some(model_str) = chunk.get("model").and_then(|v| v.as_str()) {
-            if !model_str.is_empty() && model_str != output.model {
+    if output.response_model.is_none()
+        && let Some(model_str) = chunk.get("model").and_then(|v| v.as_str())
+            && !model_str.is_empty() && model_str != output.model {
                 output.response_model = Some(model_str.to_string());
             }
-        }
-    }
 
     // Parse usage if present
     if let Some(usage) = chunk.get("usage") {
@@ -260,11 +258,10 @@ async fn process_mistral_line(
     };
 
     // Check finish reason
-    if let Some(finish) = choice.get("finish_reason").and_then(|v| v.as_str()) {
-        if !finish.is_empty() && finish != "null" {
+    if let Some(finish) = choice.get("finish_reason").and_then(|v| v.as_str())
+        && !finish.is_empty() && finish != "null" {
             output.stop_reason = map_mistral_finish_reason(finish);
         }
-    }
 
     // Process delta content
     let delta = match choice.get("delta") {
@@ -273,8 +270,8 @@ async fn process_mistral_line(
     };
 
     // Text content
-    if let Some(content) = delta.get("content").and_then(|v| v.as_str()) {
-        if !content.is_empty() {
+    if let Some(content) = delta.get("content").and_then(|v| v.as_str())
+        && !content.is_empty() {
             let idx = if let Some(idx) = text_block_idx {
                 *idx
             } else {
@@ -300,7 +297,6 @@ async fn process_mistral_line(
                 })
                 .await;
         }
-    }
 
     // Tool calls
     if let Some(tool_calls) = delta.get("tool_calls").and_then(|v| v.as_array()) {
@@ -385,8 +381,7 @@ async fn process_mistral_tool_call(
             .get("function")
             .and_then(|f| f.get("arguments"))
             .and_then(|v| v.as_str())
-        {
-            if !args.is_empty() {
+            && !args.is_empty() {
                 let pos = tool_blocks.len() - 1;
                 tool_blocks[pos].3.push_str(args);
                 let arguments: serde_json::Value =
@@ -402,7 +397,6 @@ async fn process_mistral_tool_call(
                     })
                     .await;
             }
-        }
     }
 }
 

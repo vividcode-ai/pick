@@ -114,9 +114,9 @@ pub fn prepare_branch_entries(entries: &[Value], token_budget: usize) -> BranchP
     let mut total_tokens = 0usize;
 
     for entry in entries {
-        if entry.get("type").and_then(|v| v.as_str()) == Some("branch_summary") {
-            if entry.get("fromHook") != Some(&Value::Bool(true)) {
-                if let Some(details) = entry.get("details") {
+        if entry.get("type").and_then(|v| v.as_str()) == Some("branch_summary")
+            && entry.get("fromHook") != Some(&Value::Bool(true))
+                && let Some(details) = entry.get("details") {
                     if let Some(read_files) = details.get("readFiles").and_then(|v| v.as_array()) {
                         for f in read_files {
                             if let Some(s) = f.as_str() {
@@ -134,8 +134,6 @@ pub fn prepare_branch_entries(entries: &[Value], token_budget: usize) -> BranchP
                         }
                     }
                 }
-            }
-        }
     }
 
     for entry in entries.iter().rev() {
@@ -144,14 +142,12 @@ pub fn prepare_branch_entries(entries: &[Value], token_budget: usize) -> BranchP
             extract_file_ops_from_message(&msg, &mut file_ops);
             let tokens = estimate_tokens(&msg);
             if token_budget > 0 && total_tokens + tokens > token_budget {
-                if let Some(entry_type) = entry.get("type").and_then(|v| v.as_str()) {
-                    if entry_type == "compaction" || entry_type == "branch_summary" {
-                        if total_tokens < (token_budget as f64 * 0.9) as usize {
+                if let Some(entry_type) = entry.get("type").and_then(|v| v.as_str())
+                    && (entry_type == "compaction" || entry_type == "branch_summary")
+                        && total_tokens < (token_budget as f64 * 0.9) as usize {
                             messages.insert(0, msg);
                             total_tokens += tokens;
                         }
-                    }
-                }
                 break;
             }
             messages.insert(0, msg);

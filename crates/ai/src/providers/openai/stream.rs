@@ -204,7 +204,7 @@ pub fn stream_openai_completions(
                         }
                     }
 
-                    if !has_finish_reason && output.stop_reason == StopReason::Stop {}
+                    
 
                     let _ = tx
                         .send(StreamEvent::Done {
@@ -277,13 +277,11 @@ async fn process_openai_line(
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
     }
-    if output.response_model.is_none() {
-        if let Some(model_str) = chunk.get("model").and_then(|v| v.as_str()) {
-            if !model_str.is_empty() && model_str != output.model {
+    if output.response_model.is_none()
+        && let Some(model_str) = chunk.get("model").and_then(|v| v.as_str())
+            && !model_str.is_empty() && model_str != output.model {
                 output.response_model = Some(model_str.to_string());
             }
-        }
-    }
 
     if let Some(usage) = chunk.get("usage") {
         parse_chunk_usage(output, usage);
@@ -303,19 +301,18 @@ async fn process_openai_line(
         }
     }
 
-    if output.usage.input == 0 && output.usage.output == 0 {
-        if let Some(usage) = choice.get("usage") {
+    if output.usage.input == 0 && output.usage.output == 0
+        && let Some(usage) = choice.get("usage") {
             parse_chunk_usage(output, usage);
         }
-    }
 
     let delta = match choice.get("delta") {
         Some(d) => d,
         None => return,
     };
 
-    if let Some(content) = delta.get("content").and_then(|v| v.as_str()) {
-        if !content.is_empty() {
+    if let Some(content) = delta.get("content").and_then(|v| v.as_str())
+        && !content.is_empty() {
             let idx = ensure_text_block(output, text_block_idx, tx).await;
             if let ContentBlock::Text(ref mut tc) = output.content[idx] {
                 tc.text.push_str(content);
@@ -328,11 +325,10 @@ async fn process_openai_line(
                 })
                 .await;
         }
-    }
 
     for thinking_field in &["reasoning_content", "reasoning", "reasoning_text"] {
-        if let Some(reasoning) = delta.get(*thinking_field).and_then(|v| v.as_str()) {
-            if !reasoning.is_empty() {
+        if let Some(reasoning) = delta.get(*thinking_field).and_then(|v| v.as_str())
+            && !reasoning.is_empty() {
                 let idx = ensure_thinking_block(output, thinking_block_idx, tx, None).await;
                 if let ContentBlock::Thinking(ref mut tc) = output.content[idx] {
                     tc.thinking.push_str(reasoning);
@@ -345,7 +341,6 @@ async fn process_openai_line(
                     })
                     .await;
             }
-        }
     }
 
     if let Some(details) = delta.get("reasoning_details").and_then(|v| v.as_array()) {
@@ -509,7 +504,7 @@ async fn process_tool_call_delta(
 
         let (partial_str, parsed) = tc_val
             .get("function")
-            .map(|f| extract_tool_args(f))
+            .map(extract_tool_args)
             .unwrap_or_default();
 
         let content_idx = output.content.len();

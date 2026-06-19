@@ -25,7 +25,7 @@ impl CountdownTimer {
             0
         } else {
             let remaining = self.timeout_ms - elapsed;
-            (remaining + 999) / 1000
+            remaining.div_ceil(1000)
         }
     }
 

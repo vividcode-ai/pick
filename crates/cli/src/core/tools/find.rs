@@ -215,11 +215,10 @@ pub fn render_find_result(
         if let Some(rl) = details.result_limit_reached {
             warnings.push(format!("{} results limit", rl));
         }
-        if let Some(ref truncation) = details.truncation {
-            if truncation.truncated {
+        if let Some(ref truncation) = details.truncation
+            && truncation.truncated {
                 warnings.push(format!("{} limit", format_size(truncation.max_bytes)));
             }
-        }
         if !warnings.is_empty() {
             formatted.push_str(&format!(
                 "\n{}",

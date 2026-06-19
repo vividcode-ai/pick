@@ -331,8 +331,8 @@ fn load_extension_from_library(path: &Path) -> Result<Extension, String> {
 
     let mut ext = Extension::new(format!("dynamic:{}", ext_name), path_str);
 
-    if let Some(ref reg_str) = reg_str {
-        if !reg_str.is_empty() {
+    if let Some(ref reg_str) = reg_str
+        && !reg_str.is_empty() {
             match serde_json::from_str::<DynamicExtensionRegistration>(reg_str) {
                 Ok(registration) => {
                     validate_extension_factory(&mut ext, registration);
@@ -345,7 +345,6 @@ fn load_extension_from_library(path: &Path) -> Result<Extension, String> {
                 }
             }
         }
-    }
 
     // Keep the library loaded for the extension's lifetime
     std::mem::forget(lib);
@@ -376,13 +375,11 @@ pub fn discover_extensions_in_dir(dir: &Path) -> Vec<String> {
     if let Ok(entries) = std::fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.is_file() {
-                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                    if is_extension_file(name) {
+            if path.is_file()
+                && let Some(name) = path.file_name().and_then(|n| n.to_str())
+                    && is_extension_file(name) {
                         discovered.push(path.to_string_lossy().to_string());
                     }
-                }
-            }
         }
     }
 
@@ -514,23 +511,19 @@ fn find_extension_manifest(dir: &Path) -> Option<std::path::PathBuf> {
     let extension_json = dir.join("extension.json");
     if extension_json.is_file() {
         // Validate it's parseable
-        if let Ok(content) = std::fs::read_to_string(&extension_json) {
-            if serde_json::from_str::<ExtensionManifest>(&content).is_ok() {
+        if let Ok(content) = std::fs::read_to_string(&extension_json)
+            && serde_json::from_str::<ExtensionManifest>(&content).is_ok() {
                 return Some(extension_json);
             }
-        }
     }
     // Check package.json with pick field
     let package_json = dir.join("package.json");
-    if package_json.is_file() {
-        if let Ok(content) = std::fs::read_to_string(&package_json) {
-            if let Ok(pkg) = serde_json::from_str::<serde_json::Value>(&content) {
-                if pkg.get("pick").and_then(|v| v.as_object()).is_some() {
+    if package_json.is_file()
+        && let Ok(content) = std::fs::read_to_string(&package_json)
+            && let Ok(pkg) = serde_json::from_str::<serde_json::Value>(&content)
+                && pkg.get("pick").and_then(|v| v.as_object()).is_some() {
                     return Some(package_json);
                 }
-            }
-        }
-    }
     None
 }
 
@@ -575,13 +568,11 @@ fn discover_extensions_in_dir_v2(dir: &Path) -> Vec<std::path::PathBuf> {
             }
 
             // Files: direct extension files
-            if path.is_file() {
-                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                    if is_extension_file(name) {
+            if path.is_file()
+                && let Some(name) = path.file_name().and_then(|n| n.to_str())
+                    && is_extension_file(name) {
                         discovered.push(path);
                     }
-                }
-            }
         }
     }
 
@@ -616,12 +607,11 @@ pub async fn discover_and_load_extensions(
         if canonical.is_dir() {
             // Try manifest-based and dynamic extensions in directory
             let manifest = find_extension_manifest(&canonical);
-            if let Some(manifest_path) = manifest {
-                if let Some(ext) = load_extension_from_manifest(&manifest_path) {
+            if let Some(manifest_path) = manifest
+                && let Some(ext) = load_extension_from_manifest(&manifest_path) {
                     all_extensions.push(ext);
                     continue;
                 }
-            }
             // Fall back to discovering individual files
             let discovered = discover_extensions_in_dir(&canonical);
             for file_path in discovered {

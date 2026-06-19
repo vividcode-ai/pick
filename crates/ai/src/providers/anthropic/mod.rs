@@ -110,8 +110,8 @@ pub fn stream_anthropic(
         let is_cloudflare_gateway = cloudflare::is_cloudflare_ai_gateway(&model.provider);
 
         for attempt in 0..=max_retries {
-            if let Some(signal) = opts.and_then(|o| o.signal.as_ref()) {
-                if *signal.borrow() {
+            if let Some(signal) = opts.and_then(|o| o.signal.as_ref())
+                && *signal.borrow() {
                     let mut msg = AssistantMessage::new(
                         vec![],
                         "anthropic-messages".to_string(),
@@ -129,7 +129,6 @@ pub fn stream_anthropic(
                         .await;
                     return;
                 }
-            }
 
             if attempt > 0 {
                 let delay = crate::retry::retry_delay(attempt, 1000, max_delay);
@@ -195,8 +194,8 @@ pub fn stream_anthropic(
 
                     use futures::StreamExt;
                     while let Some(chunk_result) = chunk_stream.next().await {
-                        if let Some(signal) = opts.and_then(|o| o.signal.as_ref()) {
-                            if *signal.borrow() {
+                        if let Some(signal) = opts.and_then(|o| o.signal.as_ref())
+                            && *signal.borrow() {
                                 emit_error(
                                     &tx,
                                     &mut output,
@@ -206,7 +205,6 @@ pub fn stream_anthropic(
                                 .await;
                                 return;
                             }
-                        }
 
                         match chunk_result {
                             Ok(chunk) => {

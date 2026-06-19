@@ -136,11 +136,10 @@ async fn run_subagent_turn(
     // Build tool set: default tools filtered by agent.tools, excluding subagent
     let mut tools = create_coding_tools();
     tools.retain(|t| t.name != "subagent");
-    if let Some(ref tool_names) = agent.tools {
-        if !tool_names.is_empty() {
+    if let Some(ref tool_names) = agent.tools
+        && !tool_names.is_empty() {
             tools.retain(|t| tool_names.contains(&t.name));
         }
-    }
 
     // Capture output text and usage from child's on_event
     let output = Arc::new(Mutex::new(String::new()));
@@ -178,15 +177,14 @@ async fn run_subagent_turn(
                 }
             }
             AgentEvent::MessageUpdate { message, .. } => {
-                if let Some(ref tx) = on_event_progress {
-                    if let Message::Assistant(msg) = message {
+                if let Some(ref tx) = on_event_progress
+                    && let Message::Assistant(msg) = message {
                         for block in &msg.content {
                             if let ContentBlock::Text(t) = block {
                                 let _ = tx.send(t.text.clone());
                             }
                         }
                     }
-                }
             }
             _ => {}
         }
@@ -443,8 +441,8 @@ async fn run_parallel_agents(
     let index = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
     let tasks = std::sync::Arc::new(tasks);
     let agent_mode = std::sync::Arc::new(agent_mode);
-    let registry = registry.map(|r| std::sync::Arc::new(r));
-    let parent_model = parent_model.map(|m| std::sync::Arc::new(m));
+    let registry = registry.map(std::sync::Arc::new);
+    let parent_model = parent_model.map(std::sync::Arc::new);
 
     let mut handles = Vec::with_capacity(limit);
     for _ in 0..limit {
@@ -666,8 +664,8 @@ async fn execute_subagent(
                 .iter()
                 .filter(|a| matches!(a.source, AgentSource::Project))
                 .collect();
-            if !project_agents.is_empty() {
-                if let Some(ref approve) = ctx.approve {
+            if !project_agents.is_empty()
+                && let Some(ref approve) = ctx.approve {
                     let names: Vec<&str> = project_agents.iter().map(|a| a.name.as_str()).collect();
                     let dir = discovery
                         .project_agents_dir
@@ -691,18 +689,17 @@ async fn execute_subagent(
                         });
                     }
                 }
-            }
         }
     }
 
     let has_chain = args
         .get("chain")
         .and_then(|v| v.as_array())
-        .map_or(false, |a| !a.is_empty());
+        .is_some_and(|a| !a.is_empty());
     let has_tasks = args
         .get("tasks")
         .and_then(|v| v.as_array())
-        .map_or(false, |a| !a.is_empty());
+        .is_some_and(|a| !a.is_empty());
     let has_single = args.get("agent").and_then(|v| v.as_str()).is_some()
         && args.get("task").and_then(|v| v.as_str()).is_some();
 

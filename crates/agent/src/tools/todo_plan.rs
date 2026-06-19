@@ -62,20 +62,19 @@ pub fn create_todo_plan_tool() -> AgentTool {
                 let title = format!("{} todos", todos.iter().filter(|t| t.status != "completed").count());
 
                 // Emit event for TUI rendering
-                if let Some(ref handler) = ctx.progress.as_ref() {
+                if let Some(handler) = ctx.progress.as_ref() {
                     let _ = handler.send(serde_json::json!({"todos": &todos}).to_string());
                 }
 
                 // Permission check
-                if let Some(ref approve) = ctx.approve {
-                    if !approve("todo_plan".to_string(), title.clone()).await {
+                if let Some(ref approve) = ctx.approve
+                    && !approve("todo_plan".to_string(), title.clone()).await {
                         return Ok(AgentToolResult {
                             content: vec![ContentBlock::text("Permission denied for todo_plan")],
                             is_error: true,
                             terminate: false,
                         });
                     }
-                }
 
                 Ok(AgentToolResult {
                     content: vec![ContentBlock::text(serde_json::to_string_pretty(&todos).unwrap_or_default())],

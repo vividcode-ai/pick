@@ -109,7 +109,7 @@ impl Writer {
                 self.flush_pending();
             }
             Tag::Heading { level, .. } => {
-                let level = (*level as usize).min(6).max(1);
+                let level = (*level as usize).clamp(1, 6);
                 let heading_style = self.styles.heading[level - 1];
                 self.push_style(heading_style);
             }
@@ -261,8 +261,8 @@ impl Writer {
             }
             TagEnd::Link => {
                 self.flush_pending();
-                if let Some(link) = self.link.take() {
-                    if link.show_dest && !link.local {
+                if let Some(link) = self.link.take()
+                    && link.show_dest && !link.local {
                         let display_dest = if link.dest.len() > 60 {
                             format!("…{}", &link.dest[link.dest.len().saturating_sub(59)..])
                         } else {
@@ -273,7 +273,6 @@ impl Writer {
                             self.styles.link_url,
                         )]);
                     }
-                }
             }
             _ => {}
         }
@@ -333,11 +332,10 @@ impl Writer {
 
     fn make_span(&self, content: impl Into<Cow<'static, str>>) -> Span<'static> {
         let mut span = Span::styled(content.into(), self.current_style());
-        if let Some(ref link) = self.link {
-            if link.show_dest {
+        if let Some(ref link) = self.link
+            && link.show_dest {
                 span = span.style(self.styles.link);
             }
-        }
         span
     }
 
@@ -401,9 +399,9 @@ impl Writer {
     }
 
     fn render_highlighted_code(&self, code: &str, lang: Option<&str>) -> Vec<Line<'static>> {
-        if let Some(ref lang) = lang {
+        if let Some(lang) = lang {
             let lines = crate::syntax_highlight::highlight_code_to_lines(code, lang);
-            if !lines.is_empty() && !(lines.len() == 1 && lines[0].spans.is_empty()) {
+            if !(lines.is_empty() || lines.len() == 1 && lines[0].spans.is_empty()) {
                 return lines;
             }
         }
@@ -519,7 +517,7 @@ impl Writer {
 #[allow(dead_code)]
 pub(crate) fn parse_local_link_target(dest: &str, cwd: Option<&Path>) -> (String, String) {
     let dest = dest.trim();
-    let (path_str, location) = if let Some(pos) = dest.rfind(|c| c == '#' || c == ':') {
+    let (path_str, location) = if let Some(pos) = dest.rfind(['#', ':']) {
         let (p, loc) = dest.split_at(pos);
         (p.to_string(), loc.to_string())
     } else {

@@ -423,7 +423,7 @@ pub fn render_warning_settings(
     ));
     lines.push(String::new());
 
-    let items = vec![(
+    let items = [(
         "anthropic-extra-usage",
         "Anthropic extra usage",
         "Warn when Anthropic subscription auth may use paid extra usage",

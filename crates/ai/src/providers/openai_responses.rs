@@ -354,9 +354,9 @@ async fn process_responses_event(
                 .await;
         }
         "response.output_text.delta" => {
-            if let Some(delta) = data.get("delta").and_then(|v| v.as_str()) {
-                if let Some(idx) = *text_block_idx {
-                    if idx < output.content.len() {
+            if let Some(delta) = data.get("delta").and_then(|v| v.as_str())
+                && let Some(idx) = *text_block_idx
+                    && idx < output.content.len() {
                         if let ContentBlock::Text(ref mut tc) = output.content[idx] {
                             tc.text.push_str(delta);
                         }
@@ -368,8 +368,6 @@ async fn process_responses_event(
                             })
                             .await;
                     }
-                }
-            }
         }
         "response.function_call_arguments.delta" => {
             if let Some(delta) = data.get("delta").and_then(|v| v.as_str()) {
@@ -383,13 +381,12 @@ async fn process_responses_event(
                         // Try to merge the delta into arguments
                         if let Some(existing) = tc.arguments.as_object() {
                             let mut merged = existing.clone();
-                            if let Ok(new_val) = serde_json::from_str::<serde_json::Value>(delta) {
-                                if let Some(obj) = new_val.as_object() {
+                            if let Ok(new_val) = serde_json::from_str::<serde_json::Value>(delta)
+                                && let Some(obj) = new_val.as_object() {
                                     for (k, v) in obj {
                                         merged.insert(k.clone(), v.clone());
                                     }
                                 }
-                            }
                             tc.arguments = serde_json::Value::Object(merged);
                         } else if tc.arguments.is_null() {
                             tc.arguments =

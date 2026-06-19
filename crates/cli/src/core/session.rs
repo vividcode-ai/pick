@@ -69,20 +69,17 @@ pub async fn create_session_manager(
             // -c without ID: scan both project and global dirs, pick newest
             let mut all: Vec<(PathBuf, std::time::SystemTime)> = Vec::new();
             for dir in [&project_dir, &global_dir] {
-                if dir.exists() {
-                    if let Ok(entries) = std::fs::read_dir(dir) {
+                if dir.exists()
+                    && let Ok(entries) = std::fs::read_dir(dir) {
                         for e in entries.flatten() {
                             let p = e.path();
-                            if p.extension().map_or(false, |ext| ext == "jsonl") {
-                                if let Ok(meta) = p.metadata() {
-                                    if let Ok(t) = meta.modified() {
+                            if p.extension().is_some_and(|ext| ext == "jsonl")
+                                && let Ok(meta) = p.metadata()
+                                    && let Ok(t) = meta.modified() {
                                         all.push((p, t));
                                     }
-                                }
-                            }
                         }
                     }
-                }
             }
             all.sort_by_key(|(_, t)| *t);
             if let Some((latest, _)) = all.last() {
@@ -165,27 +162,24 @@ fn find_session_file(id: &str, search_dir: &PathBuf) -> Option<PathBuf> {
             if let Some(found) = find_session_file(id, &path) {
                 return Some(found);
             }
-        } else if path.extension().map_or(false, |ext| ext == "jsonl") {
+        } else if path.extension().is_some_and(|ext| ext == "jsonl") {
             // Quick check: does the filename contain the ID?
             if path
                 .file_stem()
                 .and_then(|s| s.to_str())
-                .map_or(false, |s| s.contains(id))
+                .is_some_and(|s| s.contains(id))
             {
                 // Verify by reading the header
-                if let Ok(content) = std::fs::read_to_string(&path) {
-                    if let Some(first_line) = content.lines().next() {
-                        if let Ok(header) = serde_json::from_str::<serde_json::Value>(first_line) {
-                            if header
+                if let Ok(content) = std::fs::read_to_string(&path)
+                    && let Some(first_line) = content.lines().next()
+                        && let Ok(header) = serde_json::from_str::<serde_json::Value>(first_line)
+                            && header
                                 .get("id")
                                 .and_then(|v| v.as_str())
-                                .map_or(false, |hid| hid.starts_with(id))
+                                .is_some_and(|hid| hid.starts_with(id))
                             {
                                 return Some(path);
                             }
-                        }
-                    }
-                }
             }
         }
     }

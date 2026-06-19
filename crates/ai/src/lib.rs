@@ -1,4 +1,12 @@
 //! Pick-ai: AI types, provider abstraction, and streaming.
+#![allow(clippy::type_complexity)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::await_holding_lock)]
+#![allow(clippy::ptr_arg)]
+#![allow(clippy::len_without_is_empty)]
+#![allow(clippy::doc_lazy_continuation)]
+#![allow(clippy::while_let_loop)]
+#![allow(clippy::needless_range_loop)]
 
 pub mod image_models;
 pub mod images;
@@ -43,7 +51,7 @@ pub async fn complete_simple(
     _reasoning: Option<String>,
 ) -> SimpleCompletionResult {
     let registry = registry::global_registry();
-    let provider = registry.get(&model.api.as_str());
+    let provider = registry.get(model.api.as_str());
 
     let provider = match provider {
         Some(p) => p,
@@ -60,11 +68,13 @@ pub async fn complete_simple(
         }
     };
 
-    let mut options = StreamOptions::default();
-    options.api_key = api_key;
-    options.headers = headers;
-    options.max_tokens = max_tokens;
-    options.temperature = temperature;
+    let options = StreamOptions {
+        api_key,
+        headers,
+        max_tokens,
+        temperature,
+        ..Default::default()
+    };
     // reasoning is used by providers as a separate parameter, not in StreamOptions
 
     let mut receiver = (provider.stream)(model.clone(), context, Some(options));

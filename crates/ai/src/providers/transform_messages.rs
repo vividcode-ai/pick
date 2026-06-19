@@ -95,13 +95,12 @@ pub fn transform_messages(
                 Message::User(_) => msg.clone(),
                 Message::ToolResult(tr) => {
                     let normalized_id = tool_call_id_map.get(&tr.tool_call_id);
-                    if let Some(nid) = normalized_id {
-                        if nid != &tr.tool_call_id {
+                    if let Some(nid) = normalized_id
+                        && nid != &tr.tool_call_id {
                             let mut new_tr = tr.clone();
                             new_tr.tool_call_id = nid.clone();
                             return Message::ToolResult(new_tr);
                         }
-                    }
                     msg.clone()
                 }
                 Message::Assistant(a) => {
@@ -149,8 +148,8 @@ pub fn transform_messages(
                                     if !is_same_model && tc.thought_signature.is_some() {
                                         normalized.thought_signature = None;
                                     }
-                                    if !is_same_model {
-                                        if let Some(normalize_fn) = &normalize_tool_call_id {
+                                    if !is_same_model
+                                        && let Some(normalize_fn) = &normalize_tool_call_id {
                                             let new_id = normalize_fn(&tc.id, model, a);
                                             if new_id != tc.id {
                                                 tool_call_id_map
@@ -158,7 +157,6 @@ pub fn transform_messages(
                                                 normalized.id = new_id;
                                             }
                                         }
-                                    }
                                     vec![ContentBlock::ToolCall(normalized)]
                                 }
                                 _ => vec![block.clone()],

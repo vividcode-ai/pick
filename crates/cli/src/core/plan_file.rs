@@ -31,11 +31,10 @@ impl PlanFile {
     }
 
     pub fn write(&self, content: &str) -> std::io::Result<()> {
-        if let Some(parent) = self.path.parent() {
-            if !parent.exists() {
+        if let Some(parent) = self.path.parent()
+            && !parent.exists() {
                 std::fs::create_dir_all(parent)?;
             }
-        }
         std::fs::write(&self.path, content)
     }
 

@@ -3,7 +3,7 @@ use super::context::TuiContext;
 /// Disable bracketed paste mode, restore terminal, print session resume box
 pub(crate) fn cleanup_tui_mode(ctx: &mut TuiContext) {
     // Disable bracketed paste mode
-    let _ = print!("\x1b[?2004l");
+    print!("\x1b[?2004l");
     let _ = std::io::Write::flush(&mut std::io::stdout());
 
     // Cleanup terminal manager first (restore cursor, clear overflow)

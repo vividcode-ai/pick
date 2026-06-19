@@ -64,12 +64,11 @@ pub fn create_ls_tool() -> AgentTool {
                 while let Some(entry) = entries.next_entry().await
                     .map_err(|e| format!("Error reading entry: {}", e))?
                 {
-                    if let Some(lim) = limit {
-                        if count >= lim {
+                    if let Some(lim) = limit
+                        && count >= lim {
                             result.push_str(&format!("... (limit of {} entries reached)", lim));
                             break;
                         }
-                    }
 
                     let file_name = entry.file_name().to_string_lossy().to_string();
                     let file_type = entry.file_type().await

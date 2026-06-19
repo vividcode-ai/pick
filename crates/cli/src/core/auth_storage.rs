@@ -348,11 +348,10 @@ impl AuthStorage {
         if find_env_key(provider).is_some() {
             return true;
         }
-        if let Some(ref resolver) = *self.fallback_resolver.lock().unwrap() {
-            if resolver(provider).is_some() {
+        if let Some(ref resolver) = *self.fallback_resolver.lock().unwrap()
+            && resolver(provider).is_some() {
                 return true;
             }
-        }
         false
     }
 
@@ -383,15 +382,14 @@ impl AuthStorage {
                 label: Some(key),
             };
         }
-        if let Some(ref resolver) = *self.fallback_resolver.lock().unwrap() {
-            if resolver(provider).is_some() {
+        if let Some(ref resolver) = *self.fallback_resolver.lock().unwrap()
+            && resolver(provider).is_some() {
                 return AuthStatus {
                     configured: false,
                     source: Some("fallback".to_string()),
                     label: Some("custom provider config".to_string()),
                 };
             }
-        }
         AuthStatus {
             configured: false,
             source: None,
@@ -437,11 +435,10 @@ impl AuthStorage {
         }
 
         // Fallback resolver
-        if include_fallback {
-            if let Some(ref resolver) = *self.fallback_resolver.lock().unwrap() {
+        if include_fallback
+            && let Some(ref resolver) = *self.fallback_resolver.lock().unwrap() {
                 return resolver(provider_id);
             }
-        }
 
         None
     }
@@ -491,9 +488,9 @@ fn find_env_key(provider: &str) -> Option<String> {
         format!("{}_APIKEY", provider_upper),
         format!("{}_KEY", provider_upper),
         format!("{}_TOKEN", provider_upper),
-        format!("ANTHROPIC_API_KEY"),
-        format!("OPENAI_API_KEY"),
-        format!("GOOGLE_API_KEY"),
+        "ANTHROPIC_API_KEY".to_string(),
+        "OPENAI_API_KEY".to_string(),
+        "GOOGLE_API_KEY".to_string(),
     ];
     candidates
         .into_iter()

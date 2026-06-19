@@ -175,11 +175,10 @@ impl ModelRegistry {
             .as_ref()
             .and_then(|p| self.load_custom_models(p));
 
-        if let Some(ref result) = custom_result {
-            if let Some(ref error) = result.error {
+        if let Some(ref result) = custom_result
+            && let Some(ref error) = result.error {
                 *self.load_error.lock().unwrap() = Some(error.clone());
             }
-        }
 
         let mut combined = self.load_builtin_models();
 
@@ -250,22 +249,20 @@ impl ModelRegistry {
         let mut model_request_headers = self.model_request_headers.lock().unwrap();
 
         for (provider_name, provider_config) in &parsed.providers {
-            self.store_provider_request_config(provider_name, &provider_config);
+            self.store_provider_request_config(provider_name, provider_config);
 
             if let Some(ref model_defs) = provider_config.models {
                 for model_def in model_defs {
                     let api = model_def
                         .api
                         .as_ref()
-                        .or(provider_config.api.as_ref())
-                        .map(|s| s.clone())
+                        .or(provider_config.api.as_ref()).cloned()
                         .unwrap_or_else(|| "openai-completions".to_string());
 
                     let base_url = model_def
                         .base_url
                         .as_ref()
-                        .or(provider_config.base_url.as_ref())
-                        .map(|s| s.clone())
+                        .or(provider_config.base_url.as_ref()).cloned()
                         .unwrap_or_default();
 
                     let raw_cost = model_def.cost.as_ref().or(provider_config.cost());
@@ -502,11 +499,10 @@ fn strip_json_comments(input: &str) -> String {
             }
             ',' if !in_string => {
                 // Skip trailing comma before ] or }
-                if let Some(&(_, next)) = chars.peek() {
-                    if next == '}' || next == ']' {
+                if let Some(&(_, next)) = chars.peek()
+                    && (next == '}' || next == ']') {
                         continue;
                     }
-                }
                 result.push(',');
             }
             _ => result.push(c),

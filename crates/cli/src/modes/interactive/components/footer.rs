@@ -112,7 +112,7 @@ pub fn render_footer(
         pwd_display = format!("{} • {}", pwd_display, name);
     }
 
-    let pwd_line = format!("{}", ToolTheme::fg("dim", &pwd_display));
+    let pwd_line = ToolTheme::fg("dim", &pwd_display).to_string();
 
     // Stats line with left/right alignment
     let stats_line = format!(

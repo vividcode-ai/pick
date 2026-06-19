@@ -24,19 +24,12 @@ pub enum TruncationType {
 }
 
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct TruncationOptions {
     pub max_lines: Option<usize>,
     pub max_bytes: Option<usize>,
 }
 
-impl Default for TruncationOptions {
-    fn default() -> Self {
-        Self {
-            max_lines: None,
-            max_bytes: None,
-        }
-    }
-}
 
 fn split_lines_for_counting(content: &str) -> Vec<&str> {
     if content.is_empty() {

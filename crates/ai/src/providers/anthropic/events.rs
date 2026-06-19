@@ -145,7 +145,7 @@ async fn handle_anthropic_content_block_start(
             let name = cb.get("name").and_then(|v| v.as_str()).unwrap_or("");
             let input = cb.get("input").unwrap_or(&serde_json::Value::Null);
             let is_placeholder =
-                input.is_null() || input.as_object().map_or(false, |o| o.is_empty());
+                input.is_null() || input.as_object().is_some_and(|o| o.is_empty());
             let content_index = output.content.len();
             let block = BlockState {
                 block_type: "toolCall".to_string(),
@@ -275,11 +275,10 @@ async fn handle_anthropic_content_block_delta(
                 block.thinking_signature =
                     Some(block.thinking_signature.clone().unwrap_or_default() + signature);
                 let idx = block.content_index;
-                if idx < output.content.len() {
-                    if let ContentBlock::Thinking(ref mut tc) = output.content[idx] {
+                if idx < output.content.len()
+                    && let ContentBlock::Thinking(ref mut tc) = output.content[idx] {
                         tc.thinking_signature = block.thinking_signature.clone();
                     }
-                }
             }
         }
         _ => {}
@@ -288,11 +287,10 @@ async fn handle_anthropic_content_block_delta(
 }
 
 fn handle_anthropic_message_delta(data: &serde_json::Value, output: &mut AssistantMessage) {
-    if let Some(delta) = data.get("delta") {
-        if let Some(stop_reason) = delta.get("stop_reason").and_then(|v| v.as_str()) {
+    if let Some(delta) = data.get("delta")
+        && let Some(stop_reason) = delta.get("stop_reason").and_then(|v| v.as_str()) {
             output.stop_reason = super::map_anthropic_stop_reason(stop_reason);
         }
-    }
     if let Some(usage) = data.get("usage") {
         if let Some(val) = usage.get("input_tokens").and_then(|v| v.as_u64()) {
             output.usage.input = val;
@@ -360,8 +358,8 @@ pub(crate) async fn process_anthropic_event(
             if let Some(block) = blocks.iter().find(|b| b.index == index) {
                 let idx = block.content_index;
                 match block.block_type.as_str() {
-                    "text" => {
-                        if idx < output.content.len() {
+                    "text"
+                        if idx < output.content.len() => {
                             let _ = tx
                                 .send(StreamEvent::TextEnd {
                                     content_index: idx,
@@ -370,9 +368,8 @@ pub(crate) async fn process_anthropic_event(
                                 })
                                 .await;
                         }
-                    }
-                    "thinking" => {
-                        if idx < output.content.len() {
+                    "thinking"
+                        if idx < output.content.len() => {
                             let _ = tx
                                 .send(StreamEvent::ThinkingEnd {
                                     content_index: idx,
@@ -381,9 +378,8 @@ pub(crate) async fn process_anthropic_event(
                                 })
                                 .await;
                         }
-                    }
-                    "toolCall" => {
-                        if idx < output.content.len() {
+                    "toolCall"
+                        if idx < output.content.len() => {
                             let args = if block.partial_json.is_empty() {
                                 block.arguments.clone()
                             } else {
@@ -409,7 +405,6 @@ pub(crate) async fn process_anthropic_event(
                                     .await;
                             }
                         }
-                    }
                     _ => {}
                 }
             }

@@ -95,10 +95,10 @@ pub fn mcp_result_to_agent_result(
                 }
             },
             rmcp::model::RawContent::Audio(a) => {
-                blocks.push(ContentBlock::text(&format!("[Audio: {}]", a.mime_type)));
+                blocks.push(ContentBlock::text(format!("[Audio: {}]", a.mime_type)));
             }
             rmcp::model::RawContent::ResourceLink(r) => {
-                blocks.push(ContentBlock::text(&format!(
+                blocks.push(ContentBlock::text(format!(
                     "[Resource: {} ({})]",
                     r.uri, r.name
                 )));

@@ -87,7 +87,7 @@ impl AgentMode {
             for sub in *subcmds {
                 rules.push(Rule::new(
                     "bash",
-                    &format!("{} {}", base, sub),
+                    format!("{} {}", base, sub),
                     Action::Allow,
                 ));
             }

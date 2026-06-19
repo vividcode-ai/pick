@@ -60,8 +60,8 @@ pub fn create_write_tool() -> AgentTool {
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| "Missing content argument".to_string())?;
 
-                if let (Some(ref policy), Some(ref cwd)) = (ctx.fs_policy, ctx.cwd) {
-                    if let Err(_e) = policy.can_write(std::path::Path::new(file_path), cwd) {
+                if let (Some(ref policy), Some(ref cwd)) = (ctx.fs_policy, ctx.cwd)
+                    && let Err(_e) = policy.can_write(std::path::Path::new(file_path), cwd) {
                         // Protected paths (e.g. .git/**) are hard denied, not authorizable
                         if policy.is_path_protected(std::path::Path::new(file_path), cwd).unwrap_or(false) {
                             return Ok(AgentToolResult {
@@ -89,7 +89,6 @@ pub fn create_write_tool() -> AgentTool {
                             });
                         }
                     }
-                }
 
                 // Ensure parent directory exists
                 if let Some(parent) = std::path::Path::new(file_path).parent() {

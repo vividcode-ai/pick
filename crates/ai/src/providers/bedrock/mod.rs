@@ -56,13 +56,12 @@ fn build_bedrock_request(model: &Model, context: &Context, region: &str) -> (Str
                 let mut content_blocks: Vec<serde_json::Value> = Vec::new();
                 for block in &a.content {
                     match block {
-                        ContentBlock::Text(t) => {
-                            if !t.text.trim().is_empty() {
+                        ContentBlock::Text(t)
+                            if !t.text.trim().is_empty() => {
                                 content_blocks.push(serde_json::json!({"text": t.text}));
                             }
-                        }
-                        ContentBlock::Thinking(th) => {
-                            if !th.thinking.trim().is_empty() {
+                        ContentBlock::Thinking(th)
+                            if !th.thinking.trim().is_empty() => {
                                 if let Some(sig) = &th.thinking_signature {
                                     content_blocks.push(serde_json::json!({
                                         "reasoningContent": {
@@ -82,7 +81,6 @@ fn build_bedrock_request(model: &Model, context: &Context, region: &str) -> (Str
                                     }));
                                 }
                             }
-                        }
                         ContentBlock::ToolCall(tc) => {
                             content_blocks.push(serde_json::json!({
                                 "toolUse": {
@@ -191,8 +189,7 @@ async fn process_bedrock_stream(
     max_retries: u32,
     max_delay: u64,
 ) {
-    let mut extra_headers = Vec::new();
-    extra_headers.push(("content-type".to_string(), "application/json".to_string()));
+    let extra_headers = vec![("content-type".to_string(), "application/json".to_string())];
 
     for attempt in 0..=max_retries {
         if attempt > 0 {

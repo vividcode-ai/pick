@@ -41,36 +41,12 @@ pub fn normalize_for_fuzzy_match(text: &str) -> String {
         .collect::<Vec<_>>()
         .join("\n")
         // Smart quotes to ASCII
-        .replace('\u{2018}', "'")
-        .replace('\u{2019}', "'")
-        .replace('\u{201A}', "'")
-        .replace('\u{201B}', "'")
-        .replace('\u{201C}', "\"")
-        .replace('\u{201D}', "\"")
-        .replace('\u{201E}', "\"")
-        .replace('\u{201F}', "\"")
+        .replace(['\u{2018}', '\u{2019}', '\u{201A}', '\u{201B}'], "'")
+        .replace(['\u{201C}', '\u{201D}', '\u{201E}', '\u{201F}'], "\"")
         // Dashes to hyphen
-        .replace('\u{2010}', "-")
-        .replace('\u{2011}', "-")
-        .replace('\u{2012}', "-")
-        .replace('\u{2013}', "-")
-        .replace('\u{2014}', "-")
-        .replace('\u{2015}', "-")
-        .replace('\u{2212}', "-")
+        .replace(['\u{2010}', '\u{2011}', '\u{2012}', '\u{2013}', '\u{2014}', '\u{2015}', '\u{2212}'], "-")
         // Special spaces to regular space
-        .replace('\u{00A0}', " ")
-        .replace('\u{2002}', " ")
-        .replace('\u{2003}', " ")
-        .replace('\u{2004}', " ")
-        .replace('\u{2005}', " ")
-        .replace('\u{2006}', " ")
-        .replace('\u{2007}', " ")
-        .replace('\u{2008}', " ")
-        .replace('\u{2009}', " ")
-        .replace('\u{200A}', " ")
-        .replace('\u{202F}', " ")
-        .replace('\u{205F}', " ")
-        .replace('\u{3000}', " ")
+        .replace(['\u{00A0}', '\u{2002}', '\u{2003}', '\u{2004}', '\u{2005}', '\u{2006}', '\u{2007}', '\u{2008}', '\u{2009}', '\u{200A}', '\u{202F}', '\u{205F}', '\u{3000}'], " ")
 }
 
 /// Result of a fuzzy match
@@ -471,7 +447,7 @@ pub async fn compute_edits_diff(
     let (_bom, text) = strip_bom(&content);
     let normalized_content = normalize_to_lf(&text);
     let result =
-        apply_edits_to_normalized_content(&normalized_content, edits, path).map_err(|e| e)?;
+        apply_edits_to_normalized_content(&normalized_content, edits, path)?;
 
     Ok(generate_diff_string(
         &result.base_content,

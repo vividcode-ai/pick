@@ -52,11 +52,10 @@ impl EventBus {
         let channel = channel.to_string();
         let handlers = self.handlers.clone();
         Box::new(move || {
-            if let Ok(mut h) = handlers.lock() {
-                if let Some(ch) = h.get_mut(&channel) {
+            if let Ok(mut h) = handlers.lock()
+                && let Some(ch) = h.get_mut(&channel) {
                     ch.retain(|h| !Arc::ptr_eq(h, &wrapped));
                 }
-            }
         })
     }
 

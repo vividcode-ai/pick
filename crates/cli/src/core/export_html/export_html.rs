@@ -425,13 +425,12 @@ pub fn export_from_data(
 
     let html = generate_html(&session_data, &theme_colors, &export_colors);
 
-    if let Some(opts) = options {
-        if let Some(ref path) = opts.output_path {
+    if let Some(opts) = options
+        && let Some(ref path) = opts.output_path {
             std::fs::write(path, &html)
                 .map_err(|e| format!("Failed to write export file: {}", e))?;
             return Ok(path.clone());
         }
-    }
 
     Ok(html)
 }

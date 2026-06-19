@@ -8,6 +8,7 @@ use crate::core::settings::SettingsManager;
 use pick_agent::session::SessionManager;
 
 /// Options for creating an agent session
+#[derive(Default)]
 pub struct CreateAgentSessionOptions {
     /// Working directory for project-local discovery
     pub cwd: Option<String>,
@@ -21,17 +22,6 @@ pub struct CreateAgentSessionOptions {
     pub settings_manager: Option<SettingsManager>,
 }
 
-impl Default for CreateAgentSessionOptions {
-    fn default() -> Self {
-        Self {
-            cwd: None,
-            agent_dir: None,
-            model_registry: None,
-            session_manager: None,
-            settings_manager: None,
-        }
-    }
-}
 
 /// Result from creating an agent session
 pub struct CreateAgentSessionResult {

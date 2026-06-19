@@ -58,14 +58,13 @@ pub async fn run_print_mode(
         );
         std::process::exit(1);
     }
-    if std::env::var(&env_var).is_err() {
-        if let Some(ref key) = api_key {
+    if std::env::var(&env_var).is_err()
+        && let Some(ref key) = api_key {
             // SAFETY: set_var is safe in single-threaded context at startup
             unsafe {
                 std::env::set_var(&env_var, key);
             }
         }
-    }
 
     let tools = if args.no_tools { vec![] } else { tools };
 
@@ -158,14 +157,11 @@ pub async fn run_print_mode(
         before_tool_call: Some(std::sync::Arc::new(
             move |tc: &pick_ai::types::ToolCall| -> Option<String> {
                 let tool_args_str = tc.arguments.to_string();
-                match pick_agent::permission::evaluate::check_permission(
+                pick_agent::permission::evaluate::check_permission(
                     &tc.name,
                     &tool_args_str,
                     &[&mode_rules],
-                ) {
-                    Ok(()) => None,
-                    Err(msg) => Some(msg),
-                }
+                ).err()
             },
         )),
         should_stop_after_turn: None,
@@ -202,8 +198,8 @@ pub async fn run_print_mode(
                     let _ = std::io::stdout().lock().flush();
                 }
             }
-            if let AgentEvent::MessageUpdate { message, .. } = event {
-                if let Message::Assistant(msg) = message {
+            if let AgentEvent::MessageUpdate { message, .. } = event
+                && let Message::Assistant(msg) = message {
                     for block in &msg.content {
                         if let ContentBlock::Text(t) = block {
                             let mut out = output_clone.lock().unwrap();
@@ -211,7 +207,6 @@ pub async fn run_print_mode(
                         }
                     }
                 }
-            }
         })),
     };
 

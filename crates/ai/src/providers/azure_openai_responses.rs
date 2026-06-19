@@ -325,9 +325,9 @@ async fn process_azure_event(
                 .await;
         }
         "response.output_text.delta" => {
-            if let Some(delta) = data.get("delta").and_then(|v| v.as_str()) {
-                if let Some(idx) = *text_block_idx {
-                    if idx < output.content.len() {
+            if let Some(delta) = data.get("delta").and_then(|v| v.as_str())
+                && let Some(idx) = *text_block_idx
+                    && idx < output.content.len() {
                         if let ContentBlock::Text(ref mut tc) = output.content[idx] {
                             tc.text.push_str(delta);
                         }
@@ -339,8 +339,6 @@ async fn process_azure_event(
                             })
                             .await;
                     }
-                }
-            }
         }
         "response.completed" => {
             if let Some(response) = data.get("response") {

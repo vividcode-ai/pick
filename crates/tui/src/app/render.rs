@@ -16,6 +16,7 @@ use super::types::AppState;
 use super::types::TuiApp;
 use super::types::format_cwd_for_footer;
 use super::types::format_tokens;
+#[cfg(windows)]
 use super::types::set_windows_terminal_title;
 
 impl TuiApp {
@@ -133,8 +134,8 @@ impl TuiApp {
                 s != "completed" && s != "cancelled"
             });
         let todo_lines: u16 = if has_todo {
-            let line_count = self.render_todo_lines(width as usize).len() as u16;
-            line_count
+            
+            self.render_todo_lines(width as usize).len() as u16
         } else {
             0
         };
@@ -252,8 +253,8 @@ impl TuiApp {
                         render_at!(i, Line::from(""));
                         i += 1;
 
-                        if i < chunks.len() {
-                            if let Some(ref status) = self.status_text {
+                        if i < chunks.len()
+                            && let Some(ref status) = self.status_text {
                                 let frame_idx = self.status_frame % Self::SPINNER_FRAMES.len();
                                 let spinner = Self::SPINNER_FRAMES[frame_idx];
                                 let display_text = if let Some(start) = self.agent_start_time {
@@ -273,7 +274,6 @@ impl TuiApp {
                                 ));
                                 frame.render_widget_ref(&status_line, chunks[i]);
                             }
-                        }
                         i += 1;
 
                         render_at!(i, Line::from(""));
@@ -419,7 +419,7 @@ impl TuiApp {
                             .editor
                             .render_autocomplete(width as usize, autocomplete_lines as usize);
                         let bottom_sep = &chunks[i - 2];
-                        let ac_y = bottom_sep.y + bottom_sep.height as u16;
+                        let ac_y = bottom_sep.y + bottom_sep.height;
                         let ac_area = Rect::new(0, ac_y, width, autocomplete_lines);
                         frame.render_widget_ref(
                             &Paragraph::new(ratatui::text::Text::from(ac_content)),
@@ -624,8 +624,8 @@ impl TuiApp {
             pwd = format!("{} \u{2022} {}", pwd, branch);
         }
 
-        if pwd.width() > right_target {
-            if let Some(sep_pos) = pwd.rfind(" \u{2022} ") {
+        if pwd.width() > right_target
+            && let Some(sep_pos) = pwd.rfind(" \u{2022} ") {
                 let suffix = &pwd[sep_pos..];
                 let suffix_w = suffix.width();
                 let max_path = right_target.saturating_sub(suffix_w);
@@ -644,7 +644,6 @@ impl TuiApp {
                     pwd = format!("... {}{}", tail, suffix);
                 }
             }
-        }
         let pwd_w = pwd.width();
         if pwd_w < right_target {
             let pad = " ".repeat(right_target - pwd_w);
@@ -795,7 +794,7 @@ impl TuiApp {
                 .is_some();
             let reserved: u16 = if has_desc { 5 } else { 4 };
             let visible = std::cmp::min(item_count, 10) as u16;
-            std::cmp::max(5, std::cmp::min(reserved + visible, 14))
+            (reserved + visible).clamp(5, 14)
         } else if self.state == AppState::TreeSelecting {
             let count = self
                 .tree_view
@@ -803,7 +802,7 @@ impl TuiApp {
                 .map(|tv| tv.visible_count())
                 .unwrap_or(0);
             let visible = std::cmp::min(count, 12) as u16;
-            std::cmp::max(5, std::cmp::min(visible + 5, 18))
+            (visible + 5).clamp(5, 18)
         } else if self.state == AppState::ApiKeyInput {
             6_u16
         } else if self.state == AppState::UpdatePrompt {
@@ -929,7 +928,7 @@ impl TuiApp {
         lines.push(Line::from(
             vec![Span::raw("> ".to_string())]
                 .into_iter()
-                .chain(input_display.spans.into_iter())
+                .chain(input_display.spans)
                 .collect::<Vec<_>>(),
         ));
         lines.push(Line::from(""));
@@ -955,7 +954,7 @@ impl TuiApp {
     pub fn update_terminal_title(&self) {
         let indicator = match self.state {
             AppState::Streaming => {
-                if (self.status_frame / 5) % 2 == 0 {
+                if (self.status_frame / 5).is_multiple_of(2) {
                     "☀️"
                 } else {
                     "  "

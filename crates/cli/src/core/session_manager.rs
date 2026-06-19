@@ -52,8 +52,8 @@ pub struct FlatSessionNode {
 pub fn get_default_session_dir(cwd: &str, agent_dir: &str) -> PathBuf {
     let safe_path = format!(
         "--{}--",
-        cwd.trim_start_matches(|c: char| c == '/' || c == '\\')
-            .replace(|c: char| c == '/' || c == ':' || c == '\\', "-")
+        cwd.trim_start_matches(['/', '\\'])
+            .replace(['/', ':', '\\'], "-")
     );
     let session_dir = Path::new(agent_dir).join("sessions").join(&safe_path);
     std::fs::create_dir_all(&session_dir).ok();
@@ -118,9 +118,7 @@ async fn build_session_info(file_path: &Path) -> Option<SessionInfo> {
 
     // Parse header (first line)
     let header: serde_json::Value = serde_json::from_str(lines[0]).ok()?;
-    if header.get("id").and_then(|v| v.as_str()).is_none() {
-        return None;
-    }
+    header.get("id").and_then(|v| v.as_str())?;
 
     let id = header
         .get("id")
@@ -182,14 +180,13 @@ async fn build_session_info(file_path: &Path) -> Option<SessionInfo> {
             }
         }
 
-        if type_ == Some("model_change") {
-            if let (Some(p), Some(m)) = (
+        if type_ == Some("model_change")
+            && let (Some(p), Some(m)) = (
                 entry.get("from").and_then(|v| v.as_str()),
                 entry.get("to").and_then(|v| v.as_str()),
             ) {
                 model = format!("{}/{}", p, m);
             }
-        }
 
         if type_ != Some("message") {
             continue;
@@ -201,32 +198,28 @@ async fn build_session_info(file_path: &Path) -> Option<SessionInfo> {
             continue;
         }
 
-        if model.is_empty() && role == "assistant" {
-            if let (Some(p), Some(m)) = (
+        if model.is_empty() && role == "assistant"
+            && let (Some(p), Some(m)) = (
                 entry.get("provider").and_then(|v| v.as_str()),
                 entry.get("model").and_then(|v| v.as_str()),
             ) {
                 model = format!("{}/{}", p, m);
             }
-        }
 
         // Extract text content from content blocks
-        if let Some(content) = entry.get("content") {
-            if let Some(blocks) = content.as_array() {
+        if let Some(content) = entry.get("content")
+            && let Some(blocks) = content.as_array() {
                 for block in blocks {
-                    if block.get("type").and_then(|v| v.as_str()) == Some("text") {
-                        if let Some(text) = block.get("text").and_then(|v| v.as_str()) {
-                            if !text.is_empty() {
+                    if block.get("type").and_then(|v| v.as_str()) == Some("text")
+                        && let Some(text) = block.get("text").and_then(|v| v.as_str())
+                            && !text.is_empty() {
                                 all_messages.push(text.to_string());
                                 if first_message.is_empty() && role == "user" {
                                     first_message = text.to_string();
                                 }
                             }
-                        }
-                    }
                 }
             }
-        }
     }
 
     let git_branch = detect_git_branch_for_cwd(&cwd);
@@ -380,7 +373,7 @@ pub fn build_session_tree(sessions: &[SessionDisplayInfo]) -> Vec<FlatSessionNod
     }
 
     for &root in &roots {
-        walk(root, &sessions, &children, 0, &[], true, &mut result);
+        walk(root, sessions, &children, 0, &[], true, &mut result);
     }
     result
 }

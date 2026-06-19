@@ -228,11 +228,10 @@ pub fn load_project_context_files(cwd: &Path, agent_dir: &Path) -> Vec<ContextFi
 
     // Global context (agent dir)
     let global_context = load_context_file_from_dir(&resolved_agent_dir);
-    if let Some(ctx) = global_context {
-        if seen_paths.insert(canonicalize_path(Path::new(&ctx.path))) {
+    if let Some(ctx) = global_context
+        && seen_paths.insert(canonicalize_path(Path::new(&ctx.path))) {
             context_files.push(ctx);
         }
-    }
 
     // Ancestor context files
     let mut ancestor_files: Vec<ContextFile> = Vec::new();
@@ -393,8 +392,8 @@ fn load_prompt_from_file(
 }
 
 fn parse_frontmatter_description(content: &str) -> String {
-    if let Some(fm) = content.strip_prefix("---") {
-        if let Some(end) = fm.find("\n---") {
+    if let Some(fm) = content.strip_prefix("---")
+        && let Some(end) = fm.find("\n---") {
             let header = &fm[..end];
             for line in header.lines() {
                 if let Some(desc) = line.trim().strip_prefix("description:") {
@@ -402,7 +401,6 @@ fn parse_frontmatter_description(content: &str) -> String {
                 }
             }
         }
-    }
     String::new()
 }
 
@@ -468,14 +466,13 @@ fn load_themes(agent_dir: &Path, cwd: &Path, extra_paths: &[PathBuf]) -> ThemeLo
                     themes.push(theme::create_theme_from_json(&json, None));
                 }
             }
-        } else if path.is_file() && path.extension().map(|e| e == "json").unwrap_or(false) {
-            if let Ok(t) = theme::load_theme_from_path(&path.to_string_lossy(), None) {
+        } else if path.is_file() && path.extension().map(|e| e == "json").unwrap_or(false)
+            && let Ok(t) = theme::load_theme_from_path(&path.to_string_lossy(), None) {
                 let name = t.name.clone().unwrap_or_else(|| "unnamed".to_string());
                 if seen_names.insert(name) {
                     themes.push(t);
                 }
             }
-        }
     }
 
     ThemeLoadResult {
@@ -550,18 +547,16 @@ fn discover_append_system_prompt(agent_dir: &Path, cwd: &Path) -> Vec<String> {
     let mut prompts = Vec::new();
 
     let project_path = cwd.join(config::CONFIG_DIR_NAME).join("APPEND_SYSTEM.md");
-    if project_path.exists() {
-        if let Ok(content) = std::fs::read_to_string(&project_path) {
+    if project_path.exists()
+        && let Ok(content) = std::fs::read_to_string(&project_path) {
             prompts.push(content);
         }
-    }
 
     let global_path = agent_dir.join("APPEND_SYSTEM.md");
-    if global_path.exists() {
-        if let Ok(content) = std::fs::read_to_string(&global_path) {
+    if global_path.exists()
+        && let Ok(content) = std::fs::read_to_string(&global_path) {
             prompts.push(content);
         }
-    }
 
     prompts
 }

@@ -326,22 +326,20 @@ impl DefaultPackageManager {
             let parsed = parse_source(&pkg.source);
             match parsed {
                 ParsedSource::Npm(ref npm) => {
-                    if let Some(ref installed_path) = pkg.installed_path {
-                        if let Some(current_version) =
+                    if let Some(ref installed_path) = pkg.installed_path
+                        && let Some(current_version) =
                             self.get_installed_npm_version(Path::new(installed_path))
                         {
                             let url = format!("https://registry.npmjs.org/{}", npm.name);
-                            if let Ok(response) = reqwest::get(&url).await {
-                                if let Ok(body) = response.text().await {
-                                    if let Ok(data) =
+                            if let Ok(response) = reqwest::get(&url).await
+                                && let Ok(body) = response.text().await
+                                    && let Ok(data) =
                                         serde_json::from_str::<serde_json::Value>(&body)
-                                    {
-                                        if let Some(latest) = data
+                                        && let Some(latest) = data
                                             .get("dist-tags")
                                             .and_then(|t| t.get("latest"))
                                             .and_then(|v| v.as_str())
-                                        {
-                                            if latest != &current_version {
+                                            && latest != current_version {
                                                 updates.push(PackageUpdate {
                                                     source: pkg.source,
                                                     display_name: npm.name.clone(),
@@ -349,12 +347,7 @@ impl DefaultPackageManager {
                                                     scope: pkg.scope,
                                                 });
                                             }
-                                        }
-                                    }
-                                }
-                            }
                         }
-                    }
                 }
                 ParsedSource::Git(ref git) => {
                     let scope = if pkg.scope == "project" {
@@ -363,12 +356,11 @@ impl DefaultPackageManager {
                         SourceScope::User
                     };
                     let install_path = self.get_git_install_path(git, &scope);
-                    if install_path.exists() {
-                        if let Ok(local) = self
+                    if install_path.exists()
+                        && let Ok(local) = self
                             .run_command_capture("git", &["rev-parse", "HEAD"], Some(&install_path))
                             .await
-                        {
-                            if let Ok(remote_output) = self
+                            && let Ok(remote_output) = self
                                 .run_command_capture("git", &["ls-remote", &git.repo, "HEAD"], None)
                                 .await
                             {
@@ -386,8 +378,6 @@ impl DefaultPackageManager {
                                     });
                                 }
                             }
-                        }
-                    }
                 }
                 ParsedSource::Local(_) => {}
             }
@@ -536,11 +526,10 @@ impl DefaultPackageManager {
 
             if is_file && (name.ends_with(".ts") || name.ends_with(".js")) {
                 entries.push(full_path.to_string_lossy().to_string());
-            } else if is_dir {
-                if let Some(resolved) = Self::resolve_extension_entries(&full_path) {
+            } else if is_dir
+                && let Some(resolved) = Self::resolve_extension_entries(&full_path) {
                     entries.extend(resolved);
                 }
-            }
         }
 
         entries
@@ -549,11 +538,11 @@ impl DefaultPackageManager {
     fn resolve_extension_entries(dir: &Path) -> Option<Vec<String>> {
         // Check package.json for pick.extensions
         let package_json_path = dir.join("package.json");
-        if package_json_path.exists() {
-            if let Ok(content) = std::fs::read_to_string(&package_json_path) {
-                if let Ok(pkg) = serde_json::from_str::<PackageJson>(&content) {
-                    if let Some(ref manifest) = pkg.pick {
-                        if !manifest.extensions.is_empty() {
+        if package_json_path.exists()
+            && let Ok(content) = std::fs::read_to_string(&package_json_path)
+                && let Ok(pkg) = serde_json::from_str::<PackageJson>(&content)
+                    && let Some(ref manifest) = pkg.pick
+                        && !manifest.extensions.is_empty() {
                             let entries: Vec<String> = manifest
                                 .extensions
                                 .iter()
@@ -567,10 +556,6 @@ impl DefaultPackageManager {
                                 return Some(entries);
                             }
                         }
-                    }
-                }
-            }
-        }
 
         // Check for index.ts or index.js
         let index_ts = dir.join("index.ts");
@@ -787,22 +772,20 @@ impl DefaultPackageManager {
             if entry.contains('*') || entry.contains('?') {
                 // Glob pattern - basic implementation
                 let full_path = root.join(entry);
-                if let Some(parent) = full_path.parent() {
-                    if let Ok(read_dir) = std::fs::read_dir(parent) {
+                if let Some(parent) = full_path.parent()
+                    && let Ok(read_dir) = std::fs::read_dir(parent) {
                         for dir_entry in read_dir.flatten() {
                             let name = dir_entry.file_name().to_string_lossy().to_string();
                             // Simple glob matching
                             let glob_pattern = entry.replace('*', ".*");
-                            if let Ok(re) = regex::Regex::new(&format!("^{}$", glob_pattern)) {
-                                if re.is_match(&name)
-                                    || re.is_match(&dir_entry.path().to_string_lossy())
+                            if let Ok(re) = regex::Regex::new(&format!("^{}$", glob_pattern))
+                                && (re.is_match(&name)
+                                    || re.is_match(&dir_entry.path().to_string_lossy()))
                                 {
                                     resolved.push(dir_entry.path());
                                 }
-                            }
                         }
                     }
-                }
             } else {
                 resolved.push(root.join(entry));
             }

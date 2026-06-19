@@ -204,7 +204,7 @@ pub async fn run_interactive_mode(
                         if sm.get_enable_skill_commands() {
                             let skills = resource_loader.skills();
                             if !skills.is_empty() {
-                                println!("");
+                                println!();
                                 println!("Skills:");
                                 for skill in skills {
                                     println!("  /skill:{}", skill.name);
@@ -427,7 +427,7 @@ pub async fn run_interactive_mode(
                         match prepare_compaction(&path_entries, &compact_settings) {
                             Some(preparation) => {
                                 let api_key =
-                                    auth.get_api_key(&provider, true).await.unwrap_or_default();
+                                    auth.get_api_key(provider, true).await.unwrap_or_default();
                                 match compact(
                                     &preparation,
                                     &model,
@@ -441,7 +441,7 @@ pub async fn run_interactive_mode(
                                     Ok(result) => {
                                         let summary = result.summary;
                                         all_messages =
-                                            vec![Message::User(UserMessage::text(&format!(
+                                            vec![Message::User(UserMessage::text(format!(
                                                 "[Compacted conversation summary]\n\n{}",
                                                 summary
                                             )))];
@@ -491,7 +491,7 @@ pub async fn run_interactive_mode(
                 }
 
                 if let Some(rest) = input.strip_prefix("/fork at ") {
-                    if let Some(n) = rest.trim().parse::<usize>().ok() {
+                    if let Ok(n) = rest.trim().parse::<usize>() {
                         if n > 0 && n <= all_messages.len() {
                             let idx = n - 1;
                             let cwd = std::env::current_dir().unwrap_or_default();
@@ -778,14 +778,11 @@ pub async fn run_interactive_mode(
                                 tc.arguments.to_string()
                             };
 
-                            match pick_agent::permission::evaluate::check_permission(
+                            pick_agent::permission::evaluate::check_permission(
                                 &tc.name,
                                 &tool_args_str,
                                 &[&mode_rules],
-                            ) {
-                                Ok(()) => None,
-                                Err(msg) => Some(msg),
-                            }
+                            ).err()
                         }
                     })),
                     should_stop_after_turn: None,
@@ -800,8 +797,8 @@ pub async fn run_interactive_mode(
                                 }
                                 AgentMode::Build => vec![],
                             };
-                            if let Some(goal) = goal_manager.get() {
-                                if goal.status == "active" {
+                            if let Some(goal) = goal_manager.get()
+                                && goal.status == "active" {
                                     let remaining = goal_manager
                                         .remaining_tokens()
                                         .map(|r| format!("\nRemaining token budget: {}", r))
@@ -811,7 +808,6 @@ pub async fn run_interactive_mode(
                                         goal.objective, goal.tokens_used, remaining,
                                     ))));
                                 }
-                            }
                             msgs
                         }
                     })),
@@ -843,12 +839,11 @@ pub async fn run_interactive_mode(
                                     let mut input = String::new();
                                     std::io::stdin().read_line(&mut input).ok();
                                     let trimmed = input.trim().to_string();
-                                    if let Ok(num) = trimmed.parse::<usize>() {
-                                        if num >= 1 && num <= q.options.len() {
+                                    if let Ok(num) = trimmed.parse::<usize>()
+                                        && num >= 1 && num <= q.options.len() {
                                             answers.push(vec![q.options[num - 1].label.clone()]);
                                             continue;
                                         }
-                                    }
                                     answers.push(vec![trimmed]);
                                 }
                                 Ok(answers)
@@ -928,15 +923,14 @@ pub async fn run_interactive_mode(
                                     if let Some(texts) = content.as_array() {
                                         let mut has_output = false;
                                         for t in texts {
-                                            if let Some(text) = t.as_str() {
-                                                if !text.is_empty() {
+                                            if let Some(text) = t.as_str()
+                                                && !text.is_empty() {
                                                     if !has_output {
-                                                        print!("\n");
+                                                        println!();
                                                         has_output = true;
                                                     }
                                                     print!("{}", ToolTheme::fg("toolOutput", text));
                                                 }
-                                            }
                                         }
                                     }
                                 } else {
@@ -969,7 +963,7 @@ pub async fn run_interactive_mode(
                         }
 
                         let last_msg = result.messages.last();
-                        let has_tool_calls = last_msg.map_or(false, |m| {
+                        let has_tool_calls = last_msg.is_some_and(|m| {
                             if let Message::Assistant(msg) = m {
                                 msg.content
                                     .iter()
@@ -1035,66 +1029,63 @@ pub async fn run_interactive_mode(
                             }
 
                             let api_key =
-                                auth.get_api_key(&provider, true).await.unwrap_or_default();
-                            match prepare_compaction(&path_entries, &compact_settings) {
-                                Some(preparation) => {
-                                    match compact(&preparation, &model, &api_key, None, None, None)
-                                        .await
-                                    {
-                                        Ok(result) => {
-                                            let summary = result.summary;
-                                            let before = all_messages.len();
-                                            all_messages =
-                                                vec![Message::User(UserMessage::text(&format!(
-                                                    "[Compacted conversation summary]\n\n{}",
-                                                    summary
-                                                )))];
-                                            println!(
-                                                "\x1b[2mAuto-compacted ({} msgs → 1, {} tokens before).\x1b[0m",
-                                                before, result.tokens_before
-                                            );
-                                            let compact_entry = SessionEntry {
-                                                id: uuid::Uuid::now_v7().to_string(),
-                                                parent_id: None,
-                                                timestamp: chrono::Utc::now().timestamp_millis(),
-                                                kind: SessionEntryKind::Compaction(
-                                                    CompactionEntry {
-                                                        summary: summary.clone(),
-                                                        token_count: Some(
-                                                            result.tokens_before as u64,
-                                                        ),
-                                                    },
-                                                ),
-                                            };
-                                            if let Err(e) =
-                                                session_manager.append(compact_entry).await
-                                            {
-                                                eprintln!(
-                                                    "Warning: failed to persist compaction entry: {}",
-                                                    e
-                                                );
-                                            }
-                                            if let Some(ref runner) = extension_runner {
-                                                runner.emit(&ExtensionEvent::SessionCompact(
-                                                    SessionCompactEvent {
-                                                        compaction_entry: serde_json::json!({
-                                                            "summary": summary,
-                                                            "tokensBefore": result.tokens_before,
-                                                        }),
-                                                        from_extension: false,
-                                                    },
-                                                ));
-                                            }
-                                        }
-                                        Err(e) => {
+                                auth.get_api_key(provider, true).await.unwrap_or_default();
+                            if let Some(preparation) = prepare_compaction(&path_entries, &compact_settings) {
+                                match compact(&preparation, &model, &api_key, None, None, None)
+                                    .await
+                                {
+                                    Ok(result) => {
+                                        let summary = result.summary;
+                                        let before = all_messages.len();
+                                        all_messages =
+                                            vec![Message::User(UserMessage::text(format!(
+                                                "[Compacted conversation summary]\n\n{}",
+                                                summary
+                                            )))];
+                                        println!(
+                                            "\x1b[2mAuto-compacted ({} msgs → 1, {} tokens before).\x1b[0m",
+                                            before, result.tokens_before
+                                        );
+                                        let compact_entry = SessionEntry {
+                                            id: uuid::Uuid::now_v7().to_string(),
+                                            parent_id: None,
+                                            timestamp: chrono::Utc::now().timestamp_millis(),
+                                            kind: SessionEntryKind::Compaction(
+                                                CompactionEntry {
+                                                    summary: summary.clone(),
+                                                    token_count: Some(
+                                                        result.tokens_before as u64,
+                                                    ),
+                                                },
+                                            ),
+                                        };
+                                        if let Err(e) =
+                                            session_manager.append(compact_entry).await
+                                        {
                                             eprintln!(
-                                                "\x1b[31mAuto-compaction failed: {}\x1b[0m",
-                                                e.message
+                                                "Warning: failed to persist compaction entry: {}",
+                                                e
                                             );
+                                        }
+                                        if let Some(ref runner) = extension_runner {
+                                            runner.emit(&ExtensionEvent::SessionCompact(
+                                                SessionCompactEvent {
+                                                    compaction_entry: serde_json::json!({
+                                                        "summary": summary,
+                                                        "tokensBefore": result.tokens_before,
+                                                    }),
+                                                    from_extension: false,
+                                                },
+                                            ));
                                         }
                                     }
+                                    Err(e) => {
+                                        eprintln!(
+                                            "\x1b[31mAuto-compaction failed: {}\x1b[0m",
+                                            e.message
+                                        );
+                                    }
                                 }
-                                None => {}
                             }
                         }
                     }

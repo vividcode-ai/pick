@@ -238,9 +238,9 @@ pub fn render_read_result(
         ));
     }
 
-    if let Some(ref details) = output.details {
-        if let Some(ref truncation) = details.truncation {
-            if truncation.truncated {
+    if let Some(ref details) = output.details
+        && let Some(ref truncation) = details.truncation
+            && truncation.truncated {
                 if truncation.first_line_exceeds_limit {
                     formatted.push_str(&format!(
                         "\n{}",
@@ -279,8 +279,6 @@ pub fn render_read_result(
                     ));
                 }
             }
-        }
-    }
 
     ToolRenderOutput {
         label: String::new(),

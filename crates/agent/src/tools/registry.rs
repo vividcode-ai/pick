@@ -140,21 +140,20 @@ fn tool_params_to_json_schema(params: &[ToolParameter]) -> JsonSchema {
     let mut required = Vec::new();
 
     for p in params {
-        let prop = if p.schema.is_null() || p.schema.as_object().map_or(true, |o| o.is_empty()) {
+        let prop = if p.schema.is_null() || p.schema.as_object().is_none_or(|o| o.is_empty()) {
             serde_json::json!({
                 "type": "string",
                 "description": p.description
             })
         } else {
             let mut s = p.schema.clone();
-            if let Some(obj) = s.as_object_mut() {
-                if !obj.contains_key("description") {
+            if let Some(obj) = s.as_object_mut()
+                && !obj.contains_key("description") {
                     obj.insert(
                         "description".to_string(),
                         serde_json::Value::String(p.description.clone()),
                     );
                 }
-            }
             s
         };
 
@@ -203,11 +202,7 @@ fn parse_tool_result(result: &serde_json::Value) -> (Vec<ContentBlock>, bool) {
                 .filter_map(|v| {
                     if let Some(text) = v.as_str() {
                         Some(ContentBlock::text(text))
-                    } else if let Some(text) = v.get("text").and_then(|t| t.as_str()) {
-                        Some(ContentBlock::text(text))
-                    } else {
-                        None
-                    }
+                    } else { v.get("text").and_then(|t| t.as_str()).map(ContentBlock::text) }
                 })
                 .collect::<Vec<_>>()
         })

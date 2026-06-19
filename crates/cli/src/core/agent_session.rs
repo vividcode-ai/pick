@@ -73,7 +73,7 @@ pub fn is_retryable_error_message(err: &str) -> bool {
     ];
     patterns
         .iter()
-        .any(|p| regex::Regex::new(p).map_or(false, |re| re.is_match(&lower)))
+        .any(|p| regex::Regex::new(p).is_ok_and(|re| re.is_match(&lower)))
 }
 
 /// Run the agent loop with automatic retry on transient errors.
@@ -98,30 +98,28 @@ pub async fn run_agent_loop_with_retry(
         match result {
             Ok(success) => {
                 let prev_attempt = attempt.saturating_sub(1);
-                if prev_attempt > 0 {
-                    if let Some(ref handler) = config.on_event {
+                if prev_attempt > 0
+                    && let Some(ref handler) = config.on_event {
                         handler(AgentEvent::AutoRetryEnd {
                             success: true,
                             attempt: prev_attempt,
                             final_error: None,
                         });
                     }
-                }
                 return Ok(success);
             }
             Err(err) => {
                 if attempt >= retry_config.max_retries.saturating_add(1)
                     || !is_retryable_error_message(&err)
                 {
-                    if attempt > 1 {
-                        if let Some(ref handler) = config.on_event {
+                    if attempt > 1
+                        && let Some(ref handler) = config.on_event {
                             handler(AgentEvent::AutoRetryEnd {
                                 success: false,
                                 attempt: attempt - 1,
                                 final_error: Some(err.clone()),
                             });
                         }
-                    }
                     return Err(err);
                 }
 
@@ -181,30 +179,28 @@ async fn run_agent_loop_continue_with_retry(
         match result {
             Ok(success) => {
                 let prev_attempt = attempt.saturating_sub(1);
-                if prev_attempt > 0 {
-                    if let Some(ref handler) = config.on_event {
+                if prev_attempt > 0
+                    && let Some(ref handler) = config.on_event {
                         handler(AgentEvent::AutoRetryEnd {
                             success: true,
                             attempt: prev_attempt,
                             final_error: None,
                         });
                     }
-                }
                 return Ok(success);
             }
             Err(err) => {
                 if attempt >= retry_config.max_retries.saturating_add(1)
                     || !is_retryable_error_message(&err)
                 {
-                    if attempt > 1 {
-                        if let Some(ref handler) = config.on_event {
+                    if attempt > 1
+                        && let Some(ref handler) = config.on_event {
                             handler(AgentEvent::AutoRetryEnd {
                                 success: false,
                                 attempt: attempt - 1,
                                 final_error: Some(err.clone()),
                             });
                         }
-                    }
                     return Err(err);
                 }
 

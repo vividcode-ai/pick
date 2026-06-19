@@ -252,7 +252,7 @@ where
         self.autoresize()?;
 
         let mut frame = self.get_frame();
-        render_callback(&mut frame).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+        render_callback(&mut frame).map_err(|e| io::Error::other(e))?;
 
         let cursor_position = frame.cursor_position;
         let cursor_style = frame.cursor_style;

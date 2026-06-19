@@ -54,11 +54,10 @@ pub(crate) fn create_on_event(
             ref args,
             ..
         } => {
-            if tool_name.to_lowercase() == "bash" {
-                if let Ok(mut times) = tool_times.lock() {
+            if tool_name.to_lowercase() == "bash"
+                && let Ok(mut times) = tool_times.lock() {
                     times.insert(tool_call_id.clone(), Instant::now());
                 }
-            }
             if let Ok(mut map) = tool_args.lock() {
                 map.insert(tool_call_id.clone(), args.clone());
             }
@@ -149,8 +148,8 @@ fn format_message_content(content: &[ContentBlock]) -> String {
             ContentBlock::Text(t) => {
                 combined.push_str(&t.text);
             }
-            ContentBlock::Thinking(t) => {
-                if !t.thinking.is_empty() {
+            ContentBlock::Thinking(t)
+                if !t.thinking.is_empty() => {
                     if !combined.is_empty() {
                         combined.push('\n');
                     }
@@ -159,7 +158,6 @@ fn format_message_content(content: &[ContentBlock]) -> String {
                         t.thinking.trim_end()
                     ));
                 }
-            }
             ContentBlock::Image(img) => {
                 let rendered = render_image_block(img);
                 if !rendered.is_empty() {

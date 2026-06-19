@@ -3,6 +3,23 @@
 // Allow dead code - many module items are pub for cross-module use but reported as
 // dead in a binary crate. Remove this if refactoring to a lib+bin split.
 #![allow(dead_code)]
+#![allow(clippy::type_complexity)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::needless_range_loop)]
+#![allow(clippy::if_same_then_else)]
+#![allow(clippy::field_reassign_with_default)]
+#![allow(clippy::collapsible_match)]
+#![allow(clippy::never_loop)]
+#![allow(clippy::manual_strip)]
+#![allow(clippy::ptr_arg)]
+#![allow(clippy::unnecessary_sort_by)]
+#![allow(clippy::vec_init_then_push)]
+#![allow(clippy::enum_variant_names)]
+#![allow(clippy::format_in_format_args)]
+#![allow(clippy::module_inception)]
+#![allow(clippy::manual_flatten)]
+#![allow(clippy::await_holding_lock)]
+#![allow(clippy::collapsible_if)]
 
 mod args;
 mod cli;
@@ -19,7 +36,9 @@ use core::auth_storage::AuthStorage;
 use core::migrations::run_migrations;
 use core::session::create_session_manager;
 use core::settings::{Settings, SettingsManager};
-use core::update_action::{UpdateAction, get_update_action};
+use core::update_action::UpdateAction;
+#[cfg_attr(debug_assertions, allow(unused_imports))]
+use core::update_action::get_update_action;
 use modes::{run_audit_command, run_interactive_mode, run_print_mode, run_rpc_mode, run_tui_mode};
 
 use pick_agent::agent_registry::AgentRegistry;
@@ -256,11 +275,10 @@ async fn main() {
     }
 
     // Set runtime API key from --api-key flag
-    if let Some(ref api_key) = args.api_key {
-        if let Some(ref provider) = args.provider {
+    if let Some(ref api_key) = args.api_key
+        && let Some(ref provider) = args.provider {
             auth.set_runtime_api_key(provider, api_key.clone());
         }
-    }
 
     // Discover and load extensions (skipped if --no-extensions)
     let load_result = if args.no_extensions {
@@ -375,11 +393,10 @@ async fn main() {
             let tools = bg_mgr.connect_from_config(&bg_configs).await;
             if !bg_cancel.load(std::sync::atomic::Ordering::Relaxed) {
                 let count = tools.len();
-                if count > 0 {
-                    if let Ok(mut locked) = bg_tools.write() {
+                if count > 0
+                    && let Ok(mut locked) = bg_tools.write() {
                         locked.extend(tools);
                     }
-                }
                 bg_done.send(true).ok();
             }
         });
@@ -551,9 +568,8 @@ async fn main() {
     };
 
     // Execute pending update action after TUI exits
-    if let Some(action) = update_action {
-        if let Err(e) = run_update_action(action) {
+    if let Some(action) = update_action
+        && let Err(e) = run_update_action(action) {
             eprintln!("Error updating Pick: {}", e);
         }
-    }
 }

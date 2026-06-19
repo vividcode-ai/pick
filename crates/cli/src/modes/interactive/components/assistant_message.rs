@@ -11,14 +11,13 @@ pub fn render_assistant_message(
     let mut output = String::new();
 
     // Thinking block
-    if let Some(thinking) = thinking_text {
-        if !hide_thinking && !thinking.is_empty() {
+    if let Some(thinking) = thinking_text
+        && !hide_thinking && !thinking.is_empty() {
             output.push_str(&ToolTheme::fg(
                 "dim",
                 &format!("[thinking]\n{}\n[/thinking]\n", thinking),
             ));
         }
-    }
 
     // Main content
     if !text.is_empty() {

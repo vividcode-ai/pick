@@ -137,13 +137,12 @@ impl ChatView {
         if self.next_stream_creates_new {
             self.next_stream_creates_new = false;
             // Commit any existing active streaming content first
-            if let Some(existing) = self.active_streaming_content.take() {
-                if !existing.is_empty() {
+            if let Some(existing) = self.active_streaming_content.take()
+                && !existing.is_empty() {
                     self.entries
                         .push(ChatEntry::Message(ChatMessage::new("assistant", existing)));
                     self.invalidate_cache();
                 }
-            }
             self.active_streaming_content = Some(text.to_string());
         } else if let Some(ref mut current) = self.active_streaming_content {
             // Streaming optimization: if the new text has the old content as a prefix,
@@ -164,8 +163,8 @@ impl ChatView {
     /// Mark the end of a turn. Commits any active streaming content to entries
     /// and sets the flag so the next `stream_assistant_content` creates a new message.
     pub fn mark_turn_end(&mut self) {
-        if let Some(content) = self.active_streaming_content.take() {
-            if !content.is_empty() {
+        if let Some(content) = self.active_streaming_content.take()
+            && !content.is_empty() {
                 // Guard: prevent committing the same content twice.
                 // The content may have been already committed via the next_stream_creates_new
                 // path in stream_assistant_content if a StreamContent arrived after an EndTurn.
@@ -180,7 +179,6 @@ impl ChatView {
                     self.invalidate_cache();
                 }
             }
-        }
         self.next_stream_creates_new = true;
     }
 
@@ -206,7 +204,7 @@ impl ChatView {
         let mut lines = Vec::new();
         let msg = ChatMessage::new("assistant", content.clone());
         self.render_assistant_message_lines(&msg, width, &mut lines);
-        while lines.last().map_or(false, |l| {
+        while lines.last().is_some_and(|l| {
             l.spans.is_empty() || l.spans.iter().all(|s| s.content.as_ref().is_empty())
         }) {
             lines.pop();
@@ -223,7 +221,7 @@ impl ChatView {
         } else {
             let needs_new = self
                 .last_assistant_message_mut()
-                .map_or(true, |m| m.role != "assistant");
+                .is_none_or(|m| m.role != "assistant");
             if needs_new {
                 self.entries.push(ChatEntry::Message(ChatMessage::new(
                     "assistant",
@@ -322,8 +320,8 @@ impl ChatView {
     /// Used for streaming tool output before execution completes.
     pub fn update_tool_execution_output(&mut self, tool_call_id: &str, partial: &str) {
         for entry in self.entries.iter_mut().rev() {
-            if let ChatEntry::ToolExecution(te) = entry {
-                if te.tool_call_id == tool_call_id {
+            if let ChatEntry::ToolExecution(te) = entry
+                && te.tool_call_id == tool_call_id {
                     if !partial.is_empty() {
                         if te.output.is_empty() {
                             te.output = partial.to_string();
@@ -333,7 +331,6 @@ impl ChatView {
                     }
                     break;
                 }
-            }
         }
         self.invalidate_cache();
         self.scroll_to_bottom();
@@ -343,8 +340,8 @@ impl ChatView {
     /// The output is the full tool result (replaces any streaming content).
     pub fn update_tool_execution(&mut self, tool_call_id: &str, output: &str, is_error: bool) {
         for entry in self.entries.iter_mut().rev() {
-            if let ChatEntry::ToolExecution(te) = entry {
-                if te.tool_call_id == tool_call_id {
+            if let ChatEntry::ToolExecution(te) = entry
+                && te.tool_call_id == tool_call_id {
                     te.status = if is_error {
                         ToolStatus::Error
                     } else {
@@ -353,7 +350,6 @@ impl ChatView {
                     te.output = output.to_string();
                     break;
                 }
-            }
         }
         self.invalidate_cache();
         self.scroll_to_bottom();
@@ -362,12 +358,11 @@ impl ChatView {
     /// Replace tool execution output without changing status (for streaming bash timer).
     pub fn replace_tool_execution_output(&mut self, tool_call_id: &str, output: &str) {
         for entry in self.entries.iter_mut().rev() {
-            if let ChatEntry::ToolExecution(te) = entry {
-                if te.tool_call_id == tool_call_id {
+            if let ChatEntry::ToolExecution(te) = entry
+                && te.tool_call_id == tool_call_id {
                     te.output = output.to_string();
                     break;
                 }
-            }
         }
         self.invalidate_cache();
         self.scroll_to_bottom();
@@ -426,7 +421,7 @@ impl ChatView {
         // Trim trailing blank lines — only remove lines with ZERO-length content
         // (e.g. Line::from("") which is the blank separator between messages).
         // Lines with background-colored spaces as padding MUST be preserved.
-        while lines.last().map_or(false, |l| {
+        while lines.last().is_some_and(|l| {
             l.spans.is_empty() || l.spans.iter().all(|s| s.content.as_ref().is_empty())
         }) {
             lines.pop();
@@ -1363,8 +1358,8 @@ mod tests {
         let width = 80;
 
         eprintln!("\n{}", "#".repeat(72));
-        eprintln!("{}", "# VISUAL ALIGNMENT TEST");
-        eprintln!("{}", "# Tool execution UI vs canonical");
+        eprintln!("# VISUAL ALIGNMENT TEST");
+        eprintln!("# Tool execution UI vs canonical");
         eprintln!("{}", "#".repeat(72));
 
         // 1. User message
@@ -1496,7 +1491,7 @@ mod tests {
         );
 
         eprintln!("{}", "#".repeat(72));
-        eprintln!("{}", "# ALL VERIFICATIONS PASSED");
+        eprintln!("# ALL VERIFICATIONS PASSED");
         eprintln!("{}", "#".repeat(72));
 
         // === SIDE-BY-SIDE: canonical format vs Pick rendered plain text ===
@@ -1517,7 +1512,6 @@ mod tests {
 
         eprintln!("\n{}", "=".repeat(80));
         eprintln!(
-            "{}",
             "SIDE-BY-SIDE COMPARISON: canonical format vs Pick rendered"
         );
         eprintln!("{}", "=".repeat(80));
