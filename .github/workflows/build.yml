@@ -202,7 +202,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           registry-url: "https://registry.npmjs.org"
 
       - name: Extract binaries from packages
@@ -251,7 +251,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           registry-url: "https://registry.npmjs.org"
           scope: "@vividcodeai"
 
@@ -287,7 +287,7 @@ jobs:
                 ;;
             esac
 
-            publish_cmd="npm publish './${tarball}' --access public --registry 'https://registry.npmjs.org'"
+            publish_cmd="npm publish './${tarball}' --access public --registry 'https://registry.npmjs.org' --provenance"
             if [[ -n "${tag}" ]]; then
               publish_cmd="${publish_cmd} --tag '${tag}'"
             fi
