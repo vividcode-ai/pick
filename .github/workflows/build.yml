@@ -252,8 +252,11 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: "22"
-          registry-url: "https://registry.npmjs.org"
-          scope: "@vividcodeai"
+
+      - name: Upgrade npm for OIDC support
+        run: |
+          npm install -g npm@latest
+          echo "npm upgraded to $(npm --version)"
 
       - name: Publish to npm
         env:
@@ -262,17 +265,21 @@ jobs:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         shell: bash
         run: |
+          echo "node: $(node --version) | npm: $(npm --version)"
+
+          # --- Setup authentication ---
           if [[ -n "${NPM_TOKEN}" ]]; then
-            # Append (don't overwrite) to preserve @vividcodeai scope registry mapping from setup-node
             echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> ~/.npmrc
             echo "-> Using NPM_TOKEN authentication"
           else
-            echo "-> No NPM_TOKEN, using OIDC trusted publishing"
+            echo "-> No NPM_TOKEN; --provenance will trigger OIDC auth automatically"
           fi
 
+          # --- Publish each tarball ---
           shopt -s nullglob
           for tarball in npm-packages/*.tgz; do
             filename=$(basename "$tarball")
+            echo ""
             echo "Publishing: ${filename}"
 
             tag=""
