@@ -15,7 +15,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/vividcodeai/pick.git",
+    "url": "git+https://github.com/vividcode-ai/pick.git",
     "directory": "npm/pick"
   },
   "publishConfig": {
