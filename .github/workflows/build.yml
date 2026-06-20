@@ -266,13 +266,12 @@ jobs:
           set -euo pipefail
 
           echo "-> Fetching OIDC JWT from GitHub Actions..."
-          # ACTIONS_ID_TOKEN_REQUEST_URL has NO query params, so use ? not &
           OIDC_JWT="$(curl -sSL -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
             "${ACTIONS_ID_TOKEN_REQUEST_URL}?audience=npm")"
           OIDC_VALUE="$(echo "${OIDC_JWT}" | python3 -c "import sys,json; print(json.load(sys.stdin)['value'])")"
 
           if [[ -z "${OIDC_VALUE}" ]]; then
-            echo "ERROR: Failed to fetch OIDC JWT. Response:"
+            echo "ERROR: Failed to fetch OIDC JWT."
             echo "${OIDC_JWT}"
             exit 1
           fi
@@ -282,11 +281,7 @@ jobs:
           EXCHANGE="$(curl -sSL -X POST \
             "https://registry.npmjs.org/-/npm/v1/oidc/claims/exchange" \
             -H "Content-Type: application/json" \
-            -d "$(python3 -c "
-import json, sys
-data = {'token': sys.argv[1], 'token_type': 'github-actions', 'scope': '@vividcodeai'}
-print(json.dumps(data))
-" "${OIDC_VALUE}")")"
+            -d "$(python3 -c "import json,sys; print(json.dumps({'token':sys.argv[1],'token_type':'github-actions','scope':'@vividcodeai'}))" "${OIDC_VALUE}")")"
 
           NPM_SESSION_TOKEN="$(echo "${EXCHANGE}" | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")"
 
