@@ -260,59 +260,15 @@ jobs:
           npm install -g npm@latest
           echo "npm upgraded to $(npm --version)"
 
-      - name: Authenticate via OIDC token exchange
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          echo "-> Fetching OIDC JWT from GitHub Actions..."
-          OIDC_JWT="$(curl -sSL -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
-            "${ACTIONS_ID_TOKEN_REQUEST_URL}?audience=npm")"
-          OIDC_VALUE="$(echo "${OIDC_JWT}" | python3 -c "import sys,json; print(json.load(sys.stdin)['value'])")"
-
-          if [[ -z "${OIDC_VALUE}" ]]; then
-            echo "ERROR: Failed to fetch OIDC JWT."
-            echo "${OIDC_JWT}"
-            exit 1
-          fi
-          echo "-> OIDC JWT received (${#OIDC_VALUE} chars)"
-
-          echo "-> Exchanging for npm session token..."
-          EXCHANGE="$(curl -sSL -X POST \
-            "https://registry.npmjs.org/-/npm/v1/oidc/claims/exchange" \
-            -H "Content-Type: application/json" \
-            -d "$(python3 -c "import json,sys; print(json.dumps({'token':sys.argv[1],'token_type':'github-actions','scope':'@vividcodeai'}))" "${OIDC_VALUE}")")"
-
-          NPM_SESSION_TOKEN="$(echo "${EXCHANGE}" | python3 -c "
-import sys, json
-data = json.load(sys.stdin)
-print('DEBUG: response keys: %s' % list(data.keys()), file=sys.stderr)
-if 'token' in data:
-    print(data['token'])
-elif 'npm_token' in data:
-    print(data['npm_token'])
-else:
-    sys.stderr.write('ERROR: unknown response format: ' + json.dumps(data)[:500] + '\n')
-    sys.exit(1)
-")"
-
-          if [[ -z "${NPM_SESSION_TOKEN}" ]]; then
-            echo "ERROR: Failed to exchange OIDC token. Response:"
-            echo "${EXCHANGE}"
-            exit 1
-          fi
-
-          echo "//registry.npmjs.org/:_authToken=${NPM_SESSION_TOKEN}" >> ~/.npmrc
-          echo "-> OIDC token exchange successful"
-
-      - name: Publish to npm
+      - name: Publish to npm via OIDC
         env:
           VERSION: ${{ needs.release.outputs.version }}
           NPM_TAG: ${{ needs.release.outputs.npm_tag }}
         shell: bash
         run: |
           echo "node: $(node --version) | npm: $(npm --version)"
-          npm whoami --registry https://registry.npmjs.org 2>&1 && echo "-> Auth OK" || echo "-> WARN: not authenticated"
+
+          cat ~/.npmrc 2>/dev/null || true
 
           # --- Publish each tarball ---
           shopt -s nullglob
