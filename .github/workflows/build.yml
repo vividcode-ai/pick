@@ -260,35 +260,39 @@ jobs:
           npm install -g npm@latest
           echo "npm upgraded to $(npm --version)"
 
-      - name: Perform OIDC token exchange with npm registry
-        id: oidc
-        env:
-          NPM_SCOPE: "@vividcodeai"
+      - name: Authenticate via OIDC token exchange
         shell: bash
         run: |
-          echo "-> Fetching OIDC token from GitHub Actions..."
-          OIDC_JWT="$(curl -sSL -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
-            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=npm")"
-          OIDC_VALUE="$(echo "${OIDC_JWT}" | jq -r '.value')"
+          set -euo pipefail
 
-          if [[ -z "${OIDC_VALUE}" || "${OIDC_VALUE}" == "null" ]]; then
-            echo "ERROR: Failed to fetch OIDC JWT"
-            echo "Response: ${OIDC_JWT}"
+          echo "-> Fetching OIDC JWT from GitHub Actions..."
+          # ACTIONS_ID_TOKEN_REQUEST_URL has NO query params, so use ? not &
+          OIDC_JWT="$(curl -sSL -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}?audience=npm")"
+          OIDC_VALUE="$(echo "${OIDC_JWT}" | python3 -c "import sys,json; print(json.load(sys.stdin)['value'])")"
+
+          if [[ -z "${OIDC_VALUE}" ]]; then
+            echo "ERROR: Failed to fetch OIDC JWT. Response:"
+            echo "${OIDC_JWT}"
             exit 1
           fi
+          echo "-> OIDC JWT received (${#OIDC_VALUE} chars)"
 
-          echo "-> Exchanging OIDC JWT for npm session token..."
+          echo "-> Exchanging for npm session token..."
           EXCHANGE="$(curl -sSL -X POST \
             "https://registry.npmjs.org/-/npm/v1/oidc/claims/exchange" \
             -H "Content-Type: application/json" \
-            -d "$(jq -n --arg token "${OIDC_VALUE}" --arg scope "${NPM_SCOPE}" \
-              '{token: $token, token_type: "github-actions", scope: $scope}')")"
+            -d "$(python3 -c "
+import json, sys
+data = {'token': sys.argv[1], 'token_type': 'github-actions', 'scope': '@vividcodeai'}
+print(json.dumps(data))
+" "${OIDC_VALUE}")")"
 
-          NPM_SESSION_TOKEN="$(echo "${EXCHANGE}" | jq -r '.token')"
+          NPM_SESSION_TOKEN="$(echo "${EXCHANGE}" | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")"
 
-          if [[ -z "${NPM_SESSION_TOKEN}" || "${NPM_SESSION_TOKEN}" == "null" ]]; then
-            echo "ERROR: Failed to exchange OIDC token for npm session"
-            echo "Response: ${EXCHANGE}"
+          if [[ -z "${NPM_SESSION_TOKEN}" ]]; then
+            echo "ERROR: Failed to exchange OIDC token. Response:"
+            echo "${EXCHANGE}"
             exit 1
           fi
 
@@ -302,6 +306,7 @@ jobs:
         shell: bash
         run: |
           echo "node: $(node --version) | npm: $(npm --version)"
+          npm whoami --registry https://registry.npmjs.org 2>&1 && echo "-> Auth OK" || echo "-> WARN: not authenticated"
 
           # --- Publish each tarball ---
           shopt -s nullglob
