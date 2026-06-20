@@ -180,7 +180,7 @@ def stage_sources(staging_dir: Path, version: str, package: str, binary_src: Pat
             "files": ["vendor"],
             "repository": {
                 "type": "git",
-                "url": "git+https://github.com/vividcodeai/pick.git",
+                "url": "git+https://github.com/vividcode-ai/pick.git",
             },
             "publishConfig": {
                 "registry": "https://registry.npmjs.org",
