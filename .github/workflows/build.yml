@@ -252,28 +252,56 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+          scope: "@vividcodeai"
 
       - name: Upgrade npm for OIDC support
         run: |
           npm install -g npm@latest
           echo "npm upgraded to $(npm --version)"
 
+      - name: Perform OIDC token exchange with npm registry
+        id: oidc
+        env:
+          NPM_SCOPE: "@vividcodeai"
+        shell: bash
+        run: |
+          echo "-> Fetching OIDC token from GitHub Actions..."
+          OIDC_JWT="$(curl -sSL -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=npm")"
+          OIDC_VALUE="$(echo "${OIDC_JWT}" | jq -r '.value')"
+
+          if [[ -z "${OIDC_VALUE}" || "${OIDC_VALUE}" == "null" ]]; then
+            echo "ERROR: Failed to fetch OIDC JWT"
+            echo "Response: ${OIDC_JWT}"
+            exit 1
+          fi
+
+          echo "-> Exchanging OIDC JWT for npm session token..."
+          EXCHANGE="$(curl -sSL -X POST \
+            "https://registry.npmjs.org/-/npm/v1/oidc/claims/exchange" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n --arg token "${OIDC_VALUE}" --arg scope "${NPM_SCOPE}" \
+              '{token: $token, token_type: "github-actions", scope: $scope}')")"
+
+          NPM_SESSION_TOKEN="$(echo "${EXCHANGE}" | jq -r '.token')"
+
+          if [[ -z "${NPM_SESSION_TOKEN}" || "${NPM_SESSION_TOKEN}" == "null" ]]; then
+            echo "ERROR: Failed to exchange OIDC token for npm session"
+            echo "Response: ${EXCHANGE}"
+            exit 1
+          fi
+
+          echo "//registry.npmjs.org/:_authToken=${NPM_SESSION_TOKEN}" >> ~/.npmrc
+          echo "-> OIDC token exchange successful"
+
       - name: Publish to npm
         env:
           VERSION: ${{ needs.release.outputs.version }}
           NPM_TAG: ${{ needs.release.outputs.npm_tag }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         shell: bash
         run: |
           echo "node: $(node --version) | npm: $(npm --version)"
-
-          # --- Setup authentication ---
-          if [[ -n "${NPM_TOKEN}" ]]; then
-            echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> ~/.npmrc
-            echo "-> Using NPM_TOKEN authentication"
-          else
-            echo "-> No NPM_TOKEN; --provenance will trigger OIDC auth automatically"
-          fi
 
           # --- Publish each tarball ---
           shopt -s nullglob
