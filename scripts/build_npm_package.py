@@ -185,7 +185,7 @@ def stage_sources(staging_dir: Path, version: str, package: str, binary_src: Pat
             "publishConfig": {
                 "registry": "https://registry.npmjs.org",
                 "access": "public",
-                "provenance": true,
+                "provenance": True,
             },
         }
 
