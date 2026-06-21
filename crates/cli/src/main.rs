@@ -88,13 +88,8 @@ fn run_update_action(action: UpdateAction) -> anyhow::Result<()> {
                 let (cmd, args) = action.command_args();
                 std::process::Command::new(cmd).args(args).status()?
             } else {
-                let full_cmd = if cfg!(target_os = "windows") {
-                    format!("cmd /C \"{}\"", cmd_str)
-                } else {
-                    cmd_str.clone()
-                };
                 std::process::Command::new("cmd")
-                    .args(["/C", &full_cmd])
+                    .args(["/C", &cmd_str])
                     .status()?
             }
         }
