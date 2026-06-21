@@ -70,9 +70,12 @@ impl InstallContext {
             return InstallMethod::Cargo;
         }
 
-        // Check if standalone (under ~/.pick/packages/standalone/)
-        let pick_standalone = home.join(".pick").join("packages").join("standalone");
-        if exe_path.starts_with(&pick_standalone) {
+        // Check if standalone — under ~/.pick/packages/standalone/ (symlink-resolved)
+        // or under ~/.pick/bin/ (direct copy, e.g. Windows install.ps1 copy)
+        let pick_home = home.join(".pick");
+        let pick_standalone = pick_home.join("packages").join("standalone");
+        let pick_bin = pick_home.join("bin");
+        if exe_path.starts_with(&pick_standalone) || exe_path.starts_with(&pick_bin) {
             return InstallMethod::GitHub {
                 platform: if cfg!(windows) {
                     StandalonePlatform::Windows
