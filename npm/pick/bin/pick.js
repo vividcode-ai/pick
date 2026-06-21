@@ -58,7 +58,7 @@ function main() {
 
   const child = spawn(binaryPath, process.argv.slice(2), {
     stdio: "inherit",
-    env: process.env,
+    env: { ...process.env, PICK_MANAGED_BY_NPM: "1" },
   });
 
   child.on("exit", (code) => process.exit(code));
