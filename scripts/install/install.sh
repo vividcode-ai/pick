@@ -100,7 +100,30 @@ ls -t "${RELEASES_DIR}" | tail -n +3 | while read -r old; do
     rm -rf "${RELEASES_DIR}/${old}"
 done
 
+# Add to PATH in shell profile
+add_to_path() {
+    local profile_file="$1"
+    local line="export PATH=\"\${PATH}:${BIN_DIR}\""
+    if [ -f "${profile_file}" ]; then
+        if grep -q "${BIN_DIR}" "${profile_file}" 2>/dev/null; then
+            return 0
+        fi
+        echo "" >> "${profile_file}"
+        echo "# Pick CLI" >> "${profile_file}"
+        echo "${line}" >> "${profile_file}"
+        echo "  Added ${BIN_DIR} to ${profile_file}"
+    fi
+}
+
+echo ""
+echo "Adding ${BIN_DIR} to PATH..."
+add_to_path "${HOME}/.profile"
+case "${SHELL}" in
+    *zsh*) add_to_path "${HOME}/.zshrc" ;;
+    *bash*) add_to_path "${HOME}/.bashrc" ;;
+esac
+export PATH="${PATH}:${BIN_DIR}"
+
 echo ""
 echo "Pick v${VERSION} installed successfully!"
-echo "Make sure ${BIN_DIR} is in your PATH."
 echo "Run 'pick update' to check for future updates."

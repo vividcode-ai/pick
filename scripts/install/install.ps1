@@ -93,6 +93,17 @@ New-Item -ItemType Directory -Path $BinDir -Force | Out-Null
 Copy-Item "$ExtractDir\pick.exe" "$BinDir\pick.exe" -Force
 
 Write-Host ""
+Write-Host "Adding ${BinDir} to PATH..."
+$currentPath = [Environment]::GetEnvironmentVariable("PATH", "User")
+if ($currentPath -notlike "*${BinDir}*") {
+    [Environment]::SetEnvironmentVariable("PATH", "${currentPath};${BinDir}", "User")
+    # Also update current session
+    $env:PATH = "${env:PATH};${BinDir}"
+    Write-Host "  Added ${BinDir} to User PATH." -ForegroundColor Green
+} else {
+    Write-Host "  ${BinDir} already in PATH." -ForegroundColor Yellow
+}
+
+Write-Host ""
 Write-Host "Pick v${Version} installed successfully!" -ForegroundColor Green
-Write-Host "Make sure ${BinDir} is in your PATH." -ForegroundColor Yellow
 Write-Host "Run 'pick update' to check for future updates." -ForegroundColor Cyan
