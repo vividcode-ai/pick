@@ -1,10 +1,10 @@
 #!/bin/sh
 # Pick standalone installer
-# Usage: curl -fsSL https://github.com/vividcodeai/pick/releases/latest/download/install.sh | sh
+# Usage: curl -fsSL https://github.com/vividcode-ai/pick/releases/latest/download/install.sh | sh
 
 set -e
 
-REPO="vividcodeai/pick"
+REPO="vividcode-ai/pick"
 PICK_HOME="${HOME}/.pick"
 PACKAGES_DIR="${PICK_HOME}/packages/standalone"
 RELEASES_DIR="${PACKAGES_DIR}/releases"
@@ -31,11 +31,18 @@ ARCHIVE="pick-package-${TARGET}.tar.gz"
 
 # Fetch latest release info from GitHub API
 echo "Fetching latest release info..."
-LATEST=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null || true)
+LATEST=$(curl -sSL "https://api.github.com/repos/${REPO}/releases/latest" 2>&1) || true
 if [ -z "${LATEST}" ]; then
-    echo "Error: Could not fetch release info from GitHub."
+    echo "Error: Could not fetch release info from GitHub (curl failed with no output)."
     exit 1
 fi
+
+# Check if the response is an error (e.g. rate limited)
+echo "${LATEST}" | grep -q '"message"' && echo "${LATEST}" | grep -q '"documentation_url"' && {
+    echo "Error: GitHub API responded with an error:"
+    echo "${LATEST}" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('message','unknown error'))" 2>/dev/null || echo "${LATEST}"
+    exit 1
+}
 
 VERSION=$(echo "${LATEST}" | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": "//' | sed 's/".*//' | sed 's/^v//')
 if [ -z "${VERSION}" ]; then

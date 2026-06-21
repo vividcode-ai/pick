@@ -63,7 +63,7 @@ async fn run_update_command() -> anyhow::Result<()> {
     {
         let Some(action) = get_update_action() else {
             anyhow::bail!(
-                "Could not detect the Pick installation method. Please update manually: https://github.com/vividcodeai/pick/releases/latest"
+                "Could not detect the Pick installation method. Please update manually: https://github.com/vividcode-ai/pick/releases/latest"
             );
         };
         run_update_action(action)
@@ -73,7 +73,7 @@ async fn run_update_command() -> anyhow::Result<()> {
 fn run_update_action(action: UpdateAction) -> anyhow::Result<()> {
     if matches!(action, UpdateAction::Manual) {
         anyhow::bail!(
-            "Manual update required. Download from: https://github.com/vividcodeai/pick/releases/latest"
+            "Manual update required. Download from: https://github.com/vividcode-ai/pick/releases/latest"
         );
     }
 

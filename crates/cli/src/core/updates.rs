@@ -13,7 +13,7 @@ use crate::utils::version_check::is_newer_package_version;
 use super::install_context::{InstallContext, InstallMethod};
 
 const CACHE_REFRESH_HOURS: i64 = 20;
-const GITHUB_API_URL: &str = "https://api.github.com/repos/vividcodeai/pick/releases/latest";
+const GITHUB_API_URL: &str = "https://api.github.com/repos/vividcode-ai/pick/releases/latest";
 const NPM_REGISTRY_URL: &str = "https://registry.npmjs.org/@vividcodeai/pick";
 const HTTP_TIMEOUT_MS: u64 = 10000;
 

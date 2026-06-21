@@ -3,7 +3,7 @@
 use super::install_context::{InstallContext, InstallMethod, StandalonePlatform};
 
 const PICK_NPM_PACKAGE: &str = "@vividcodeai/pick";
-const PICK_REPO: &str = "https://github.com/vividcodeai/pick";
+const PICK_REPO: &str = "https://github.com/vividcode-ai/pick";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UpdateAction {
@@ -36,7 +36,7 @@ impl UpdateAction {
                 "sh",
                 vec![
                     "-c",
-                    "curl -fsSL https://vividcodeai.github.io/pick/install.sh | sh",
+                    "curl -fsSL https://github.com/vividcode-ai/pick/releases/latest/download/install.sh | sh",
                 ],
             ),
             Self::GitHubStandaloneWindows => (
@@ -45,7 +45,7 @@ impl UpdateAction {
                     "-ExecutionPolicy",
                     "Bypass",
                     "-c",
-                    "irm https://vividcodeai.github.io/pick/install.ps1 | iex",
+                    "irm https://github.com/vividcode-ai/pick/releases/latest/download/install.ps1 | iex",
                 ],
             ),
             Self::CargoInstall => ("cargo", vec!["install", "pick", "--git", PICK_REPO]),
@@ -57,14 +57,14 @@ impl UpdateAction {
         match self {
             Self::NpmGlobalLatest => format!("npm install -g {PICK_NPM_PACKAGE}"),
             Self::GitHubStandaloneUnix => {
-                "curl -fsSL https://vividcodeai.github.io/pick/install.sh | sh".to_string()
+                "curl -fsSL https://github.com/vividcode-ai/pick/releases/latest/download/install.sh | sh".to_string()
             }
             Self::GitHubStandaloneWindows => {
-                "irm https://vividcodeai.github.io/pick/install.ps1 | iex".to_string()
+                "irm https://github.com/vividcode-ai/pick/releases/latest/download/install.ps1 | iex".to_string()
             }
             Self::CargoInstall => format!("cargo install pick --git {PICK_REPO}"),
             Self::Manual => {
-                "Manually download from https://github.com/vividcodeai/pick/releases/latest"
+                "Manually download from https://github.com/vividcode-ai/pick/releases/latest"
                     .to_string()
             }
         }

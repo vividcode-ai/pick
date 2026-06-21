@@ -50,22 +50,29 @@ pick-sandbox（进程隔离实现）
 
 ## 安装
 
+### npm 安装（需要 Node.js >= 16）
+
+```bash
+npm install -g @vividcodeai/pick
+```
+
+> npm 安装会自动下载您系统对应的平台二进制文件。
 ### Linux / macOS
 
 ```bash
-curl -fsSL https://github.com/vividcodeai/pick/releases/latest/download/install.sh | sh
+curl -fsSL https://github.com/vividcode-ai/pick/releases/latest/download/install.sh | sh
 ```
 
 ### Windows (PowerShell)
 
 ```powershell
-irm https://github.com/vividcodeai/pick/releases/latest/download/install.ps1 | iex
+irm https://github.com/vividcode-ai/pick/releases/latest/download/install.ps1 | iex
 ```
 
 ### 从源码编译
 
 ```bash
-git clone https://github.com/vividcodeai/pick.git
+git clone https://github.com/vividcode-ai/pick.git
 cd pick
 cargo build --release
 ./target/release/pick --help
