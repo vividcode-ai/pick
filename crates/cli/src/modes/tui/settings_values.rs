@@ -59,8 +59,8 @@ pub(crate) fn toggle_hide_thinking_block(sm: &mut SettingsManager, ctx: &mut Tui
         Ok(()) => {
             ctx.hide_thinking.store(new, Ordering::Relaxed);
             ctx.tui.chat.add_system_message(&format!(
-                "Hide thinking \x1b[1m{}\x1b[0m.",
-                if new { "enabled" } else { "disabled" }
+                "Show thinking \x1b[1m{}\x1b[0m.",
+                if new { "disabled" } else { "enabled" }
             ));
         }
         Err(e) => ctx

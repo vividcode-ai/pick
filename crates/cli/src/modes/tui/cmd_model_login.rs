@@ -2,6 +2,7 @@ use pick_tui::components::select::{SelectItem, SelectList};
 
 use super::context::TuiContext;
 use super::init;
+use crate::core::settings::SettingsManager;
 
 /// Handle /model slash command
 pub(crate) fn handle_model_command(ctx: &mut TuiContext, args: &[String]) {
@@ -97,53 +98,87 @@ pub(crate) fn handle_scoped_models_command(ctx: &mut TuiContext) {
 /// Handle /settings slash command: show settings menu
 pub(crate) fn handle_settings_command(ctx: &mut TuiContext) {
     ctx.pending_command = Some("settings".to_string());
+
+    // Load current settings to display boolean states
+    let cwd_set = std::env::current_dir().unwrap_or_default();
+    let sm = SettingsManager::load(&cwd_set);
+
+    let s = |enabled: bool| -> &'static str { if enabled { "enabled" } else { "disabled" } };
+
+    let auto_compact = sm
+        .get()
+        .compaction
+        .as_ref()
+        .and_then(|c| c.enabled)
+        .unwrap_or(true);
+    let show_images = sm.get_show_images();
+    let auto_resize = sm.get_image_auto_resize();
+    let block_images = sm.get_block_images();
+    let skill_cmds = sm.get_enable_skill_commands();
+    let hw_cursor = sm.get_show_hardware_cursor();
+    let clear_shrink = sm.get_clear_on_shrink();
+    let term_prog = sm.get_show_terminal_progress();
+    let show_thinking = !sm.get_hide_thinking_block(); // inverted: "Show thinking" = enabled when NOT hiding
+    let collapse = sm.get_collapse_changelog();
+    let quiet = sm.get_quiet_startup();
+    let telemetry = sm.get().enable_install_telemetry.unwrap_or(false);
+
     let items = vec![
-        SelectItem::new("Auto-compact", "auto-compact")
-            .with_description("Toggle automatic context compaction"),
-        SelectItem::new("Show images", "show-images")
-            .with_description("Render images inline in terminal"),
-        SelectItem::new("Image width", "image-width-cells")
-            .with_description("Preferred inline image width in cells"),
-        SelectItem::new("Auto-resize images", "auto-resize-images")
-            .with_description("Resize large images to 2000x2000 max"),
-        SelectItem::new("Block images", "block-images")
-            .with_description("Prevent images from being sent to LLM"),
-        SelectItem::new("Skill commands", "skill-commands")
-            .with_description("Register skills as /skill:name commands"),
-        SelectItem::new("Show hardware cursor", "show-hardware-cursor")
-            .with_description("Show terminal cursor for IME support"),
-        SelectItem::new("Editor padding", "editor-padding-x")
-            .with_description("Horizontal padding for input editor (0-3)"),
-        SelectItem::new("Autocomplete max items", "autocomplete-max-visible")
-            .with_description("Max visible items in autocomplete"),
-        SelectItem::new("Clear on shrink", "clear-on-shrink")
-            .with_description("Clear empty rows when content shrinks"),
-        SelectItem::new("Terminal progress", "terminal-progress")
-            .with_description("Show progress in terminal tab bar"),
-        SelectItem::new("Steering mode", "steering-mode")
-            .with_description("How steering messages are delivered"),
-        SelectItem::new("Follow-up mode", "follow-up-mode")
-            .with_description("How follow-up messages are delivered"),
-        SelectItem::new("Transport", "transport")
-            .with_description("Preferred transport for providers"),
-        SelectItem::new("HTTP idle timeout", "http-idle-timeout")
-            .with_description("Max idle gap for HTTP requests"),
-        SelectItem::new("Hide thinking", "hide-thinking")
-            .with_description("Hide thinking blocks in responses"),
-        SelectItem::new("Collapse changelog", "collapse-changelog")
-            .with_description("Show condensed changelog after updates"),
-        SelectItem::new("Quiet startup", "quiet-startup")
-            .with_description("Disable verbose printing at startup"),
-        SelectItem::new("Install telemetry", "install-telemetry")
-            .with_description("Send anonymous version ping after updates"),
-        SelectItem::new("Double-escape action", "double-escape-action")
-            .with_description("Action on Esc twice with empty editor"),
-        SelectItem::new("Tree filter mode", "tree-filter-mode")
-            .with_description("Default filter when opening /tree"),
-        SelectItem::new("Warnings", "warnings").with_description("Configure individual warnings"),
-        SelectItem::new("Thinking level", "thinking").with_description("Change thinking level"),
-        SelectItem::new("Theme", "theme").with_description("Change color theme"),
-        SelectItem::new("Models", "models").with_description("Configure enabled models"),
+        SelectItem::new(
+            format!("Auto-compact  [{}]", s(auto_compact)),
+            "auto-compact",
+        ),
+        SelectItem::new(format!("Show images  [{}]", s(show_images)), "show-images"),
+        SelectItem::new("Image width", "image-width-cells"),
+        SelectItem::new(
+            format!("Auto-resize images  [{}]", s(auto_resize)),
+            "auto-resize-images",
+        ),
+        SelectItem::new(
+            format!("Block images  [{}]", s(block_images)),
+            "block-images",
+        ),
+        SelectItem::new(
+            format!("Skill commands  [{}]", s(skill_cmds)),
+            "skill-commands",
+        ),
+        SelectItem::new(
+            format!("Show hardware cursor  [{}]", s(hw_cursor)),
+            "show-hardware-cursor",
+        ),
+        SelectItem::new("Editor padding", "editor-padding-x"),
+        SelectItem::new("Autocomplete max items", "autocomplete-max-visible"),
+        SelectItem::new(
+            format!("Clear on shrink  [{}]", s(clear_shrink)),
+            "clear-on-shrink",
+        ),
+        SelectItem::new(
+            format!("Terminal progress  [{}]", s(term_prog)),
+            "terminal-progress",
+        ),
+        SelectItem::new("Steering mode", "steering-mode"),
+        SelectItem::new("Follow-up mode", "follow-up-mode"),
+        SelectItem::new("Transport", "transport"),
+        SelectItem::new("HTTP idle timeout", "http-idle-timeout"),
+        SelectItem::new(
+            format!("Show thinking  [{}]", s(show_thinking)),
+            "hide-thinking",
+        ),
+        SelectItem::new(
+            format!("Collapse changelog  [{}]", s(collapse)),
+            "collapse-changelog",
+        ),
+        SelectItem::new(format!("Quiet startup  [{}]", s(quiet)), "quiet-startup"),
+        SelectItem::new(
+            format!("Install telemetry  [{}]", s(telemetry)),
+            "install-telemetry",
+        ),
+        SelectItem::new("Double-escape action", "double-escape-action"),
+        SelectItem::new("Tree filter mode", "tree-filter-mode"),
+        SelectItem::new("Warnings", "warnings"),
+        SelectItem::new("Thinking level", "thinking"),
+        SelectItem::new("Theme", "theme"),
+        SelectItem::new("Models", "models"),
     ];
     let select = SelectList::new("Settings", items);
     ctx.tui.start_selection(select);

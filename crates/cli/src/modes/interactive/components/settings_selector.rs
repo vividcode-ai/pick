@@ -55,14 +55,14 @@ pub fn build_settings_items(
             id: "autocompact".to_string(),
             label: "Auto-compact".to_string(),
             description: "Automatically compact context when it gets too large".to_string(),
-            current_value: if auto_compact { "true" } else { "false" }.to_string(),
+            current_value: if auto_compact { "enabled" } else { "disabled" }.to_string(),
             has_submenu: false,
         },
         SettingDisplayItem {
             id: "show-images".to_string(),
             label: "Show images".to_string(),
             description: "Render images inline in terminal".to_string(),
-            current_value: if show_images { "true" } else { "false" }.to_string(),
+            current_value: if show_images { "enabled" } else { "disabled" }.to_string(),
             has_submenu: false,
         },
         SettingDisplayItem {
@@ -77,14 +77,19 @@ pub fn build_settings_items(
             label: "Auto-resize images".to_string(),
             description: "Resize large images to 2000x2000 max for better model compatibility"
                 .to_string(),
-            current_value: if auto_resize_images { "true" } else { "false" }.to_string(),
+            current_value: if auto_resize_images {
+                "enabled"
+            } else {
+                "disabled"
+            }
+            .to_string(),
             has_submenu: false,
         },
         SettingDisplayItem {
             id: "block-images".to_string(),
             label: "Block images".to_string(),
             description: "Prevent images from being sent to LLM providers".to_string(),
-            current_value: if block_images { "true" } else { "false" }.to_string(),
+            current_value: if block_images { "enabled" } else { "disabled" }.to_string(),
             has_submenu: false,
         },
         SettingDisplayItem {
@@ -92,9 +97,9 @@ pub fn build_settings_items(
             label: "Skill commands".to_string(),
             description: "Register skills as /skill:name commands".to_string(),
             current_value: if enable_skill_commands {
-                "true"
+                "enabled"
             } else {
-                "false"
+                "disabled"
             }
             .to_string(),
             has_submenu: false,
@@ -131,23 +136,33 @@ pub fn build_settings_items(
         },
         SettingDisplayItem {
             id: "hide-thinking".to_string(),
-            label: "Hide thinking".to_string(),
-            description: "Hide thinking blocks in assistant responses".to_string(),
-            current_value: if hide_thinking_block { "true" } else { "false" }.to_string(),
+            label: "Show thinking".to_string(),
+            description: "Show thinking blocks in assistant responses".to_string(),
+            current_value: if hide_thinking_block {
+                "disabled"
+            } else {
+                "enabled"
+            }
+            .to_string(),
             has_submenu: false,
         },
         SettingDisplayItem {
             id: "collapse-changelog".to_string(),
             label: "Collapse changelog".to_string(),
             description: "Show condensed changelog after updates".to_string(),
-            current_value: if collapse_changelog { "true" } else { "false" }.to_string(),
+            current_value: if collapse_changelog {
+                "enabled"
+            } else {
+                "disabled"
+            }
+            .to_string(),
             has_submenu: false,
         },
         SettingDisplayItem {
             id: "quiet-startup".to_string(),
             label: "Quiet startup".to_string(),
             description: "Disable verbose printing at startup".to_string(),
-            current_value: if quiet_startup { "true" } else { "false" }.to_string(),
+            current_value: if quiet_startup { "enabled" } else { "disabled" }.to_string(),
             has_submenu: false,
         },
         SettingDisplayItem {
@@ -156,9 +171,9 @@ pub fn build_settings_items(
             description: "Send an anonymous version/update ping after changelog-detected updates"
                 .to_string(),
             current_value: if enable_install_telemetry {
-                "true"
+                "enabled"
             } else {
-                "false"
+                "disabled"
             }
             .to_string(),
             has_submenu: false,
@@ -204,9 +219,9 @@ pub fn build_settings_items(
             description: "Show the terminal cursor while still positioning it for IME support"
                 .to_string(),
             current_value: if show_hardware_cursor {
-                "true"
+                "enabled"
             } else {
-                "false"
+                "disabled"
             }
             .to_string(),
             has_submenu: false,
@@ -229,7 +244,12 @@ pub fn build_settings_items(
             id: "clear-on-shrink".to_string(),
             label: "Clear on shrink".to_string(),
             description: "Clear empty rows when content shrinks (may cause flicker)".to_string(),
-            current_value: if clear_on_shrink { "true" } else { "false" }.to_string(),
+            current_value: if clear_on_shrink {
+                "enabled"
+            } else {
+                "disabled"
+            }
+            .to_string(),
             has_submenu: false,
         },
         SettingDisplayItem {
@@ -237,9 +257,9 @@ pub fn build_settings_items(
             label: "Terminal progress".to_string(),
             description: "Show OSC 9;4 progress indicators in the terminal tab bar".to_string(),
             current_value: if show_terminal_progress {
-                "true"
+                "enabled"
             } else {
-                "false"
+                "disabled"
             }
             .to_string(),
             has_submenu: false,
@@ -434,9 +454,9 @@ pub fn render_warning_settings(
         let cursor = if is_selected { "› " } else { "  " };
         let value = if id == &"anthropic-extra-usage" {
             if anthropic_extra_usage {
-                "true"
+                "enabled"
             } else {
-                "false"
+                "disabled"
             }
         } else {
             ""
