@@ -1,4 +1,5 @@
 use pick_agent::session::SessionEntry;
+use pick_ai::types::{Message, UserMessage};
 
 use super::context::TuiContext;
 use super::init;
@@ -267,6 +268,13 @@ pub(crate) async fn handle_build(ctx: &mut TuiContext) {
         ctx.tui
             .chat
             .add_system_message(&format!("\x1b[32m{}\x1b[0m", msg));
+
+        // Inject mode switch into conversation history so LLM is aware of mode change
+        if from_plan {
+            ctx.all_messages.push(Message::User(UserMessage::text(
+                crate::core::agent_mode::AgentMode::build_switch_prompt(),
+            )));
+        }
     }
 }
 

@@ -1,4 +1,5 @@
 use pick_agent::session::{AgentModeChangeEntry, SessionEntry, SessionEntryKind};
+use pick_ai::types::{Message, UserMessage};
 use pick_tui::components::select::{SelectItem, SelectList};
 
 use super::context::TuiContext;
@@ -163,6 +164,13 @@ pub(crate) async fn handle_cycle_mode(ctx: &mut TuiContext) {
         &ctx.args.append_system_prompt,
         Some(&ctx.agent_mode),
     );
+
+    // Inject mode switch into conversation history so LLM is aware of mode change
+    if from_plan {
+        ctx.all_messages.push(Message::User(UserMessage::text(
+            crate::core::agent_mode::AgentMode::build_switch_prompt(),
+        )));
+    }
 
     ctx.tui.finalize_turn();
 }

@@ -61,7 +61,7 @@ impl FileSystemPolicy {
             readable_roots: vec![],
             unreadable_paths: vec![],
             protected_paths: default_protected_paths(),
-            allow_absolute_paths: false,
+            allow_absolute_paths: true,
             allow_relative_paths: true,
             default_access_mode: AccessMode::Deny,
         }

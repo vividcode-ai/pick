@@ -95,6 +95,11 @@ pub fn build_system_prompt(options: BuildSystemPromptOptions) -> String {
             std::env::consts::ARCH
         ));
 
+        // Add agent mode indicator so LLM always knows its current mode
+        if let Some(mode) = options.agent_mode {
+            prompt.push_str(&format!("\nAgent mode: {}", mode));
+        }
+
         return prompt;
     }
 
@@ -264,6 +269,11 @@ Pick documentation (read only when the user asks about Pick itself, its SDK, ext
         std::env::consts::OS,
         std::env::consts::ARCH
     ));
+
+    // Add agent mode indicator so LLM always knows its current mode
+    if let Some(mode) = options.agent_mode {
+        prompt.push_str(&format!("\nAgent mode: {}", mode));
+    }
 
     prompt
 }

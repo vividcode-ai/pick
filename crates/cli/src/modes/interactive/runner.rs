@@ -276,6 +276,14 @@ pub async fn run_interactive_mode(
                             "Switched to BUILD mode"
                         };
                         println!("\x1b[32m{}\x1b[0m", msg);
+
+                        // Inject mode switch into conversation history so LLM is aware
+                        if was_plan {
+                            all_messages.push(Message::User(UserMessage::text(
+                                AgentMode::build_switch_prompt(),
+                            )));
+                        }
+
                         continue;
                     }
                     "/info" => {
