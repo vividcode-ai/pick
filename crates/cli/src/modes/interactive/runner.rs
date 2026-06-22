@@ -195,7 +195,7 @@ pub async fn run_interactive_mode(
                         println!("  /clear           Clear screen");
                         println!("  /model <name>    Show/set model");
                         println!("  /auth <cmd>      Manage credentials (set|remove|login|list)");
-                        println!("  /login           OAuth login flow");
+                        println!("  /connect         OAuth login flow");
                         println!("  /info             Show session info");
                         println!("  /session list     List recent sessions");
                         println!("  /compact           Compact conversation context");
@@ -222,7 +222,7 @@ pub async fn run_interactive_mode(
                         println!("Current model: {} ({})", model_id, provider);
                         continue;
                     }
-                    "/login" => {
+                    "/connect" => {
                         handle_oauth_login(&auth).await;
                         continue;
                     }

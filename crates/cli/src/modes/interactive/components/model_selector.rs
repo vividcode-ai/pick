@@ -50,7 +50,7 @@ pub fn render_model_selector(
     } else {
         lines.push(ToolTheme::fg(
             "warning",
-            "Only showing models from configured providers. Use /login to add providers.",
+            "Only showing models from configured providers. Use /connect to add providers.",
         ));
     }
     lines.push(String::new());

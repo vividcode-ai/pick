@@ -118,11 +118,11 @@ pub(crate) async fn handle_slash_command(
             cmd_model_login::handle_settings_command(ctx);
             SlashCommandResult::Consumed
         }
-        "login" => {
+        "connect" => {
             cmd_model_login::handle_login_command(ctx);
             SlashCommandResult::Consumed
         }
-        "logout" => {
+        "unconnect" => {
             cmd_model_login::handle_logout_command(ctx);
             SlashCommandResult::Consumed
         }

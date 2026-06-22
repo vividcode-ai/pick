@@ -334,8 +334,28 @@ impl TuiApp {
                 self.cancel_selection();
                 None
             }
+            KeyCode::Backspace => {
+                if let Some(ref mut sel) = self.selection {
+                    sel.pop_search_char();
+                }
+                None
+            }
+            KeyCode::Char(c) if !c.is_ascii_control() => {
+                if let Some(ref mut sel) = self.selection {
+                    sel.push_search_char(c);
+                }
+                None
+            }
             KeyCode::Esc => {
-                self.cancel_selection();
+                if let Some(ref mut sel) = self.selection {
+                    if sel.has_search() {
+                        sel.clear_search();
+                    } else {
+                        self.cancel_selection();
+                    }
+                } else {
+                    self.cancel_selection();
+                }
                 None
             }
             _ => None,

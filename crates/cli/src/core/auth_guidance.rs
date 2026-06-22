@@ -7,7 +7,7 @@ const UNKNOWN_PROVIDER: &str = "unknown";
 /// Get login help message for configuring providers
 pub fn get_provider_login_help() -> String {
     format!(
-        "Use /login to log into a provider via OAuth or API key. See:\n  {}\n  {}",
+        "Use /connect to log into a provider via OAuth or API key. See:\n  {}\n  {}",
         config::get_docs_path()
             .join("providers.md")
             .to_string_lossy(),

@@ -25,7 +25,6 @@ fn migrate_auth_to_auth_json() -> Vec<String> {
     let agent_dir = crate::config::get_agent_dir();
     let auth_path = agent_dir.join("auth.json");
     let oauth_path = agent_dir.join("oauth.json");
-    let settings_path = agent_dir.join("settings.json");
 
     // Skip if auth.json already exists
     if auth_path.exists() {
@@ -47,27 +46,6 @@ fn migrate_auth_to_auth_json() -> Vec<String> {
             providers.push(provider.clone());
         }
         let _ = std::fs::rename(&oauth_path, oauth_path.with_extension("json.migrated"));
-    }
-
-    // Migrate settings.json apiKeys
-    if settings_path.exists()
-        && let Ok(content) = std::fs::read_to_string(&settings_path)
-        && let Ok(mut settings) = serde_json::from_str::<serde_json::Value>(&content)
-        && let Some(api_keys) = settings.get("apiKeys").and_then(|v| v.as_object())
-    {
-        for (provider, key) in api_keys {
-            if !migrated.contains_key(provider) && key.is_string() {
-                let entry = serde_json::json!({"type": "api_key", "key": key});
-                migrated.insert(provider.clone(), entry);
-                providers.push(provider.clone());
-            }
-        }
-        if let Some(obj) = settings.as_object_mut() {
-            obj.remove("apiKeys");
-            if let Ok(new_content) = serde_json::to_string_pretty(&settings) {
-                let _ = std::fs::write(&settings_path, new_content);
-            }
-        }
     }
 
     if !migrated.is_empty()

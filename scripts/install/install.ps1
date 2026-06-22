@@ -107,3 +107,4 @@ if ($currentPath -notlike "*${BinDir}*") {
 Write-Host ""
 Write-Host "Pick v${Version} installed successfully!" -ForegroundColor Green
 Write-Host "Run 'pick update' to check for future updates." -ForegroundColor Cyan
+Write-Host "Run 'pick' to start a new session." -ForegroundColor Cyan

@@ -6,7 +6,7 @@ use std::time::Duration;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::config::{VERSION, get_agent_dir};
+use crate::config::{VERSION, get_pick_dir};
 use crate::utils::user_agent::get_user_agent;
 use crate::utils::version_check::is_newer_package_version;
 
@@ -26,7 +26,7 @@ pub struct VersionCache {
 
 impl VersionCache {
     fn cache_path() -> PathBuf {
-        get_agent_dir().join("version.json")
+        get_pick_dir().join("version.json")
     }
 
     pub fn load() -> Option<Self> {

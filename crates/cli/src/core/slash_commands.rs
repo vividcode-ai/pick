@@ -93,11 +93,11 @@ pub const BUILTIN_SLASH_COMMANDS: &[BuiltinSlashCommand] = &[
         description: "Navigate session tree (switch branches)",
     },
     BuiltinSlashCommand {
-        name: "login",
+        name: "connect",
         description: "Configure provider authentication",
     },
     BuiltinSlashCommand {
-        name: "logout",
+        name: "unconnect",
         description: "Remove provider authentication",
     },
     BuiltinSlashCommand {
@@ -168,8 +168,8 @@ mod tests {
         "fork",
         "clone",
         "tree",
-        "login",
-        "logout",
+        "connect",
+        "unconnect",
         "new",
         "compact",
         "resume",

@@ -132,45 +132,43 @@ pub(crate) fn handle_tree_command(ctx: &mut TuiContext, args: &[String]) {
     ctx.tui.finalize_turn();
 }
 
-/// Handle /resume slash command: show session list
-pub(crate) fn handle_resume_selector(ctx: &mut TuiContext) {
-    let cwd = std::env::current_dir().unwrap_or_default();
-    let session_dir = cwd.join(".pick").join("sessions");
-    let mut session_files: Vec<(String, std::path::PathBuf)> = Vec::new();
-
-    if session_dir.exists()
-        && let Ok(entries) = std::fs::read_dir(&session_dir)
-    {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.extension().map(|e| e == "jsonl").unwrap_or(false) {
-                let name = path
-                    .file_stem()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("unknown")
-                    .to_string();
-                session_files.push((name, path));
+/// Recursively scan a directory for .jsonl session files.
+fn collect_session_files(dir: &std::path::Path, files: &mut Vec<(String, std::path::PathBuf)>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_session_files(&path, files);
+        } else if path.extension().map(|e| e == "jsonl").unwrap_or(false) {
+            let name = path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("unknown")
+                .to_string();
+            if !files.iter().any(|(n, _)| n == &name) {
+                files.push((name, path));
             }
         }
     }
+}
 
-    let global_sessions = dirs::home_dir().map(|h| h.join(".pick").join("sessions"));
-    if let Some(ref global) = global_sessions
-        && global.exists()
-        && let Ok(entries) = std::fs::read_dir(global)
-    {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.extension().map(|e| e == "jsonl").unwrap_or(false) {
-                let name = path
-                    .file_stem()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("unknown")
-                    .to_string();
-                if !session_files.iter().any(|(n, _)| n == &name) {
-                    session_files.push((name, path));
-                }
-            }
+/// Handle /resume slash command: show session list
+pub(crate) fn handle_resume_selector(ctx: &mut TuiContext) {
+    let cwd = std::env::current_dir().unwrap_or_default();
+    let mut session_files: Vec<(String, std::path::PathBuf)> = Vec::new();
+
+    // Scan project directory
+    let project_session_dir = cwd.join(".pick").join("sessions");
+    if project_session_dir.exists() {
+        collect_session_files(&project_session_dir, &mut session_files);
+    }
+
+    // Scan global sessions directory (~/.pick/agent/sessions/)
+    if let Some(global) = dirs::home_dir().map(|h| h.join(".pick").join("agent").join("sessions")) {
+        if global.exists() {
+            collect_session_files(&global, &mut session_files);
         }
     }
 

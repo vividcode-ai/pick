@@ -25,23 +25,29 @@ impl SelectItem {
     }
 }
 
-/// A select list component with pagination support
+/// A select list component with pagination and search support
 pub struct SelectList {
     pub items: Vec<SelectItem>,
     pub selected_index: usize,
     pub title: String,
     pub page: usize,
     pub page_size: usize,
+    /// Original unfiltered items (kept when search query is active)
+    all_items: Vec<SelectItem>,
+    /// Current search/filter query
+    pub search_query: String,
 }
 
 impl SelectList {
     pub fn new(title: impl Into<String>, items: Vec<SelectItem>) -> Self {
         Self {
-            items,
+            items: items.clone(),
             selected_index: 0,
             title: title.into(),
             page: 0,
             page_size: 7,
+            all_items: items,
+            search_query: String::new(),
         }
     }
 
@@ -132,5 +138,54 @@ impl SelectList {
         }
         self.page = self.page_count() - 1;
         self.selected_index = len - 1;
+    }
+
+    /// Re-filter `items` from `all_items` based on `search_query`.
+    fn apply_search(&mut self) {
+        if self.search_query.is_empty() {
+            self.items = self.all_items.clone();
+        } else {
+            let q = self.search_query.to_lowercase();
+            self.items = self
+                .all_items
+                .iter()
+                .filter(|item| {
+                    item.label.to_lowercase().contains(&q)
+                        || item.value.to_lowercase().contains(&q)
+                        || item
+                            .description
+                            .as_ref()
+                            .is_some_and(|d| d.to_lowercase().contains(&q))
+                })
+                .cloned()
+                .collect();
+        }
+        self.selected_index = 0;
+        self.page = 0;
+    }
+
+    /// Append a character to the search query and re-filter.
+    pub fn push_search_char(&mut self, c: char) {
+        self.search_query.push(c);
+        self.apply_search();
+    }
+
+    /// Remove the last character from the search query and re-filter.
+    pub fn pop_search_char(&mut self) {
+        self.search_query.pop();
+        self.apply_search();
+    }
+
+    /// Clear the search query and restore all items.
+    pub fn clear_search(&mut self) {
+        if !self.search_query.is_empty() {
+            self.search_query.clear();
+            self.apply_search();
+        }
+    }
+
+    /// Whether a search query is currently active.
+    pub fn has_search(&self) -> bool {
+        !self.search_query.is_empty()
     }
 }

@@ -1,4 +1,6 @@
 .pick/
+.claude/
+.opencode/
 target/
 dist/
 __pycache__/

@@ -149,9 +149,9 @@ pub(crate) fn handle_settings_command(ctx: &mut TuiContext) {
     ctx.tui.start_selection(select);
 }
 
-/// Handle /login slash command
+/// Handle /connect slash command
 pub(crate) fn handle_login_command(ctx: &mut TuiContext) {
-    ctx.pending_command = Some("login".to_string());
+    ctx.pending_command = Some("connect".to_string());
     let items = vec![
         SelectItem::new("Use an API key", "apikey").with_description("Sign in using an API key"),
         SelectItem::new("Use a subscription", "subscription")
@@ -161,7 +161,7 @@ pub(crate) fn handle_login_command(ctx: &mut TuiContext) {
     ctx.tui.start_selection(select);
 }
 
-/// Handle /logout slash command
+/// Handle /unconnect slash command
 pub(crate) fn handle_logout_command(ctx: &mut TuiContext) {
     let providers = ctx.auth.list_providers();
     if providers.is_empty() {
@@ -169,14 +169,14 @@ pub(crate) fn handle_logout_command(ctx: &mut TuiContext) {
             .chat
             .add_system_message("No stored credentials to remove.");
     } else {
-        ctx.pending_command = Some("logout".to_string());
+        ctx.pending_command = Some("unconnect".to_string());
         let items: Vec<SelectItem> = providers
             .iter()
             .map(|p| {
                 SelectItem::new(p.clone(), p.clone()).with_description("Remove stored credential")
             })
             .collect();
-        let select = SelectList::new("Select provider to log out from", items);
+        let select = SelectList::new("Select provider to disconnect from", items);
         ctx.tui.start_selection(select);
     }
 }

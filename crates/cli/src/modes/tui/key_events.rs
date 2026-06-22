@@ -1,7 +1,7 @@
 use std::time::Instant;
 
 use crossterm::event::{KeyCode, KeyEventKind, KeyModifiers};
-use pick_tui::app::{TuiAction, TuiApp};
+use pick_tui::app::{AppState, TuiAction, TuiApp};
 
 /// Process a single keyboard event in the input loop context.
 /// Accumulates Char + Enter for paste batching, falls through to
@@ -25,6 +25,13 @@ pub(crate) fn process_key_event(
             tui.handle_paste(&text);
         }
         return None;
+    }
+
+    // In Selecting or ApiKeyInput state: route char keys directly to
+    // search / API key input, skip paste accumulation.
+    if tui.state == AppState::Selecting || tui.state == AppState::ApiKeyInput {
+        tui.finalize_paste_accumulator(now);
+        return tui.handle_key(key.code, key.modifiers);
     }
 
     // Route Char + Enter to paste accumulator
@@ -133,6 +140,15 @@ pub(crate) fn drain_key_events(
                             .modifiers
                             .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
                 {
+                    // During selecting or api-key input, route chars directly
+                    if tui.state == AppState::Selecting || tui.state == AppState::ApiKeyInput {
+                        tui.finalize_paste_accumulator(now);
+                        if let Some(a) = tui.handle_key(key.code, key.modifiers) {
+                            action = Some(a);
+                            had_action = true;
+                        }
+                        continue;
+                    }
                     match key.code {
                         KeyCode::Char(c) => {
                             tui.paste_accumulator.push(c);

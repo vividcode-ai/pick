@@ -7,10 +7,15 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 use std::path::PathBuf;
 
+/// Get the top-level Pick config directory (~/.pick/)
+pub fn get_pick_dir() -> PathBuf {
+    let home = dirs::home_dir().unwrap_or_default();
+    home.join(CONFIG_DIR_NAME)
+}
+
 /// Get the agent config directory
 pub fn get_agent_dir() -> PathBuf {
-    let home = dirs::home_dir().unwrap_or_default();
-    home.join(CONFIG_DIR_NAME).join("agent")
+    get_pick_dir().join("agent")
 }
 
 /// Get the sessions directory

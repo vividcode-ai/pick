@@ -6,7 +6,7 @@ use crossterm::terminal::size;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::Paragraph;
+use ratatui::widgets::{Clear, Paragraph};
 use unicode_width::UnicodeWidthStr;
 
 use crate::terminal_manager::TerminalManager;
@@ -367,11 +367,16 @@ impl TuiApp {
                                 );
                             }
                             AppState::ApiKeyInput => {
+                                frame.render_widget_ref(&Clear, chunks[i]);
                                 let popup = self.build_apikey_popup_lines(width);
                                 frame.render_widget_ref(
                                     &Paragraph::new(ratatui::text::Text::from(popup)),
                                     chunks[i],
                                 );
+                                // Set cursor right after "> " on the input line (7th visual line, 0-indexed)
+                                let cursor_col = 2u16.min(width.saturating_sub(1));
+                                let cursor_row = chunks[i].y + 6;
+                                frame.set_cursor_position((cursor_col, cursor_row));
                             }
                             AppState::UpdatePrompt => {
                                 // render empty editor area (the dialog is drawn as overlay)
@@ -793,7 +798,13 @@ impl TuiApp {
                 .and_then(|s| s.selected())
                 .and_then(|i| i.description.as_ref())
                 .is_some();
-            let reserved: u16 = if has_desc { 5 } else { 4 };
+            let has_search = self.selection.as_ref().is_some_and(|s| s.has_search());
+            // base: N items + title(1) + position(1) + empty(1) + hint(1) = N + 4
+            // + desc: + desc(1) + empty(1) = N + 6
+            // + search bar: +1 = N + 5 or N + 7
+            let base: u16 = if has_desc { 6 } else { 4 };
+            let search_extra: u16 = if has_search { 1 } else { 0 };
+            let reserved = base + search_extra;
             let visible = std::cmp::min(item_count, 10) as u16;
             (reserved + visible).clamp(5, 14)
         } else if self.state == AppState::TreeSelecting {
@@ -805,7 +816,7 @@ impl TuiApp {
             let visible = std::cmp::min(count, 12) as u16;
             (visible + 5).clamp(5, 18)
         } else if self.state == AppState::ApiKeyInput {
-            6_u16
+            11_u16
         } else if self.state == AppState::UpdatePrompt {
             1_u16
         } else if self.editor.buffer.is_empty() {
@@ -851,10 +862,23 @@ impl TuiApp {
         let dim = Style::default().add_modifier(Modifier::DIM);
         if let Some(ref sel) = self.selection {
             let mut result: Vec<Line<'static>> = Vec::new();
+
+            // Search / filter bar (only show when user is actively searching)
+            if sel.has_search() {
+                let search_display = sel.search_query.clone();
+                result.push(Line::from(Span::styled(
+                    format!("> {}", search_display),
+                    dim,
+                )));
+            }
+
             result.push(Line::from(Span::styled(sel.title.clone(), bold)));
             let label_max = std::cmp::min(32, width.saturating_sub(4) as usize);
             let start = sel.page_start();
             let end = sel.page_end();
+            if sel.items.is_empty() {
+                result.push(Line::from(Span::styled("  No matches", dim)));
+            }
             for i in start..end {
                 let item = &sel.items[i];
                 let selected = i == sel.selected_index;
@@ -883,11 +907,13 @@ impl TuiApp {
                 }
             }
             let total = sel.items.len();
-            let current_pos = sel.selected_index + 1;
-            result.push(Line::from(Span::styled(
-                format!("  ({}/{})", current_pos, total),
-                dim,
-            )));
+            if total > 0 {
+                let current_pos = sel.selected_index + 1;
+                result.push(Line::from(Span::styled(
+                    format!("  ({}/{})", current_pos, total),
+                    dim,
+                )));
+            }
             result.push(Line::from(""));
             if let Some(desc) = sel.selected().and_then(|i| i.description.as_ref()) {
                 let desc_trimmed: String = desc
@@ -898,7 +924,7 @@ impl TuiApp {
                 result.push(Line::from(""));
             }
             result.push(Line::from(Span::styled(
-                "Type to search \u{00B7} Enter/Space to change \u{00B7} Esc to cancel".to_string(),
+                "Enter/Space to select \u{00B7} Esc to cancel".to_string(),
                 dim,
             )));
             result
@@ -913,28 +939,33 @@ impl TuiApp {
         let provider = self.api_key_provider.as_deref().unwrap_or("provider");
         let mut lines: Vec<Line<'static>> = Vec::new();
         lines.push(Line::from(Span::styled(
-            format!("Login to {}", provider),
+            format!("Connect to {}", provider),
             bold,
         )));
         lines.push(Line::from(""));
-        lines.push(Line::from(Span::raw("Enter your API key:")));
+        lines.push(Line::from(""));
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::raw("  Enter your API key:")));
+        lines.push(Line::from(""));
         let input_display = if self.api_key_input.is_empty() {
-            Line::from(Span::styled("<type your API key>".to_string(), dim))
+            Line::from(Span::styled("  <type your API key>".to_string(), dim))
         } else {
             let masked_len = self.api_key_input.len().saturating_sub(4);
             let masked = "\u{2022}".repeat(masked_len);
             let last_four = &self.api_key_input[self.api_key_input.len().saturating_sub(4)..];
-            Line::from(Span::raw(format!("{}{}", masked, last_four)))
+            Line::from(Span::raw(format!("  {}{}", masked, last_four)))
         };
         lines.push(Line::from(
-            vec![Span::raw("> ".to_string())]
+            vec![Span::styled(">".to_string(), dim), Span::raw(" ")]
                 .into_iter()
                 .chain(input_display.spans)
                 .collect::<Vec<_>>(),
         ));
         lines.push(Line::from(""));
+        lines.push(Line::from(""));
+        lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
-            "Enter to confirm \u{00B7} Esc to cancel".to_string(),
+            "  Enter to confirm \u{00B7} Esc to cancel".to_string(),
             dim,
         )));
         lines

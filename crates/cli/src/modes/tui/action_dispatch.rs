@@ -68,11 +68,12 @@ async fn handle_interrupt(ctx: &mut TuiContext) {
 
 /// Handle SelectionResult by dispatching to the correct handler
 async fn handle_selection_result(ctx: &mut TuiContext, val: &str) {
-    match ctx.pending_command.as_deref() {
-        Some("login") => actions_login::handle_login_selection(ctx, val).await,
+    let prev_cmd = ctx.pending_command.clone();
+    match prev_cmd.as_deref() {
+        Some("connect") => actions_login::handle_login_selection(ctx, val).await,
         Some("login-oauth") => actions_login::handle_oauth_login(ctx, val).await,
         Some("login-apikey") => actions_login::handle_apikey_login(ctx, val),
-        Some("logout") => actions_login::handle_logout(ctx, val),
+        Some("unconnect") => actions_login::handle_logout(ctx, val),
         Some("settings") => {
             actions_settings::handle_settings_selection(ctx, val).await;
         }
@@ -105,7 +106,10 @@ async fn handle_selection_result(ctx: &mut TuiContext, val: &str) {
                 .add_system_message(&format!("\x1b[36m→\x1b[0m \x1b[1m{}\x1b[0m", val));
         }
     }
-    ctx.pending_command = None;
+    // Only clear pending_command if the handler didn't chain to a new one.
+    if ctx.pending_command == prev_cmd {
+        ctx.pending_command = None;
+    }
     ctx.tui.finalize_turn();
 }
 

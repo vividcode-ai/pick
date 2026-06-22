@@ -98,7 +98,7 @@ pub fn render_oauth_selector(
             if mode == "login" {
                 "No providers available"
             } else {
-                "No providers logged in. Use /login first."
+                "No providers logged in. Use /connect first."
             }
         } else {
             "No matching providers"

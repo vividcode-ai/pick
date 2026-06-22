@@ -34,8 +34,8 @@ mod tests {
         let cmd_names: std::collections::HashSet<&str> = [
             "quit",
             "help",
-            "login",
-            "logout",
+            "connect",
+            "unconnect",
             "model",
             "scoped-models",
             "settings",

@@ -189,23 +189,49 @@ pub(crate) async fn handle_fork(ctx: &mut TuiContext, idx: usize) {
     }
 }
 
+/// Recursively search for a session file by UUID in a directory tree.
+fn find_session_file_recursive(
+    dir: &std::path::Path,
+    session_id: &str,
+) -> Option<std::path::PathBuf> {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return None;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            if let Some(found) = find_session_file_recursive(&path, session_id) {
+                return Some(found);
+            }
+        } else if path.file_stem().and_then(|s| s.to_str()) == Some(session_id)
+            && path.extension().map(|e| e == "jsonl").unwrap_or(false)
+        {
+            return Some(path);
+        }
+    }
+    None
+}
+
 /// Handle resume session
 pub(crate) async fn handle_resume(ctx: &mut TuiContext, session_id: &str) {
     let cwd = std::env::current_dir().unwrap_or_default();
-    let session_dir = cwd.join(".pick").join("sessions");
-    let session_path = session_dir.join(format!("{}.jsonl", session_id));
+    let project_path = cwd
+        .join(".pick")
+        .join("sessions")
+        .join(format!("{}.jsonl", session_id));
 
-    let session_path = if session_path.exists() {
-        session_path
-    } else if let Some(global) = dirs::home_dir().map(|h| h.join(".pick").join("sessions")) {
-        let global_path = global.join(format!("{}.jsonl", session_id));
-        if global_path.exists() {
-            global_path
+    let session_path = if project_path.exists() {
+        project_path
+    } else if let Some(global) =
+        dirs::home_dir().map(|h| h.join(".pick").join("agent").join("sessions"))
+    {
+        if global.exists() {
+            find_session_file_recursive(&global, session_id).unwrap_or(project_path)
         } else {
-            session_path
+            project_path
         }
     } else {
-        session_path
+        project_path
     };
 
     match SessionManager::open(session_path, cwd.clone()).await {
