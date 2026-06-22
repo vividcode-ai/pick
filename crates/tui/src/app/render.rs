@@ -872,6 +872,21 @@ impl TuiApp {
 
     /// Update shared chat render cache
     pub fn build_selection_popup_lines(&self, width: u16) -> Vec<Line<'static>> {
+        fn split_bracket_suffix(s: &str) -> (&str, &str) {
+            // Trim trailing whitespace first so we don't match padding spaces.
+            let trimmed = s.trim_end();
+            if let Some(pos) = trimmed.rfind("  [") {
+                let bracket = &trimmed[pos..];
+                if bracket.ends_with(']') {
+                    // Use pos from trimmed to slice the original s.
+                    // main_part = text before bracket (no padding)
+                    // bracket = everything from `  [` onward (includes any trailing padding)
+                    return (&s[..pos], &s[pos..]);
+                }
+            }
+            (s, "")
+        }
+
         let bold = Style::default().add_modifier(Modifier::BOLD);
         let cyan = Style::default().fg(Color::Cyan);
         let dim = Style::default().add_modifier(Modifier::DIM);
@@ -898,11 +913,16 @@ impl TuiApp {
                 let item = &sel.items[i];
                 let selected = i == sel.selected_index;
                 if selected {
-                    result.push(Line::from(vec![
+                    let (main_part, bracket) = split_bracket_suffix(&item.label);
+                    let mut spans = vec![
                         Span::styled("\u{2192}".to_string(), cyan),
                         Span::raw(" ".to_string()),
-                        Span::styled(item.label.clone(), cyan),
-                    ]));
+                        Span::styled(main_part.to_string(), cyan),
+                    ];
+                    if !bracket.is_empty() {
+                        spans.push(Span::styled(bracket.to_string(), dim));
+                    }
+                    result.push(Line::from(spans));
                 } else {
                     let truncated = if item.label.len() > label_max {
                         let max_bytes = label_max.saturating_sub(1);
@@ -918,7 +938,16 @@ impl TuiApp {
                             " ".repeat(label_max.saturating_sub(item.label.len()))
                         )
                     };
-                    result.push(Line::from(Span::raw(truncated)));
+                    let (main_part, bracket) = split_bracket_suffix(&truncated);
+                    if bracket.is_empty() {
+                        result.push(Line::from(Span::raw(truncated)));
+                    } else {
+                        let mut spans = vec![Span::raw(main_part.to_string())];
+                        if !bracket.is_empty() {
+                            spans.push(Span::styled(bracket.to_string(), dim));
+                        }
+                        result.push(Line::from(spans));
+                    }
                 }
             }
             let total = sel.items.len();

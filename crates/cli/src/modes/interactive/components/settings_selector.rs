@@ -331,7 +331,7 @@ pub fn render_settings_selector(
             } else {
                 format!(
                     " {}",
-                    ToolTheme::fg("muted", &format!("[{}]", item.current_value))
+                    ToolTheme::fg("dim", &format!("[{}]", item.current_value))
                 )
             };
 
