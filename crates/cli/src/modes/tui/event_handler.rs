@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
@@ -13,14 +14,25 @@ pub(crate) fn create_on_event(
     cmd_tx: mpsc::UnboundedSender<TuiCommand>,
     tool_start_times: Arc<Mutex<HashMap<String, Instant>>>,
     tool_args_map: Arc<Mutex<HashMap<String, serde_json::Value>>>,
+    hide_thinking: Arc<AtomicBool>,
+    show_images: Arc<AtomicBool>,
+    block_images: Arc<AtomicBool>,
 ) -> Arc<dyn Fn(AgentEvent) + Send + Sync> {
     let cmd_tx_for_events = cmd_tx;
     let tool_times = tool_start_times;
     let tool_args = tool_args_map;
+    let hide = hide_thinking;
+    let show_img = show_images;
+    let block_img = block_images;
     Arc::new(move |event| match event {
         AgentEvent::MessageUpdate { message, .. } => {
             if let Message::Assistant(msg) = message {
-                let combined = format_message_content(&msg.content);
+                let combined = format_message_content(
+                    &msg.content,
+                    hide.load(Ordering::Relaxed),
+                    show_img.load(Ordering::Relaxed),
+                    block_img.load(Ordering::Relaxed),
+                );
                 if !combined.is_empty() {
                     let _ = cmd_tx_for_events.send(TuiCommand::StreamContent(combined));
                 }
@@ -142,14 +154,19 @@ pub(crate) fn create_on_event(
 }
 
 /// Format message content blocks into a combined display string
-fn format_message_content(content: &[ContentBlock]) -> String {
+fn format_message_content(
+    content: &[ContentBlock],
+    hide_thinking: bool,
+    show_images: bool,
+    block_images: bool,
+) -> String {
     let mut combined = String::new();
     for block in content {
         match block {
             ContentBlock::Text(t) => {
                 combined.push_str(&t.text);
             }
-            ContentBlock::Thinking(t) if !t.thinking.is_empty() => {
+            ContentBlock::Thinking(t) if !t.thinking.is_empty() && !hide_thinking => {
                 if !combined.is_empty() {
                     combined.push('\n');
                 }
@@ -159,7 +176,7 @@ fn format_message_content(content: &[ContentBlock]) -> String {
                 ));
             }
             ContentBlock::Image(img) => {
-                let rendered = render_image_block(img);
+                let rendered = render_image_block(img, show_images, block_images);
                 if !rendered.is_empty() {
                     if !combined.is_empty() && !combined.ends_with('\n') {
                         combined.push('\n');
@@ -175,7 +192,18 @@ fn format_message_content(content: &[ContentBlock]) -> String {
 }
 
 /// Render image content block to ANSI terminal output
-fn render_image_block(img: &pick_ai::types::ImageContent) -> String {
+fn render_image_block(
+    img: &pick_ai::types::ImageContent,
+    show_images: bool,
+    block_images: bool,
+) -> String {
+    if block_images {
+        return "\x1b[38;2;128;128;128m[Image blocked by settings]\x1b[39m".to_string();
+    }
+    if !show_images {
+        return "\x1b[38;2;128;128;128m[Image]\x1b[39m".to_string();
+    }
+
     let (mime, data) = if img.mime_type != "image/png" {
         use base64::Engine;
         if let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(&img.data) {

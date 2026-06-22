@@ -167,14 +167,21 @@ pub(crate) fn is_default_session_title(name: &str) -> bool {
 
 /// Combine content blocks into a single display string with ANSI markers.
 /// Thinking blocks are wrapped in italic+gray ANSI sequences (same format as live streaming).
-pub(crate) fn combine_content_blocks(content: &[ContentBlock]) -> String {
+pub(crate) fn combine_content_blocks(
+    content: &[ContentBlock],
+    hide_thinking: bool,
+    show_images: bool,
+    block_images: bool,
+) -> String {
     let mut combined = String::new();
     for block in content {
         match block {
             ContentBlock::Text(t) => {
                 combined.push_str(&t.text);
             }
-            ContentBlock::Thinking(t) if !t.thinking.is_empty() && !t.redacted => {
+            ContentBlock::Thinking(t)
+                if !t.thinking.is_empty() && !t.redacted && !hide_thinking =>
+            {
                 if !combined.is_empty() && !combined.ends_with('\n') {
                     combined.push('\n');
                 }
@@ -182,6 +189,18 @@ pub(crate) fn combine_content_blocks(content: &[ContentBlock]) -> String {
                     "\x1b[3m\x1b[38;2;128;128;128m{}\x1b[23m\x1b[39m\n\n",
                     t.thinking.trim_end()
                 ));
+            }
+            ContentBlock::Image(_) if block_images => {
+                if !combined.is_empty() && !combined.ends_with('\n') {
+                    combined.push('\n');
+                }
+                combined.push_str("\x1b[38;2;128;128;128m[Image blocked by settings]\x1b[39m\n");
+            }
+            ContentBlock::Image(_) if !show_images => {
+                if !combined.is_empty() && !combined.ends_with('\n') {
+                    combined.push('\n');
+                }
+                combined.push_str("\x1b[38;2;128;128;128m[Image]\x1b[39m\n");
             }
             ContentBlock::Image(_) => {
                 if !combined.is_empty() && !combined.ends_with('\n') {

@@ -141,6 +141,9 @@ pub struct TuiApp {
     pub todo_items: Vec<serde_json::Value>,
     pub todo_scroll_offset: usize,
     pub confirm_quit: bool,
+    /// Show the hardware terminal cursor (for IME support). When false,
+    /// the physical cursor is hidden and only the ratatui virtual cursor is active.
+    pub show_hardware_cursor: bool,
 }
 
 /// Format token counts for compact display (e.g. 1500 → "1.5k", 15000 → "15k")

@@ -39,7 +39,20 @@ impl TuiApp {
         self.last_render_width = width;
 
         if self.state != self.last_render_state {
-            manager.invalidate_viewport();
+            // For ApiKeyInput transitions, skip invalidate_viewport to let
+            // the normal buffer diff handle clearing of stale selection-popup
+            // content. When invalidate_viewport resets the previous buffer
+            // to spaces, the Clear widget in the render pipeline also writes
+            // spaces — the diff sees "space == space" and outputs nothing,
+            // leaving stale content on the physical terminal (especially
+            // visible in WSL where the PTY buffering can drop the explicit
+            // ClearFromCursorDown escape from clear_for_viewport_change).
+            //
+            // By preserving the previous buffer content, the Clear widget
+            // triggers proper difference detection: old content → spaces.
+            if self.state != AppState::ApiKeyInput {
+                manager.invalidate_viewport();
+            }
             self.last_render_state.clone_from(&self.state);
         }
         let editor_line_count = self.compute_editor_line_count(width);
@@ -376,7 +389,9 @@ impl TuiApp {
                                 // Set cursor right after "> " on the input line (7th visual line, 0-indexed)
                                 let cursor_col = 2u16.min(width.saturating_sub(1));
                                 let cursor_row = chunks[i].y + 6;
-                                frame.set_cursor_position((cursor_col, cursor_row));
+                                if self.show_hardware_cursor {
+                                    frame.set_cursor_position((cursor_col, cursor_row));
+                                }
                             }
                             AppState::UpdatePrompt => {
                                 // render empty editor area (the dialog is drawn as overlay)
@@ -389,7 +404,7 @@ impl TuiApp {
                                     &Paragraph::new(ratatui::text::Text::from(editor_lines)),
                                     chunks[i],
                                 );
-                                if !has_selection {
+                                if !has_selection && self.show_hardware_cursor {
                                     frame.set_cursor_position((
                                         cursor_col as u16,
                                         chunks[i].y + cursor_row as u16,

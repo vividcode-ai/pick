@@ -1,3 +1,5 @@
+use std::sync::atomic::Ordering;
+
 use super::context::TuiContext;
 use crate::core::settings::{
     CompactionSettings, ImageSettings, Settings, SettingsManager, TerminalSettings,
@@ -29,11 +31,42 @@ pub(crate) fn toggle_enable_skill_commands(sm: &mut SettingsManager, ctx: &mut T
 }
 
 pub(crate) fn toggle_show_hardware_cursor(sm: &mut SettingsManager, ctx: &mut TuiContext) {
-    toggle_bool_setting!(sm, ctx, show_hardware_cursor, "Show hardware cursor");
+    let current = sm.get().show_hardware_cursor.unwrap_or(false);
+    let new = !current;
+    let mut update = Settings::default();
+    update.show_hardware_cursor = Some(new);
+    match sm.set_global(update) {
+        Ok(()) => {
+            ctx.tui.show_hardware_cursor = new;
+            ctx.tui.chat.add_system_message(&format!(
+                "Show hardware cursor \x1b[1m{}\x1b[0m.",
+                if new { "enabled" } else { "disabled" }
+            ));
+        }
+        Err(e) => ctx
+            .tui
+            .show_error(&format!("Failed to save setting: {}", e)),
+    }
 }
 
 pub(crate) fn toggle_hide_thinking_block(sm: &mut SettingsManager, ctx: &mut TuiContext) {
-    toggle_bool_setting!(sm, ctx, hide_thinking_block, "Hide thinking");
+    use std::sync::atomic::Ordering;
+    let current = sm.get().hide_thinking_block.unwrap_or(false);
+    let new = !current;
+    let mut update = Settings::default();
+    update.hide_thinking_block = Some(new);
+    match sm.set_global(update) {
+        Ok(()) => {
+            ctx.hide_thinking.store(new, Ordering::Relaxed);
+            ctx.tui.chat.add_system_message(&format!(
+                "Hide thinking \x1b[1m{}\x1b[0m.",
+                if new { "enabled" } else { "disabled" }
+            ));
+        }
+        Err(e) => ctx
+            .tui
+            .show_error(&format!("Failed to save setting: {}", e)),
+    }
 }
 
 pub(crate) fn toggle_collapse_changelog(sm: &mut SettingsManager, ctx: &mut TuiContext) {
@@ -83,18 +116,22 @@ pub(crate) async fn toggle_show_images(sm: &mut SettingsManager, ctx: &mut TuiCo
         .as_ref()
         .and_then(|t| t.show_images)
         .unwrap_or(true);
+    let new = !current;
     let mut update = Settings::default();
     update.terminal = Some(TerminalSettings {
-        show_images: Some(!current),
+        show_images: Some(new),
         image_width_cells: None,
         clear_on_shrink: None,
         show_terminal_progress: None,
     });
     match sm.set_global(update) {
-        Ok(()) => ctx.tui.chat.add_system_message(&format!(
-            "Show images \x1b[1m{}\x1b[0m.",
-            if !current { "enabled" } else { "disabled" }
-        )),
+        Ok(()) => {
+            ctx.show_images.store(new, Ordering::Relaxed);
+            ctx.tui.chat.add_system_message(&format!(
+                "Show images \x1b[1m{}\x1b[0m.",
+                if new { "enabled" } else { "disabled" }
+            ));
+        }
         Err(e) => ctx
             .tui
             .show_error(&format!("Failed to save setting: {}", e)),
@@ -131,16 +168,20 @@ pub(crate) async fn toggle_block_images(sm: &mut SettingsManager, ctx: &mut TuiC
         .as_ref()
         .and_then(|i| i.block_images)
         .unwrap_or(false);
+    let new = !current;
     let mut update = Settings::default();
     update.images = Some(ImageSettings {
         auto_resize: None,
-        block_images: Some(!current),
+        block_images: Some(new),
     });
     match sm.set_global(update) {
-        Ok(()) => ctx.tui.chat.add_system_message(&format!(
-            "Block images \x1b[1m{}\x1b[0m.",
-            if !current { "enabled" } else { "disabled" }
-        )),
+        Ok(()) => {
+            ctx.block_images.store(new, Ordering::Relaxed);
+            ctx.tui.chat.add_system_message(&format!(
+                "Block images \x1b[1m{}\x1b[0m.",
+                if new { "enabled" } else { "disabled" }
+            ));
+        }
         Err(e) => ctx
             .tui
             .show_error(&format!("Failed to save setting: {}", e)),

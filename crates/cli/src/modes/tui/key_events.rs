@@ -31,6 +31,18 @@ pub(crate) fn process_key_event(
     // search / API key input, skip paste accumulation.
     if tui.state == AppState::Selecting || tui.state == AppState::ApiKeyInput {
         tui.finalize_paste_accumulator(now);
+        // In ApiKeyInput state, Ctrl+V reads clipboard and pastes
+        if tui.state == AppState::ApiKeyInput
+            && key.code == KeyCode::Char('v')
+            && key.modifiers == KeyModifiers::CONTROL
+        {
+            if let Ok(mut clipboard) = arboard::Clipboard::new()
+                && let Ok(text) = clipboard.get_text()
+            {
+                tui.handle_paste(&text);
+            }
+            return None;
+        }
         return tui.handle_key(key.code, key.modifiers);
     }
 

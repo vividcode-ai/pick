@@ -92,6 +92,7 @@ impl TuiApp {
             update_prompt: None,
             todo_items: Vec::new(),
             todo_scroll_offset: 0,
+            show_hardware_cursor: false,
         })
     }
 
@@ -169,6 +170,7 @@ impl TuiApp {
             update_prompt: None,
             todo_items: Vec::new(),
             todo_scroll_offset: 0,
+            show_hardware_cursor: false,
         }
     }
 
@@ -1075,11 +1077,13 @@ impl TuiApp {
     pub fn handle_paste(&mut self, text: &str) {
         if matches!(
             self.state,
-            AppState::Selecting
-                | AppState::TreeSelecting
-                | AppState::ApiKeyInput
-                | AppState::UpdatePrompt
+            AppState::Selecting | AppState::TreeSelecting | AppState::UpdatePrompt
         ) {
+            return;
+        }
+
+        if self.state == AppState::ApiKeyInput {
+            self.api_key_input.push_str(text);
             return;
         }
         let pasted = text.replace("\r\n", "\n").replace('\r', "\n");

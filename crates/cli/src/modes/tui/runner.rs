@@ -17,6 +17,7 @@ use super::cleanup;
 use super::commands;
 use super::init;
 use super::key_events;
+use super::types::TuiCommand;
 
 use crate::core::update_action::UpdateAction;
 
@@ -90,6 +91,13 @@ pub async fn run_tui_mode(
 
                 cmd = cmd_rx.recv() => {
                     match cmd {
+                        Some(TuiCommand::SetSessionTitle(title)) => {
+                            commands::apply_tui_command(&mut ctx.tui, TuiCommand::SetSessionTitle(title.clone()));
+                            // Persist immediately so the session picker sees the real title
+                            if let Err(e) = ctx.session_manager.append_session_info(&title).await {
+                                ctx.tui.show_error(&format!("Failed to persist session title: {}", e));
+                            }
+                        }
                         Some(cmd) => commands::apply_tui_command(&mut ctx.tui, cmd),
                         None => break 'input TuiAction::Quit,
                     }

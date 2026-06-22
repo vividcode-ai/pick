@@ -62,6 +62,13 @@ pub(crate) struct TuiContext {
     // Auth
     pub auth: Arc<AuthStorage>,
 
+    // Whether to hide thinking blocks (shared with event handler for live updates)
+    pub hide_thinking: Arc<AtomicBool>,
+    /// Whether to render images inline in terminal
+    pub show_images: Arc<AtomicBool>,
+    /// Whether to prevent images from being sent to the LLM
+    pub block_images: Arc<AtomicBool>,
+
     // Tool tracking
     pub tool_start_times: Arc<Mutex<HashMap<String, Instant>>>,
     pub tool_args_map: Arc<Mutex<HashMap<String, serde_json::Value>>>,

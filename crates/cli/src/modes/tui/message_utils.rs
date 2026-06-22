@@ -83,6 +83,9 @@ pub(crate) fn restore_session_history(
     tui: &mut TuiApp,
     session_manager: &SessionManager,
     initial_messages: &[Message],
+    hide_thinking: bool,
+    show_images: bool,
+    block_images: bool,
 ) -> Vec<Message> {
     let session_msgs = entries_to_messages(session_manager.entries());
     for msg in &session_msgs {
@@ -95,7 +98,12 @@ pub(crate) fn restore_session_history(
                 }
             }
             Message::Assistant(a) => {
-                let combined = super::types::combine_content_blocks(&a.content);
+                let combined = super::types::combine_content_blocks(
+                    &a.content,
+                    hide_thinking,
+                    show_images,
+                    block_images,
+                );
                 if !combined.is_empty() {
                     tui.chat.stream_assistant_content(&combined);
                 }

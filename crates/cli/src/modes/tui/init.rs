@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::Instant;
 
@@ -144,11 +144,15 @@ pub(crate) async fn init_tui_mode(
         }
     };
 
-    // Add startup header
-    if let Ok((width, _height)) = crossterm::terminal::size() {
-        tui.ensure_startup_header(width as usize);
-    } else {
-        tui.ensure_startup_header(80);
+    // Add startup header (skip if quiet_startup is enabled)
+    let settings = SettingsManager::load(&cwd);
+    tui.show_hardware_cursor = settings.get_show_hardware_cursor();
+    if !settings.get_quiet_startup() {
+        if let Ok((width, _height)) = crossterm::terminal::size() {
+            tui.ensure_startup_header(width as usize);
+        } else {
+            tui.ensure_startup_header(80);
+        }
     }
 
     // Check for update on startup and add banner if available
@@ -169,6 +173,54 @@ pub(crate) async fn init_tui_mode(
                     tui.chat.add_system_message(&banner);
                 }
             }
+        }
+    }
+
+    // Auto-show changelog on version change
+    {
+        let sm = SettingsManager::load(&cwd);
+        let collapse = sm.get_collapse_changelog();
+        let last_version = sm.get().last_changelog_version.clone();
+        let current_ver = crate::config::VERSION;
+        if last_version.as_deref() != Some(current_ver) && last_version.is_some() {
+            use crate::utils::changelog::{get_changelog_path, get_new_entries, parse_changelog};
+            let changelog_path = get_changelog_path();
+            if changelog_path.exists() {
+                let entries = parse_changelog(&changelog_path);
+                let new_entries =
+                    get_new_entries(&entries, last_version.as_deref().unwrap_or("0.0.0"));
+                if !new_entries.is_empty() {
+                    tui.chat.add_system_message(
+                        "\x1b[1m\x1b[38;2;100;200;100m\u{1f4dd} What's New\x1b[0m",
+                    );
+                    for entry in &new_entries {
+                        let version = format!("v{}.{}.{}", entry.major, entry.minor, entry.patch);
+                        tui.chat
+                            .add_system_message(&format!("\x1b[1m{}\x1b[0m", version));
+                        let lines: Vec<&str> = if collapse {
+                            // Condensed: only title/header line
+                            entry.content.lines().take(1).collect()
+                        } else {
+                            entry.content.lines().collect()
+                        };
+                        for line in &lines {
+                            tui.chat
+                                .add_system_message(&format!("\x1b[2m  {}\x1b[0m", line));
+                        }
+                        if collapse && entry.content.lines().count() > 1 {
+                            tui.chat.add_system_message("\x1b[2m  ...\x1b[0m");
+                        }
+                        tui.chat.add_system_message("");
+                    }
+                }
+            }
+        }
+        // Update last_changelog_version to current
+        if last_version.as_deref() != Some(current_ver) {
+            let mut update = crate::core::settings::Settings::default();
+            update.last_changelog_version = Some(current_ver.to_string());
+            let mut settings = SettingsManager::load(&cwd);
+            let _ = settings.set_global(update);
         }
     }
 
@@ -202,16 +254,31 @@ pub(crate) async fn init_tui_mode(
     let tool_args_map: Arc<Mutex<HashMap<String, serde_json::Value>>> =
         Arc::new(Mutex::new(HashMap::new()));
 
+    // Load display/behavior flags from settings
+    let settings = SettingsManager::load(&cwd);
+    let hide_thinking = Arc::new(AtomicBool::new(settings.get_hide_thinking_block()));
+    let show_images = Arc::new(AtomicBool::new(settings.get_show_images()));
+    let block_images = Arc::new(AtomicBool::new(settings.get_block_images()));
+
     // Build on_event callback
     let on_event = event_handler::create_on_event(
         cmd_tx.clone(),
         tool_start_times.clone(),
         tool_args_map.clone(),
+        hide_thinking.clone(),
+        show_images.clone(),
+        block_images.clone(),
     );
 
     // Restore session history
-    let all_messages =
-        message_utils::restore_session_history(&mut tui, &session_manager, &initial_messages);
+    let all_messages = message_utils::restore_session_history(
+        &mut tui,
+        &session_manager,
+        &initial_messages,
+        hide_thinking.load(Ordering::Relaxed),
+        show_images.load(Ordering::Relaxed),
+        block_images.load(Ordering::Relaxed),
+    );
 
     let ctx = TuiContext {
         tui,
@@ -234,6 +301,9 @@ pub(crate) async fn init_tui_mode(
         permission_manager,
         platform_sandbox,
         auth,
+        hide_thinking,
+        show_images,
+        block_images,
         tool_start_times,
         tool_args_map,
         on_event,

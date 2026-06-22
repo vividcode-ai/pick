@@ -61,6 +61,44 @@ async fn run_update_command() -> anyhow::Result<()> {
 
     #[cfg(not(debug_assertions))]
     {
+        use crate::core::install_context::{InstallContext, InstallMethod};
+        use crate::core::updates::fetch_latest_version;
+        use crate::utils::version_check::is_newer_package_version;
+
+        let ctx = InstallContext::current();
+
+        // Print which source we're checking
+        match ctx.method {
+            InstallMethod::Npm => {
+                println!(
+                    "Checking npm registry (registry.npmjs.org/@vividcodeai/pick) for updates..."
+                );
+            }
+            InstallMethod::GitHub { .. } | InstallMethod::Cargo => {
+                println!(
+                    "Checking GitHub releases (api.github.com/repos/vividcode-ai/pick) for updates..."
+                );
+            }
+            InstallMethod::Other => {
+                println!("Source build detected \u{2014} unable to auto-update.");
+                println!(
+                    "Please update manually: https://github.com/vividcode-ai/pick/releases/latest"
+                );
+                return Ok(());
+            }
+        }
+
+        match fetch_latest_version(ctx).await {
+            Some(latest) if is_newer_package_version(&latest, VERSION) => {
+                println!("New version available: v{latest} (current: v{VERSION})");
+                println!("Downloading...");
+            }
+            _ => {
+                println!("Pick v{VERSION} is already up to date.");
+                return Ok(());
+            }
+        }
+
         let Some(action) = get_update_action() else {
             anyhow::bail!(
                 "Could not detect the Pick installation method. Please update manually: https://github.com/vividcode-ai/pick/releases/latest"
