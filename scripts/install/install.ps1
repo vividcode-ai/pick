@@ -90,7 +90,17 @@ New-Item -ItemType Junction -Path $CurrentLink -Target $ExtractDir | Out-Null
 
 # Copy binary to bin dir
 New-Item -ItemType Directory -Path $BinDir -Force | Out-Null
+# On Windows, a running .exe cannot be overwritten, but it CAN be renamed.
+# Rename the current binary first so the new one can take its place.
+$BinExe = "$BinDir\pick.exe"
+$OldExe = "$BinDir\pick.exe.old"
+if (Test-Path $BinExe) {
+    Remove-Item $OldExe -Force -ErrorAction SilentlyContinue
+    Rename-Item $BinExe $OldExe -ErrorAction SilentlyContinue
+}
 Copy-Item "$ExtractDir\pick.exe" "$BinDir\pick.exe" -Force
+# Clean up the renamed old binary (no longer needed)
+Remove-Item $OldExe -Force -ErrorAction SilentlyContinue
 
 Write-Host ""
 Write-Host "Adding ${BinDir} to PATH..."
