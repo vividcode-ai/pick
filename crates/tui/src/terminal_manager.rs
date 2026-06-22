@@ -69,6 +69,10 @@ where
     /// Once true, the viewport is pinned to the screen bottom on every draw
     /// to prevent content jumping when streaming tail / status disappear.
     has_reached_bottom: bool,
+    /// Transient height from the previous draw. Used to detect when a transient
+    /// overlay (selection popup, autocomplete, dialog) is dismissed, so we don't
+    /// re-pin the viewport to screen bottom and destroy valid scrollback content.
+    prev_transient_height: u16,
 }
 
 impl TerminalManager<CrosstermBackend<std::io::Stdout>> {
@@ -95,6 +99,7 @@ impl TerminalManager<CrosstermBackend<std::io::Stdout>> {
             pending_history: Vec::new(),
             has_drawn: false,
             has_reached_bottom: false,
+            prev_transient_height: 0,
         })
     }
 }
@@ -120,6 +125,7 @@ where
         self.pending_history.clear();
         self.has_drawn = false;
         self.has_reached_bottom = false;
+        self.prev_transient_height = 0;
         let screen_size = self.terminal.size()?;
         self.terminal
             .set_viewport_area(Rect::new(0, 0, screen_size.width, 0));
@@ -284,27 +290,44 @@ where
                 }
             }
 
-            // 3a. Pin viewport to screen bottom once scrollback content
-            //     fills the screen (excluding transient_height for autocomplete).
-            //     When it no longer fills the screen, unpin so input floats
-            //     below the last scrollback message.
+            // 3x. Detect transient overlay dismissal.
+            // When transient_height drops from >0 to 0, a transient overlay
+            // (selection popup, autocomplete, dialog) just ended. During the
+            // overlay the viewport Y was set correctly relative to scrollback
+            // (step 3 overflow adjusted it). Don't re-pin to screen bottom
+            // now — that would call clear_for_viewport_change which destroys
+            // valid scrollback content, creating blank rows.
+            let transient_just_ended = self.prev_transient_height > 0 && transient_height == 0;
+            self.prev_transient_height = transient_height;
+            if transient_just_ended && self.has_reached_bottom {
+                self.has_reached_bottom = false;
+            }
+
+            // 3a. Pin viewport to scrollback bottom.
+            //
+            // The viewport naturally tracks the scrollback bottom: every
+            // insert_history call pushes the viewport down as content is
+            // written above it.
+            //
+            // Once scrollback fills the screen ("reached bottom"), pin the
+            // viewport to the screen bottom — at that point scrollback
+            // bottom ≡ screen bottom. The pin also handles viewport resizing
+            // when content height changes (e.g. stream tail ends while
+            // autocomplete is active), clearing stale cells below the new
+            // viewport area.
+            //
+            // Crucially, never *unpin* just because transient_height > 0
+            // (autocomplete, selection popups, dialogs). The original code
+            // did this, which caused the viewport to drift away from the
+            // scrollback bottom whenever a transient overlay appeared.
             if self.has_reached_bottom {
                 let cur = self.terminal.viewport_area;
-                let real_bottom = cur.bottom().saturating_sub(transient_height);
-                if real_bottom < size.height && transient_height > 0 {
-                    // Real content no longer fills the screen → unpin.
-                    self.has_reached_bottom = false;
-                } else {
-                    let pinned_y = size.height.saturating_sub(visible_height);
-                    if pinned_y != cur.y {
-                        // Viewport shifted down (e.g. stream tail removed):
-                        // clear stale content between old viewport top and
-                        // new viewport top so it doesn't persist on screen.
-                        let new_area = Rect::new(0, pinned_y, size.width, visible_height);
-                        clear_for_viewport_change(&mut self.terminal, new_area)?;
-                        self.terminal.set_viewport_area(new_area);
-                        self.terminal.invalidate_viewport();
-                    }
+                let pinned_y = size.height.saturating_sub(visible_height);
+                if pinned_y != cur.y {
+                    let new_area = Rect::new(0, pinned_y, size.width, visible_height);
+                    clear_for_viewport_change(&mut self.terminal, new_area)?;
+                    self.terminal.set_viewport_area(new_area);
+                    self.terminal.invalidate_viewport();
                 }
             } else {
                 let viewport_bottom = self.terminal.viewport_area.bottom();

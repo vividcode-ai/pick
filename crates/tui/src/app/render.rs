@@ -219,6 +219,19 @@ impl TuiApp {
             })
             .sum();
 
+        // When selection/tree/api-key popups replace the editor, their height
+        // is transient — it disappears on cancel. Exclude it from scrollback-
+        // bottom detection (draw()'s transient_height parameter) so the
+        // viewport doesn't get falsely pinned to screen bottom.
+        let transient_selection_lines = if matches!(
+            self.state,
+            AppState::Selecting | AppState::TreeSelecting | AppState::ApiKeyInput
+        ) {
+            editor_line_count
+        } else {
+            0
+        };
+
         let top_border = Line::from(Span::styled(
             "\u{2500}".repeat(width as usize),
             Style::default().add_modifier(Modifier::DIM),
@@ -227,7 +240,7 @@ impl TuiApp {
         manager
             .draw(
                 content_height,
-                self.autocomplete_space_lines + dialog_lines,
+                self.autocomplete_space_lines + dialog_lines + transient_selection_lines,
                 |frame: &mut crate::custom_terminal::Frame| {
                     let area = frame.area();
                     let chunks = Layout::default()
