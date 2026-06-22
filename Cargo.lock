@@ -2225,7 +2225,7 @@ dependencies = [
 
 [[package]]
 name = "pick-agent"
-version = "0.1.13"
+version = "0.1.14"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2253,7 +2253,7 @@ dependencies = [
 
 [[package]]
 name = "pick-ai"
-version = "0.1.13"
+version = "0.1.14"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2281,7 +2281,7 @@ dependencies = [
 
 [[package]]
 name = "pick-cli"
-version = "0.1.13"
+version = "0.1.14"
 dependencies = [
  "anyhow",
  "arboard",
@@ -2320,7 +2320,7 @@ dependencies = [
 
 [[package]]
 name = "pick-mcp"
-version = "0.1.13"
+version = "0.1.14"
 dependencies = [
  "anyhow",
  "futures",
@@ -2334,7 +2334,7 @@ dependencies = [
 
 [[package]]
 name = "pick-sandbox"
-version = "0.1.13"
+version = "0.1.14"
 dependencies = [
  "libc",
  "pick-agent",
@@ -2343,7 +2343,7 @@ dependencies = [
 
 [[package]]
 name = "pick-tui"
-version = "0.1.13"
+version = "0.1.14"
 dependencies = [
  "ansi-to-tui",
  "anyhow",
