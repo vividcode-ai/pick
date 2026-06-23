@@ -6,7 +6,13 @@ pub(crate) fn cleanup_tui_mode(ctx: &mut TuiContext) {
     print!("\x1b[?2004l");
     let _ = std::io::Write::flush(&mut std::io::stdout());
 
-    // Cleanup terminal manager first (restore cursor, clear overflow)
+    // Render one final frame with a compact viewport so the cursor
+    // lands right below the last content line (no blank gap).
+    ctx.tui.state = pick_tui::app::AppState::Input;
+    ctx.tui.has_ever_streamed = false;
+    let _ = ctx.tui.render_with_terminal(&mut ctx.terminal_manager);
+
+    // Cleanup terminal manager (restore cursor, clear overflow)
     let _ = ctx.terminal_manager.cleanup();
 
     // TUI app cleanup (disable raw mode, print newline)

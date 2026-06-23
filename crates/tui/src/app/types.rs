@@ -24,6 +24,9 @@ pub enum TuiAction {
     /// Queue a message to be injected into the running agent's steering queue
     /// (user typed while the agent was streaming)
     QueueMessage(String),
+    /// Queue a message to be injected into the running agent's follow-up queue
+    /// (user typed Alt+Enter while the agent was streaming; processed after agent stops)
+    QueueFollowUp(String),
 }
 
 /// App state
@@ -128,6 +131,9 @@ pub struct TuiApp {
     pub status_text: Option<String>,
     pub status_frame: usize,
     pub agent_start_time: Option<std::time::Instant>,
+    /// Set to true once streaming has ever started. Prevents the viewport
+    /// from collapsing on Streaming→Input state transitions.
+    pub has_ever_streamed: bool,
     pub(crate) folder: String,
     pub(crate) last_escape_time: Option<std::time::Instant>,
     pub paste_burst: PasteBurst,
@@ -140,6 +146,9 @@ pub struct TuiApp {
     /// Messages queued by user while agent is running, waiting to be processed.
     /// Shown above the editor as pending; consumed one-at-a-time by steer_queue.
     pub pending_user_messages: std::collections::VecDeque<String>,
+    /// Messages queued via Alt+Enter while agent is running, waiting to be processed
+    /// as follow-up (consumed after agent naturally stops, by follow_up_queue).
+    pub pending_follow_up_messages: std::collections::VecDeque<String>,
     pub update_prompt: Option<crate::components::UpdatePromptState>,
     pub todo_items: Vec<serde_json::Value>,
     pub todo_scroll_offset: usize,

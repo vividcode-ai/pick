@@ -163,6 +163,8 @@ pub(crate) fn build_agent_config(
         let goal_manager = ctx.session_manager.goal_manager();
         // Capture follow-up queue for queue draining
         let follow_up_queue = ctx.follow_up_queue.clone();
+        // Capture cmd_tx for real-time notification when queued messages are consumed
+        let follow_up_cmd_tx = cmd_tx.clone();
         move |_result: &pick_agent::core::agent_loop::AgentRunResult| {
             let mut msgs = Vec::new();
 
@@ -202,10 +204,30 @@ pub(crate) fn build_agent_config(
                 }
             }
 
-            // Drain from follow-up queue
+            // Drain from follow-up queue and notify TUI about consumed messages
             if let Ok(mut queue) = follow_up_queue.lock() {
                 let queued = queue.drain();
                 if !queued.is_empty() {
+                    // Notify TUI about each consumed message for real-time rendering
+                    for msg in &queued {
+                        if let Message::User(u) = msg {
+                            let text: String = u
+                                .content
+                                .iter()
+                                .filter_map(|b| {
+                                    if let ContentBlock::Text(t) = b {
+                                        Some(t.text.clone())
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .collect();
+                            if !text.is_empty() {
+                                let _ = follow_up_cmd_tx
+                                    .send(super::types::TuiCommand::FollowUpMessageConsumed(text));
+                            }
+                        }
+                    }
                     msgs.extend(queued);
                 }
             }

@@ -59,6 +59,10 @@ pub(crate) enum TuiCommand {
     /// A queued steering message has been consumed by the agent and should
     /// be moved from "pending" to a rendered user message bubble.
     SteeringMessageConsumed(String),
+    /// A queued follow-up message has been consumed by the agent (after it
+    /// naturally stopped) and should be moved from "follow-up pending" to
+    /// a rendered user message bubble.
+    FollowUpMessageConsumed(String),
 }
 
 /// TUI approval hook that shows a permission dialog in the TUI viewport

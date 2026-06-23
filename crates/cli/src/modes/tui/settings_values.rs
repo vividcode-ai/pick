@@ -1,5 +1,7 @@
 use std::sync::atomic::Ordering;
 
+use pick_agent::core::message_queue::QueueMode;
+
 use super::context::TuiContext;
 use crate::core::settings::{
     CompactionSettings, ImageSettings, Settings, SettingsManager, TerminalSettings,
@@ -347,10 +349,16 @@ pub(crate) async fn apply_steering_mode(sm: &mut SettingsManager, ctx: &mut TuiC
     let mut update = Settings::default();
     update.steering_mode = Some(mode.to_string());
     match sm.set_global(update) {
-        Ok(()) => ctx
-            .tui
-            .chat
-            .add_system_message(&format!("Steering mode set to \x1b[1m{}\x1b[0m.", mode)),
+        Ok(()) => {
+            let queue_mode = match mode {
+                "all" => QueueMode::All,
+                _ => QueueMode::OneAtATime,
+            };
+            ctx.steer_queue.lock().unwrap().set_mode(queue_mode);
+            ctx.tui
+                .chat
+                .add_system_message(&format!("Steering mode set to \x1b[1m{}\x1b[0m.", mode));
+        }
         Err(e) => ctx
             .tui
             .show_error(&format!("Failed to save setting: {}", e)),
@@ -366,10 +374,16 @@ pub(crate) async fn apply_follow_up_mode(
     let mut update = Settings::default();
     update.follow_up_mode = Some(mode.to_string());
     match sm.set_global(update) {
-        Ok(()) => ctx
-            .tui
-            .chat
-            .add_system_message(&format!("Follow-up mode set to \x1b[1m{}\x1b[0m.", mode)),
+        Ok(()) => {
+            let queue_mode = match mode {
+                "all" => QueueMode::All,
+                _ => QueueMode::OneAtATime,
+            };
+            ctx.follow_up_queue.lock().unwrap().set_mode(queue_mode);
+            ctx.tui
+                .chat
+                .add_system_message(&format!("Follow-up mode set to \x1b[1m{}\x1b[0m.", mode));
+        }
         Err(e) => ctx
             .tui
             .show_error(&format!("Failed to save setting: {}", e)),

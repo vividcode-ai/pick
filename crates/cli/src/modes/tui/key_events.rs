@@ -191,6 +191,17 @@ pub(crate) fn drain_key_events(
                     }
                     continue;
                 }
+                Ok(crossterm::event::Event::Key(key))
+                    if key.kind == KeyEventKind::Press
+                        && key.modifiers.intersects(KeyModifiers::ALT) =>
+                {
+                    tui.finalize_paste_accumulator(now);
+                    if let Some(a) = tui.handle_key(key.code, key.modifiers) {
+                        action = Some(a);
+                        had_action = true;
+                    }
+                    continue;
+                }
                 Ok(crossterm::event::Event::Key(_)) => {
                     continue;
                 }
@@ -285,7 +296,28 @@ pub(crate) fn drain_key_events_during_agent(
                         if matches!(a, TuiAction::Quit) {
                             action = Some(a);
                             had_action = true;
-                        } else if matches!(a, TuiAction::QueueMessage(_)) {
+                        } else if matches!(
+                            a,
+                            TuiAction::QueueMessage(_) | TuiAction::QueueFollowUp(_)
+                        ) {
+                            action = Some(a);
+                            had_action = true;
+                        }
+                    }
+                    continue;
+                }
+                Ok(crossterm::event::Event::Key(key))
+                    if key.kind == KeyEventKind::Press
+                        && key.modifiers.intersects(KeyModifiers::ALT) =>
+                {
+                    tui.finalize_paste_accumulator(now);
+                    if let Some(a) = tui.handle_key(key.code, key.modifiers) {
+                        if matches!(
+                            a,
+                            TuiAction::Quit
+                                | TuiAction::QueueMessage(_)
+                                | TuiAction::QueueFollowUp(_)
+                        ) {
                             action = Some(a);
                             had_action = true;
                         }

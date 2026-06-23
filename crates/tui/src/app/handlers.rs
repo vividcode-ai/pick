@@ -78,6 +78,7 @@ impl TuiApp {
             status_text: None,
             status_frame: 0,
             agent_start_time: None,
+            has_ever_streamed: false,
             folder: folder.to_string(),
             last_escape_time: None,
             paste_burst: crate::paste_burst::PasteBurst::new(),
@@ -87,6 +88,7 @@ impl TuiApp {
             question_dialog: None,
             question_response_tx: None,
             pending_user_messages: std::collections::VecDeque::new(),
+            pending_follow_up_messages: std::collections::VecDeque::new(),
             update_prompt: None,
             todo_items: Vec::new(),
             todo_scroll_offset: 0,
@@ -154,6 +156,7 @@ impl TuiApp {
             status_text: None,
             status_frame: 0,
             agent_start_time: None,
+            has_ever_streamed: false,
             folder: folder.to_string(),
             last_escape_time: None,
             paste_burst: crate::paste_burst::PasteBurst::new(),
@@ -163,6 +166,7 @@ impl TuiApp {
             question_dialog: None,
             question_response_tx: None,
             pending_user_messages: std::collections::VecDeque::new(),
+            pending_follow_up_messages: std::collections::VecDeque::new(),
             update_prompt: None,
             todo_items: Vec::new(),
             todo_scroll_offset: 0,
@@ -224,6 +228,7 @@ impl TuiApp {
         self.cached_lines_entry_count = 0;
         self.cached_lines_committed = 0;
         self.last_render_width = 0;
+        self.has_ever_streamed = false;
     }
 
     /// Start an interactive selection dialog
@@ -900,6 +905,9 @@ impl TuiApp {
                     let text = self.editor.text().to_string();
                     self.editor.clear();
                     if !text.trim().is_empty() {
+                        if modifiers == KeyModifiers::ALT {
+                            return Some(TuiAction::QueueFollowUp(text));
+                        }
                         return Some(TuiAction::QueueMessage(text));
                     }
                     return None;

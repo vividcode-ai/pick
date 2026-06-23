@@ -106,6 +106,17 @@ pub(crate) fn apply_tui_command(tui: &mut TuiApp, cmd: TuiCommand) {
             }
             tui.chat.add_user_message(&text);
         }
+        TuiCommand::FollowUpMessageConsumed(text) => {
+            // A queued follow-up message was consumed by the agent — move from pending to chat
+            if let Some(pos) = tui
+                .pending_follow_up_messages
+                .iter()
+                .position(|m| m == &text)
+            {
+                tui.pending_follow_up_messages.remove(pos);
+            }
+            tui.chat.add_user_message(&text);
+        }
     }
 }
 

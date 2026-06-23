@@ -40,6 +40,9 @@ pub(crate) async fn dispatch_action(ctx: &mut TuiContext, action: TuiAction) -> 
         TuiAction::QueueMessage(text) => {
             handle_queue_message(ctx, text).await;
         }
+        TuiAction::QueueFollowUp(text) => {
+            handle_follow_up_message(ctx, text).await;
+        }
         TuiAction::UpdateResponse(update_now) => {
             if update_now {
                 if let Some(action) = crate::core::update_action::get_update_action() {
@@ -76,6 +79,7 @@ async fn handle_interrupt(ctx: &mut TuiContext) {
     if let Ok(mut queue) = ctx.follow_up_queue.lock() {
         queue.clear();
     }
+    ctx.tui.pending_follow_up_messages.clear();
 
     ctx.agent_cancel_requested.store(true, Ordering::Relaxed);
     if let Some(ref cancel_tx) = ctx.agent_cancel_tx {
@@ -126,6 +130,17 @@ pub(crate) async fn handle_agent_finished(
                             .unwrap_or(false)
                     {
                         ctx.tui.pending_user_messages.pop_front();
+                    }
+                    // Also reconcile pending_follow_up_messages
+                    if !text.is_empty()
+                        && ctx
+                            .tui
+                            .pending_follow_up_messages
+                            .front()
+                            .map(|f| f == &text)
+                            .unwrap_or(false)
+                    {
+                        ctx.tui.pending_follow_up_messages.pop_front();
                     }
                 }
             }
@@ -178,6 +193,24 @@ async fn handle_queue_message(ctx: &mut TuiContext, text: String) {
         let _ = ctx.cmd_tx.send(TuiCommand::QueueUpdate {
             steer_len: len,
             follow_up_len: ctx.follow_up_queue.lock().map(|q| q.len()).unwrap_or(0),
+            next_turn_len: ctx.next_turn_queue.lock().map(|q| q.len()).unwrap_or(0),
+        });
+    }
+}
+
+/// Handle QueueFollowUp action — enqueue user message into follow-up queue
+async fn handle_follow_up_message(ctx: &mut TuiContext, text: String) {
+    if let Ok(mut queue) = ctx.follow_up_queue.lock() {
+        queue.enqueue(Message::User(UserMessage::text(&text)));
+        // Track in pending_follow_up_messages for above-editor rendering
+        if !ctx.tui.pending_follow_up_messages.contains(&text) {
+            ctx.tui.pending_follow_up_messages.push_back(text.clone());
+        }
+        let len = queue.len();
+        // Send QueueUpdate for UI feedback
+        let _ = ctx.cmd_tx.send(TuiCommand::QueueUpdate {
+            steer_len: ctx.steer_queue.lock().map(|q| q.len()).unwrap_or(0),
+            follow_up_len: len,
             next_turn_len: ctx.next_turn_queue.lock().map(|q| q.len()).unwrap_or(0),
         });
     }

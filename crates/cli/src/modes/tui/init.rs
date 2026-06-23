@@ -260,6 +260,14 @@ pub(crate) async fn init_tui_mode(
     let hide_thinking = Arc::new(AtomicBool::new(settings.get_hide_thinking_block()));
     let show_images = Arc::new(AtomicBool::new(settings.get_show_images()));
     let block_images = Arc::new(AtomicBool::new(settings.get_block_images()));
+    let steer_mode = match settings.get_steering_mode() {
+        "all" => QueueMode::All,
+        _ => QueueMode::OneAtATime,
+    };
+    let follow_up_mode = match settings.get_follow_up_mode() {
+        "all" => QueueMode::All,
+        _ => QueueMode::OneAtATime,
+    };
 
     // Build on_event callback
     let on_event = event_handler::create_on_event(
@@ -311,11 +319,11 @@ pub(crate) async fn init_tui_mode(
         pending_command: None,
         scoped_models: Vec::new(),
         was_interrupted: Arc::new(AtomicBool::new(false)),
-        steer_queue: Arc::new(Mutex::new(PendingMessageQueue::new(QueueMode::OneAtATime))),
-        follow_up_queue: Arc::new(Mutex::new(PendingMessageQueue::new(QueueMode::OneAtATime))),
+        steer_queue: Arc::new(Mutex::new(PendingMessageQueue::new(steer_mode))),
+        follow_up_queue: Arc::new(Mutex::new(PendingMessageQueue::new(follow_up_mode))),
         next_turn_queue: Arc::new(Mutex::new(PendingMessageQueue::new(QueueMode::All))),
-        steer_queue_mode: QueueMode::OneAtATime,
-        follow_up_queue_mode: QueueMode::OneAtATime,
+        steer_queue_mode: steer_mode,
+        follow_up_queue_mode: follow_up_mode,
         agent_is_running: false,
         agent_cancel_tx: None,
         agent_cancel_requested: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),

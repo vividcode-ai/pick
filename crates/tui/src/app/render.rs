@@ -98,26 +98,23 @@ impl TuiApp {
         );
 
         let entry_count = self.chat.entry_count();
-        if entry_count > self.cached_lines_entry_count || self.chat.cache_dirty {
-            let all_lines = self.chat.render_lines(width as usize, usize::MAX);
-            if entry_count > self.cached_lines_entry_count {
-                let start = self.cached_lines_committed.min(all_lines.len());
-                let new_lines = all_lines[start..].to_vec();
-                if !new_lines.is_empty() {
-                    manager.insert_history(new_lines);
-                }
-                self.cached_lines_committed = all_lines.len();
-            } else {
-                let new_len = all_lines.len();
-                if new_len > self.cached_lines_committed {
-                    let start = self.cached_lines_committed.min(new_len);
-                    let new_lines = all_lines[start..].to_vec();
-                    manager.insert_history(new_lines);
-                }
-                self.cached_lines_committed = new_len;
-            }
-            self.cached_lines_entry_count = entry_count;
+        if self.chat.cache_dirty {
+            // cache_dirty means in-place content changes (tool exec status,
+            // stream commit, etc.). These update the rendered line cache in
+            // ChatView but don't create new entries — do NOT reset the
+            // scrollback commit pointer, which would re-insert ALL lines
+            // (including the startup header) and cause visual duplicates.
             self.chat.cache_dirty = false;
+        }
+        if entry_count > self.cached_lines_entry_count {
+            let all_lines = self.chat.render_lines(width as usize, usize::MAX);
+            let start = self.cached_lines_committed.min(all_lines.len());
+            let new_lines = all_lines[start..].to_vec();
+            if !new_lines.is_empty() {
+                manager.insert_history(new_lines);
+            }
+            self.cached_lines_committed = all_lines.len();
+            self.cached_lines_entry_count = entry_count;
         }
 
         let stream_lines = if self.state == AppState::Streaming {
@@ -134,11 +131,7 @@ impl TuiApp {
             self.autocomplete_space_lines = 0;
         }
         let has_pending = !self.pending_user_messages.is_empty();
-        let pending_lines: u16 = if has_pending {
-            self.pending_user_messages.len() as u16
-        } else {
-            0
-        };
+        let has_pending_follow_up = !self.pending_follow_up_messages.is_empty();
 
         let has_todo = !self.todo_items.is_empty()
             && self.todo_items.iter().any(|t| {
@@ -157,7 +150,6 @@ impl TuiApp {
             + 2
             + if has_status { 3 } else { 0 }
             + if has_todo { todo_lines + 1 } else { 0 }
-            + if has_pending { pending_lines + 2 } else { 0 }
             + self.autocomplete_space_lines
             + dialog_lines;
         let stream_extra = if stream_chat_len > 0 { 2 } else { 0 };
@@ -182,13 +174,6 @@ impl TuiApp {
             }
             constraints.push(Constraint::Length(1));
         }
-        if has_pending {
-            constraints.push(Constraint::Length(1)); // pending header line
-            for _ in 0..pending_lines {
-                constraints.push(Constraint::Length(1));
-            }
-            constraints.push(Constraint::Length(1)); // separator
-        }
         // Editor area: border + editor + border + status separator + context separator
         constraints.push(Constraint::Length(1));
         constraints.push(Constraint::Length(editor_line_count));
@@ -202,9 +187,11 @@ impl TuiApp {
             constraints.push(Constraint::Length(dialog_lines));
         }
 
-        // Content height fills the entire terminal during streaming so the
-        // viewport always covers the full screen. The leftover area after
-        // Layout::split() is simply unallocated — ratatui's frame clears it.
+        // When streaming, fill the full terminal height so stream content
+        // fills the visible area. Otherwise use the constraints sum so the
+        // viewport stays compact at the scrollback tail — insert_history
+        // pushes it down as content grows, and TerminalManager pins to
+        // screen bottom only when content exceeds terminal height.
         let content_height = if has_stream {
             height
         } else {
@@ -245,6 +232,21 @@ impl TuiApp {
                         .direction(Direction::Vertical)
                         .constraints(constraints.clone())
                         .split(area);
+
+                    // Clear only the unallocated gap below the last constraint
+                    // chunk. Allocated areas are rendered on top — clearing
+                    // them too would fill the terminal with spaces that
+                    // persist as blank rows on exit.
+                    if let Some(last) = chunks.last() {
+                        let gap_y = last.y + last.height;
+                        let gap_bottom = area.y + area.height;
+                        if gap_y < gap_bottom {
+                            frame.render_widget_ref(
+                                &Clear,
+                                Rect::new(0, gap_y, width, gap_bottom - gap_y),
+                            );
+                        }
+                    }
 
                     let mut i = 0;
 
@@ -314,39 +316,7 @@ impl TuiApp {
                         i += 1;
                     }
 
-                    if has_pending {
-                        let pending_label =
-                            format!("── {} pending ──", self.pending_user_messages.len());
-                        render_at!(
-                            i,
-                            Line::from(Span::styled(
-                                &pending_label,
-                                Style::default().add_modifier(Modifier::DIM),
-                            ))
-                        );
-                        i += 1;
-
-                        let pending_bg = Style::default().bg(Color::Rgb(45, 46, 60));
-                        for msg in self.pending_user_messages.iter() {
-                            if i >= chunks.len() {
-                                break;
-                            }
-                            let truncated = if msg.len() > (width as usize).saturating_sub(4) {
-                                format!("{}...", &msg[..(width as usize).saturating_sub(7)])
-                            } else {
-                                msg.clone()
-                            };
-                            let padded = format!("  {}", truncated);
-                            frame.render_widget_ref(
-                                &Line::from(Span::styled(padded, pending_bg)),
-                                chunks[i],
-                            );
-                            i += 1;
-                        }
-                        render_at!(i, Line::from(""));
-                        i += 1;
-                    }
-
+                    let editor_border_idx = i;
                     render_at!(i, top_border.clone());
                     i += 1;
 
@@ -446,6 +416,68 @@ impl TuiApp {
                         let overlay_area = Rect::new(0, overlay_y, width, dialog_lines);
                         frame.render_widget_ref(
                             &Paragraph::new(ratatui::text::Text::from(dialog_content)),
+                            overlay_area,
+                        );
+                    }
+
+                    // Pending messages rendered as overlay above the editor's
+                    // top border, not as layout constraints. This prevents
+                    // layout shift when pending messages appear/disappear.
+                    if (has_pending || has_pending_follow_up) && editor_border_idx < chunks.len() {
+                        let pending_count = self.pending_user_messages.len();
+                        let follow_up_count = self.pending_follow_up_messages.len();
+                        let total_pending_lines = pending_count + follow_up_count;
+                        let pending_total = 2u16 + total_pending_lines as u16;
+                        let border_chunk = &chunks[editor_border_idx];
+                        let overlay_y = border_chunk.y.saturating_sub(pending_total);
+                        let overlay_area = Rect::new(0, overlay_y, width, pending_total);
+
+                        let dim = Style::default().add_modifier(Modifier::DIM);
+                        let pending_bg = Style::default().bg(Color::Rgb(45, 46, 60));
+                        let mut overlay_lines: Vec<Line<'static>> = Vec::new();
+
+                        // Steer pending messages
+                        if has_pending {
+                            overlay_lines.push(Line::from(Span::styled(
+                                format!("── {} pending ──", pending_count),
+                                dim,
+                            )));
+                            for msg in self.pending_user_messages.iter() {
+                                let truncated = if msg.len() > (width as usize).saturating_sub(4) {
+                                    format!("{}...", &msg[..(width as usize).saturating_sub(7)])
+                                } else {
+                                    msg.clone()
+                                };
+                                overlay_lines.push(Line::from(Span::styled(
+                                    format!("  {}", truncated),
+                                    pending_bg,
+                                )));
+                            }
+                        }
+
+                        // Follow-up pending messages
+                        if has_pending_follow_up {
+                            overlay_lines.push(Line::from(Span::styled(
+                                format!("── {} follow-up ──", follow_up_count),
+                                dim,
+                            )));
+                            for msg in self.pending_follow_up_messages.iter() {
+                                let truncated = if msg.len() > (width as usize).saturating_sub(4) {
+                                    format!("{}...", &msg[..(width as usize).saturating_sub(7)])
+                                } else {
+                                    msg.clone()
+                                };
+                                overlay_lines.push(Line::from(Span::styled(
+                                    format!("  {}", truncated),
+                                    pending_bg,
+                                )));
+                            }
+                        }
+
+                        overlay_lines.push(Line::from(""));
+
+                        frame.render_widget_ref(
+                            &Paragraph::new(ratatui::text::Text::from(overlay_lines)),
                             overlay_area,
                         );
                     }
@@ -1061,6 +1093,7 @@ impl TuiApp {
 
     /// Append text to the ongoing assistant message
     pub fn stream_content(&mut self, text: &str) {
+        self.has_ever_streamed = true;
         self.chat.stream_assistant_content(text);
         if self.state != AppState::Streaming {
             self.state = AppState::Streaming;
@@ -1070,6 +1103,7 @@ impl TuiApp {
 
     /// Append content after the current assistant content
     pub fn append_content(&mut self, text: &str) {
+        self.has_ever_streamed = true;
         self.chat.append_assistant_content(text);
         if self.state != AppState::Streaming {
             self.state = AppState::Streaming;
