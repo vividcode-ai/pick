@@ -1,11 +1,9 @@
 use std::sync::atomic::Ordering;
-use std::time::Instant;
 
 use pick_agent::core::agent_loop::AgentRunResult;
 use pick_agent::session::SessionEntry;
-use pick_ai::types::{Message, UserMessage};
+use pick_ai::types::{ContentBlock, Message, UserMessage};
 use pick_tui::app::TuiAction;
-use tokio::sync::mpsc;
 
 use crate::core::updates;
 
@@ -15,20 +13,14 @@ use super::actions_session;
 use super::actions_settings;
 use super::agent_exec;
 use super::cmd_dispatch;
-use super::commands;
 use super::context::TuiContext;
 use super::init;
-use super::key_events;
 use super::tree_summarize;
 use super::types::*;
 
 /// Dispatch a TuiAction to the appropriate handler
-pub(crate) async fn dispatch_action(
-    ctx: &mut TuiContext,
-    cmd_rx: &mut mpsc::UnboundedReceiver<TuiCommand>,
-    evt_rx: &mut mpsc::UnboundedReceiver<crossterm::event::Event>,
-    action: TuiAction,
-) -> bool {
+/// Returns true if the TUI should quit.
+pub(crate) async fn dispatch_action(ctx: &mut TuiContext, action: TuiAction) -> bool {
     match action {
         TuiAction::Quit => return true,
         TuiAction::Interrupt => handle_interrupt(ctx).await,
@@ -43,7 +35,10 @@ pub(crate) async fn dispatch_action(
             handle_selection_result(ctx, &val).await;
         }
         TuiAction::Submit(text) => {
-            handle_submit(ctx, cmd_rx, evt_rx, text).await;
+            handle_submit(ctx, text).await;
+        }
+        TuiAction::QueueMessage(text) => {
+            handle_queue_message(ctx, text).await;
         }
         TuiAction::UpdateResponse(update_now) => {
             if update_now {
@@ -60,10 +55,132 @@ pub(crate) async fn dispatch_action(
     false
 }
 
-/// Handle Interrupt action
+/// Handle Interrupt action — cooperative cancellation for running agent
 async fn handle_interrupt(ctx: &mut TuiContext) {
-    ctx.tui.chat.add_system_message("Interrupted.");
+    if !ctx.agent_is_running {
+        return;
+    }
+
+    if ctx.agent_cancel_requested.load(Ordering::Relaxed) {
+        // Second Esc: hard abort via AbortHandle
+        if let Some(ref handle) = ctx.agent_abort_handle {
+            handle.abort();
+        }
+        return;
+    }
+
+    // First Esc: cooperative cancellation
+    if let Ok(mut queue) = ctx.steer_queue.lock() {
+        queue.clear();
+    }
+    if let Ok(mut queue) = ctx.follow_up_queue.lock() {
+        queue.clear();
+    }
+
+    ctx.agent_cancel_requested.store(true, Ordering::Relaxed);
+    if let Some(ref cancel_tx) = ctx.agent_cancel_tx {
+        let _ = cancel_tx.send(true);
+    }
+}
+
+/// Post-processing after agent finishes
+pub(crate) async fn handle_agent_finished(
+    ctx: &mut TuiContext,
+    result: Result<AgentRunResult, String>,
+    prev_len: usize,
+    cancel_requested: bool,
+) {
+    ctx.agent_is_running = false;
+    ctx.agent_cancel_tx = None;
+    ctx.agent_abort_handle = None;
+
+    ctx.tui.chat.discard_active_stream();
+
+    match result {
+        Ok(agent_result) => {
+            // Persist all new messages from this run
+            for msg in &agent_result.messages[prev_len..] {
+                if let Err(e) = ctx.session_manager.append(SessionEntry::from(msg)).await {
+                    ctx.tui
+                        .show_error(&format!("Session persist failed: {}", e));
+                }
+                // Reconcile pending_user_messages
+                if let Message::User(u) = msg {
+                    let text: String = u
+                        .content
+                        .iter()
+                        .filter_map(|b| {
+                            if let ContentBlock::Text(t) = b {
+                                Some(t.text.clone())
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+                    if !text.is_empty()
+                        && ctx
+                            .tui
+                            .pending_user_messages
+                            .front()
+                            .map(|f| f == &text)
+                            .unwrap_or(false)
+                    {
+                        ctx.tui.pending_user_messages.pop_front();
+                    }
+                }
+            }
+            ctx.all_messages = agent_result.messages;
+
+            // Show usage in chat (reads agent_start_time, so do this before stopping timer)
+            ctx.tui
+                .show_usage(agent_result.usage.input, agent_result.usage.output);
+
+            // Stop timer
+            ctx.tui.stop_agent_timer();
+            let pct = (agent_result.usage.total_tokens as f64) / (ctx.model.context_window as f64)
+                * 100.0;
+            ctx.tui
+                .set_context_info(Some(pct), ctx.model.context_window);
+
+            // Clear status — usage is already shown in chat via show_usage
+            ctx.tui.set_status(None);
+
+            // Render usage status before auto-compaction (which may take a while)
+            let _ = ctx.tui.render_with_terminal(&mut ctx.terminal_manager);
+
+            agent_exec::auto_compact_session(ctx).await;
+        }
+        Err(e) => {
+            ctx.tui.set_status(None);
+            let _ = ctx.tui.render_with_terminal(&mut ctx.terminal_manager);
+            ctx.tui.show_error(&e);
+        }
+    }
+
+    if cancel_requested {
+        ctx.was_interrupted.store(true, Ordering::Relaxed);
+        ctx.tui.chat.add_system_message("Interrupted.");
+    }
+
     ctx.tui.finalize_turn();
+}
+
+/// Handle QueueMessage action — enqueue user message into steering queue
+async fn handle_queue_message(ctx: &mut TuiContext, text: String) {
+    if let Ok(mut queue) = ctx.steer_queue.lock() {
+        queue.enqueue(Message::User(UserMessage::text(&text)));
+        // Track in pending_user_messages for above-editor rendering
+        if !ctx.tui.pending_user_messages.contains(&text) {
+            ctx.tui.pending_user_messages.push_back(text.clone());
+        }
+        let len = queue.len();
+        // Send QueueUpdate for UI feedback
+        let _ = ctx.cmd_tx.send(TuiCommand::QueueUpdate {
+            steer_len: len,
+            follow_up_len: ctx.follow_up_queue.lock().map(|q| q.len()).unwrap_or(0),
+            next_turn_len: ctx.next_turn_queue.lock().map(|q| q.len()).unwrap_or(0),
+        });
+    }
 }
 
 /// Handle SelectionResult by dispatching to the correct handler
@@ -224,13 +341,10 @@ async fn handle_settings_models_selection(ctx: &mut TuiContext, val: &str) {
     }
 }
 
-/// Handle Submit action - the main message submission flow
-async fn handle_submit(
-    ctx: &mut TuiContext,
-    cmd_rx: &mut mpsc::UnboundedReceiver<TuiCommand>,
-    evt_rx: &mut mpsc::UnboundedReceiver<crossterm::event::Event>,
-    user_text: String,
-) {
+/// Handle Submit action — the main message submission flow (flat EventStream model).
+/// Sets up user message, spawns agent task + watcher, and returns immediately.
+/// The main loop handles all events (agent streaming, keyboard, lifecycle) through cmd_rx.
+async fn handle_submit(ctx: &mut TuiContext, user_text: String) {
     // Clear stale paste accumulator before processing input
     ctx.tui.paste_accumulator.clear();
     ctx.tui.last_paste_time = None;
@@ -270,19 +384,26 @@ async fn handle_submit(
         }
     }
 
-    // ---- Run the agent ----
+    // ---- Run the agent (flat EventStream model) ----
     ctx.tui.start_agent_timer();
     let prev_len = ctx.all_messages.len();
 
     if !skip_user_message {
-        let from_flush = ctx.tui.pending_from_flush;
+        // Drain nextTurnQueue (messages survive abort, prepended to next user prompt)
+        if let Ok(mut queue) = ctx.next_turn_queue.lock() {
+            let next_msgs = queue.drain();
+            if !next_msgs.is_empty() {
+                ctx.tui.chat.add_system_message(&format!(
+                    "📤 {} queued message(s) delivered",
+                    next_msgs.len()
+                ));
+                ctx.all_messages.extend(next_msgs);
+            }
+        }
+
         ctx.all_messages
             .push(Message::User(UserMessage::text(&user_text)));
-        if from_flush {
-            ctx.tui.pending_from_flush = false;
-            ctx.tui.pending_user_messages.clear();
-            ctx.tui.pending_submitted_count = 0;
-        } else if !is_skill_expanded {
+        if !is_skill_expanded {
             ctx.tui.chat.add_user_message(&user_text);
         }
     }
@@ -325,13 +446,19 @@ async fn handle_submit(
         );
     }
 
+    // Update UI: show "Working..." status
     let _ = ctx.tui.render_with_terminal(&mut ctx.terminal_manager);
     ctx.tui.set_status(Some("Working..."));
     let _ = ctx.tui.render_with_terminal(&mut ctx.terminal_manager);
 
     // Refresh tools and build agent config
     ctx.tools = init::refilter_tools(&ctx.all_tools, &ctx.agent_mode, &ctx.session_manager);
-    let config = agent_exec::build_agent_config(ctx, ctx.cmd_tx.clone());
+    let mut config = agent_exec::build_agent_config(ctx, ctx.cmd_tx.clone());
+
+    // Create cooperative cancellation channel
+    let (cancel_tx, _cancel_rx) = tokio::sync::watch::channel(false);
+    let cancel_tx = std::sync::Arc::new(cancel_tx);
+    config.cancel_signal_tx = Some(cancel_tx.clone());
 
     // Register TUI approval hook
     let approval_hook = super::types::TuiApprovalHook {
@@ -341,7 +468,9 @@ async fn handle_submit(
         .register_permission_hook(std::sync::Arc::new(approval_hook));
 
     let msgs = ctx.all_messages.clone();
-    let mut agent_handle = tokio::spawn(async move {
+
+    // Spawn agent task
+    let agent_handle = tokio::spawn(async move {
         crate::core::agent_session::run_agent_loop_with_retry_and_continuation(
             config,
             msgs,
@@ -351,135 +480,36 @@ async fn handle_submit(
         .await
     });
 
-    // Clear paste state before agent loop to avoid stale accumulator content
+    // Store abort handle for second-Esc hard abort
+    let abort_handle = agent_handle.abort_handle();
+    ctx.agent_abort_handle = Some(abort_handle);
+
+    // Wire cancellation state into context (shared with main loop via AgentFinished)
+    ctx.agent_is_running = true;
+    ctx.agent_cancel_requested.store(false, Ordering::Relaxed);
+    ctx.agent_cancel_tx = Some(cancel_tx);
+    ctx.agent_start_message_count = prev_len;
+
+    // Clear paste state
     ctx.tui.paste_accumulator.clear();
     ctx.tui.last_paste_time = None;
 
-    // Process events while agent runs
-    let mut should_quit = false;
-    let mut agent_result: Option<Result<AgentRunResult, String>> = None;
-    let mut tick_interval = tokio::time::interval(std::time::Duration::from_millis(100));
-    let mut needs_render = true;
+    // Spawn watcher task: awaits agent completion and sends AgentFinished through cmd_rx.
+    // This is the EventStream completion signal — the main loop handles it like
+    // any other TuiCommand event, keeping the loop flat/non-nested.
+    let cmd_tx_spawn = ctx.cmd_tx.clone();
+    let cancel_flag = ctx.agent_cancel_requested.clone();
+    tokio::spawn(async move {
+        let result = match agent_handle.await {
+            Ok(r) => r,
+            Err(join_err) => Err(format!("Agent task failed: {}", join_err)),
+        };
+        let _ = cmd_tx_spawn.send(TuiCommand::AgentFinished {
+            result,
+            prev_len,
+            cancel_requested: cancel_flag.load(Ordering::Relaxed),
+        });
+    });
 
-    loop {
-        if needs_render {
-            if ctx
-                .tui
-                .render_with_terminal(&mut ctx.terminal_manager)
-                .is_err()
-            {
-                should_quit = true;
-                agent_handle.abort();
-                break;
-            }
-            needs_render = false;
-        }
-
-        tokio::select! {
-            cmd = cmd_rx.recv() => {
-                match cmd {
-                    Some(cmd) => {
-                        commands::apply_tui_command(&mut ctx.tui, cmd);
-                        commands::drain_commands(&mut ctx.tui, cmd_rx);
-                    }
-                    None => {
-                        should_quit = true;
-                        agent_handle.abort();
-                        break;
-                    }
-                }
-                needs_render = true;
-            }
-
-            _ = tokio::signal::ctrl_c() => {
-                should_quit = true;
-                agent_handle.abort();
-                break;
-            }
-
-            evt = evt_rx.recv() => {
-                match evt {
-                    Some(crossterm::event::Event::Key(key)) => {
-                        let now = Instant::now();
-                        if let Some(TuiAction::Quit) = key_events::process_key_event_during_agent(&mut ctx.tui, key, now) {
-                            should_quit = true;
-                            agent_handle.abort();
-                            break;
-                        }
-                        // Drain remaining events
-                        let mut abort = false;
-                        key_events::drain_key_events_during_agent(&mut ctx.tui, evt_rx, now, &mut abort);
-                        if abort {
-                            agent_handle.abort();
-                            break;
-                        }
-                        needs_render = true;
-                    }
-                    Some(crossterm::event::Event::Resize(_, _)) => { needs_render = true; }
-                    Some(crossterm::event::Event::Paste(text)) => {
-                        ctx.tui.handle_paste(&text);
-                        needs_render = true;
-                    }
-                    Some(_) => {}
-                    None => {
-                        should_quit = true;
-                        agent_handle.abort();
-                        break;
-                    }
-                }
-            }
-
-            _ = tick_interval.tick() => {
-                ctx.tui.advance_spinner();
-                ctx.tui.update_terminal_title();
-                needs_render = true;
-            }
-
-            result = &mut agent_handle => {
-                agent_result = Some(match result {
-                    Ok(r) => r,
-                    Err(join_err) => Err(format!("Agent task failed: {}", join_err)),
-                });
-                break;
-            }
-        }
-    }
-
-    if should_quit {
-        return; // Will break outer loop
-    }
-
-    // Post-agent drain
-    commands::drain_commands_persist(&mut ctx.tui, &mut ctx.session_manager, cmd_rx).await;
-    ctx.tui.chat.discard_active_stream();
-
-    // Process agent result
-    match agent_result {
-        Some(Ok(result)) => {
-            for msg in &result.messages[prev_len..] {
-                if let Err(e) = ctx.session_manager.append(SessionEntry::from(msg)).await {
-                    ctx.tui
-                        .show_error(&format!("Session persist failed: {}", e));
-                }
-            }
-            ctx.all_messages = result.messages;
-            ctx.tui.show_usage(result.usage.input, result.usage.output);
-            let pct =
-                (result.usage.total_tokens as f64) / (ctx.model.context_window as f64) * 100.0;
-            ctx.tui
-                .set_context_info(Some(pct), ctx.model.context_window);
-            agent_exec::auto_compact_session(ctx).await;
-        }
-        Some(Err(e)) => {
-            ctx.tui.show_error(&e);
-        }
-        None => {
-            ctx.was_interrupted.store(true, Ordering::Relaxed);
-            ctx.tui.chat.add_system_message("Interrupted.");
-        }
-    }
-
-    ctx.tui.stop_agent_timer();
-    ctx.tui.set_status(None);
-    ctx.tui.finalize_turn();
+    // Return immediately — agent events flow through cmd_rx to the main loop
 }

@@ -59,6 +59,9 @@ pub async fn run_tui_mode(
     // Git branch refresh timer (1-second interval)
     let mut git_timer = tokio::time::interval(Duration::from_secs(1));
     git_timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    // Spinner animation timer (100ms interval)
+    let mut spinner_timer = tokio::time::interval(Duration::from_millis(100));
+    spinner_timer.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
     // Phase 2: Main interaction loop
     loop {
@@ -72,12 +75,10 @@ pub async fn run_tui_mode(
                 break 'input TuiAction::Quit;
             }
 
-            // Check for pending auto-submit from pending_user_messages flush
+            // Check for pending command continuation
             if let Some(text) = ctx.pending_command.take() {
                 if text.starts_with('/') || ctx.tui.state != pick_tui::app::AppState::Input {
                     ctx.pending_command = Some(text);
-                } else if ctx.tui.pending_from_flush {
-                    break 'input TuiAction::Submit(text);
                 }
             }
 
@@ -89,6 +90,11 @@ pub async fn run_tui_mode(
                     ctx.tui.set_git_branch(branch);
                 }
 
+                _ = spinner_timer.tick() => {
+                    ctx.tui.advance_spinner();
+                    ctx.tui.update_terminal_title();
+                }
+
                 cmd = cmd_rx.recv() => {
                     match cmd {
                         Some(TuiCommand::SetSessionTitle(title)) => {
@@ -97,6 +103,9 @@ pub async fn run_tui_mode(
                             if let Err(e) = ctx.session_manager.append_session_info(&title).await {
                                 ctx.tui.show_error(&format!("Failed to persist session title: {}", e));
                             }
+                        }
+                        Some(TuiCommand::AgentFinished { result, prev_len, cancel_requested }) => {
+                            action_dispatch::handle_agent_finished(&mut ctx, result, prev_len, cancel_requested).await;
                         }
                         Some(cmd) => commands::apply_tui_command(&mut ctx.tui, cmd),
                         None => break 'input TuiAction::Quit,
@@ -137,47 +146,9 @@ pub async fn run_tui_mode(
             commands::drain_commands(&mut ctx.tui, &mut cmd_rx);
         };
 
-        let is_submit = matches!(action, TuiAction::Submit(_));
-        let should_quit =
-            action_dispatch::dispatch_action(&mut ctx, &mut cmd_rx, &mut evt_rx, action).await;
+        let should_quit = action_dispatch::dispatch_action(&mut ctx, action).await;
         if should_quit {
             break;
-        }
-
-        // Flush pending user messages after a Submit completes.
-        // Then wipe all residual state to prevent terminal echo or stale
-        // paste buffer content from leaking into the next input loop.
-        if is_submit {
-            let current_pending_count = ctx.tui.pending_user_messages.len();
-            let new_count = current_pending_count.saturating_sub(ctx.tui.pending_submitted_count);
-            if new_count > 0 {
-                let new_msgs: Vec<String> = ctx
-                    .tui
-                    .pending_user_messages
-                    .iter()
-                    .skip(ctx.tui.pending_submitted_count)
-                    .cloned()
-                    .collect();
-                let combined = new_msgs.join("\n");
-                for msg in &new_msgs {
-                    ctx.tui.editor.push_history(msg.clone());
-                }
-                let _ = ctx.tui.render_with_terminal(&mut ctx.terminal_manager);
-                ctx.tui.paste_accumulator.clear();
-                ctx.tui.last_paste_time = None;
-                ctx.tui.pending_from_flush = true;
-                ctx.tui.pending_submitted_count = current_pending_count;
-                ctx.pending_command = Some(combined);
-            } else {
-                // No pending messages to flush: clear all residual state
-                // to prevent terminal echo characters from the agent's
-                // stdout output reaching pending_user_messages.
-                ctx.tui.paste_accumulator.clear();
-                ctx.tui.last_paste_time = None;
-                ctx.tui.pending_user_messages.clear();
-                ctx.tui.pending_submitted_count = 0;
-                ctx.tui.pending_from_flush = false;
-            }
         }
     }
 

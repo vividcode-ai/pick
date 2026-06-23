@@ -771,6 +771,7 @@ pub async fn run_interactive_mode(
                     mode_rulesets: Some(vec![mode_rules_for_hook.clone()]),
                     permission_manager: Some(permission_manager.clone()),
                     sandbox: platform_sandbox.clone(),
+                    cancel_signal_tx: None,
                     before_tool_call: Some(Arc::new({
                         let mode_rules = mode_rules_for_hook.clone();
                         move |tc: &pick_ai::types::ToolCall| -> Option<String> {

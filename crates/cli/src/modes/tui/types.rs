@@ -44,6 +44,21 @@ pub(crate) enum TuiCommand {
         response_tx: tokio::sync::oneshot::Sender<Result<Vec<Vec<String>>, String>>,
     },
     GoalUpdated(serde_json::Value),
+    /// Queue state update for UI feedback
+    QueueUpdate {
+        steer_len: usize,
+        follow_up_len: usize,
+        next_turn_len: usize,
+    },
+    /// Agent run completed — carries results for post-processing
+    AgentFinished {
+        result: Result<pick_agent::core::agent_loop::AgentRunResult, String>,
+        prev_len: usize,
+        cancel_requested: bool,
+    },
+    /// A queued steering message has been consumed by the agent and should
+    /// be moved from "pending" to a rendered user message bubble.
+    SteeringMessageConsumed(String),
 }
 
 /// TUI approval hook that shows a permission dialog in the TUI viewport

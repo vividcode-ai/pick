@@ -10,7 +10,7 @@ use ratatui::widgets::{Clear, Paragraph};
 use unicode_width::UnicodeWidthStr;
 
 use crate::terminal_manager::TerminalManager;
-use crate::utils::{visible_width, wrap_text_with_ansi};
+use crate::utils::visible_width;
 
 use super::types::AppState;
 use super::types::TuiApp;
@@ -134,12 +134,11 @@ impl TuiApp {
             self.autocomplete_space_lines = 0;
         }
         let has_pending = !self.pending_user_messages.is_empty();
-        let (pending_lines, pending_overflow) = if has_pending {
-            Self::compute_pending_message_lines(&self.pending_user_messages, width as usize)
+        let pending_lines: u16 = if has_pending {
+            self.pending_user_messages.len() as u16
         } else {
-            (0, false)
+            0
         };
-        let pending_lines = pending_lines as u16;
 
         let has_todo = !self.todo_items.is_empty()
             && self.todo_items.iter().any(|t| {
@@ -157,12 +156,8 @@ impl TuiApp {
             + 1
             + 2
             + if has_status { 3 } else { 0 }
-            + if has_pending {
-                pending_lines + (if pending_overflow { 2 } else { 1 })
-            } else {
-                0
-            }
             + if has_todo { todo_lines + 1 } else { 0 }
+            + if has_pending { pending_lines + 2 } else { 0 }
             + self.autocomplete_space_lines
             + dialog_lines;
         let stream_extra = if stream_chat_len > 0 { 2 } else { 0 };
@@ -188,17 +183,13 @@ impl TuiApp {
             constraints.push(Constraint::Length(1));
         }
         if has_pending {
-            constraints.push(Constraint::Length(1));
+            constraints.push(Constraint::Length(1)); // pending header line
             for _ in 0..pending_lines {
                 constraints.push(Constraint::Length(1));
             }
-            if pending_overflow {
-                constraints.push(Constraint::Length(1));
-                constraints.push(Constraint::Length(1));
-            } else {
-                constraints.push(Constraint::Length(1));
-            }
+            constraints.push(Constraint::Length(1)); // separator
         }
+        // Editor area: border + editor + border + status separator + context separator
         constraints.push(Constraint::Length(1));
         constraints.push(Constraint::Length(editor_line_count));
         constraints.push(Constraint::Length(1));
@@ -211,13 +202,20 @@ impl TuiApp {
             constraints.push(Constraint::Length(dialog_lines));
         }
 
-        let content_height: u16 = constraints
-            .iter()
-            .map(|c| match c {
-                Constraint::Length(len) => *len,
-                _ => 0,
-            })
-            .sum();
+        // Content height fills the entire terminal during streaming so the
+        // viewport always covers the full screen. The leftover area after
+        // Layout::split() is simply unallocated — ratatui's frame clears it.
+        let content_height = if has_stream {
+            height
+        } else {
+            constraints
+                .iter()
+                .map(|c| match c {
+                    Constraint::Length(len) => *len,
+                    _ => 0,
+                })
+                .sum()
+        };
 
         // When selection/tree/api-key popups replace the editor, their height
         // is transient — it disappears on cancel. Exclude it from scrollback-
@@ -317,60 +315,36 @@ impl TuiApp {
                     }
 
                     if has_pending {
-                        let user_bg = Style::default().bg(self
-                            .chat
-                            .colors
-                            .user_msg_bg
-                            .unwrap_or(Color::Rgb(52, 53, 69)));
-                        let content_width = (width as usize).saturating_sub(4).max(1);
-                        render_at!(i, Line::from(""));
+                        let pending_label =
+                            format!("── {} pending ──", self.pending_user_messages.len());
+                        render_at!(
+                            i,
+                            Line::from(Span::styled(
+                                &pending_label,
+                                Style::default().add_modifier(Modifier::DIM),
+                            ))
+                        );
                         i += 1;
 
-                        let max_visible = 5usize;
-                        let max_lines_per_msg = 3usize;
-                        for (msg_idx, msg) in self.pending_user_messages.iter().enumerate() {
-                            if msg_idx >= max_visible {
-                                break;
-                            }
+                        let pending_bg = Style::default().bg(Color::Rgb(45, 46, 60));
+                        for msg in self.pending_user_messages.iter() {
                             if i >= chunks.len() {
                                 break;
                             }
-                            let wrapped = wrap_text_with_ansi(msg, content_width);
-                            let display_lines = wrapped.len().min(max_lines_per_msg);
-                            for line_idx in 0..display_lines {
-                                if i >= chunks.len() {
-                                    break;
-                                }
-                                let line_text = &wrapped[line_idx];
-                                let vis = visible_width(line_text);
-                                let right_pad = (width as usize).saturating_sub(vis + 2);
-                                let padded = format!("  {}{}", line_text, " ".repeat(right_pad));
-                                frame.render_widget_ref(
-                                    &Line::from(Span::styled(padded, user_bg)),
-                                    chunks[i],
-                                );
-                                i += 1;
-                            }
-                            if msg_idx + 1 < max_visible {
-                                render_at!(i, Line::from(""));
-                                i += 1;
-                            }
-                        }
-
-                        if pending_overflow {
-                            let extra = self.pending_user_messages.len() - max_visible;
-                            let overflow_line = Line::from(Span::styled(
-                                format!("  \u{2026} {} more pending", extra),
-                                Style::default().add_modifier(Modifier::DIM),
-                            ));
-                            render_at!(i, overflow_line);
-                            i += 1;
-                            render_at!(i, Line::from(""));
-                            i += 1;
-                        } else {
-                            render_at!(i, Line::from(""));
+                            let truncated = if msg.len() > (width as usize).saturating_sub(4) {
+                                format!("{}...", &msg[..(width as usize).saturating_sub(7)])
+                            } else {
+                                msg.clone()
+                            };
+                            let padded = format!("  {}", truncated);
+                            frame.render_widget_ref(
+                                &Line::from(Span::styled(padded, pending_bg)),
+                                chunks[i],
+                            );
                             i += 1;
                         }
+                        render_at!(i, Line::from(""));
+                        i += 1;
                     }
 
                     render_at!(i, top_border.clone());
@@ -855,33 +829,6 @@ impl TuiApp {
     }
 
     /// Compute the number of visual lines occupied by pending user messages
-    pub fn compute_pending_message_lines(
-        pending: &std::collections::VecDeque<String>,
-        width: usize,
-    ) -> (usize, bool) {
-        if pending.is_empty() {
-            return (0, false);
-        }
-        let max_visible = 5usize;
-        let max_lines_per = 3usize;
-        let content_width = width.saturating_sub(4).max(1);
-        let mut total = 0usize;
-        let count = pending.len().min(max_visible);
-
-        for (idx, msg) in pending.iter().enumerate() {
-            if idx >= count {
-                break;
-            }
-            let wrapped = wrap_text_with_ansi(msg, content_width);
-            total += wrapped.len().min(max_lines_per);
-            if idx + 1 < count {
-                total += 1;
-            }
-        }
-
-        let overflow = pending.len() > max_visible;
-        (total, overflow)
-    }
 
     /// Update shared chat render cache
     pub fn build_selection_popup_lines(&self, width: u16) -> Vec<Line<'static>> {

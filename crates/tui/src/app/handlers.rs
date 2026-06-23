@@ -84,11 +84,9 @@ impl TuiApp {
             paste_accumulator: String::new(),
             last_paste_time: None,
             last_render_state: AppState::Input,
-            pending_user_messages: std::collections::VecDeque::new(),
-            pending_from_flush: false,
-            pending_submitted_count: 0,
             question_dialog: None,
             question_response_tx: None,
+            pending_user_messages: std::collections::VecDeque::new(),
             update_prompt: None,
             todo_items: Vec::new(),
             todo_scroll_offset: 0,
@@ -162,11 +160,9 @@ impl TuiApp {
             paste_accumulator: String::new(),
             last_paste_time: None,
             last_render_state: AppState::Input,
-            pending_user_messages: std::collections::VecDeque::new(),
-            pending_from_flush: false,
-            pending_submitted_count: 0,
             question_dialog: None,
             question_response_tx: None,
+            pending_user_messages: std::collections::VecDeque::new(),
             update_prompt: None,
             todo_items: Vec::new(),
             todo_scroll_offset: 0,
@@ -902,9 +898,9 @@ impl TuiApp {
             KeyCode::Enter => {
                 if self.state == AppState::Streaming {
                     let text = self.editor.text().to_string();
+                    self.editor.clear();
                     if !text.trim().is_empty() {
-                        self.pending_user_messages.push_back(text);
-                        self.editor.clear();
+                        return Some(TuiAction::QueueMessage(text));
                     }
                     return None;
                 }
@@ -961,9 +957,6 @@ impl TuiApp {
             KeyCode::Up => {
                 if self.editor.is_autocomplete_active() {
                     self.editor.autocomplete_previous();
-                } else if !self.pending_user_messages.is_empty() {
-                    self.editor
-                        .pending_previous(self.pending_user_messages.make_contiguous());
                 } else if self.editor.history_index.is_some() {
                     self.editor.history_previous();
                 } else if self.editor.buffer.is_empty() {
@@ -975,9 +968,6 @@ impl TuiApp {
             KeyCode::Down => {
                 if self.editor.is_autocomplete_active() {
                     self.editor.autocomplete_next();
-                } else if self.editor.pending_index.is_some() {
-                    self.editor
-                        .pending_next(self.pending_user_messages.make_contiguous());
                 } else if self.editor.history_index.is_some() {
                     self.editor.history_next();
                 } else if self.editor.buffer.is_empty() {
@@ -1163,8 +1153,6 @@ impl TuiApp {
         };
         let is_slash = text.trim().starts_with('/');
         self.editor.push_history(text.clone());
-        self.pending_user_messages.clear();
-        self.pending_submitted_count = 0;
         self.editor.clear();
         self.autocomplete_space_lines = 0;
         if !is_slash {

@@ -23,21 +23,14 @@ use crate::permission::{Action, Ruleset};
 enum ContinueTurn {
     Continue,
     Break,
+    /// should_stop_after_turn returned true — steering CANNOT override this break.
+    /// Unlike Break (text-only, all_terminate, max_errors) which allows steering
+    /// to keep the loop alive, HardBreak exits unconditionally.
+    /// should_stop_after_turn is checked BEFORE the steering poll.
+    HardBreak,
 }
 
 // ===== Helper functions =====
-
-fn check_token_limit(config: &AgentLoopConfig, state: &mut AgentState, accumulated_usage: &Usage) {
-    if let Some(ref follow_up_hook) = config.get_follow_up_messages {
-        let follow_up_msgs = follow_up_hook(&AgentRunResult {
-            messages: state.messages.clone(),
-            usage: accumulated_usage.clone(),
-        });
-        if !follow_up_msgs.is_empty() {
-            state.messages.extend(follow_up_msgs);
-        }
-    }
-}
 
 fn setup_initial_state(
     config: &AgentLoopConfig,
@@ -65,8 +58,13 @@ fn setup_initial_state(
     let accumulated_usage = Usage::zero();
     let turn_index: usize = 0;
 
-    let (_cancel_tx, cancel_rx) = tokio::sync::watch::channel(false);
-    let cancel_rx = std::sync::Arc::new(cancel_rx);
+    let cancel_rx = match config.cancel_signal_tx.as_ref() {
+        Some(tx) => std::sync::Arc::new(tx.subscribe()),
+        None => {
+            let (_cancel_tx, cancel_rx) = tokio::sync::watch::channel(false);
+            std::sync::Arc::new(cancel_rx)
+        }
+    };
 
     if let Some(ref handler) = config.on_event {
         handler(AgentEvent::AgentStart);
@@ -104,24 +102,25 @@ fn prepare_continue_state(
     let accumulated_usage = Usage::zero();
     let turn_index: usize = 0;
 
-    let (_cancel_tx, cancel_rx) = tokio::sync::watch::channel(false);
-    let cancel_rx = std::sync::Arc::new(cancel_rx);
+    let cancel_rx = match config.cancel_signal_tx.as_ref() {
+        Some(tx) => std::sync::Arc::new(tx.subscribe()),
+        None => {
+            let (_cancel_tx, cancel_rx) = tokio::sync::watch::channel(false);
+            std::sync::Arc::new(cancel_rx)
+        }
+    };
 
     (state, accumulated_usage, turn_index, cancel_rx)
 }
 
 async fn process_llm_stream(
     config: &AgentLoopConfig,
-    state: &mut AgentState,
+    state: &AgentState,
     accumulated_usage: &mut Usage,
     cancel_rx: std::sync::Arc<tokio::sync::watch::Receiver<bool>>,
 ) -> Result<(AssistantMessage, Vec<ToolCall>), String> {
-    if let Some(ref steering_hook) = config.get_steering_messages {
-        let steering_msgs = steering_hook();
-        if !steering_msgs.is_empty() {
-            state.messages.extend(steering_msgs);
-        }
-    }
+    // Note: steering messages are injected at the loop level (run_agent_loop),
+    // not here.
 
     let tools_defs: Vec<ToolDefinition> = state
         .tools
@@ -1152,11 +1151,14 @@ async fn execute_turn(
     *turn_index += 1;
 
     if should_stop {
-        return Ok(ContinueTurn::Break);
+        // HardBreak prevents steering from overriding should_stop_after_turn
+        return Ok(ContinueTurn::HardBreak);
     }
 
     Ok(ContinueTurn::Continue)
 }
+
+// ===== execute_continue_turn =====
 
 async fn execute_continue_turn(
     config: &AgentLoopConfig,
@@ -1341,7 +1343,7 @@ async fn execute_continue_turn(
     *turn_index += 1;
 
     if should_stop {
-        return Ok(ContinueTurn::Break);
+        return Ok(ContinueTurn::HardBreak);
     }
 
     Ok(ContinueTurn::Continue)
@@ -1350,6 +1352,12 @@ async fn execute_continue_turn(
 // ===== Main agent loop =====
 
 /// Run the agent loop
+///
+/// - Initial steering poll runs ONCE before the outer loop
+/// - Outer loop: follow-up messages create new segments
+/// - Inner loop: turn execution with steering polled after each turn_end
+/// - Steering can keep the inner loop alive after text-only responses
+/// - HardBreak (should_stop_after_turn) exits unconditionally — steering cannot override
 pub async fn run_agent_loop(
     config: AgentLoopConfig,
     initial_messages: Vec<Message>,
@@ -1357,22 +1365,93 @@ pub async fn run_agent_loop(
     let (mut state, mut accumulated_usage, mut turn_index, cancel_rx) =
         setup_initial_state(&config, initial_messages);
 
-    loop {
-        match execute_turn(
-            &config,
-            &mut state,
-            &mut accumulated_usage,
-            &mut turn_index,
-            cancel_rx.clone(),
-        )
-        .await?
-        {
-            ContinueTurn::Break => break,
-            ContinueTurn::Continue => {}
+    // Initial steering poll (runs ONCE per top-level call, before outer loop)
+    if let Some(ref steering_hook) = config.get_steering_messages {
+        let steering = steering_hook();
+        if !steering.is_empty() {
+            state.messages.extend(steering);
         }
     }
 
-    check_token_limit(&config, &mut state, &accumulated_usage);
+    // Outer loop (follow-up messages create new segments)
+    loop {
+        // Inner loop (steering + tool calls)
+        loop {
+            let result = match execute_turn(
+                &config,
+                &mut state,
+                &mut accumulated_usage,
+                &mut turn_index,
+                cancel_rx.clone(),
+            )
+            .await
+            {
+                Ok(r) => r,
+                Err(e) => {
+                    // Check for cooperative cancellation — return partial results cleanly
+                    if *cancel_rx.borrow() {
+                        break;
+                    }
+                    return Err(e);
+                }
+            };
+
+            match result {
+                ContinueTurn::HardBreak => {
+                    // should_stop_after_turn checked BEFORE steering poll
+                    // → exit inner loop unconditionally
+                    break;
+                }
+                ContinueTurn::Break => {
+                    // poll steering after turn_end
+                    if let Some(ref steering_hook) = config.get_steering_messages {
+                        let steering = steering_hook();
+                        if !steering.is_empty() {
+                            state.messages.extend(steering);
+                            continue; // steering keeps inner loop alive
+                        }
+                    }
+                    break; // exit inner loop
+                }
+                ContinueTurn::Continue => {
+                    // poll steering after turn_end
+                    if let Some(ref steering_hook) = config.get_steering_messages {
+                        let steering = steering_hook();
+                        if !steering.is_empty() {
+                            state.messages.extend(steering);
+                        }
+                    }
+                    // continue inner loop — more tool results to process
+                }
+            }
+        }
+
+        // If cancelled, skip follow-up outer loop
+        if *cancel_rx.borrow() {
+            break;
+        }
+
+        // Outer loop: poll follow-up after inner loop exits
+        let follow_up = config
+            .get_follow_up_messages
+            .as_ref()
+            .map(|f| {
+                f(&AgentRunResult {
+                    messages: state.messages.clone(),
+                    usage: accumulated_usage.clone(),
+                })
+            })
+            .unwrap_or_default();
+
+        if follow_up.is_empty() {
+            break; // exit outer loop
+        }
+
+        // Extend state.messages with follow-up and restart inner loop
+        // NOTE: no initial steering poll here! The inner loop starts at turn_start,
+        // and the steering poll happens after the first turn_end.
+        state.messages.extend(follow_up);
+    }
 
     // Emit end events
     if let Some(ref handler) = config.on_event {
@@ -1400,6 +1479,8 @@ pub async fn run_agent_loop(
 /// Continue an agent loop with additional messages (retry / continue support).
 /// Unlike `run_agent_loop`, this does NOT re-emit AgentStart or run before_agent_start
 /// extensions — it picks up from where the previous turn left off.
+///
+/// Same inner/outer loop structure as `run_agent_loop`.
 pub async fn run_agent_loop_continue(
     config: AgentLoopConfig,
     existing_messages: Vec<Message>,
@@ -1407,22 +1488,85 @@ pub async fn run_agent_loop_continue(
     let (mut state, mut accumulated_usage, mut turn_index, cancel_rx) =
         prepare_continue_state(&config, existing_messages);
 
-    loop {
-        match execute_continue_turn(
-            &config,
-            &mut state,
-            &mut accumulated_usage,
-            &mut turn_index,
-            cancel_rx.clone(),
-        )
-        .await?
-        {
-            ContinueTurn::Break => break,
-            ContinueTurn::Continue => {}
+    // Initial steering poll (runs ONCE per top-level call)
+    if let Some(ref steering_hook) = config.get_steering_messages {
+        let steering = steering_hook();
+        if !steering.is_empty() {
+            state.messages.extend(steering);
         }
     }
 
-    check_token_limit(&config, &mut state, &accumulated_usage);
+    // Outer loop (follow-up)
+    loop {
+        // Inner loop (steering + tools)
+        loop {
+            let result = match execute_continue_turn(
+                &config,
+                &mut state,
+                &mut accumulated_usage,
+                &mut turn_index,
+                cancel_rx.clone(),
+            )
+            .await
+            {
+                Ok(r) => r,
+                Err(e) => {
+                    if *cancel_rx.borrow() {
+                        break;
+                    }
+                    return Err(e);
+                }
+            };
+
+            match result {
+                ContinueTurn::HardBreak => {
+                    break; // should_stop_after_turn — unconditional exit
+                }
+                ContinueTurn::Break => {
+                    if let Some(ref steering_hook) = config.get_steering_messages {
+                        let steering = steering_hook();
+                        if !steering.is_empty() {
+                            state.messages.extend(steering);
+                            continue;
+                        }
+                    }
+                    break;
+                }
+                ContinueTurn::Continue => {
+                    if let Some(ref steering_hook) = config.get_steering_messages {
+                        let steering = steering_hook();
+                        if !steering.is_empty() {
+                            state.messages.extend(steering);
+                        }
+                    }
+                }
+            }
+        }
+
+        // If cancelled, skip follow-up outer loop
+        if *cancel_rx.borrow() {
+            break;
+        }
+
+        // Outer loop: poll follow-up
+        let follow_up = config
+            .get_follow_up_messages
+            .as_ref()
+            .map(|f| {
+                f(&AgentRunResult {
+                    messages: state.messages.clone(),
+                    usage: accumulated_usage.clone(),
+                })
+            })
+            .unwrap_or_default();
+
+        if follow_up.is_empty() {
+            break;
+        }
+
+        // Restart inner loop with follow-up messages (no initial steering poll)
+        state.messages.extend(follow_up);
+    }
 
     // Emit end events
     if let Some(ref handler) = config.on_event {

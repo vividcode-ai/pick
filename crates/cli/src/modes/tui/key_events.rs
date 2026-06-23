@@ -246,11 +246,14 @@ pub(crate) fn drain_key_events_during_agent(
                         }
                         KeyCode::Enter => {
                             tui.finalize_paste_accumulator(now);
-                            if let Some(a) = tui.handle_key(KeyCode::Enter, KeyModifiers::NONE)
-                                && matches!(a, TuiAction::Quit)
-                            {
-                                action = Some(a);
-                                had_action = true;
+                            if let Some(a) = tui.handle_key(KeyCode::Enter, KeyModifiers::NONE) {
+                                if matches!(a, TuiAction::Quit) {
+                                    action = Some(a);
+                                    had_action = true;
+                                } else if matches!(a, TuiAction::QueueMessage(_)) {
+                                    action = Some(a);
+                                    had_action = true;
+                                }
                             }
                             continue;
                         }
@@ -260,11 +263,14 @@ pub(crate) fn drain_key_events_during_agent(
                                 *abort_on_esc = true;
                                 break;
                             }
-                            if let Some(a) = tui.handle_key(key.code, key.modifiers)
-                                && matches!(a, TuiAction::Quit)
-                            {
-                                action = Some(a);
-                                had_action = true;
+                            if let Some(a) = tui.handle_key(key.code, key.modifiers) {
+                                if matches!(a, TuiAction::Quit) {
+                                    action = Some(a);
+                                    had_action = true;
+                                } else if matches!(a, TuiAction::QueueMessage(_)) {
+                                    action = Some(a);
+                                    had_action = true;
+                                }
                             }
                             continue;
                         }
@@ -275,11 +281,14 @@ pub(crate) fn drain_key_events_during_agent(
                         && key.modifiers.intersects(KeyModifiers::CONTROL) =>
                 {
                     tui.finalize_paste_accumulator(now);
-                    if let Some(a) = tui.handle_key(key.code, key.modifiers)
-                        && matches!(a, TuiAction::Quit)
-                    {
-                        action = Some(a);
-                        had_action = true;
+                    if let Some(a) = tui.handle_key(key.code, key.modifiers) {
+                        if matches!(a, TuiAction::Quit) {
+                            action = Some(a);
+                            had_action = true;
+                        } else if matches!(a, TuiAction::QueueMessage(_)) {
+                            action = Some(a);
+                            had_action = true;
+                        }
                     }
                     continue;
                 }

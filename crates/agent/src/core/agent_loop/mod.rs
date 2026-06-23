@@ -87,6 +87,10 @@ pub struct AgentLoopConfig {
     pub permission_manager: Option<Arc<PermissionManager>>,
     /// Platform sandbox for process isolation (bwrap, seatbelt, restricted token)
     pub sandbox: Option<Arc<dyn crate::permission::sandbox::Sandbox>>,
+    /// External cancellation signal: when the Sender is triggered, the agent loop
+    /// stops cooperatively — the current LLM call is abandoned and any accumulated
+    /// messages are returned as a normal result rather than an error.
+    pub cancel_signal_tx: Option<std::sync::Arc<tokio::sync::watch::Sender<bool>>>,
 }
 
 /// Result from a single agent run

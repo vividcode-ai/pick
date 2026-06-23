@@ -59,8 +59,14 @@ pub(crate) fn build_agent_config(
         let interrupted = was_interrupted.clone();
         let goal_manager = ctx.session_manager.goal_manager();
         let budget_injected = Arc::new(AtomicBool::new(false));
+        // Capture steer queue for queue draining
+        let steer_queue = ctx.steer_queue.clone();
+        // Capture cmd_tx for real-time notification when queued messages are consumed
+        let steer_cmd_tx = cmd_tx.clone();
         move || {
             let mut msgs = Vec::new();
+
+            // Dynamic messages (interruption, plan mode, goal context)
             if interrupted.swap(false, Ordering::Relaxed) {
                 msgs.push(Message::User(UserMessage::text(
                     "[System: The previous assistant response was interrupted. The previous context is no longer relevant. Please respond to the new message below.]",
@@ -120,50 +126,91 @@ pub(crate) fn build_agent_config(
                     _ => {}
                 }
             }
+
+            // Drain from steer queue and notify TUI about consumed messages
+            if let Ok(mut queue) = steer_queue.lock() {
+                let queued = queue.drain();
+                if !queued.is_empty() {
+                    // Notify TUI about each consumed message for real-time rendering
+                    for msg in &queued {
+                        if let Message::User(u) = msg {
+                            let text: String = u
+                                .content
+                                .iter()
+                                .filter_map(|b| {
+                                    if let ContentBlock::Text(t) = b {
+                                        Some(t.text.clone())
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .collect();
+                            if !text.is_empty() {
+                                let _ = steer_cmd_tx
+                                    .send(super::types::TuiCommand::SteeringMessageConsumed(text));
+                            }
+                        }
+                    }
+                    msgs.extend(queued);
+                }
+            }
+
             msgs
         }
     };
 
     let get_follow_up_messages = {
         let goal_manager = ctx.session_manager.goal_manager();
+        // Capture follow-up queue for queue draining
+        let follow_up_queue = ctx.follow_up_queue.clone();
         move |_result: &pick_agent::core::agent_loop::AgentRunResult| {
-            if !goal_manager.can_continue() {
-                return vec![];
-            }
-            let goal = match goal_manager.get() {
-                Some(g) if g.status == "active" => g,
-                _ => return vec![],
-            };
-            if !goal_manager.register_continuation() {
-                return vec![];
-            }
-            let remaining = goal_manager
-                .remaining_tokens()
-                .map(|r| format!(", remaining token budget: {}", r))
-                .unwrap_or_default();
-            vec![Message::User(UserMessage::text(format!(
-                "<goal_context>\n\
-                 Continue working toward the current goal.\n\
-                 Objective: {}\n\
-                 Tokens used: {}{}\n\
-                 Time elapsed: {}\n\
-                 Audit the actual current state.\n\
-                 Only mark as complete when every requirement is verified.\n\
-                 </goal_context>",
-                goal.objective,
-                goal.tokens_used,
-                remaining,
+            let mut msgs = Vec::new();
+
+            // Goal-driven continuation
+            if goal_manager.can_continue() {
+                if let Some(goal) = goal_manager.get()
+                    && goal.status == "active"
+                    && goal_manager.register_continuation()
                 {
-                    let s = goal.time_used_seconds;
-                    if s < 60 {
-                        format!("{}s", s)
-                    } else if s < 3600 {
-                        format!("{}m", s / 60)
-                    } else {
-                        format!("{}h {}m", s / 3600, (s % 3600) / 60)
-                    }
-                },
-            )))]
+                    let remaining = goal_manager
+                        .remaining_tokens()
+                        .map(|r| format!(", remaining token budget: {}", r))
+                        .unwrap_or_default();
+                    msgs.push(Message::User(UserMessage::text(format!(
+                        "<goal_context>\n\
+                         Continue working toward the current goal.\n\
+                         Objective: {}\n\
+                         Tokens used: {}{}\n\
+                         Time elapsed: {}\n\
+                         Audit the actual current state.\n\
+                         Only mark as complete when every requirement is verified.\n\
+                         </goal_context>",
+                        goal.objective,
+                        goal.tokens_used,
+                        remaining,
+                        {
+                            let s = goal.time_used_seconds;
+                            if s < 60 {
+                                format!("{}s", s)
+                            } else if s < 3600 {
+                                format!("{}m", s / 60)
+                            } else {
+                                format!("{}h {}m", s / 3600, (s % 3600) / 60)
+                            }
+                        },
+                    ))));
+                }
+            }
+
+            // Drain from follow-up queue
+            if let Ok(mut queue) = follow_up_queue.lock() {
+                let queued = queue.drain();
+                if !queued.is_empty() {
+                    msgs.extend(queued);
+                }
+            }
+
+            msgs
         }
     };
 
@@ -260,6 +307,7 @@ pub(crate) fn build_agent_config(
         permission_hooks: Some(permission_manager.hook_registry.clone()),
         permission_manager: Some(permission_manager.clone()),
         sandbox: ctx.platform_sandbox.clone(),
+        cancel_signal_tx: None,
         on_turn_complete: Some(on_turn_complete),
         provider_max_retries: None,
         provider_max_retry_delay_ms: None,

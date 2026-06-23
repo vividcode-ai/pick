@@ -245,72 +245,15 @@ async fn run_agent_loop_continue_with_retry(
     Err("Max retries exceeded".to_string())
 }
 
-/// Run the agent loop with retry AND automatic goal-driven continuation.
+/// Run the agent loop with retry.
 ///
-/// After each segment (a complete agent loop with retry), checks the
-/// `get_follow_up_messages` hook. If it returns non-empty messages,
-/// starts a new continuation segment using `run_agent_loop_continue`.
-/// Continues until the hook returns empty or max continuation count is reached.
+/// The outer loop (goal-driven follow-up continuation) is handled internally
+/// by `run_agent_loop` itself.
 pub async fn run_agent_loop_with_retry_and_continuation(
     config: AgentLoopConfig,
     initial_messages: Vec<Message>,
     retry_config: RetryConfig,
     cancel_signal: Option<Arc<watch::Receiver<bool>>>,
 ) -> Result<AgentRunResult, String> {
-    // First segment
-    let result = run_agent_loop_with_retry(
-        config.clone(),
-        initial_messages,
-        retry_config.clone(),
-        cancel_signal.clone(),
-    )
-    .await?;
-
-    let mut all_messages = result.messages;
-    let mut total_usage = result.usage;
-
-    // Continuation segments
-    loop {
-        let follow_up = config
-            .get_follow_up_messages
-            .as_ref()
-            .map(|f| {
-                f(&AgentRunResult {
-                    messages: all_messages.clone(),
-                    usage: total_usage.clone(),
-                })
-            })
-            .unwrap_or_default();
-
-        if follow_up.is_empty() {
-            break;
-        }
-
-        all_messages.extend(follow_up);
-
-        let result = run_agent_loop_continue_with_retry(
-            config.clone(),
-            all_messages,
-            retry_config.clone(),
-            cancel_signal.clone(),
-        )
-        .await?;
-
-        all_messages = result.messages;
-        total_usage.input += result.usage.input;
-        total_usage.output += result.usage.output;
-        total_usage.cache_read += result.usage.cache_read;
-        total_usage.cache_write += result.usage.cache_write;
-        total_usage.total_tokens += result.usage.total_tokens;
-        total_usage.cost.input += result.usage.cost.input;
-        total_usage.cost.output += result.usage.cost.output;
-        total_usage.cost.cache_read += result.usage.cost.cache_read;
-        total_usage.cost.cache_write += result.usage.cost.cache_write;
-        total_usage.cost.total += result.usage.cost.total;
-    }
-
-    Ok(AgentRunResult {
-        messages: all_messages,
-        usage: total_usage,
-    })
+    run_agent_loop_with_retry(config, initial_messages, retry_config, cancel_signal).await
 }

@@ -10,6 +10,7 @@ use crate::core::agent_mode::AgentMode;
 use crate::core::auth_storage::AuthStorage;
 use crate::core::resource_loader::ResourceLoader;
 use crate::core::settings::SettingsManager;
+use pick_agent::core::message_queue::{PendingMessageQueue, QueueMode};
 use pick_agent::core::state::{AgentTool, ThinkingLevel};
 use pick_agent::extensions::runner::ExtensionRunner;
 use pick_agent::session::SessionManager;
@@ -310,6 +311,16 @@ pub(crate) async fn init_tui_mode(
         pending_command: None,
         scoped_models: Vec::new(),
         was_interrupted: Arc::new(AtomicBool::new(false)),
+        steer_queue: Arc::new(Mutex::new(PendingMessageQueue::new(QueueMode::OneAtATime))),
+        follow_up_queue: Arc::new(Mutex::new(PendingMessageQueue::new(QueueMode::OneAtATime))),
+        next_turn_queue: Arc::new(Mutex::new(PendingMessageQueue::new(QueueMode::All))),
+        steer_queue_mode: QueueMode::OneAtATime,
+        follow_up_queue_mode: QueueMode::OneAtATime,
+        agent_is_running: false,
+        agent_cancel_tx: None,
+        agent_cancel_requested: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+        agent_abort_handle: None,
+        agent_start_message_count: 0,
         args,
         all_tools,
         cwd,

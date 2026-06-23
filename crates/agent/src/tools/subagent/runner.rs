@@ -69,6 +69,7 @@ fn build_subagent_loop_config(
         mode_rulesets,
         permission_manager,
         sandbox,
+        cancel_signal_tx: None,
     }
 }
 

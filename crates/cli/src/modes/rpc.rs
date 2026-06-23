@@ -207,6 +207,7 @@ pub async fn run_rpc_mode(
                         permission_hooks: Some(permission_manager.hook_registry.clone()),
                         permission_manager: Some(permission_manager.clone()),
                         sandbox: platform_sandbox.clone(),
+                        cancel_signal_tx: None,
                         on_turn_complete: None,
                     };
 

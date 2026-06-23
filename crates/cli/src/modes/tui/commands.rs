@@ -93,6 +93,19 @@ pub(crate) fn apply_tui_command(tui: &mut TuiApp, cmd: TuiCommand) {
         TuiCommand::GoalUpdated(goal) => {
             apply_goal_update(tui, &goal);
         }
+        TuiCommand::QueueUpdate { .. } => {
+            // Queue info is rendered via pending_user_messages above the editor,
+            // no need to set status text that would collide with timer display.
+        }
+        // AgentFinished is handled directly in runner.rs, not here
+        TuiCommand::AgentFinished { .. } => {}
+        TuiCommand::SteeringMessageConsumed(text) => {
+            // A queued message was consumed by the agent — move from pending to chat
+            if let Some(pos) = tui.pending_user_messages.iter().position(|m| m == &text) {
+                tui.pending_user_messages.remove(pos);
+            }
+            tui.chat.add_user_message(&text);
+        }
     }
 }
 

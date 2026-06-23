@@ -190,6 +190,7 @@ pub async fn run_print_mode(
         permission_hooks: Some(permission_manager.hook_registry.clone()),
         permission_manager: Some(permission_manager.clone()),
         sandbox: platform_sandbox.clone(),
+        cancel_signal_tx: None,
         on_event: Some(Arc::new(move |event| {
             if mode_is_json {
                 let json_line = agent_event_to_json_value(&event);

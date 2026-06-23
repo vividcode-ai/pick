@@ -62,15 +62,9 @@ pub async fn call_llm(
     let mut receiver = (provider.stream)(model.clone(), context, Some(stream_options));
 
     let mut result_msg = None;
+    let mut partial_msg: Option<AssistantMessage> = None;
 
     while let Some(event) = receiver.recv().await {
-        // Check for cancellation request during streaming
-        if let Some(ref sig) = cancel_signal
-            && *sig.borrow()
-        {
-            return Err("LLM call cancelled".to_string());
-        }
-
         match event {
             StreamEvent::Done { message, .. } => {
                 result_msg = Some(message);
@@ -86,12 +80,31 @@ pub async fn call_llm(
                 if let Some(handler) = on_event
                     && let Some(msg) = partial_event_to_message(&other)
                 {
+                    // Clone before moving for accumulation
+                    let msg_clone = msg.clone();
                     handler(AgentEvent::MessageUpdate {
                         message: msg,
                         assistant_message_event: None,
                     });
+                    // Accumulate partial AssistantMessage for cancellation handling
+                    if let Message::Assistant(a) = msg_clone {
+                        partial_msg = Some(a);
+                    }
                 }
             }
+        }
+
+        // Check for cancellation AFTER processing the event (pi-compatible behavior)
+        // This ensures any partial content received so far is preserved and returned
+        // as a normal result with StopReason::Aborted, rather than lost via Err.
+        if let Some(ref sig) = cancel_signal
+            && *sig.borrow()
+        {
+            if let Some(mut msg) = partial_msg.take() {
+                msg.stop_reason = StopReason::Aborted;
+                return Ok(msg);
+            }
+            return Err("LLM call cancelled".to_string());
         }
     }
 

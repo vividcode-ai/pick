@@ -21,6 +21,9 @@ pub enum TuiAction {
     Quit,
     /// Update prompt actions: true = update now, false = skip/dismiss
     UpdateResponse(bool),
+    /// Queue a message to be injected into the running agent's steering queue
+    /// (user typed while the agent was streaming)
+    QueueMessage(String),
 }
 
 /// App state
@@ -131,12 +134,12 @@ pub struct TuiApp {
     pub paste_accumulator: String,
     pub last_paste_time: Option<std::time::Instant>,
     pub(crate) last_render_state: AppState,
-    pub pending_user_messages: std::collections::VecDeque<String>,
-    pub pending_from_flush: bool,
-    pub pending_submitted_count: usize,
     pub question_dialog: Option<crate::components::QuestionDialog>,
     pub question_response_tx:
         Option<tokio::sync::oneshot::Sender<Result<Vec<Vec<String>>, String>>>,
+    /// Messages queued by user while agent is running, waiting to be processed.
+    /// Shown above the editor as pending; consumed one-at-a-time by steer_queue.
+    pub pending_user_messages: std::collections::VecDeque<String>,
     pub update_prompt: Option<crate::components::UpdatePromptState>,
     pub todo_items: Vec<serde_json::Value>,
     pub todo_scroll_offset: usize,
