@@ -132,6 +132,17 @@ impl TuiApp {
         }
         let has_pending = !self.pending_user_messages.is_empty();
         let has_pending_follow_up = !self.pending_follow_up_messages.is_empty();
+        let pending_lines: u16 = if has_pending || has_pending_follow_up {
+            let pc = self.pending_user_messages.len() as u16;
+            let fc = self.pending_follow_up_messages.len() as u16;
+            // heading + messages for each section + trailing blank
+            (if has_pending { 1 + pc } else { 0 })
+                + (if has_pending_follow_up { 1 + fc } else { 0 })
+                + 1
+        } else {
+            0
+        };
+        let has_pending_layout = pending_lines > 0;
 
         let has_todo = !self.todo_items.is_empty()
             && self.todo_items.iter().any(|t| {
@@ -150,6 +161,7 @@ impl TuiApp {
             + 1
             + 2
             + if has_status { 3 } else { 0 }
+            + pending_lines
             + if has_todo { todo_lines + 1 } else { 0 }
             + if has_usage { 2 } else { 0 }
             + self.autocomplete_space_lines
@@ -168,6 +180,22 @@ impl TuiApp {
         if has_status {
             constraints.push(Constraint::Length(1));
             constraints.push(Constraint::Length(1));
+            constraints.push(Constraint::Length(1));
+        }
+        // Pending messages — between status bar and editor
+        if has_pending_layout {
+            if has_pending {
+                constraints.push(Constraint::Length(1));
+                for _ in 0..self.pending_user_messages.len() {
+                    constraints.push(Constraint::Length(1));
+                }
+            }
+            if has_pending_follow_up {
+                constraints.push(Constraint::Length(1));
+                for _ in 0..self.pending_follow_up_messages.len() {
+                    constraints.push(Constraint::Length(1));
+                }
+            }
             constraints.push(Constraint::Length(1));
         }
         if has_todo {
@@ -309,6 +337,62 @@ impl TuiApp {
                         i += 1;
                     }
 
+                    // Pending messages — between status bar and editor/todo
+                    if has_pending_layout {
+                        let dim = Style::default().add_modifier(Modifier::DIM);
+                        let pending_bg = Style::default().bg(Color::Rgb(45, 46, 60));
+                        if has_pending {
+                            let count = self.pending_user_messages.len();
+                            render_at!(
+                                i,
+                                Line::from(Span::styled(format!("── {} pending ──", count), dim,))
+                            );
+                            i += 1;
+                            for msg in self.pending_user_messages.iter() {
+                                let truncated = if msg.len() > (width as usize).saturating_sub(4) {
+                                    format!("{}...", &msg[..(width as usize).saturating_sub(7)])
+                                } else {
+                                    msg.clone()
+                                };
+                                render_at!(
+                                    i,
+                                    Line::from(Span::styled(
+                                        format!("  {}", truncated),
+                                        pending_bg,
+                                    ))
+                                );
+                                i += 1;
+                            }
+                        }
+                        if has_pending_follow_up {
+                            let count = self.pending_follow_up_messages.len();
+                            render_at!(
+                                i,
+                                Line::from(
+                                    Span::styled(format!("── {} follow-up ──", count), dim,)
+                                )
+                            );
+                            i += 1;
+                            for msg in self.pending_follow_up_messages.iter() {
+                                let truncated = if msg.len() > (width as usize).saturating_sub(4) {
+                                    format!("{}...", &msg[..(width as usize).saturating_sub(7)])
+                                } else {
+                                    msg.clone()
+                                };
+                                render_at!(
+                                    i,
+                                    Line::from(Span::styled(
+                                        format!("  {}", truncated),
+                                        pending_bg,
+                                    ))
+                                );
+                                i += 1;
+                            }
+                        }
+                        render_at!(i, Line::from(""));
+                        i += 1;
+                    }
+
                     if has_todo {
                         let todo_lines_rendered = self.render_todo_lines(width as usize);
                         for line in &todo_lines_rendered {
@@ -332,7 +416,6 @@ impl TuiApp {
                         i += 1;
                     }
 
-                    let editor_border_idx = i;
                     render_at!(i, top_border.clone());
                     i += 1;
 
@@ -432,68 +515,6 @@ impl TuiApp {
                         let overlay_area = Rect::new(0, overlay_y, width, dialog_lines);
                         frame.render_widget_ref(
                             &Paragraph::new(ratatui::text::Text::from(dialog_content)),
-                            overlay_area,
-                        );
-                    }
-
-                    // Pending messages rendered as overlay above the editor's
-                    // top border, not as layout constraints. This prevents
-                    // layout shift when pending messages appear/disappear.
-                    if (has_pending || has_pending_follow_up) && editor_border_idx < chunks.len() {
-                        let pending_count = self.pending_user_messages.len();
-                        let follow_up_count = self.pending_follow_up_messages.len();
-                        let total_pending_lines = pending_count + follow_up_count;
-                        let pending_total = 2u16 + total_pending_lines as u16;
-                        let border_chunk = &chunks[editor_border_idx];
-                        let overlay_y = border_chunk.y.saturating_sub(pending_total);
-                        let overlay_area = Rect::new(0, overlay_y, width, pending_total);
-
-                        let dim = Style::default().add_modifier(Modifier::DIM);
-                        let pending_bg = Style::default().bg(Color::Rgb(45, 46, 60));
-                        let mut overlay_lines: Vec<Line<'static>> = Vec::new();
-
-                        // Steer pending messages
-                        if has_pending {
-                            overlay_lines.push(Line::from(Span::styled(
-                                format!("── {} pending ──", pending_count),
-                                dim,
-                            )));
-                            for msg in self.pending_user_messages.iter() {
-                                let truncated = if msg.len() > (width as usize).saturating_sub(4) {
-                                    format!("{}...", &msg[..(width as usize).saturating_sub(7)])
-                                } else {
-                                    msg.clone()
-                                };
-                                overlay_lines.push(Line::from(Span::styled(
-                                    format!("  {}", truncated),
-                                    pending_bg,
-                                )));
-                            }
-                        }
-
-                        // Follow-up pending messages
-                        if has_pending_follow_up {
-                            overlay_lines.push(Line::from(Span::styled(
-                                format!("── {} follow-up ──", follow_up_count),
-                                dim,
-                            )));
-                            for msg in self.pending_follow_up_messages.iter() {
-                                let truncated = if msg.len() > (width as usize).saturating_sub(4) {
-                                    format!("{}...", &msg[..(width as usize).saturating_sub(7)])
-                                } else {
-                                    msg.clone()
-                                };
-                                overlay_lines.push(Line::from(Span::styled(
-                                    format!("  {}", truncated),
-                                    pending_bg,
-                                )));
-                            }
-                        }
-
-                        overlay_lines.push(Line::from(""));
-
-                        frame.render_widget_ref(
-                            &Paragraph::new(ratatui::text::Text::from(overlay_lines)),
                             overlay_area,
                         );
                     }
