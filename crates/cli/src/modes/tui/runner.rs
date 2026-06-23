@@ -142,8 +142,31 @@ pub async fn run_tui_mode(
                 break 'input action;
             }
 
-            // Drain remaining command events
-            commands::drain_commands(&mut ctx.tui, &mut cmd_rx);
+            // Drain remaining command events — AgentFinished must be
+            // handled here (not in apply_tui_command which treats it as
+            // no-op) to ensure usage display and session persistence.
+            // Without this, AgentFinished can be lost when it arrives in
+            // the channel alongside EndTurn and gets picked up by drain
+            // instead of the select! branch above.
+            loop {
+                match cmd_rx.try_recv() {
+                    Ok(TuiCommand::AgentFinished {
+                        result,
+                        prev_len,
+                        cancel_requested,
+                    }) => {
+                        action_dispatch::handle_agent_finished(
+                            &mut ctx,
+                            result,
+                            prev_len,
+                            cancel_requested,
+                        )
+                        .await;
+                    }
+                    Ok(cmd) => commands::apply_tui_command(&mut ctx.tui, cmd),
+                    Err(_) => break,
+                }
+            }
         };
 
         let should_quit = action_dispatch::dispatch_action(&mut ctx, action).await;

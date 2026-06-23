@@ -143,6 +143,7 @@ impl TuiApp {
         } else {
             0
         };
+        let has_usage = self.usage_display.is_some();
 
         let fixed_non_stream = 1u16
             + editor_line_count
@@ -150,6 +151,7 @@ impl TuiApp {
             + 2
             + if has_status { 3 } else { 0 }
             + if has_todo { todo_lines + 1 } else { 0 }
+            + if has_usage { 2 } else { 0 }
             + self.autocomplete_space_lines
             + dialog_lines;
         let stream_extra = if stream_chat_len > 0 { 2 } else { 0 };
@@ -174,6 +176,11 @@ impl TuiApp {
             }
             constraints.push(Constraint::Length(1));
         }
+        // Usage line displayed above the editor after a turn ends
+        if has_usage {
+            constraints.push(Constraint::Length(1));
+            constraints.push(Constraint::Length(1));
+        }
         // Editor area: border + editor + border + status separator + context separator
         constraints.push(Constraint::Length(1));
         constraints.push(Constraint::Length(editor_line_count));
@@ -187,22 +194,18 @@ impl TuiApp {
             constraints.push(Constraint::Length(dialog_lines));
         }
 
-        // When streaming, fill the full terminal height so stream content
-        // fills the visible area. Otherwise use the constraints sum so the
-        // viewport stays compact at the scrollback tail — insert_history
-        // pushes it down as content grows, and TerminalManager pins to
-        // screen bottom only when content exceeds terminal height.
-        let content_height = if has_stream {
-            height
-        } else {
-            constraints
-                .iter()
-                .map(|c| match c {
-                    Constraint::Length(len) => *len,
-                    _ => 0,
-                })
-                .sum()
-        };
+        // When streaming, content_height includes the stream lines as part
+        // of constraints (via stream_display_len), so the viewport naturally
+        // grows to accommodate them. This avoids the abrupt full-screen→compact
+        // viewport transition that creates visible blank gaps when streaming
+        // ends and the content is committed to scrollback.
+        let content_height: u16 = constraints
+            .iter()
+            .map(|c| match c {
+                Constraint::Length(len) => *len,
+                _ => 0,
+            })
+            .sum();
 
         // When selection/tree/api-key popups replace the editor, their height
         // is transient — it disappears on cancel. Exclude it from scrollback-
@@ -310,6 +313,19 @@ impl TuiApp {
                         let todo_lines_rendered = self.render_todo_lines(width as usize);
                         for line in &todo_lines_rendered {
                             render_at!(i, line.clone());
+                            i += 1;
+                        }
+                        render_at!(i, Line::from(""));
+                        i += 1;
+                    }
+
+                    // Usage info line — dimmed token count and duration
+                    if has_usage {
+                        if let Some(ref usage) = self.usage_display {
+                            use ratatui::style::Style as RtStyle;
+                            let dim = RtStyle::default().add_modifier(Modifier::DIM);
+                            let line = Line::from(Span::styled(format!(" {}  ", usage), dim));
+                            render_at!(i, line);
                             i += 1;
                         }
                         render_at!(i, Line::from(""));
@@ -1067,9 +1083,24 @@ impl TuiApp {
             .agent_start_time
             .as_ref()
             .map(|t| t.elapsed().as_secs());
-        self.chat.add_usage(input, output, duration_secs);
         self.total_input = self.total_input.saturating_add(input);
         self.total_output = self.total_output.saturating_add(output);
+        // Store for viewport display above editor
+        let dur_str = duration_secs
+            .map(|s| {
+                if s >= 60 {
+                    format!("{}m {:02}s", s / 60, s % 60)
+                } else {
+                    format!("{}s", s)
+                }
+            })
+            .unwrap_or_default();
+        self.usage_display = Some(format!(
+            "In: {}  Out: {}  Duration: {}",
+            format_tokens(input),
+            format_tokens(output),
+            dur_str,
+        ));
     }
 
     /// Update cache stats for footer display
@@ -1136,6 +1167,13 @@ impl TuiApp {
     /// Finalize the current turn (assistant done).
     pub fn finalize_turn(&mut self) {
         self.chat.mark_turn_end();
+        // Clear working/status message since the turn is done.
+        // This ensures the status is cleared even when the AgentFinished
+        // command gets drained as a no-op in the runner loop (commands.rs
+        // treats AgentFinished as a no-op since it's handled directly by
+        // the runner). The EndTurn command always arrives and is always
+        // processed before AgentFinished, so this covers the race.
+        self.set_status(None);
         if self.state != AppState::Selecting
             && self.state != AppState::TreeSelecting
             && self.state != AppState::ApiKeyInput
@@ -1166,6 +1204,7 @@ impl TuiApp {
 
     pub fn start_agent_timer(&mut self) {
         self.agent_start_time = Some(std::time::Instant::now());
+        self.usage_display = None;
     }
 
     pub fn stop_agent_timer(&mut self) {

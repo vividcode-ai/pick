@@ -156,6 +156,9 @@ pub struct TuiApp {
     /// Show the hardware terminal cursor (for IME support). When false,
     /// the physical cursor is hidden and only the ratatui virtual cursor is active.
     pub show_hardware_cursor: bool,
+    /// Last turn usage stats displayed above the editor after a conversation ends.
+    /// Set by show_usage(), cleared on next user message or /new.
+    pub usage_display: Option<String>,
 }
 
 /// Format token counts for compact display (e.g. 1500 → "1.5k", 15000 → "15k")

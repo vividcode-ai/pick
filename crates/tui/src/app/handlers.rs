@@ -93,6 +93,7 @@ impl TuiApp {
             todo_items: Vec::new(),
             todo_scroll_offset: 0,
             show_hardware_cursor: false,
+            usage_display: None,
         })
     }
 
@@ -171,6 +172,7 @@ impl TuiApp {
             todo_items: Vec::new(),
             todo_scroll_offset: 0,
             show_hardware_cursor: false,
+            usage_display: None,
         }
     }
 
