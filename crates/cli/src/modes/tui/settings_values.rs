@@ -55,6 +55,14 @@ fn rebuild_autocomplete_provider(ctx: &mut TuiContext, include_skills: bool) {
             });
         }
     }
+    // Add command templates from .pick/commands/ .md files
+    for cmd in ctx.resource_loader.commands() {
+        commands.push(TuiSlashCommand {
+            name: cmd.name.clone(),
+            description: Some(cmd.description.clone()),
+            argument_hint: cmd.argument_hint.clone(),
+        });
+    }
     let provider = CombinedAutocompleteProvider::new(commands, ctx.cwd.clone());
     ctx.tui.set_autocomplete_provider(Box::new(provider));
 }

@@ -464,7 +464,7 @@ fn resolve_thinking_level(thinking_arg: Option<&str>, model: &AiModel) -> Thinki
     }
 }
 
-/// Build autocomplete provider with slash commands and skills
+/// Build autocomplete provider with slash commands, skills, and command templates
 fn build_autocomplete_provider(
     cwd: &std::path::Path,
     resource_loader: &ResourceLoader,
@@ -487,6 +487,14 @@ fn build_autocomplete_provider(
                 argument_hint: None,
             });
         }
+    }
+    // Add command templates from .pick/commands/ .md files
+    for cmd in resource_loader.commands() {
+        commands.push(TuiSlashCommand {
+            name: cmd.name.clone(),
+            description: Some(cmd.description.clone()),
+            argument_hint: cmd.argument_hint.clone(),
+        });
     }
     let provider = CombinedAutocompleteProvider::new(commands, cwd.to_path_buf());
     Some(Box::new(provider))
