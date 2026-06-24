@@ -154,8 +154,6 @@ pub struct Settings {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub packages: Option<Vec<serde_json::Value>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub prompts: Option<Vec<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub themes: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub markdown: Option<MarkdownSettings>,

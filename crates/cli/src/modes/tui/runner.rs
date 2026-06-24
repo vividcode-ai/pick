@@ -95,6 +95,17 @@ pub async fn run_tui_mode(
                     ctx.tui.update_terminal_title();
                 }
 
+                // OS-level Ctrl+C signal fallback. On Windows, crossterm raw
+                // mode doesn't always prevent Ctrl+C from generating a real
+                // CTRL_C_EVENT that bypasses the keyboard reader thread and
+                // reaches tokio's signal handler. This branch catches that
+                // signal and triggers a clean exit through the normal path.
+                _ = ctx.ctrl_c_rx.changed() => {
+                    if *ctx.ctrl_c_rx.borrow() {
+                        break 'input TuiAction::Quit;
+                    }
+                }
+
                 cmd = cmd_rx.recv() => {
                     match cmd {
                         Some(TuiCommand::SetSessionTitle(title)) => {

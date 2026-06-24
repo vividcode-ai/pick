@@ -1,4 +1,4 @@
-//! Resource loader - loads extensions, skills, prompts, themes, and context files
+//! Resource loader - loads extensions, skills, themes, and context files
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -31,14 +31,6 @@ pub struct ResourceCollision {
     pub loser_path: String,
 }
 
-/// A loaded prompt template
-#[derive(Debug, Clone)]
-pub struct PromptTemplate {
-    pub name: String,
-    pub description: String,
-    pub file_path: String,
-}
-
 /// Source information for a resource
 #[derive(Debug, Clone)]
 pub struct SourceInfo {
@@ -59,8 +51,6 @@ pub struct ResourceLoader {
     extensions_result: Option<LoadExtensionsResult>,
     skills: Vec<Skill>,
     skill_diagnostics: Vec<ResourceDiagnostic>,
-    prompts: Vec<PromptTemplate>,
-    prompt_diagnostics: Vec<ResourceDiagnostic>,
     commands: Vec<prompt_templates::PromptTemplate>,
     command_diagnostics: Vec<ResourceDiagnostic>,
     themes: Vec<Theme>,
@@ -74,10 +64,8 @@ pub struct ResourceLoader {
 #[derive(Debug, Clone, Default)]
 pub struct ResourceLoaderOptions {
     pub no_skills: bool,
-    pub no_prompt_templates: bool,
     pub no_themes: bool,
     pub no_context_files: bool,
-    pub prompt_template_paths: Vec<PathBuf>,
     pub theme_paths: Vec<PathBuf>,
 }
 
@@ -89,8 +77,6 @@ impl ResourceLoader {
             extensions_result: None,
             skills: Vec::new(),
             skill_diagnostics: Vec::new(),
-            prompts: Vec::new(),
-            prompt_diagnostics: Vec::new(),
             commands: Vec::new(),
             command_diagnostics: Vec::new(),
             themes: Vec::new(),
@@ -133,14 +119,6 @@ impl ResourceLoader {
                 .collect();
         }
 
-        // Load prompts (unless disabled)
-        if !options.no_prompt_templates {
-            let prompt_result =
-                load_prompts(&self.agent_dir, &self.cwd, &options.prompt_template_paths);
-            self.prompts = prompt_result.prompts;
-            self.prompt_diagnostics = prompt_result.diagnostics;
-        }
-
         // Load commands
         let cmds = prompt_templates::load_command_templates(&self.agent_dir, &self.cwd);
         self.commands = cmds;
@@ -174,14 +152,6 @@ impl ResourceLoader {
 
     pub fn skill_diagnostics(&self) -> &[ResourceDiagnostic] {
         &self.skill_diagnostics
-    }
-
-    pub fn prompts(&self) -> &[PromptTemplate] {
-        &self.prompts
-    }
-
-    pub fn prompt_diagnostics(&self) -> &[ResourceDiagnostic] {
-        &self.prompt_diagnostics
     }
 
     pub fn commands(&self) -> &[FullPromptTemplate] {
@@ -300,132 +270,6 @@ fn load_context_file_from_dir(dir: &Path) -> Option<ContextFile> {
         }
     }
     None
-}
-
-// ============================================================================
-// Prompt Templates
-// ============================================================================
-
-fn load_prompts(agent_dir: &Path, cwd: &Path, extra_paths: &[PathBuf]) -> PromptLoadResult {
-    let mut prompts = Vec::new();
-    let mut diagnostics = Vec::new();
-    let mut seen_names = HashSet::new();
-
-    // Load from agent dir
-    let prompts_dir = agent_dir.join("prompts");
-    if prompts_dir.exists() {
-        load_prompts_from_dir(
-            &prompts_dir,
-            &mut prompts,
-            &mut diagnostics,
-            &mut seen_names,
-        );
-    }
-
-    // Load from project dir
-    let project_prompts_dir = cwd.join(config::CONFIG_DIR_NAME).join("prompts");
-    if project_prompts_dir.exists() {
-        load_prompts_from_dir(
-            &project_prompts_dir,
-            &mut prompts,
-            &mut diagnostics,
-            &mut seen_names,
-        );
-    }
-
-    // Load from extra paths
-    for path in extra_paths {
-        if path.is_dir() {
-            load_prompts_from_dir(path, &mut prompts, &mut diagnostics, &mut seen_names);
-        } else if path.is_file() {
-            load_prompt_from_file(path, &mut prompts, &mut diagnostics, &mut seen_names);
-        }
-    }
-
-    PromptLoadResult {
-        prompts,
-        diagnostics,
-    }
-}
-
-fn load_prompts_from_dir(
-    dir: &Path,
-    prompts: &mut Vec<PromptTemplate>,
-    diagnostics: &mut Vec<ResourceDiagnostic>,
-    seen_names: &mut HashSet<String>,
-) {
-    if let Ok(entries) = std::fs::read_dir(dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_file() {
-                load_prompt_from_file(&path, prompts, diagnostics, seen_names);
-            }
-        }
-    }
-}
-
-fn load_prompt_from_file(
-    path: &Path,
-    prompts: &mut Vec<PromptTemplate>,
-    diagnostics: &mut Vec<ResourceDiagnostic>,
-    seen_names: &mut HashSet<String>,
-) {
-    let content = match std::fs::read_to_string(path) {
-        Ok(c) => c,
-        Err(e) => {
-            diagnostics.push(ResourceDiagnostic {
-                r#type: "warning".to_string(),
-                message: format!("Failed to read prompt file: {}", e),
-                path: path.to_string_lossy().to_string(),
-                collision: None,
-            });
-            return;
-        }
-    };
-
-    let name = path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .map(|s| s.to_string())
-        .unwrap_or_else(|| "unnamed".to_string());
-
-    let description = parse_frontmatter_description(&content);
-
-    if seen_names.contains(&name) {
-        diagnostics.push(ResourceDiagnostic {
-            r#type: "collision".to_string(),
-            message: format!("Duplicate prompt name: {}", name),
-            path: path.to_string_lossy().to_string(),
-            collision: None,
-        });
-        return;
-    }
-
-    seen_names.insert(name.clone());
-    prompts.push(PromptTemplate {
-        name,
-        description,
-        file_path: path.to_string_lossy().to_string(),
-    });
-}
-
-fn parse_frontmatter_description(content: &str) -> String {
-    if let Some(fm) = content.strip_prefix("---")
-        && let Some(end) = fm.find("\n---")
-    {
-        let header = &fm[..end];
-        for line in header.lines() {
-            if let Some(desc) = line.trim().strip_prefix("description:") {
-                return desc.trim().to_string();
-            }
-        }
-    }
-    String::new()
-}
-
-struct PromptLoadResult {
-    prompts: Vec<PromptTemplate>,
-    diagnostics: Vec<ResourceDiagnostic>,
 }
 
 // ============================================================================

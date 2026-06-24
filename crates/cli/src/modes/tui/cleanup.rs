@@ -28,7 +28,7 @@ pub(crate) fn cleanup_tui_mode(ctx: &mut TuiContext) {
     print_session_box(&ctx.session_manager, ctx.version);
 }
 
-/// Print session resume hint box to stdout
+/// Print session resume hint box to stdout (with stderr fallback)
 fn print_session_box(session_manager: &pick_agent::session::SessionManager, version: &str) {
     let path = session_manager.session_path();
     let header = session_manager.header();
@@ -77,5 +77,27 @@ fn print_session_box(session_manager: &pick_agent::session::SessionManager, vers
         }
         println!("╰{}╯", "─".repeat(inner));
         let _ = std::io::stdout().flush();
+    } else {
+        // Session path or header unavailable — write session info to stderr as
+        // last-resort fallback so the user has some trace of the session.
+        let hdr = session_manager.header();
+        let short_id = hdr
+            .map(|h| {
+                if h.id.len() > 8 {
+                    &h.id[..8]
+                } else {
+                    h.id.as_str()
+                }
+            })
+            .unwrap_or("unknown");
+        let msg_count = session_manager.entries().len();
+        let _ = write!(
+            std::io::stderr(),
+            "\r━━━ Pick v{} session ended  (ID: {}, {} msgs) ━━━\r\n",
+            version,
+            short_id,
+            msg_count
+        );
+        let _ = std::io::stderr().flush();
     }
 }

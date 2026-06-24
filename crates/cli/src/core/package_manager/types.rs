@@ -44,7 +44,6 @@ pub struct ResolvedResource {
 pub struct ResolvedPaths {
     pub extensions: Vec<ResolvedResource>,
     pub skills: Vec<ResolvedResource>,
-    pub prompts: Vec<ResolvedResource>,
     pub themes: Vec<ResolvedResource>,
 }
 
@@ -121,7 +120,7 @@ pub enum ParsedSource {
 // Resource type constants
 // ============================================================================
 
-pub(crate) const RESOURCE_TYPES: [&str; 4] = ["extensions", "skills", "prompts", "themes"];
+pub(crate) const RESOURCE_TYPES: [&str; 3] = ["extensions", "skills", "themes"];
 pub(crate) const NETWORK_TIMEOUT_MS: u64 = 10000;
 pub(crate) const UPDATE_CHECK_CONCURRENCY: usize = 4;
 pub(crate) const GIT_UPDATE_CONCURRENCY: usize = 4;
@@ -136,8 +135,6 @@ pub(crate) struct PickManifest {
     pub(crate) extensions: Vec<String>,
     #[serde(default)]
     pub(crate) skills: Vec<String>,
-    #[serde(default)]
-    pub(crate) prompts: Vec<String>,
     #[serde(default)]
     pub(crate) themes: Vec<String>,
 }
@@ -164,7 +161,6 @@ pub(crate) struct ResourceEntry {
 pub(crate) struct ResourceAccumulator {
     pub(crate) extensions: HashMap<String, ResourceEntry>,
     pub(crate) skills: HashMap<String, ResourceEntry>,
-    pub(crate) prompts: HashMap<String, ResourceEntry>,
     pub(crate) themes: HashMap<String, ResourceEntry>,
 }
 
@@ -184,6 +180,5 @@ pub struct PackageSource {
 pub struct PackageFilter {
     pub extensions: Option<Vec<String>>,
     pub skills: Option<Vec<String>>,
-    pub prompts: Option<Vec<String>>,
     pub themes: Option<Vec<String>>,
 }

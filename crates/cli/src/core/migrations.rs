@@ -213,30 +213,6 @@ fn migrate_keybindings_config_file() {
     }
 }
 
-/// Migrate commands/ to prompts/
-fn migrate_commands_to_prompts(base_dir: &Path, label: &str) -> bool {
-    let commands_dir = base_dir.join("commands");
-    let prompts_dir = base_dir.join("prompts");
-
-    if commands_dir.exists() && !prompts_dir.exists() {
-        match std::fs::rename(&commands_dir, &prompts_dir) {
-            Ok(_) => {
-                eprintln!("Migrated {} commands/ → prompts/", label);
-                true
-            }
-            Err(e) => {
-                eprintln!(
-                    "Warning: Could not migrate {} commands/ to prompts/: {}",
-                    label, e
-                );
-                false
-            }
-        }
-    } else {
-        false
-    }
-}
-
 /// Check for deprecated hooks/ and tools/ directories
 fn check_deprecated_extension_dirs(base_dir: &Path, label: &str) -> Vec<String> {
     let mut warnings = Vec::new();
@@ -279,9 +255,6 @@ fn check_deprecated_extension_dirs(base_dir: &Path, label: &str) -> Vec<String> 
 fn migrate_extension_system(cwd: &Path) -> Vec<String> {
     let agent_dir = crate::config::get_agent_dir();
     let project_dir = cwd.join(crate::config::CONFIG_DIR_NAME);
-
-    migrate_commands_to_prompts(&agent_dir, "Global");
-    migrate_commands_to_prompts(&project_dir, "Project");
 
     let mut warnings = check_deprecated_extension_dirs(&agent_dir, "Global");
     warnings.extend(check_deprecated_extension_dirs(&project_dir, "Project"));

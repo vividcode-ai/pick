@@ -51,11 +51,9 @@ pub struct Args {
     pub export_html: Option<String>,
     pub no_extensions: bool,
     pub no_skills: bool,
-    pub no_prompt_templates: bool,
     pub no_themes: bool,
     pub no_context_files: bool,
     pub list_models: Option<String>,
-    pub prompt_templates: Vec<String>,
     pub themes: Vec<String>,
     pub file_args: Vec<String>,
     /// Agent mode (build/plan)
@@ -216,15 +214,8 @@ pub fn parse_args(args: Vec<String>) -> Args {
             }
             "--no-extensions" | "-ne" => parsed.no_extensions = true,
             "--no-skills" | "-ns" => parsed.no_skills = true,
-            "--no-prompt-templates" | "-np" => parsed.no_prompt_templates = true,
             "--no-themes" => parsed.no_themes = true,
             "--no-context-files" | "-nc" => parsed.no_context_files = true,
-            "--prompt-template" => {
-                i += 1;
-                if i < args.len() {
-                    parsed.prompt_templates.push(args[i].clone());
-                }
-            }
             "--theme" => {
                 i += 1;
                 if i < args.len() {
@@ -355,7 +346,6 @@ pub fn print_help() {
     println!("  --export <FILE>         Export session to HTML file");
     println!("  -ne, --no-extensions    Disable extensions");
     println!("  -ns, --no-skills        Disable skills");
-    println!("  -np, --no-prompt-templates  Disable prompt templates");
     println!("  --no-themes             Disable themes");
     println!("  -nc, --no-context-files Disable context files");
     println!("  --list-models [FILTER]  List available models");

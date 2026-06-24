@@ -462,7 +462,6 @@ impl DefaultPackageManager {
             "extensions" => Self::collect_auto_extension_entries(dir),
             _ => {
                 let pattern = match resource_type {
-                    "prompts" => regex::Regex::new(r"(?i)\.md$").unwrap(),
                     "themes" => regex::Regex::new(r"(?i)\.json$").unwrap(),
                     _ => regex::Regex::new(r"(?i)\.(ts|js)$").unwrap(),
                 };
@@ -581,7 +580,6 @@ impl DefaultPackageManager {
                 let patterns = match *resource_type {
                     "extensions" => f.extensions.as_ref(),
                     "skills" => f.skills.as_ref(),
-                    "prompts" => f.prompts.as_ref(),
                     "themes" => f.themes.as_ref(),
                     _ => None,
                 };
@@ -602,7 +600,6 @@ impl DefaultPackageManager {
                 let entries = match *resource_type {
                     "extensions" => &manifest.extensions,
                     "skills" => &manifest.skills,
-                    "prompts" => &manifest.prompts,
                     "themes" => &manifest.themes,
                     _ => continue,
                 };
@@ -617,7 +614,7 @@ impl DefaultPackageManager {
             return true;
         }
 
-        // Convention-based: look for extensions/, skills/, prompts/, themes/ dirs
+        // Convention-based: look for extensions/, skills/, themes/ dirs
         let mut has_any = false;
         for resource_type in &RESOURCE_TYPES {
             let dir = package_root.join(resource_type);
@@ -645,7 +642,6 @@ impl DefaultPackageManager {
             let entries = match resource_type {
                 "extensions" => &manifest.extensions,
                 "skills" => &manifest.skills,
-                "prompts" => &manifest.prompts,
                 "themes" => &manifest.themes,
                 _ => return,
             };
@@ -699,7 +695,6 @@ impl DefaultPackageManager {
             let entries = match resource_type {
                 "extensions" => manifest.extensions,
                 "skills" => manifest.skills,
-                "prompts" => manifest.prompts,
                 "themes" => manifest.themes,
                 _ => return (vec![], HashSet::new()),
             };
@@ -817,7 +812,6 @@ impl DefaultPackageManager {
         match resource_type {
             "extensions" => &mut accumulator.extensions,
             "skills" => &mut accumulator.skills,
-            "prompts" => &mut accumulator.prompts,
             "themes" => &mut accumulator.themes,
             _ => panic!("Unknown resource type: {}", resource_type),
         }
@@ -920,7 +914,6 @@ impl DefaultPackageManager {
         ResolvedPaths {
             extensions: map_to_resolved(accumulator.extensions),
             skills: map_to_resolved(accumulator.skills),
-            prompts: map_to_resolved(accumulator.prompts),
             themes: map_to_resolved(accumulator.themes),
         }
     }
@@ -949,14 +942,12 @@ impl DefaultPackageManager {
         let project_dirs = [
             ("extensions", project_base_dir.join("extensions")),
             ("skills", project_base_dir.join("skills")),
-            ("prompts", project_base_dir.join("prompts")),
             ("themes", project_base_dir.join("themes")),
         ];
 
         let user_dirs = [
             ("extensions", global_base_dir.join("extensions")),
             ("skills", global_base_dir.join("skills")),
-            ("prompts", global_base_dir.join("prompts")),
             ("themes", global_base_dir.join("themes")),
         ];
 

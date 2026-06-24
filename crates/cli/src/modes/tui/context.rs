@@ -3,7 +3,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::Instant;
 
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, watch};
 
 use crate::args::Args;
 use crate::core::agent_mode::AgentMode;
@@ -62,6 +62,11 @@ pub(crate) struct TuiContext {
 
     // Auth
     pub auth: Arc<AuthStorage>,
+
+    // OS-level Ctrl+C signal receiver (fallback for Windows edge cases where
+    // crossterm raw mode doesn't fully intercept the signal). When the signal
+    // fires, the main loop breaks and runs the normal cleanup path.
+    pub ctrl_c_rx: watch::Receiver<bool>,
 
     // Whether to hide thinking blocks (shared with event handler for live updates)
     pub hide_thinking: Arc<AtomicBool>,

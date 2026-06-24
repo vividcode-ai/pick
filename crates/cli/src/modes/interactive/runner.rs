@@ -90,14 +90,8 @@ pub async fn run_interactive_mode(
             &args.extensions,
             &ResourceLoaderOptions {
                 no_skills: args.no_skills,
-                no_prompt_templates: args.no_prompt_templates,
                 no_themes: args.no_themes,
                 no_context_files: args.no_context_files,
-                prompt_template_paths: args
-                    .prompt_templates
-                    .iter()
-                    .map(std::path::PathBuf::from)
-                    .collect(),
                 theme_paths: args.themes.iter().map(std::path::PathBuf::from).collect(),
             },
         )

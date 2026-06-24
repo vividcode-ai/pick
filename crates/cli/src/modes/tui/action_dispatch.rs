@@ -160,6 +160,12 @@ pub(crate) async fn handle_agent_finished(
             // Clear status — usage is already shown in chat via show_usage
             ctx.tui.set_status(None);
 
+            // Transition to Input state BEFORE auto-compaction so that the
+            // main loop is in the correct state if Ctrl+C reaches the OS-level
+            // handler during the potentially long-running compact call.
+            // (The duplicate finalize_turn at the function bottom is harmless.)
+            ctx.tui.finalize_turn();
+
             // Render usage status before auto-compaction (which may take a while)
             let _ = ctx.tui.render_with_terminal(&mut ctx.terminal_manager);
 

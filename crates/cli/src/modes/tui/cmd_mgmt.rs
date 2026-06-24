@@ -383,15 +383,8 @@ pub(crate) async fn handle_reload(ctx: &mut TuiContext) {
             &ctx.args.extensions,
             &ResourceLoaderOptions {
                 no_skills: ctx.args.no_skills,
-                no_prompt_templates: ctx.args.no_prompt_templates,
                 no_themes: ctx.args.no_themes,
                 no_context_files: ctx.args.no_context_files,
-                prompt_template_paths: ctx
-                    .args
-                    .prompt_templates
-                    .iter()
-                    .map(std::path::PathBuf::from)
-                    .collect(),
                 theme_paths: ctx
                     .args
                     .themes
@@ -454,7 +447,7 @@ pub(crate) async fn handle_reload(ctx: &mut TuiContext) {
 
     ctx.tui
         .chat
-        .add_system_message("Reloaded keybindings, extensions, skills, prompts, and themes.");
+        .add_system_message("Reloaded keybindings, extensions, skills, and themes.");
     if !context_files.is_empty() {
         ctx.tui.chat.add_system_message(&format!(
             "Context files: \x1b[2m{}\x1b[0m",

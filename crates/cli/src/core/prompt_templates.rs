@@ -1,4 +1,4 @@
-//! Prompt template loading, parsing, and expansion
+//! Command template loading, parsing, and expansion
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -215,110 +215,6 @@ fn load_templates_from_dir(
             let file_path_str = path.to_string_lossy().to_string();
             let source_info = get_source_info(&file_path_str);
             if let Some(template) = load_template_from_file(&path, source_info) {
-                templates.push(template);
-            }
-        }
-    }
-
-    templates
-}
-
-/// Options for loading prompt templates
-pub struct LoadPromptTemplatesOptions {
-    pub cwd: PathBuf,
-    pub agent_dir: PathBuf,
-    pub prompt_paths: Vec<PathBuf>,
-    pub include_defaults: bool,
-}
-
-/// Load all prompt templates from global, project, and explicit paths
-pub fn load_prompt_templates(options: LoadPromptTemplatesOptions) -> Vec<PromptTemplate> {
-    let resolved_cwd = options.cwd;
-    let resolved_agent_dir = options.agent_dir;
-    let prompt_paths = options.prompt_paths;
-    let include_defaults = options.include_defaults;
-
-    let mut templates: Vec<PromptTemplate> = Vec::new();
-
-    let global_prompts_dir = resolved_agent_dir.join("prompts");
-    let project_prompts_dir = resolved_cwd.join(CONFIG_DIR_NAME).join("prompts");
-
-    let get_source_info = |resolved_path: &str| -> SourceInfo {
-        let resolved = Path::new(resolved_path);
-
-        if is_under_path(resolved, &global_prompts_dir) {
-            create_synthetic_source_info(
-                resolved_path,
-                SyntheticSourceOptions {
-                    source: "local".to_string(),
-                    scope: Some(SourceScope::User),
-                    origin: None,
-                    base_dir: Some(global_prompts_dir.to_string_lossy().to_string()),
-                },
-            )
-        } else if is_under_path(resolved, &project_prompts_dir) {
-            create_synthetic_source_info(
-                resolved_path,
-                SyntheticSourceOptions {
-                    source: "local".to_string(),
-                    scope: Some(SourceScope::Project),
-                    origin: None,
-                    base_dir: Some(project_prompts_dir.to_string_lossy().to_string()),
-                },
-            )
-        } else {
-            let base_dir = if Path::new(resolved_path).is_dir() {
-                resolved_path.to_string()
-            } else {
-                Path::new(resolved_path)
-                    .parent()
-                    .map(|p| p.to_string_lossy().to_string())
-                    .unwrap_or_default()
-            };
-            create_synthetic_source_info(
-                resolved_path,
-                SyntheticSourceOptions {
-                    source: "local".to_string(),
-                    scope: None,
-                    origin: None,
-                    base_dir: Some(base_dir),
-                },
-            )
-        }
-    };
-
-    if include_defaults {
-        templates.extend(load_templates_from_dir(
-            &global_prompts_dir,
-            &get_source_info,
-        ));
-        templates.extend(load_templates_from_dir(
-            &project_prompts_dir,
-            &get_source_info,
-        ));
-    }
-
-    // Load explicit prompt paths
-    for raw_path in &prompt_paths {
-        let resolved_path = if raw_path.is_absolute() {
-            raw_path.clone()
-        } else {
-            resolved_cwd.join(raw_path)
-        };
-
-        if !resolved_path.exists() {
-            continue;
-        }
-
-        if resolved_path.is_dir() {
-            templates.extend(load_templates_from_dir(&resolved_path, &get_source_info));
-        } else if resolved_path.is_file()
-            && let Some(ext) = resolved_path.extension()
-            && ext == "md"
-        {
-            let path_str = resolved_path.to_string_lossy().to_string();
-            let source_info = get_source_info(&path_str);
-            if let Some(template) = load_template_from_file(&resolved_path, source_info) {
                 templates.push(template);
             }
         }

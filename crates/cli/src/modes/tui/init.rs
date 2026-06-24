@@ -229,6 +229,22 @@ pub(crate) async fn init_tui_mode(
     let (cmd_tx, cmd_rx) = mpsc::unbounded_channel::<TuiCommand>();
     let (evt_tx, evt_rx) = mpsc::unbounded_channel::<crossterm::event::Event>();
 
+    // OS-level Ctrl+C signal watcher. On Windows, crossterm raw mode does not
+    // always prevent Ctrl+C from generating a real CTRL_C_EVENT (tokio's signal
+    // handler may fire despite ENABLE_PROCESSED_INPUT being cleared). When that
+    // happens the default handler would call ExitProcess and bypass cleanup.
+    // This watcher catches the signal and lets the main loop break cleanly.
+    let (ctrl_c_tx, ctrl_c_rx) = tokio::sync::watch::channel(false);
+    tokio::spawn(async move {
+        loop {
+            if tokio::signal::ctrl_c().await.is_ok() {
+                let _ = ctrl_c_tx.send(true);
+            } else {
+                break;
+            }
+        }
+    });
+
     // Spawn keyboard reader thread
     std::thread::spawn(move || {
         loop {
@@ -317,6 +333,7 @@ pub(crate) async fn init_tui_mode(
         tool_args_map,
         on_event,
         pending_command: None,
+        ctrl_c_rx,
         scoped_models: Vec::new(),
         was_interrupted: Arc::new(AtomicBool::new(false)),
         steer_queue: Arc::new(Mutex::new(PendingMessageQueue::new(steer_mode))),

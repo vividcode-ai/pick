@@ -7,7 +7,6 @@ use crate::core::tools::render_utils::ToolTheme;
 pub enum ResourceType {
     Extensions,
     Skills,
-    Prompts,
     Themes,
 }
 
@@ -16,7 +15,6 @@ impl ResourceType {
         match self {
             ResourceType::Extensions => "Extensions",
             ResourceType::Skills => "Skills",
-            ResourceType::Prompts => "Prompts",
             ResourceType::Themes => "Themes",
         }
     }
@@ -118,7 +116,6 @@ fn get_group_label(metadata: &PathMetadata) -> String {
 pub fn build_resource_groups(
     extensions: &[ResourceItem],
     skills: &[ResourceItem],
-    prompts: &[ResourceItem],
     themes: &[ResourceItem],
 ) -> Vec<ResourceGroup> {
     use std::collections::HashMap;
@@ -172,7 +169,6 @@ pub fn build_resource_groups(
 
     add_to_group(&mut group_map, extensions, ResourceType::Extensions);
     add_to_group(&mut group_map, skills, ResourceType::Skills);
-    add_to_group(&mut group_map, prompts, ResourceType::Prompts);
     add_to_group(&mut group_map, themes, ResourceType::Themes);
 
     // Sort groups
@@ -200,8 +196,7 @@ pub fn build_resource_groups(
         match rt {
             ResourceType::Extensions => 0,
             ResourceType::Skills => 1,
-            ResourceType::Prompts => 2,
-            ResourceType::Themes => 3,
+            ResourceType::Themes => 2,
         }
     };
     for group in &mut groups {

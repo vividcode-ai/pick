@@ -13,7 +13,6 @@ pub async fn select_config(options: ConfigSelectorOptions) {
     let items = vec![
         format!("Extensions ({}/extensions)", options.agent_dir),
         format!("Skills ({}/skills)", options.agent_dir),
-        format!("Prompts ({}/prompts)", options.agent_dir),
         format!("Themes ({}/themes)", options.agent_dir),
         format!("Settings ({}/settings.json)", options.agent_dir),
     ];

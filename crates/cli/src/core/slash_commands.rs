@@ -114,7 +114,7 @@ pub const BUILTIN_SLASH_COMMANDS: &[BuiltinSlashCommand] = &[
     },
     BuiltinSlashCommand {
         name: "reload",
-        description: "Reload keybindings, extensions, skills, prompts, and themes",
+        description: "Reload keybindings, extensions, skills, and themes",
     },
     BuiltinSlashCommand {
         name: "plan",
