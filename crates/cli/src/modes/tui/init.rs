@@ -172,6 +172,10 @@ pub(crate) async fn init_tui_mode(
                         current_ver, latest_ver
                     );
                     tui.chat.add_system_message(&banner);
+                    tui.start_update_prompt(pick_tui::components::UpdatePromptState::new(
+                        current_ver,
+                        &latest_ver,
+                    ));
                 }
             }
         }
