@@ -6,11 +6,9 @@ pub(crate) fn cleanup_tui_mode(ctx: &mut TuiContext) {
     print!("\x1b[?2004l");
     let _ = std::io::Write::flush(&mut std::io::stdout());
 
-    // Render one final frame with a compact viewport so the cursor
-    // lands right below the last content line (no blank gap).
-    let had_conversation = ctx.tui.has_ever_streamed;
+    // Render one final frame so scrollback history is fully committed to the
+    // terminal, then restore cursor and disable raw mode.
     ctx.tui.state = pick_tui::app::AppState::Input;
-    ctx.tui.has_ever_streamed = false;
     let _ = ctx.tui.render_with_terminal(&mut ctx.terminal_manager);
 
     // Cleanup terminal manager (restore cursor, clear overflow)
@@ -19,16 +17,30 @@ pub(crate) fn cleanup_tui_mode(ctx: &mut TuiContext) {
     // TUI app cleanup (disable raw mode, print newline)
     ctx.tui.cleanup();
 
-    // Print session resume hint in a rounded box only when a conversation
-    // actually occurred during this session.  Without this guard the box
-    // appears even when the user quits immediately without interaction,
-    // which can render partially on some terminals.
-    if had_conversation {
+    // Print extra newline to ensure we're clear of any TUI content
+    println!();
+
+    if ctx.skill_command_executed {
+        // For /skill: commands, show a clean exit prompt text (not the session box)
+        print_skill_exit_prompt(ctx.version);
+    } else {
+        // Print session resume hint in a rounded box.
+        // Always print if a session exists — the box is harmless for short
+        // sessions and necessary when the agent ran tool-only execution
+        // (/skill:, /goal) that never triggered streaming content.
         print_session_box(&ctx.session_manager, ctx.version);
     }
 }
 
-/// Print session resume hint box to stderr
+/// Print a simple exit prompt text for skill command sessions
+fn print_skill_exit_prompt(version: &str) {
+    use std::io::Write;
+    let _ = std::io::stdout().flush();
+    println!("━━━ {} Skill session ended ━━━", version);
+    let _ = std::io::stdout().flush();
+}
+
+/// Print session resume hint box to stdout
 fn print_session_box(session_manager: &pick_agent::session::SessionManager, version: &str) {
     let path = session_manager.session_path();
     let header = session_manager.header();
@@ -67,11 +79,16 @@ fn print_session_box(session_manager: &pick_agent::session::SessionManager, vers
             format!("│ {}{}│", content, "\u{00a0}".repeat(pad))
         };
 
-        eprintln!();
-        eprintln!("╭{}╮", "─".repeat(inner));
+        // Write to stdout (same stream as TUI) so cursor positioning is
+        // consistent. Flush before and after to ensure ordering.
+        use std::io::Write;
+        let _ = std::io::stdout().flush();
+        println!();
+        println!("╭{}╮", "─".repeat(inner));
         for line in &box_content {
-            eprintln!("{}", box_line(line));
+            println!("{}", box_line(line));
         }
-        eprintln!("╰{}╯", "─".repeat(inner));
+        println!("╰{}╯", "─".repeat(inner));
+        let _ = std::io::stdout().flush();
     }
 }

@@ -382,6 +382,9 @@ async fn handle_submit(ctx: &mut TuiContext, user_text: String) {
     ctx.tui.paste_accumulator.clear();
     ctx.tui.last_paste_time = None;
 
+    // Reset skill flag — will be set true below if this is a /skill: command
+    ctx.skill_command_executed = false;
+
     let trimmed = user_text.trim().to_string();
     let mut user_text = user_text;
 
@@ -394,6 +397,7 @@ async fn handle_submit(ctx: &mut TuiContext, user_text: String) {
             Some(expanded) => {
                 user_text = expanded;
                 is_skill_expanded = true;
+                ctx.skill_command_executed = true;
             }
             None => return,
         }
@@ -418,6 +422,16 @@ async fn handle_submit(ctx: &mut TuiContext, user_text: String) {
     }
 
     // ---- Run the agent (flat EventStream model) ----
+    // Commands that start with '/' (like /skill:name, /goal <text>) keep
+    // state as Input in submit_input() — correct for sync slash commands
+    // but not for those that spawn an agent task. Transition to Streaming
+    // here so the UI shows the working state, Ctrl+C triggers immediate
+    // quit, and has_ever_streamed reflects that the session ran.
+    if ctx.tui.state != pick_tui::app::AppState::Streaming {
+        ctx.tui.state = pick_tui::app::AppState::Streaming;
+        ctx.tui.has_ever_streamed = true;
+        ctx.tui.update_terminal_title();
+    }
     ctx.tui.start_agent_timer();
     let prev_len = ctx.all_messages.len();
 

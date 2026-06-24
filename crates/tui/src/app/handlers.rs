@@ -1176,6 +1176,7 @@ impl TuiApp {
             self.state = AppState::Streaming;
             self.update_terminal_title();
         }
+        self.has_ever_streamed = true;
         Some(TuiAction::Submit(text))
     }
 }
