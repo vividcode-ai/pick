@@ -898,7 +898,6 @@ impl TuiApp {
     }
 
     /// Compute the number of visual lines occupied by pending user messages
-
     /// Update shared chat render cache
     pub fn build_selection_popup_lines(&self, width: u16) -> Vec<Line<'static>> {
         fn split_bracket_suffix(s: &str) -> (&str, &str) {
