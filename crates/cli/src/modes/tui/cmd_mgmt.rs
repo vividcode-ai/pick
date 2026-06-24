@@ -394,6 +394,10 @@ pub(crate) async fn handle_reload(ctx: &mut TuiContext) {
             },
         )
         .await;
+
+    // Rebuild autocomplete to pick up new command templates from .pick/commands/
+    super::settings_values::rebuild_autocomplete_provider(ctx, sm.get_enable_skill_commands());
+
     let context_files = super::types::build_context_display_names(&ctx.resource_loader);
     let skills = super::types::build_skill_display_names(&ctx.resource_loader);
 
@@ -447,7 +451,7 @@ pub(crate) async fn handle_reload(ctx: &mut TuiContext) {
 
     ctx.tui
         .chat
-        .add_system_message("Reloaded keybindings, extensions, skills, and themes.");
+        .add_system_message("Reloaded keybindings, extensions, skills, commands, and themes.");
     if !context_files.is_empty() {
         ctx.tui.chat.add_system_message(&format!(
             "Context files: \x1b[2m{}\x1b[0m",

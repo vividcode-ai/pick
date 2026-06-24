@@ -37,7 +37,7 @@ pub(crate) fn toggle_enable_skill_commands(sm: &mut SettingsManager, ctx: &mut T
     rebuild_autocomplete_provider(ctx, sm.get_enable_skill_commands());
 }
 
-fn rebuild_autocomplete_provider(ctx: &mut TuiContext, include_skills: bool) {
+pub(crate) fn rebuild_autocomplete_provider(ctx: &mut TuiContext, include_skills: bool) {
     let mut commands: Vec<TuiSlashCommand> = BUILTIN_SLASH_COMMANDS
         .iter()
         .map(|c| TuiSlashCommand {
