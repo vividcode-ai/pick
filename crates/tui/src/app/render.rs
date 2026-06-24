@@ -644,14 +644,18 @@ impl TuiApp {
                 "\x1b[1m[Context]\x1b[0m\u{00a0}\u{00a0}{}",
                 self.context_file_names.join(", ")
             );
-            lines.push(box_line(&ctx));
+            for line in wrap(&ctx) {
+                lines.push(box_line(&line));
+            }
         }
         if !self.skill_names.is_empty() {
             let skl = format!(
                 "\x1b[1m[Skills]\x1b[0m\u{00a0}\u{00a0}\u{00a0}{}",
                 self.skill_names.join(", ")
             );
-            lines.push(box_line(&skl));
+            for line in wrap(&skl) {
+                lines.push(box_line(&line));
+            }
         }
 
         lines.push(format!("╰{}╯", "─".repeat(inner)));
