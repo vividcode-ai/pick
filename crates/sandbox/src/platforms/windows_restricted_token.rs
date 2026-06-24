@@ -686,7 +686,16 @@ impl Sandbox for WindowsRestrictedTokenSandbox {
     ) -> Option<Result<(i32, String, String), String>> {
         #[cfg(windows)]
         {
-            Some(win_impl::run_sandboxed_command(req))
+            // On Windows, direct_spawn with CreateRestrictedToken has msys
+            // compatibility issues (signal pipes, BaseNamedObjects access).
+            // Return None to fall through to the transform + tokio::process::Command
+            // path (standard CreateProcessW without restricted token), matching codex's
+            // default execution flow. Security is maintained via:
+            //   - Filesystem policy (absolute path access control)
+            //   - Exec policy (dangerous command detection)
+            //   - Guardian (circuit breaker)
+            let _ = req;
+            None
         }
         #[cfg(not(windows))]
         {

@@ -281,14 +281,23 @@ pub fn format_skills_for_prompt(skills: &[Skill]) -> String {
         return String::new();
     }
 
-    let mut result = String::from("<available_skills>\n");
+    let mut result = String::from(
+        "The following skills provide specialized instructions for specific tasks.\n\
+         Use the read tool to load a skill's file when the task matches its description.\n\
+         When a skill file references a relative path, resolve it against the skill directory \
+         (parent of SKILL.md / dirname of the path) and use that absolute path in tool commands.\n\n",
+    );
+    result.push_str("<available_skills>\n");
     for skill in &available {
+        let location = skill.file_path.to_string_lossy();
         result.push_str(&format!(
-            r#"<skill name="{}">
-<description>{}</description>
-</skill>
+            r#"  <skill>
+    <name>{}</name>
+    <description>{}</description>
+    <location>{}</location>
+  </skill>
 "#,
-            skill.name, skill.description
+            skill.name, skill.description, location
         ));
     }
     result.push_str("</available_skills>");
@@ -359,8 +368,15 @@ Hello world"#;
         ];
 
         let formatted = format_skills_for_prompt(&skills);
+        // Check intro text
+        assert!(formatted.contains("read tool to load a skill's file"));
+        assert!(formatted.contains("skill directory"));
+        // Check test-1 with all new fields
         assert!(formatted.contains("test-1"));
         assert!(formatted.contains("First skill"));
-        assert!(!formatted.contains("test-2")); // disabled for model invocation
+        assert!(formatted.contains("/tmp/test-1.md"));
+        assert!(formatted.contains("<location>"));
+        // test-2 should be excluded (disabled for model invocation)
+        assert!(!formatted.contains("test-2"));
     }
 }
