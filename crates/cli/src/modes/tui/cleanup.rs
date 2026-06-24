@@ -1,4 +1,5 @@
 use super::context::TuiContext;
+use std::io::Write;
 
 /// Disable bracketed paste mode, restore terminal, print session resume box
 pub(crate) fn cleanup_tui_mode(ctx: &mut TuiContext) {
@@ -17,12 +18,20 @@ pub(crate) fn cleanup_tui_mode(ctx: &mut TuiContext) {
     // TUI app cleanup (disable raw mode, print newline)
     ctx.tui.cleanup();
 
-    // Print extra newline to ensure we're clear of any TUI content
-    println!();
-
+    // Print exit information. We do this AFTER disable_raw_mode so that
+    // the terminal processes newlines as CR+LF, ensuring the cursor is
+    // always positioned at the start of the next line.
     if ctx.skill_command_executed {
-        // For /skill: commands, show a clean exit prompt text (not the session box)
-        print_skill_exit_prompt(ctx.version);
+        // For skill sessions: print a simple exit line.
+        // Use explicit \r\n sequences for reliable cursor positioning
+        // on all platforms (Windows, Unix).
+        let stdout = std::io::stdout();
+        let mut h = stdout.lock();
+        // Print the exit text with \r prefix (ensure column 0) and
+        // \r\n suffix (move cursor to start of next line for shell prompt)
+        write!(h, "\r━━━ {} Skill session ended ━━━\r\n", ctx.version).ok();
+        h.flush().ok();
+        drop(h);
     } else {
         // Print session resume hint in a rounded box.
         // Always print if a session exists — the box is harmless for short
@@ -30,14 +39,6 @@ pub(crate) fn cleanup_tui_mode(ctx: &mut TuiContext) {
         // (/skill:, /goal) that never triggered streaming content.
         print_session_box(&ctx.session_manager, ctx.version);
     }
-}
-
-/// Print a simple exit prompt text for skill command sessions
-fn print_skill_exit_prompt(version: &str) {
-    use std::io::Write;
-    let _ = std::io::stdout().flush();
-    println!("━━━ {} Skill session ended ━━━", version);
-    let _ = std::io::stdout().flush();
 }
 
 /// Print session resume hint box to stdout
@@ -81,7 +82,6 @@ fn print_session_box(session_manager: &pick_agent::session::SessionManager, vers
 
         // Write to stdout (same stream as TUI) so cursor positioning is
         // consistent. Flush before and after to ensure ordering.
-        use std::io::Write;
         let _ = std::io::stdout().flush();
         println!();
         println!("╭{}╮", "─".repeat(inner));
