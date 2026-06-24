@@ -83,7 +83,8 @@ impl PermissionManager {
             None
         };
 
-        let sandbox_config = if profile.sandbox_enabled {
+        let sandbox_enabled = config.map(|c| c.sandbox_enabled).unwrap_or(true);
+        let sandbox_config = if profile.sandbox_enabled && sandbox_enabled {
             let sandbox_type = if cfg!(target_os = "linux") {
                 SandboxType::LinuxBwrap
             } else if cfg!(target_os = "macos") {

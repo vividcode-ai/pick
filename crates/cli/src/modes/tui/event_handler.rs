@@ -44,7 +44,12 @@ pub(crate) fn create_on_event(
             ref partial_result,
             ..
         } => {
-            if tool_name == "todo_plan" {
+            if tool_name == "todo_plan"
+                || matches!(
+                    tool_name.as_str(),
+                    "get_goal" | "create_goal" | "update_goal"
+                )
+            {
                 return;
             }
             let partial_output = partial_result

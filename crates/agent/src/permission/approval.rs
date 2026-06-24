@@ -43,6 +43,10 @@ impl Default for GranularApprovalConfig {
     }
 }
 
+fn default_sandbox_enabled() -> bool {
+    true
+}
+
 /// Complete permission configuration that can be merged from settings
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PermissionConfig {
@@ -54,6 +58,12 @@ pub struct PermissionConfig {
 
     #[serde(default = "default_permission_profile")]
     pub permission_profile: String,
+
+    /// Whether the platform sandbox (e.g. Windows restricted token) is enabled.
+    /// When disabled, commands run without sandbox isolation while other
+    /// permission safeguards (exec policy, guardian, fs policy) remain active.
+    #[serde(default = "default_sandbox_enabled")]
+    pub sandbox_enabled: bool,
 }
 
 fn default_permission_profile() -> String {
@@ -66,6 +76,7 @@ impl Default for PermissionConfig {
             approval_policy: ApprovalPolicy::default(),
             granular: None,
             permission_profile: default_permission_profile(),
+            sandbox_enabled: default_sandbox_enabled(),
         }
     }
 }

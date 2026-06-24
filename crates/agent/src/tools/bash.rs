@@ -132,6 +132,15 @@ pub fn create_bash_tool() -> AgentTool {
                     .map_err(|e| format!("{} Failed to get shell config: {}", plat, e))?;
 
                 // ---- Sandbox execution path ----
+                // Resolve sandbox timeout from config, falling back to 120 seconds
+                let sandbox_timeout = if let Some(ref pm) = ctx.permission_manager
+                    && let Some(ref sc) = pm.sandbox_config
+                {
+                    sc.timeout_secs
+                } else {
+                    120
+                };
+
                 // Step 1: Try direct_spawn (Windows: CreateProcessAsUserW with restricted token)
                 if let Some(sandbox) = ctx.sandbox.as_ref()
                     && let Some(cwd) = ctx.cwd.as_ref()
@@ -143,7 +152,7 @@ pub fn create_bash_tool() -> AgentTool {
                         &shell_args,
                         cwd,
                         ctx.fs_policy.clone(),
-                        0,
+                        sandbox_timeout,
                     );
                     if let Some(ref pm) = ctx.permission_manager
                         && let Some(ref sc) = pm.sandbox_config
@@ -197,7 +206,7 @@ pub fn create_bash_tool() -> AgentTool {
                             &shell_args,
                             cwd,
                             ctx.fs_policy.clone(),
-                            0,
+                            sandbox_timeout,
                         );
                         if sandbox.is_available() {
                             match sandbox.transform(&req) {

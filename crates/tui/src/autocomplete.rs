@@ -303,7 +303,7 @@ impl AutocompleteProvider for CombinedAutocompleteProvider {
 
         // Slash command
         if prefix.starts_with('/') {
-            let result = format!("{} /{} {}", before_prefix, item.value, text_after_cursor);
+            let result = format!("{}/{} {}", before_prefix, item.value, text_after_cursor);
             let cursor = before_prefix.len() + item.value.len() + 2; // +2 for / and space
             return (result, cursor);
         }

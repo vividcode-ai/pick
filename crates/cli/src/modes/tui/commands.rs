@@ -14,7 +14,13 @@ pub(crate) fn apply_tui_command(tui: &mut TuiApp, cmd: TuiCommand) {
             tool_name,
             args,
         } => {
-            if tool_name != "question" && tool_name != "todo_plan" {
+            if tool_name != "question"
+                && tool_name != "todo_plan"
+                && !matches!(
+                    tool_name.as_str(),
+                    "get_goal" | "create_goal" | "update_goal"
+                )
+            {
                 tui.add_tool_execution(&tool_call_id, &tool_name, args);
             }
         }
@@ -30,7 +36,13 @@ pub(crate) fn apply_tui_command(tui: &mut TuiApp, cmd: TuiCommand) {
             output,
             is_error,
         } => {
-            if tool_name != "question" && tool_name != "todo_plan" {
+            if tool_name != "question"
+                && tool_name != "todo_plan"
+                && !matches!(
+                    tool_name.as_str(),
+                    "get_goal" | "create_goal" | "update_goal"
+                )
+            {
                 tui.update_tool_execution(&tool_call_id, &output, is_error);
             }
         }

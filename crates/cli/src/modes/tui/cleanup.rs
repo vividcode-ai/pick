@@ -8,6 +8,7 @@ pub(crate) fn cleanup_tui_mode(ctx: &mut TuiContext) {
 
     // Render one final frame with a compact viewport so the cursor
     // lands right below the last content line (no blank gap).
+    let had_conversation = ctx.tui.has_ever_streamed;
     ctx.tui.state = pick_tui::app::AppState::Input;
     ctx.tui.has_ever_streamed = false;
     let _ = ctx.tui.render_with_terminal(&mut ctx.terminal_manager);
@@ -18,8 +19,13 @@ pub(crate) fn cleanup_tui_mode(ctx: &mut TuiContext) {
     // TUI app cleanup (disable raw mode, print newline)
     ctx.tui.cleanup();
 
-    // Print session resume hint in a rounded box
-    print_session_box(&ctx.session_manager, ctx.version);
+    // Print session resume hint in a rounded box only when a conversation
+    // actually occurred during this session.  Without this guard the box
+    // appears even when the user quits immediately without interaction,
+    // which can render partially on some terminals.
+    if had_conversation {
+        print_session_box(&ctx.session_manager, ctx.version);
+    }
 }
 
 /// Print session resume hint box to stderr
