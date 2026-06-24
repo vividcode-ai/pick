@@ -686,16 +686,38 @@ impl Sandbox for WindowsRestrictedTokenSandbox {
     ) -> Option<Result<(i32, String, String), String>> {
         #[cfg(windows)]
         {
-            // On Windows, direct_spawn with CreateRestrictedToken has msys
-            // compatibility issues (signal pipes, BaseNamedObjects access).
-            // Return None to fall through to the transform + tokio::process::Command
-            // path (standard CreateProcessW without restricted token), matching codex's
-            // default execution flow. Security is maintained via:
-            //   - Filesystem policy (absolute path access control)
-            //   - Exec policy (dangerous command detection)
-            //   - Guardian (circuit breaker)
-            let _ = req;
-            None
+            // Conditionally use the restricted token, matching codex's approach:
+            //
+            // Codex only uses CreateProcessAsUserW + CreateRestrictedToken when
+            // OS-level process isolation is REQUIRED — i.e., when the policy
+            // cannot be fully enforced at the tool level:
+            //   1. Network is completely BLOCKED (tool-level filtering insufficient)
+            //   2. Filesystem has read-only roots (tool-level read-only is weak)
+            //
+            // For all other cases (workspace profile with tool-level enforcement),
+            // codex uses tokio::process::Command (standard CreateProcessW, no
+            // restricted token). We follow the same logic here.
+            //
+            // Additional note: msys2-based programs (Git Bash, Git for Windows)
+            // are fundamentally incompatible with CreateRestrictedToken due to
+            // msys2's need to create signal pipes in \BaseNamedObjects. When
+            // the restricted token IS used, commands relying on msys2 will fail.
+            use pick_agent::permission::fs_policy::AccessMode;
+            use pick_agent::permission::profiles::NetworkAccess;
+
+            let needs_os_isolation = req.network_access == NetworkAccess::Blocked
+                || req
+                    .fs_policy
+                    .as_ref()
+                    .is_some_and(|fp| fp.writable_roots.iter().any(|r| r.mode == AccessMode::Read));
+
+            if needs_os_isolation {
+                Some(win_impl::run_sandboxed_command(req))
+            } else {
+                // Tool-level enforcement is sufficient (codex's default path)
+                let _ = req;
+                None
+            }
         }
         #[cfg(not(windows))]
         {
