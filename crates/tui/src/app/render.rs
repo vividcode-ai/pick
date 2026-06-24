@@ -2,6 +2,7 @@
 
 use std::io::Write;
 
+use crossterm::cursor::SetCursorStyle;
 use crossterm::terminal::size;
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
@@ -446,6 +447,7 @@ impl TuiApp {
                                 let cursor_col = 2u16.min(width.saturating_sub(1));
                                 let cursor_row = chunks[i].y + 6;
                                 if self.show_hardware_cursor {
+                                    frame.set_cursor_style(SetCursorStyle::BlinkingBar);
                                     frame.set_cursor_position((cursor_col, cursor_row));
                                 }
                             }
@@ -461,6 +463,7 @@ impl TuiApp {
                                     chunks[i],
                                 );
                                 if !has_selection && self.show_hardware_cursor {
+                                    frame.set_cursor_style(SetCursorStyle::BlinkingBar);
                                     frame.set_cursor_position((
                                         cursor_col as u16,
                                         chunks[i].y + cursor_row as u16,
@@ -1185,15 +1188,14 @@ impl TuiApp {
     }
 
     /// Finalize the current turn (assistant done).
+    ///
+    /// NOTE: does NOT clear status_text — during multi-round agent execution
+    /// (goal continuation / follow-up queue) the agent outer loop may restart
+    /// a new inner loop after TurnEnd, and no one re-sets "Working...".
+    /// Status is cleared once in handle_agent_finished() when the agent truly
+    /// completes.
     pub fn finalize_turn(&mut self) {
         self.chat.mark_turn_end();
-        // Clear working/status message since the turn is done.
-        // This ensures the status is cleared even when the AgentFinished
-        // command gets drained as a no-op in the runner loop (commands.rs
-        // treats AgentFinished as a no-op since it's handled directly by
-        // the runner). The EndTurn command always arrives and is always
-        // processed before AgentFinished, so this covers the race.
-        self.set_status(None);
         if self.state != AppState::Selecting
             && self.state != AppState::TreeSelecting
             && self.state != AppState::ApiKeyInput

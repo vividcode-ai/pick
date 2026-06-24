@@ -92,7 +92,7 @@ impl TuiApp {
             update_prompt: None,
             todo_items: Vec::new(),
             todo_scroll_offset: 0,
-            show_hardware_cursor: false,
+            show_hardware_cursor: true,
             usage_display: None,
         })
     }
@@ -171,7 +171,7 @@ impl TuiApp {
             update_prompt: None,
             todo_items: Vec::new(),
             todo_scroll_offset: 0,
-            show_hardware_cursor: false,
+            show_hardware_cursor: true,
             usage_display: None,
         }
     }
@@ -223,6 +223,13 @@ impl TuiApp {
         } else {
             self.todo_scroll_offset = self.todo_scroll_offset.min(max_scroll);
         }
+    }
+
+    /// Replace the autocomplete provider (e.g., after skill commands are toggled).
+    pub fn set_autocomplete_provider(&mut self, provider: Box<dyn AutocompleteProvider>) {
+        self.editor.set_autocomplete_provider(provider);
+        // Re-trigger autocomplete so the new commands appear immediately if / was typed
+        self.editor.trigger_autocomplete();
     }
 
     /// Reset scrollback tracking state

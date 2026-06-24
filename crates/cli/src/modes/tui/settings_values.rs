@@ -1,12 +1,14 @@
 use std::sync::atomic::Ordering;
 
 use pick_agent::core::message_queue::QueueMode;
+use pick_tui::autocomplete::{CombinedAutocompleteProvider, SlashCommand as TuiSlashCommand};
 
 use super::context::TuiContext;
 use crate::core::settings::{
     CompactionSettings, ImageSettings, Settings, SettingsManager, TerminalSettings,
     WarningsSettings,
 };
+use crate::core::slash_commands::BUILTIN_SLASH_COMMANDS;
 
 macro_rules! toggle_bool_setting {
     ($sm:expr, $ctx:expr, $field:ident, $label:expr) => {{
@@ -30,6 +32,31 @@ macro_rules! toggle_bool_setting {
 
 pub(crate) fn toggle_enable_skill_commands(sm: &mut SettingsManager, ctx: &mut TuiContext) {
     toggle_bool_setting!(sm, ctx, enable_skill_commands, "Skill commands");
+
+    // Rebuild autocomplete provider so the change takes effect immediately
+    rebuild_autocomplete_provider(ctx, sm.get_enable_skill_commands());
+}
+
+fn rebuild_autocomplete_provider(ctx: &mut TuiContext, include_skills: bool) {
+    let mut commands: Vec<TuiSlashCommand> = BUILTIN_SLASH_COMMANDS
+        .iter()
+        .map(|c| TuiSlashCommand {
+            name: c.name.to_string(),
+            description: Some(c.description.to_string()),
+            argument_hint: None,
+        })
+        .collect();
+    if include_skills {
+        for skill in ctx.resource_loader.skills() {
+            commands.push(TuiSlashCommand {
+                name: format!("skill:{}", skill.name),
+                description: Some(skill.description.clone()),
+                argument_hint: None,
+            });
+        }
+    }
+    let provider = CombinedAutocompleteProvider::new(commands, ctx.cwd.clone());
+    ctx.tui.set_autocomplete_provider(Box::new(provider));
 }
 
 pub(crate) fn toggle_show_hardware_cursor(sm: &mut SettingsManager, ctx: &mut TuiContext) {

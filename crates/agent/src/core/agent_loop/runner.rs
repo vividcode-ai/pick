@@ -156,6 +156,7 @@ async fn process_llm_stream(
     accumulated_usage.output += assistant_msg.usage.output;
     accumulated_usage.cache_read += assistant_msg.usage.cache_read;
     accumulated_usage.cache_write += assistant_msg.usage.cache_write;
+    accumulated_usage.total_tokens += assistant_msg.usage.total_tokens;
 
     let tool_calls: Vec<ToolCall> = assistant_msg
         .content

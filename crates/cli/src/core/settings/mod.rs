@@ -291,7 +291,7 @@ impl SettingsManager {
     }
 
     pub fn get_show_hardware_cursor(&self) -> bool {
-        self.merged.show_hardware_cursor.unwrap_or(false)
+        self.merged.show_hardware_cursor.unwrap_or(true)
     }
 
     pub fn get_editor_padding_x(&self) -> u32 {

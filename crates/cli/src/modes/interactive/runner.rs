@@ -755,6 +755,10 @@ pub async fn run_interactive_mode(
                     pick_agent::permission::hooks::CliApprovalHook::new(),
                 ));
 
+                // Track how much of the assistant text has been printed to stdout,
+                // so MessageUpdate events only print the delta (not the full text).
+                let printed_offset = std::sync::atomic::AtomicUsize::new(0);
+
                 let config = AgentLoopConfig {
                     model: model.clone(),
                     system_prompt: system_prompt.clone(),
@@ -870,23 +874,40 @@ pub async fn run_interactive_mode(
                         match event {
                             AgentEvent::TurnStart => {
                                 print!("\x1b[1mAssistant:\x1b[0m ");
+                                printed_offset.store(0, std::sync::atomic::Ordering::Relaxed);
                             }
                             AgentEvent::MessageStart { message } => {
                                 if let Message::Assistant(msg) = message {
+                                    let mut offset =
+                                        printed_offset.load(std::sync::atomic::Ordering::Relaxed);
                                     for block in &msg.content {
                                         if let ContentBlock::Text(t) = block {
-                                            print!("{}", t.text);
+                                            let text = &t.text;
+                                            if offset < text.len() {
+                                                print!("{}", &text[offset..]);
+                                                offset = text.len();
+                                            }
                                         }
                                     }
+                                    printed_offset
+                                        .store(offset, std::sync::atomic::Ordering::Relaxed);
                                 }
                             }
                             AgentEvent::MessageUpdate { message, .. } => {
                                 if let Message::Assistant(msg) = message {
+                                    let mut offset =
+                                        printed_offset.load(std::sync::atomic::Ordering::Relaxed);
                                     for block in &msg.content {
                                         if let ContentBlock::Text(t) = block {
-                                            print!("{}", t.text);
+                                            let text = &t.text;
+                                            if offset < text.len() {
+                                                print!("{}", &text[offset..]);
+                                                offset = text.len();
+                                            }
                                         }
                                     }
+                                    printed_offset
+                                        .store(offset, std::sync::atomic::Ordering::Relaxed);
                                 }
                             }
                             AgentEvent::ToolExecutionStart {

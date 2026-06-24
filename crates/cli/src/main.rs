@@ -448,13 +448,17 @@ async fn main() {
     // Build permission manager from settings
     let permission_config = settings.get_permission();
     let profile_str = &permission_config.permission_profile;
-    let rules_files: Vec<String> = vec![
-        cwd.join(".pick")
-            .join("rules")
-            .join("default.rules")
-            .to_string_lossy()
-            .to_string(),
-    ];
+    let global_rules_path = crate::config::get_agent_dir()
+        .join("rules")
+        .join("default.rules");
+    let project_rules_path = cwd.join(".pick").join("rules").join("default.rules");
+    let mut rules_files: Vec<String> = Vec::new();
+    if global_rules_path.exists() {
+        rules_files.push(global_rules_path.to_string_lossy().to_string());
+    }
+    if project_rules_path.exists() {
+        rules_files.push(project_rules_path.to_string_lossy().to_string());
+    }
     let permission_manager =
         PermissionManager::new(profile_str, &cwd, Some(&permission_config), &rules_files);
 

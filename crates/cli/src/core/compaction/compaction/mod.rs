@@ -345,8 +345,6 @@ pub fn prepare_compaction(
     }
     let boundary_end = path_entries.len();
 
-    let tokens_before = 0;
-
     let cut_point = find_cut_point(
         path_entries,
         boundary_start,
@@ -371,6 +369,8 @@ pub fn prepare_compaction(
         .iter()
         .filter_map(get_message_from_entry_for_compaction)
         .collect();
+
+    let tokens_before = estimate_context_tokens(&messages_to_summarize).tokens;
 
     let turn_prefix_messages: Vec<Value> = if cut_point.is_split_turn {
         if let Some(turn_start) = cut_point.turn_start_index {
