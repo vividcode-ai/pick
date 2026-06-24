@@ -327,6 +327,62 @@ pub fn load_prompt_templates(options: LoadPromptTemplatesOptions) -> Vec<PromptT
     templates
 }
 
+/// Load command templates from global and project commands directories.
+/// Project commands override global commands with the same name.
+pub fn load_command_templates(agent_dir: &Path, cwd: &Path) -> Vec<PromptTemplate> {
+    let mut templates: Vec<PromptTemplate> = Vec::new();
+
+    let global_cmds_dir = agent_dir.join("commands");
+    let project_cmds_dir = cwd.join(CONFIG_DIR_NAME).join("commands");
+
+    let get_source_info = |resolved_path: &str| -> SourceInfo {
+        let resolved = Path::new(resolved_path);
+
+        if is_under_path(resolved, &global_cmds_dir) {
+            create_synthetic_source_info(
+                resolved_path,
+                SyntheticSourceOptions {
+                    source: "local".to_string(),
+                    scope: Some(SourceScope::User),
+                    origin: None,
+                    base_dir: Some(global_cmds_dir.to_string_lossy().to_string()),
+                },
+            )
+        } else if is_under_path(resolved, &project_cmds_dir) {
+            create_synthetic_source_info(
+                resolved_path,
+                SyntheticSourceOptions {
+                    source: "local".to_string(),
+                    scope: Some(SourceScope::Project),
+                    origin: None,
+                    base_dir: Some(project_cmds_dir.to_string_lossy().to_string()),
+                },
+            )
+        } else {
+            create_synthetic_source_info(
+                resolved_path,
+                SyntheticSourceOptions {
+                    source: "local".to_string(),
+                    scope: None,
+                    origin: None,
+                    base_dir: None,
+                },
+            )
+        }
+    };
+
+    // Load global first
+    templates.extend(load_templates_from_dir(&global_cmds_dir, &get_source_info));
+    // Load project (overrides global by name)
+    let project_templates = load_templates_from_dir(&project_cmds_dir, &get_source_info);
+    for pt in project_templates {
+        templates.retain(|t| t.name != pt.name);
+        templates.push(pt);
+    }
+
+    templates
+}
+
 fn is_under_path(target: &Path, root: &Path) -> bool {
     let canonical_root = if root.is_absolute() {
         root.to_path_buf()

@@ -382,9 +382,6 @@ async fn handle_submit(ctx: &mut TuiContext, user_text: String) {
     ctx.tui.paste_accumulator.clear();
     ctx.tui.last_paste_time = None;
 
-    // Reset skill flag — will be set true below if this is a /skill: command
-    ctx.skill_command_executed = false;
-
     let trimmed = user_text.trim().to_string();
     let mut user_text = user_text;
 
@@ -397,7 +394,6 @@ async fn handle_submit(ctx: &mut TuiContext, user_text: String) {
             Some(expanded) => {
                 user_text = expanded;
                 is_skill_expanded = true;
-                ctx.skill_command_executed = true;
             }
             None => return,
         }
@@ -406,18 +402,36 @@ async fn handle_submit(ctx: &mut TuiContext, user_text: String) {
         let args_after: Vec<&str> = cmd_full.split_whitespace().skip(1).collect();
         let args: Vec<String> = args_after.iter().map(|s| s.to_string()).collect();
 
-        match cmd_dispatch::handle_slash_command(ctx, cmd_name, &args, &user_text).await {
-            cmd_dispatch::SlashCommandResult::Quit => {
-                ctx.tui.finalize_turn();
-                return;
+        // Check if this is a known built-in slash command — built-in commands
+        // always take priority over command templates (matching pi's behavior).
+        let is_builtin = crate::core::slash_commands::BUILTIN_SLASH_COMMANDS
+            .iter()
+            .any(|c| c.name == cmd_name);
+
+        if is_builtin {
+            match cmd_dispatch::handle_slash_command(ctx, cmd_name, &args, &user_text).await {
+                cmd_dispatch::SlashCommandResult::Quit => {
+                    ctx.tui.finalize_turn();
+                    return;
+                }
+                cmd_dispatch::SlashCommandResult::Consumed => {
+                    ctx.tui.finalize_turn();
+                    return;
+                }
+                cmd_dispatch::SlashCommandResult::ContinueSubmit => {
+                    skip_user_message = true;
+                }
             }
-            cmd_dispatch::SlashCommandResult::Consumed => {
-                ctx.tui.finalize_turn();
-                return;
+        } else {
+            // Not a built-in command — try command template expansion (from .pick/commands/ .md files)
+            let commands = ctx.resource_loader.commands();
+            let expanded =
+                crate::core::prompt_templates::expand_prompt_template(&user_text, commands);
+            if expanded != user_text {
+                // Command template matched — expand and send to agent
+                user_text = expanded;
             }
-            cmd_dispatch::SlashCommandResult::ContinueSubmit => {
-                skip_user_message = true;
-            }
+            // No match either — text is sent to agent as-is (matches pi behavior)
         }
     }
 

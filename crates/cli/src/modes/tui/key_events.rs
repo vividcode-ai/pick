@@ -46,13 +46,24 @@ pub(crate) fn process_key_event(
         return tui.handle_key(key.code, key.modifiers);
     }
 
-    // Route Char + Enter to paste accumulator
+    // Route Char + Enter to paste accumulator, but NOT ASCII control
+    // characters (U+0000–U+001F). On Windows, crossterm can report Ctrl+C
+    // as Char('\x03') / NONE and Ctrl+D as Char('\x04') / NONE instead of
+    // the usual (Char('c'), CONTROL) / (Char('d'), CONTROL) form. Those
+    // control characters must be routed to handle_key — not the paste
+    // accumulator — otherwise Ctrl+C / Ctrl+D are silently swallowed and
+    // the user can never quit.
     let mut paste_handled = false;
     if !key
         .modifiers
         .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT)
     {
         match key.code {
+            KeyCode::Char(c) if c as u32 <= 0x1F => {
+                // ASCII control character: route directly to handle_key
+                tui.finalize_paste_accumulator(now);
+                return tui.handle_key(key.code, key.modifiers);
+            }
             KeyCode::Char(c) => {
                 tui.paste_accumulator.push(c);
                 tui.last_paste_time = Some(now);
@@ -105,13 +116,18 @@ pub(crate) fn process_key_event_during_agent(
         return Some(TuiAction::Quit);
     }
 
-    // Route Char + Enter to paste accumulator
+    // Route Char + Enter to paste accumulator, but NOT ASCII control
+    // characters (same as process_key_event above).
     let mut paste_handled = false;
     if !key
         .modifiers
         .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT)
     {
         match key.code {
+            KeyCode::Char(c) if c as u32 <= 0x1F => {
+                tui.finalize_paste_accumulator(now);
+                return tui.handle_key(key.code, key.modifiers);
+            }
             KeyCode::Char(c) => {
                 tui.paste_accumulator.push(c);
                 tui.last_paste_time = Some(now);
@@ -162,6 +178,17 @@ pub(crate) fn drain_key_events(
                         continue;
                     }
                     match key.code {
+                        KeyCode::Char(c) if (c as u32) <= 0x1F => {
+                            // ASCII control character (e.g. \x03 = Ctrl+C,
+                            // \x04 = Ctrl+D arriving without CONTROL
+                            // modifier on Windows). Route to handle_key.
+                            tui.finalize_paste_accumulator(now);
+                            if let Some(a) = tui.handle_key(key.code, key.modifiers) {
+                                action = Some(a);
+                                had_action = true;
+                            }
+                            continue;
+                        }
                         KeyCode::Char(c) => {
                             tui.paste_accumulator.push(c);
                             continue;
@@ -251,6 +278,19 @@ pub(crate) fn drain_key_events_during_agent(
                             .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
                 {
                     match key.code {
+                        KeyCode::Char(c) if (c as u32) <= 0x1F => {
+                            tui.finalize_paste_accumulator(now);
+                            if let Some(a) = tui.handle_key(key.code, key.modifiers) {
+                                if matches!(a, TuiAction::Quit) {
+                                    action = Some(a);
+                                    had_action = true;
+                                } else if matches!(a, TuiAction::QueueMessage(_)) {
+                                    action = Some(a);
+                                    had_action = true;
+                                }
+                            }
+                            continue;
+                        }
                         KeyCode::Char(c) => {
                             tui.paste_accumulator.push(c);
                             continue;

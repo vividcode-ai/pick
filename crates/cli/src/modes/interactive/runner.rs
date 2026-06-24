@@ -729,6 +729,16 @@ pub async fn run_interactive_mode(
                     }
                 }
 
+                // Expand command templates from .pick/commands/ .md files
+                if input.starts_with('/') {
+                    let commands = resource_loader.commands();
+                    let expanded =
+                        crate::core::prompt_templates::expand_prompt_template(&input, commands);
+                    if expanded != input {
+                        input = expanded;
+                    }
+                }
+
                 let mode_rules_for_hook = agent_mode.ruleset();
 
                 if let Err(msg) = ensure_api_key(&auth, provider).await {

@@ -378,6 +378,20 @@ where
     std::io::Error: From<B::Error>,
 {
     fn drop(&mut self) {
-        let _ = self.cleanup();
+        // Minimal safety-net cleanup: show cursor and reset attributes.
+        // We intentionally do NOT call self.cleanup() here because that
+        // would issue Clear(ClearType::FromCursorDown) from the last
+        // viewport position, erasing any content printed below the TUI
+        // viewport — such as the session resume box in cleanup_tui_mode.
+        // The full cleanup (including Clear) is done by the explicit
+        // cleanup() call before any post-TUI content is printed.
+        use crossterm::queue;
+        let _ = queue!(
+            self.terminal.backend_mut(),
+            crossterm::style::SetAttribute(crossterm::style::Attribute::Reset),
+            crossterm::cursor::Show,
+        );
+        let _ = self.terminal.reset_cursor_style();
+        let _ = std::io::stdout().flush();
     }
 }

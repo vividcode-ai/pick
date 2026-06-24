@@ -18,27 +18,14 @@ pub(crate) fn cleanup_tui_mode(ctx: &mut TuiContext) {
     // TUI app cleanup (disable raw mode, print newline)
     ctx.tui.cleanup();
 
-    // Print exit information. We do this AFTER disable_raw_mode so that
+    // Print session resume box. We do this AFTER disable_raw_mode so that
     // the terminal processes newlines as CR+LF, ensuring the cursor is
     // always positioned at the start of the next line.
-    if ctx.skill_command_executed {
-        // For skill sessions: print a simple exit line.
-        // Use explicit \r\n sequences for reliable cursor positioning
-        // on all platforms (Windows, Unix).
-        let stdout = std::io::stdout();
-        let mut h = stdout.lock();
-        // Print the exit text with \r prefix (ensure column 0) and
-        // \r\n suffix (move cursor to start of next line for shell prompt)
-        write!(h, "\r━━━ {} Skill session ended ━━━\r\n", ctx.version).ok();
-        h.flush().ok();
-        drop(h);
-    } else {
-        // Print session resume hint in a rounded box.
-        // Always print if a session exists — the box is harmless for short
-        // sessions and necessary when the agent ran tool-only execution
-        // (/skill:, /goal) that never triggered streaming content.
-        print_session_box(&ctx.session_manager, ctx.version);
-    }
+    // Always print if a session exists — the box is harmless for short
+    // sessions and necessary when the user ran a tool-only command
+    // (/skill:, /goal) that never triggered streaming, or exited with
+    // Ctrl+C during streaming.
+    print_session_box(&ctx.session_manager, ctx.version);
 }
 
 /// Print session resume hint box to stdout

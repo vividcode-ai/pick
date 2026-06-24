@@ -4,6 +4,7 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use crate::config;
+use crate::core::prompt_templates::{self, PromptTemplate as FullPromptTemplate};
 use crate::core::theme::{self, Theme};
 use pick_agent::extensions::loader::discover_and_load_extensions;
 use pick_agent::extensions::types::LoadExtensionsResult;
@@ -60,6 +61,8 @@ pub struct ResourceLoader {
     skill_diagnostics: Vec<ResourceDiagnostic>,
     prompts: Vec<PromptTemplate>,
     prompt_diagnostics: Vec<ResourceDiagnostic>,
+    commands: Vec<prompt_templates::PromptTemplate>,
+    command_diagnostics: Vec<ResourceDiagnostic>,
     themes: Vec<Theme>,
     theme_diagnostics: Vec<ResourceDiagnostic>,
     agents_files: Vec<ContextFile>,
@@ -88,6 +91,8 @@ impl ResourceLoader {
             skill_diagnostics: Vec::new(),
             prompts: Vec::new(),
             prompt_diagnostics: Vec::new(),
+            commands: Vec::new(),
+            command_diagnostics: Vec::new(),
             themes: Vec::new(),
             theme_diagnostics: Vec::new(),
             agents_files: Vec::new(),
@@ -136,6 +141,10 @@ impl ResourceLoader {
             self.prompt_diagnostics = prompt_result.diagnostics;
         }
 
+        // Load commands
+        let cmds = prompt_templates::load_command_templates(&self.agent_dir, &self.cwd);
+        self.commands = cmds;
+
         // Load themes (unless disabled)
         if !options.no_themes {
             let theme_result = load_themes(&self.agent_dir, &self.cwd, &options.theme_paths);
@@ -173,6 +182,14 @@ impl ResourceLoader {
 
     pub fn prompt_diagnostics(&self) -> &[ResourceDiagnostic] {
         &self.prompt_diagnostics
+    }
+
+    pub fn commands(&self) -> &[FullPromptTemplate] {
+        &self.commands
+    }
+
+    pub fn command_diagnostics(&self) -> &[ResourceDiagnostic] {
+        &self.command_diagnostics
     }
 
     pub fn themes(&self) -> &[Theme] {

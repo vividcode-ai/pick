@@ -103,9 +103,6 @@ pub(crate) struct TuiContext {
     pub version: &'static str,
     pub app_name: &'static str,
 
-    // Whether the last submit was a /skill: command (used for exit display)
-    pub skill_command_executed: bool,
-
     // Update action to execute after TUI exits
     pub pending_update: Option<crate::core::update_action::UpdateAction>,
 }

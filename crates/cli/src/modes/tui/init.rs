@@ -317,7 +317,6 @@ pub(crate) async fn init_tui_mode(
         tool_args_map,
         on_event,
         pending_command: None,
-        skill_command_executed: false,
         scoped_models: Vec::new(),
         was_interrupted: Arc::new(AtomicBool::new(false)),
         steer_queue: Arc::new(Mutex::new(PendingMessageQueue::new(steer_mode))),
