@@ -690,94 +690,137 @@
       }
 
       // ============================================================
-      // TREE RENDERING (DOM manipulation)
+      // SHORTCUT SIDEBAR + ALL MESSAGES RENDERING
       // ============================================================
 
       let currentLeafId = leafId;
       let currentTargetId = urlTargetId || leafId;
-      let treeRendered = false;
 
-      function renderTree() {
-        const tree = buildTree();
-        const activePathIds = buildActivePathIds(currentLeafId);
-        const flatNodes = flattenTree(tree, activePathIds);
-        const filtered = filterNodes(flatNodes, currentLeafId);
+      /**
+       * Render the left sidebar as a flat shortcut index of all entries.
+       * Each entry shows a role marker and truncated preview.
+       * Clicking scrolls to the corresponding entry in the content area.
+       */
+      function renderShortcutSidebar() {
         const container = document.getElementById('tree-container');
+        container.innerHTML = '';
 
-        // Full render only on first call or when filter/search changes
-        if (!treeRendered) {
-          container.innerHTML = '';
+        const searchTokens = searchQuery.toLowerCase().split(/\s+/).filter(Boolean);
+        const filteredEntries = entries.filter(entry => {
+          // Filter mode
+          const isSettingsEntry = ['label', 'custom', 'model_change', 'thinking_level_change',
+            'leaf_change', 'session_info', 'goal', 'todo_update', 'agent_mode_change'
+          ].includes(entry.type);
 
-          for (const flatNode of filtered) {
-            const entry = flatNode.node.entry;
-            const isOnPath = activePathIds.has(entry.id);
-            const isTarget = entry.id === currentTargetId;
-
-            const div = document.createElement('div');
-            div.className = 'tree-node';
-            if (isOnPath) div.classList.add('in-path');
-            if (isTarget) div.classList.add('active');
-            div.dataset.id = entry.id;
-
-            const prefix = buildTreePrefix(flatNode);
-            const prefixSpan = document.createElement('span');
-            prefixSpan.className = 'tree-prefix';
-            prefixSpan.textContent = prefix;
-
-            const marker = document.createElement('span');
-            marker.className = 'tree-marker';
-            marker.textContent = isOnPath ? '•' : ' ';
-
-            const content = document.createElement('span');
-            content.className = 'tree-content';
-            content.innerHTML = getTreeNodeDisplayHtml(entry, flatNode.node.label);
-
-            div.appendChild(prefixSpan);
-            div.appendChild(marker);
-            div.appendChild(content);
-            // Navigate to the newest leaf through this node, but scroll to the clicked node
-            div.addEventListener('click', () => {
-              if (window.getSelection().toString()) return;
-              const leafId = findNewestLeaf(entry.id);
-              navigateTo(leafId, 'target', entry.id);
-            });
-
-            container.appendChild(div);
+          // Hide assistant messages with only tool calls (no text) unless error/aborted
+          if (entry.type === 'message' && entry.message.role === 'assistant') {
+            const msg = entry.message;
+            const hasText = hasTextContent(msg.content);
+            const isErrorOrAborted = msg.stopReason && msg.stopReason !== 'stop' && msg.stopReason !== 'toolUse';
+            if (!hasText && !isErrorOrAborted) return false;
           }
 
-          treeRendered = true;
-        } else {
-          // Just update markers and classes
-          const nodes = container.querySelectorAll('.tree-node');
-          for (const node of nodes) {
-            const id = node.dataset.id;
-            const isOnPath = activePathIds.has(id);
-            const isTarget = id === currentTargetId;
+          let passesFilter = true;
+          switch (filterMode) {
+            case 'user-only':
+              passesFilter = entry.type === 'message' && entry.message.role === 'user';
+              break;
+            case 'no-tools':
+              passesFilter = !isSettingsEntry && !(entry.type === 'message' && entry.message.role === 'toolResult');
+              break;
+            case 'labeled-only':
+              passesFilter = labelMap.has(entry.id);
+              break;
+            case 'all':
+              passesFilter = true;
+              break;
+            default:
+              passesFilter = !isSettingsEntry;
+              break;
+          }
+          if (!passesFilter) return false;
 
-            node.classList.toggle('in-path', isOnPath);
-            node.classList.toggle('active', isTarget);
+          if (searchTokens.length > 0) {
+            const nodeText = getSearchableText(entry, labelMap.get(entry.id));
+            if (!searchTokens.every(t => nodeText.includes(t))) return false;
+          }
+          return true;
+        });
 
-            const marker = node.querySelector('.tree-marker');
-            if (marker) {
-              marker.textContent = isOnPath ? '•' : ' ';
+        for (const entry of filteredEntries) {
+          const div = document.createElement('div');
+          div.className = 'tree-node';
+          div.dataset.id = entry.id;
+
+          // Role marker with distinct symbols and colors
+          const marker = document.createElement('span');
+          marker.className = 'tree-marker';
+          if (entry.type === 'message') {
+            const role = entry.message.role;
+            if (role === 'user') { marker.textContent = '•'; marker.style.color = 'var(--accent)'; }
+            else if (role === 'assistant') { marker.textContent = '▸'; marker.style.color = 'var(--success)'; }
+            else if (role === 'toolResult') { marker.textContent = '▪'; marker.style.color = 'var(--muted)'; }
+            else { marker.textContent = ' '; }
+          } else if (entry.type === 'model_change') {
+            marker.textContent = '◇'; marker.style.color = 'var(--warning)';
+          } else if (entry.type === 'compaction') {
+            marker.textContent = '◆'; marker.style.color = 'var(--borderAccent)';
+          } else {
+            marker.textContent = ' ';
+          }
+
+          const content = document.createElement('span');
+          content.className = 'tree-content';
+          content.innerHTML = getTreeNodeDisplayHtml(entry, labelMap.get(entry.id));
+
+          div.appendChild(marker);
+          div.appendChild(content);
+
+          // Click scrolls to the entry in the content area
+          div.addEventListener('click', () => {
+            if (window.getSelection().toString()) return;
+            const scrollTargetId = getScrollTargetElementId(entry.id);
+            const targetEl = document.getElementById(scrollTargetId) ||
+              document.getElementById(`entry-${entry.id}`);
+            if (targetEl) {
+              targetEl.scrollIntoView({ block: 'center' });
+              targetEl.classList.add('highlight');
+              setTimeout(() => targetEl.classList.remove('highlight'), 2000);
             }
+          });
+
+          container.appendChild(div);
+        }
+
+        document.getElementById('tree-status').textContent = `${filteredEntries.length} / ${entries.length} entries`;
+      }
+
+      /**
+       * Render ALL entries in the main content area (no active-path filtering).
+       */
+      function renderAllMessages() {
+        const messagesEl = document.getElementById('messages');
+        const fragment = document.createDocumentFragment();
+
+        for (const entry of entries) {
+          const node = renderEntryToNode(entry);
+          if (node) {
+            fragment.appendChild(node);
           }
         }
 
-        document.getElementById('tree-status').textContent = `${filtered.length} / ${flatNodes.length} entries`;
+        messagesEl.innerHTML = '';
+        messagesEl.appendChild(fragment);
 
-        // Scroll active node into view after layout
-        setTimeout(() => {
-          const activeNode = container.querySelector('.tree-node.active');
-          if (activeNode) {
-            activeNode.scrollIntoView({ block: 'nearest' });
-          }
-        }, 0);
-      }
-
-      function forceTreeRerender() {
-        treeRendered = false;
-        renderTree();
+        // Attach click handlers for copy-link buttons
+        messagesEl.querySelectorAll('.copy-link-btn').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const entryId = btn.dataset.entryId;
+            const shareUrl = buildShareUrl(entryId);
+            copyToClipboard(shareUrl, btn);
+          });
+        });
       }
 
       // ============================================================
@@ -1443,7 +1486,7 @@
       }
 
       // ============================================================
-      // NAVIGATION
+      // ENTRY CACHE & RENDERING HELPERS
       // ============================================================
 
       // Cache for rendered entry DOM nodes
@@ -1478,64 +1521,6 @@
           entryCache.set(entry.id, node.cloneNode(true));
         }
         return node;
-      }
-
-      function navigateTo(targetId, scrollMode = 'target', scrollToEntryId = null) {
-        currentLeafId = targetId;
-        currentTargetId = scrollToEntryId || targetId;
-        const path = getPath(targetId);
-
-        renderTree();
-
-        document.getElementById('header-container').innerHTML = renderHeader();
-        attachHeaderHandlers();
-
-        // Build messages using cached DOM nodes
-        const messagesEl = document.getElementById('messages');
-        const fragment = document.createDocumentFragment();
-
-        for (const entry of path) {
-          const node = renderEntryToNode(entry);
-          if (node) {
-            fragment.appendChild(node);
-          }
-        }
-
-        messagesEl.innerHTML = '';
-        messagesEl.appendChild(fragment);
-
-        // Attach click handlers for copy-link buttons
-        messagesEl.querySelectorAll('.copy-link-btn').forEach(btn => {
-          btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const entryId = btn.dataset.entryId;
-            const shareUrl = buildShareUrl(entryId);
-            copyToClipboard(shareUrl, btn);
-          });
-        });
-
-        // Use setTimeout(0) to ensure DOM is fully laid out before scrolling
-        setTimeout(() => {
-          const content = document.getElementById('content');
-          if (scrollMode === 'bottom') {
-            content.scrollTop = content.scrollHeight;
-          } else if (scrollMode === 'target') {
-            // If scrollToEntryId is provided, scroll to that specific entry.
-            // Tool result entries are rendered inside their assistant tool-call block,
-            // so route them to the visible tool-call element instead.
-            const scrollTargetId = scrollToEntryId || targetId;
-            const targetEl = document.getElementById(getScrollTargetElementId(scrollTargetId)) ||
-              document.getElementById(`entry-${scrollTargetId}`);
-            if (targetEl) {
-              targetEl.scrollIntoView({ block: 'center' });
-              // Briefly highlight the target message
-              if (scrollToEntryId) {
-                targetEl.classList.add('highlight');
-                setTimeout(() => targetEl.classList.remove('highlight'), 2000);
-              }
-            }
-          }
-        }, 0);
       }
 
       // ============================================================
@@ -1632,7 +1617,7 @@
       const searchInput = document.getElementById('tree-search');
       searchInput.addEventListener('input', (e) => {
         searchQuery = e.target.value;
-        forceTreeRerender();
+        renderShortcutSidebar();
       });
 
       // Filter buttons
@@ -1641,7 +1626,7 @@
           document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
           btn.classList.add('active');
           filterMode = btn.dataset.filter;
-          forceTreeRerender();
+          renderShortcutSidebar();
         });
       });
 
@@ -1818,7 +1803,9 @@
         if (e.key === 'Escape') {
           searchInput.value = '';
           searchQuery = '';
-          navigateTo(leafId, 'bottom');
+          renderShortcutSidebar();
+          const content = document.getElementById('content');
+          if (content) content.scrollTop = 0;
         }
 
         if (isEditableTarget(document.activeElement)) {
@@ -1836,16 +1823,27 @@
       });
 
       // Initial render
-      // If URL has targetId, scroll to that specific message; otherwise stay at top
-      if (leafId) {
-        if (urlTargetId && byId.has(urlTargetId)) {
-          // Deep link: navigate to leaf and scroll to target message
-          navigateTo(leafId, 'target', urlTargetId);
-        } else {
-          navigateTo(leafId, 'none');
-        }
-      } else if (entries.length > 0) {
-        // Fallback: use last entry if no leafId
-        navigateTo(entries[entries.length - 1].id, 'none');
+      // Render header
+      document.getElementById('header-container').innerHTML = renderHeader();
+      attachHeaderHandlers();
+
+      // Render ALL entries in the content area (right side)
+      renderAllMessages();
+
+      // Render shortcut sidebar (left side)
+      renderShortcutSidebar();
+
+      // If deep-linked via urlTargetId, scroll to that entry
+      if (urlTargetId && byId.has(urlTargetId)) {
+        setTimeout(() => {
+          const scrollTargetId = getScrollTargetElementId(urlTargetId);
+          const targetEl = document.getElementById(scrollTargetId) ||
+            document.getElementById(`entry-${urlTargetId}`);
+          if (targetEl) {
+            targetEl.scrollIntoView({ block: 'center' });
+            targetEl.classList.add('highlight');
+            setTimeout(() => targetEl.classList.remove('highlight'), 2000);
+          }
+        }, 0);
       }
     })();
