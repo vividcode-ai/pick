@@ -43,6 +43,7 @@ fn merge_primitive(base: &mut Settings, overrides: &Settings) {
     merge_opt!(skills);
     merge_opt!(session_dir);
     merge_opt!(enable_install_telemetry);
+    merge_opt!(enable_mcp_tools);
     merge_opt!(check_for_update_on_startup);
     merge_opt!(dismissed_update_version);
     merge_opt!(mcp_servers);
@@ -368,6 +369,10 @@ impl SettingsManager {
             max_retries: s.and_then(|r| r.max_retries).unwrap_or(3),
             base_delay_ms: s.and_then(|r| r.base_delay_ms).unwrap_or(2000),
         }
+    }
+
+    pub fn get_enable_mcp_tools(&self) -> bool {
+        self.merged.enable_mcp_tools.unwrap_or(true)
     }
 
     pub fn get_check_for_update_on_startup(&self) -> bool {

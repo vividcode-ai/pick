@@ -30,6 +30,7 @@ pub fn build_settings_items(
     auto_resize_images: bool,
     block_images: bool,
     enable_skill_commands: bool,
+    enable_mcp_tools: bool,
     steering_mode: &str,
     follow_up_mode: &str,
     transport: &str,
@@ -97,6 +98,18 @@ pub fn build_settings_items(
             label: "Skill commands".to_string(),
             description: "Register skills as /skill:name commands".to_string(),
             current_value: if enable_skill_commands {
+                "enabled"
+            } else {
+                "disabled"
+            }
+            .to_string(),
+            has_submenu: false,
+        },
+        SettingDisplayItem {
+            id: "mcp-tools".to_string(),
+            label: "MCP tools".to_string(),
+            description: "Enable MCP server tools for agent use".to_string(),
+            current_value: if enable_mcp_tools {
                 "enabled"
             } else {
                 "disabled"

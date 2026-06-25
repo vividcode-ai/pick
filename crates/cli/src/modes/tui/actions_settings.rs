@@ -22,6 +22,7 @@ pub(crate) async fn handle_settings_selection(ctx: &mut TuiContext, val: &str) {
         "hide-thinking" => settings_values::toggle_hide_thinking_block(&mut sm, ctx),
         "collapse-changelog" => settings_values::toggle_collapse_changelog(&mut sm, ctx),
         "quiet-startup" => settings_values::toggle_quiet_startup(&mut sm, ctx),
+        "mcp-tools" => settings_values::toggle_mcp_tools(&mut sm, ctx),
         "install-telemetry" => settings_values::toggle_enable_install_telemetry(&mut sm, ctx),
         "image-width-cells" => show_image_width_selector(ctx, &sm),
         "editor-padding-x" => show_editor_padding_selector(ctx, &sm),

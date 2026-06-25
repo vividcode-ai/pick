@@ -180,6 +180,8 @@ pub struct Settings {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub permission: Option<PermissionConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub enable_mcp_tools: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub check_for_update_on_startup: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dismissed_update_version: Option<String>,

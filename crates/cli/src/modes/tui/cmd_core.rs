@@ -210,7 +210,14 @@ pub(crate) async fn handle_plan(ctx: &mut TuiContext) {
                 .show_error(&format!("Failed to persist mode change: {}", e));
         }
         ctx.agent_mode = crate::core::agent_mode::AgentMode::Plan;
-        ctx.tools = init::refilter_tools(&ctx.all_tools, &ctx.agent_mode, &ctx.session_manager);
+        ctx.tools = init::refilter_tools(
+            &ctx.all_tools,
+            &ctx.agent_mode,
+            &ctx.session_manager,
+            &ctx.mcp_manager,
+            ctx.mcp_enabled.load(std::sync::atomic::Ordering::Relaxed),
+        )
+        .await;
         ctx.system_prompt = init::rebuild_system_prompt(
             &ctx.tools,
             &ctx.resource_loader,
@@ -248,7 +255,14 @@ pub(crate) async fn handle_build(ctx: &mut TuiContext) {
                 .show_error(&format!("Failed to persist mode change: {}", e));
         }
         ctx.agent_mode = crate::core::agent_mode::AgentMode::Build;
-        ctx.tools = init::refilter_tools(&ctx.all_tools, &ctx.agent_mode, &ctx.session_manager);
+        ctx.tools = init::refilter_tools(
+            &ctx.all_tools,
+            &ctx.agent_mode,
+            &ctx.session_manager,
+            &ctx.mcp_manager,
+            ctx.mcp_enabled.load(std::sync::atomic::Ordering::Relaxed),
+        )
+        .await;
         ctx.system_prompt = init::rebuild_system_prompt(
             &ctx.tools,
             &ctx.resource_loader,

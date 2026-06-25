@@ -123,6 +123,7 @@ pub(crate) fn handle_settings_command(ctx: &mut TuiContext) {
     let quiet = sm.get_quiet_startup();
     let telemetry = sm.get().enable_install_telemetry.unwrap_or(false);
     let sandbox = sm.get_permission().sandbox_enabled;
+    let mcp_tools = sm.get_enable_mcp_tools();
 
     let items = vec![
         SelectItem::new(
@@ -130,6 +131,7 @@ pub(crate) fn handle_settings_command(ctx: &mut TuiContext) {
             "auto-compact",
         ),
         SelectItem::new(format!("Sandbox  [{}]", s(sandbox)), "sandbox"),
+        SelectItem::new(format!("MCP tools  [{}]", s(mcp_tools)), "mcp-tools"),
         SelectItem::new(format!("Show images  [{}]", s(show_images)), "show-images"),
         SelectItem::new("Image width", "image-width-cells"),
         SelectItem::new(

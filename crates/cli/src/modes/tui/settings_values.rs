@@ -118,6 +118,26 @@ pub(crate) fn toggle_enable_install_telemetry(sm: &mut SettingsManager, ctx: &mu
     toggle_bool_setting!(sm, ctx, enable_install_telemetry, "Install telemetry");
 }
 
+pub(crate) fn toggle_mcp_tools(sm: &mut SettingsManager, ctx: &mut TuiContext) {
+    use std::sync::atomic::Ordering;
+    let current = sm.get().enable_mcp_tools.unwrap_or(true);
+    let new = !current;
+    let mut update = Settings::default();
+    update.enable_mcp_tools = Some(new);
+    match sm.set_global(update) {
+        Ok(()) => {
+            ctx.mcp_enabled.store(new, Ordering::Relaxed);
+            ctx.tui.chat.add_system_message(&format!(
+                "MCP tools \x1b[1m{}\x1b[0m (takes effect on next agent run).",
+                if new { "enabled" } else { "disabled" }
+            ));
+        }
+        Err(e) => ctx
+            .tui
+            .show_error(&format!("Failed to save setting: {}", e)),
+    }
+}
+
 pub(crate) async fn toggle_compact(sm: &mut SettingsManager, ctx: &mut TuiContext) {
     let current = sm
         .get()

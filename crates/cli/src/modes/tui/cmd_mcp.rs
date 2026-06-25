@@ -89,7 +89,10 @@ pub(crate) async fn handle_mcp(ctx: &mut TuiContext, args: &[String]) {
                                 &ctx.all_tools,
                                 &ctx.agent_mode,
                                 &ctx.session_manager,
-                            );
+                                &ctx.mcp_manager,
+                                ctx.mcp_enabled.load(std::sync::atomic::Ordering::Relaxed),
+                            )
+                            .await;
                             ctx.system_prompt = init::rebuild_system_prompt(
                                 &ctx.tools,
                                 &ctx.resource_loader,
@@ -137,7 +140,10 @@ pub(crate) async fn handle_mcp(ctx: &mut TuiContext, args: &[String]) {
                             &ctx.all_tools,
                             &ctx.agent_mode,
                             &ctx.session_manager,
-                        );
+                            &ctx.mcp_manager,
+                            ctx.mcp_enabled.load(std::sync::atomic::Ordering::Relaxed),
+                        )
+                        .await;
                         ctx.system_prompt = init::rebuild_system_prompt(
                             &ctx.tools,
                             &ctx.resource_loader,

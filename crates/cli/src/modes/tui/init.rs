@@ -55,8 +55,19 @@ pub(crate) async fn init_tui_mode(
     let app_name = crate::config::APP_NAME;
     let cwd = std::env::current_dir().unwrap_or_default();
 
-    // Filter tools based on agent mode
-    let tools = filter_tools_by_mode(&all_tools, &agent_mode, &session_manager);
+    // Determine initial MCP enabled state from settings
+    let mcp_enabled_init =
+        crate::core::settings::SettingsManager::load(&cwd).get_enable_mcp_tools();
+
+    // Filter tools based on agent mode and MCP enabled state
+    let tools = filter_tools_by_mode(
+        &all_tools,
+        &agent_mode,
+        &session_manager,
+        &mcp_manager,
+        mcp_enabled_init,
+    )
+    .await;
 
     // Resolve model + provider
     let (model, provider, model_id) = resolve_model(&args);
@@ -281,6 +292,7 @@ pub(crate) async fn init_tui_mode(
     let hide_thinking = Arc::new(AtomicBool::new(settings.get_hide_thinking_block()));
     let show_images = Arc::new(AtomicBool::new(settings.get_show_images()));
     let block_images = Arc::new(AtomicBool::new(settings.get_block_images()));
+    let mcp_enabled = Arc::new(AtomicBool::new(settings.get_enable_mcp_tools()));
     let steer_mode = match settings.get_steering_mode() {
         "all" => QueueMode::All,
         _ => QueueMode::OneAtATime,
@@ -328,6 +340,7 @@ pub(crate) async fn init_tui_mode(
         agent_registry,
         mcp_manager,
         mcp_cancelled,
+        mcp_enabled,
         permission_manager,
         platform_sandbox,
         sandbox_enabled,
@@ -363,34 +376,54 @@ pub(crate) async fn init_tui_mode(
     (ctx, cmd_rx, evt_rx)
 }
 
-/// Filter tools by agent mode ruleset
-fn filter_tools_by_mode(
+/// Filter tools by agent mode ruleset and MCP enabled state
+async fn filter_tools_by_mode(
     all_tools: &Arc<RwLock<Vec<AgentTool>>>,
     agent_mode: &AgentMode,
     session_manager: &SessionManager,
+    mcp_manager: &McpManager,
+    mcp_enabled: bool,
 ) -> Vec<AgentTool> {
     let ruleset = agent_mode.ruleset();
     let locked = all_tools.read().unwrap();
-    pick_agent::tools::filter_goal_tools(
+    let mut tools = pick_agent::tools::filter_goal_tools(
         pick_agent::permission::disabled::filter_tools(locked.clone(), &[&ruleset]),
         session_manager.goal_manager(),
-    )
+    );
+
+    // Filter out MCP tools when MCP is disabled
+    if !mcp_enabled {
+        let mcp_names = mcp_manager.get_all_mcp_tool_names().await;
+        tools.retain(|t| !mcp_names.contains(&t.name));
+    }
+
+    tools
 }
 
-/// Re-filter tools after mode change or MCP change
-pub(crate) fn refilter_tools(
+/// Re-filter tools after mode change, MCP toggle, or MCP connect/disconnect
+pub(crate) async fn refilter_tools(
     all_tools: &Arc<RwLock<Vec<AgentTool>>>,
     agent_mode: &AgentMode,
     session_manager: &SessionManager,
+    mcp_manager: &McpManager,
+    mcp_enabled: bool,
 ) -> Vec<AgentTool> {
     let ruleset = agent_mode.ruleset();
-    pick_agent::tools::filter_goal_tools(
+    let mut tools = pick_agent::tools::filter_goal_tools(
         pick_agent::permission::disabled::filter_tools(
             all_tools.read().unwrap().clone(),
             &[&ruleset],
         ),
         session_manager.goal_manager(),
-    )
+    );
+
+    // Filter out MCP tools when MCP is disabled
+    if !mcp_enabled {
+        let mcp_names = mcp_manager.get_all_mcp_tool_names().await;
+        tools.retain(|t| !mcp_names.contains(&t.name));
+    }
+
+    tools
 }
 
 /// Resolve model from args

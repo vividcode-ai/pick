@@ -107,10 +107,18 @@ fn truncate_for_summary(text: &str, max_chars: usize) -> String {
     if text.len() <= max_chars {
         return text.to_string();
     }
-    let truncated_chars = text.len() - max_chars;
+    // Find the nearest char boundary at or before max_chars to avoid
+    // panicking on multi-byte UTF-8 characters (e.g. CJK).
+    let cut = text
+        .char_indices()
+        .map(|(i, _)| i)
+        .take_while(|&i| i <= max_chars)
+        .last()
+        .unwrap_or(max_chars);
+    let truncated_chars = text.len() - cut;
     format!(
         "{}\n\n[... {} more characters truncated]",
-        &text[..max_chars],
+        &text[..cut],
         truncated_chars
     )
 }

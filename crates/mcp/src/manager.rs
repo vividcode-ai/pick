@@ -71,6 +71,11 @@ impl McpManager {
             .collect()
     }
 
+    /// Get all MCP tool prefixed names from all connected servers.
+    pub async fn get_all_mcp_tool_names(&self) -> Vec<String> {
+        self.executor.lock().await.get_all_tool_names()
+    }
+
     /// Gracefully shut down all MCP connections.
     /// Drops all clients, closing transports and killing child processes.
     pub async fn shutdown(&self) {

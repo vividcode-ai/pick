@@ -1,6 +1,7 @@
 use pick_agent::session::{AgentModeChangeEntry, SessionEntry, SessionEntryKind};
 use pick_ai::types::{Message, UserMessage};
 use pick_tui::components::select::{SelectItem, SelectList};
+use std::sync::atomic::Ordering;
 
 use super::context::TuiContext;
 use super::init;
@@ -153,7 +154,14 @@ pub(crate) async fn handle_cycle_mode(ctx: &mut TuiContext) {
     }
 
     // Rebuild tools and prompt
-    ctx.tools = init::refilter_tools(&ctx.all_tools, &ctx.agent_mode, &ctx.session_manager);
+    ctx.tools = init::refilter_tools(
+        &ctx.all_tools,
+        &ctx.agent_mode,
+        &ctx.session_manager,
+        &ctx.mcp_manager,
+        ctx.mcp_enabled.load(Ordering::Relaxed),
+    )
+    .await;
     ctx.system_prompt = init::rebuild_system_prompt(
         &ctx.tools,
         &ctx.resource_loader,
@@ -210,7 +218,14 @@ async fn switch_to_model(ctx: &mut TuiContext, new_model_id: &str, new_provider:
 
 /// Refresh tools and system prompt after mode/MCP change
 pub(crate) async fn refresh_tools_and_prompt(ctx: &mut TuiContext) {
-    ctx.tools = init::refilter_tools(&ctx.all_tools, &ctx.agent_mode, &ctx.session_manager);
+    ctx.tools = init::refilter_tools(
+        &ctx.all_tools,
+        &ctx.agent_mode,
+        &ctx.session_manager,
+        &ctx.mcp_manager,
+        ctx.mcp_enabled.load(Ordering::Relaxed),
+    )
+    .await;
     ctx.system_prompt = init::rebuild_system_prompt(
         &ctx.tools,
         &ctx.resource_loader,

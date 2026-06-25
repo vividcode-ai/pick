@@ -124,6 +124,14 @@ impl McpToolExecutor {
         ))
     }
 
+    /// Get all MCP tool prefixed names from all connected servers
+    pub fn get_all_tool_names(&self) -> Vec<String> {
+        self.clients
+            .iter()
+            .flat_map(|c| c.tools.iter().map(|t| t.prefixed_name.clone()))
+            .collect()
+    }
+
     fn find_tool(&self, prefixed_name: &str) -> Option<(&Arc<Mutex<McpClient>>, &ToolEntry)> {
         for ct in &self.clients {
             for tool in &ct.tools {

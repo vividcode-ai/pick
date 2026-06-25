@@ -55,6 +55,7 @@ pub(crate) struct TuiContext {
     // MCP
     pub mcp_manager: Arc<McpManager>,
     pub mcp_cancelled: Arc<AtomicBool>,
+    pub mcp_enabled: Arc<AtomicBool>,
 
     // Permissions
     pub permission_manager: Arc<pick_agent::permission::manager::PermissionManager>,

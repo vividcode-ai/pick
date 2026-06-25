@@ -525,7 +525,14 @@ async fn handle_submit(ctx: &mut TuiContext, user_text: String) {
     let _ = ctx.tui.render_with_terminal(&mut ctx.terminal_manager);
 
     // Refresh tools and build agent config
-    ctx.tools = init::refilter_tools(&ctx.all_tools, &ctx.agent_mode, &ctx.session_manager);
+    ctx.tools = init::refilter_tools(
+        &ctx.all_tools,
+        &ctx.agent_mode,
+        &ctx.session_manager,
+        &ctx.mcp_manager,
+        ctx.mcp_enabled.load(std::sync::atomic::Ordering::Relaxed),
+    )
+    .await;
     let mut config = agent_exec::build_agent_config(ctx, ctx.cmd_tx.clone());
 
     // Create cooperative cancellation channel
