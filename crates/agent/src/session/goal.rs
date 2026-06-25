@@ -1,5 +1,5 @@
 use std::sync::RwLock;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 use super::entries::GoalEntry;
 
@@ -10,6 +10,7 @@ pub struct GoalManager {
     goal: RwLock<Option<GoalEntry>>,
     continuation_count: AtomicU32,
     max_continuations: u32,
+    objective_updated: AtomicBool,
 }
 
 impl GoalManager {
@@ -18,6 +19,7 @@ impl GoalManager {
             goal: RwLock::new(None),
             continuation_count: AtomicU32::new(0),
             max_continuations: 5,
+            objective_updated: AtomicBool::new(false),
         }
     }
 
@@ -163,7 +165,19 @@ impl GoalManager {
             .ok_or_else(|| "no goal to edit".to_string())?;
         entry.objective = objective;
         entry.updated_at = chrono::Utc::now().timestamp_millis();
+        self.objective_updated.store(true, Ordering::Relaxed);
         Ok(entry.clone())
+    }
+
+    /// Mark that the goal objective has been updated externally.
+    /// This flag signals the steering closure to inject objective_updated.md.
+    pub fn mark_objective_updated(&self) {
+        self.objective_updated.store(true, Ordering::Relaxed);
+    }
+
+    /// Atomically check and clear the objective-updated flag.
+    pub fn take_objective_updated(&self) -> bool {
+        self.objective_updated.swap(false, Ordering::Relaxed)
     }
 
     pub fn can_continue(&self) -> bool {

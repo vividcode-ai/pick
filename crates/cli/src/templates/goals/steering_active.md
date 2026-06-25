@@ -1,5 +1,7 @@
 <goal_context>
-Current goal: {objective}
-Tokens used: {tokens_used}
-Time elapsed: {time_elapsed}{remaining}
+Current goal: {{ objective }}
+Tokens used: {{ tokens_used }}
+Token budget: {{ token_budget }}
+Remaining tokens: {{ remaining_tokens }}
+Time elapsed: {{ time_used_seconds }}s
 </goal_context>

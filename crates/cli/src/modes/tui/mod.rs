@@ -3,7 +3,7 @@ mod actions_login;
 mod actions_model;
 mod actions_session;
 mod actions_settings;
-mod agent_exec;
+pub(crate) mod agent_exec;
 mod cleanup;
 mod cmd_core;
 mod cmd_dispatch;

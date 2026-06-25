@@ -821,27 +821,27 @@ pub async fn run_interactive_mode(
                             if let Some(goal) = goal_manager.get()
                                 && goal.status == "active"
                             {
-                                let remaining = goal_manager
+                                let objective =
+                                    crate::modes::tui::agent_exec::escape_xml_text(&goal.objective);
+                                let token_budget_str = goal
+                                    .token_budget
+                                    .map(|b| b.to_string())
+                                    .unwrap_or_else(|| "none".to_string());
+                                let remaining_tokens = goal_manager
                                     .remaining_tokens()
-                                    .map(|r| format!("\nRemaining token budget: {}", r))
-                                    .unwrap_or_default();
-                                let time_elapsed = {
-                                    let s = goal.time_used_seconds;
-                                    if s < 60 {
-                                        format!("{}s", s)
-                                    } else if s < 3600 {
-                                        format!("{}m", s / 60)
-                                    } else {
-                                        format!("{}h {}m", s / 3600, (s % 3600) / 60)
-                                    }
-                                };
-                                msgs.push(Message::User(UserMessage::text(format!(
+                                    .map(|r| r.to_string())
+                                    .unwrap_or_else(|| "unbounded".to_string());
+                                let msg_text = crate::modes::tui::agent_exec::render_goal_template(
                                     include_str!("../../templates/goals/steering_active.md"),
-                                    objective = goal.objective,
-                                    tokens_used = goal.tokens_used,
-                                    time_elapsed = time_elapsed,
-                                    remaining = remaining,
-                                ))));
+                                    &[
+                                        ("objective", &objective),
+                                        ("tokens_used", &goal.tokens_used.to_string()),
+                                        ("token_budget", &token_budget_str),
+                                        ("remaining_tokens", &remaining_tokens),
+                                        ("time_used_seconds", &goal.time_used_seconds.to_string()),
+                                    ],
+                                );
+                                msgs.push(Message::User(UserMessage::text(msg_text)));
                             }
                             msgs
                         }
