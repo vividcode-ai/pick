@@ -178,7 +178,7 @@ pub(crate) async fn handle_export(ctx: &mut TuiContext, args: &[String]) {
                     .collect();
 
                 use crate::core::export_html::export_html::{
-                    ExportColors, SessionData, export_session_to_html,
+                    SessionData, derive_export_colors, export_session_to_html,
                 };
                 let session_data = SessionData {
                     header,
@@ -188,8 +188,12 @@ pub(crate) async fn handle_export(ctx: &mut TuiContext, args: &[String]) {
                     tools: None,
                     rendered_tools: None,
                 };
-                let colors = ExportColors::default();
-                let theme_colors = std::collections::HashMap::new();
+                let theme_colors = crate::core::theme::loader::get_resolved_theme_colors(None);
+                let user_msg_bg = theme_colors
+                    .get("userMessageBg")
+                    .cloned()
+                    .unwrap_or_else(|| "#343541".to_string());
+                let colors = derive_export_colors(&user_msg_bg);
                 match export_session_to_html(&session_data, &theme_colors, &colors, Some(&p)) {
                     Ok(path) => ctx.tui.chat.add_system_message(&format!(
                         "Session exported to: \x1b[1m{}\x1b[0m",

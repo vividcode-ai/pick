@@ -411,8 +411,14 @@ pub fn export_from_data(
     tools: Option<Vec<ToolDef>>,
     options: Option<&ExportOptions>,
 ) -> Result<String, String> {
-    let theme_colors = HashMap::new(); // Would use theme system
-    let export_colors = ExportColors::default();
+    // Load actual theme colors from the theme system
+    let theme_name = options.and_then(|o| o.theme_name.as_deref());
+    let theme_colors = crate::core::theme::loader::get_resolved_theme_colors(theme_name);
+    let user_msg_bg = theme_colors
+        .get("userMessageBg")
+        .cloned()
+        .unwrap_or_else(|| "#343541".to_string());
+    let export_colors = derive_export_colors(&user_msg_bg);
 
     let session_data = SessionData {
         header,

@@ -51,7 +51,16 @@ impl TuiApp {
             //
             // By preserving the previous buffer content, the Clear widget
             // triggers proper difference detection: old content → spaces.
-            if self.state != AppState::ApiKeyInput {
+            // For ApiKeyInput, Selecting, and TreeSelecting, skip
+            // invalidate_viewport so the buffer diff can detect changes
+            // from old content → spaces (Clear/Padding). When the previous
+            // buffer is reset to spaces, the diff sees "space == space"
+            // for padding cells and outputs nothing, leaving stale
+            // autocomplete/dialog characters on the physical terminal.
+            if self.state != AppState::ApiKeyInput
+                && self.state != AppState::Selecting
+                && self.state != AppState::TreeSelecting
+            {
                 manager.invalidate_viewport();
             }
             self.last_render_state.clone_from(&self.state);
@@ -211,20 +220,11 @@ impl TuiApp {
             constraints.push(Constraint::Length(1));
         }
         // Editor area: border + editor + border + status separator + context separator
-        // When popup replaces editor, combine the box (top border + content + bottom border)
-        // into one large chunk so Clear covers old autocomplete/dialog overlay positions.
-        // Keep the separators separate so footer lines still render.
-        if matches!(self.state, AppState::Selecting | AppState::TreeSelecting) {
-            constraints.push(Constraint::Length(editor_line_count + 2));
-            constraints.push(Constraint::Length(1));
-            constraints.push(Constraint::Length(1));
-        } else {
-            constraints.push(Constraint::Length(1));
-            constraints.push(Constraint::Length(editor_line_count));
-            constraints.push(Constraint::Length(1));
-            constraints.push(Constraint::Length(1));
-            constraints.push(Constraint::Length(1));
-        }
+        constraints.push(Constraint::Length(1));
+        constraints.push(Constraint::Length(editor_line_count));
+        constraints.push(Constraint::Length(1));
+        constraints.push(Constraint::Length(1));
+        constraints.push(Constraint::Length(1));
         if self.autocomplete_space_lines > 0 {
             constraints.push(Constraint::Length(self.autocomplete_space_lines));
         }
@@ -426,54 +426,21 @@ impl TuiApp {
                         i += 1;
                     }
 
-                    let is_popup_mode =
-                        matches!(self.state, AppState::Selecting | AppState::TreeSelecting);
-
-                    // In popup mode the combined chunk already includes the
-                    // border; skip the individual border render.
-                    if !is_popup_mode {
-                        render_at!(i, top_border.clone());
-                        i += 1;
-                    }
+                    render_at!(i, top_border.clone());
+                    i += 1;
 
                     if i < chunks.len() {
                         match self.state {
                             AppState::Selecting => {
                                 frame.render_widget_ref(&Clear, chunks[i]);
-                                let mut popup = self.build_selection_popup_lines(width);
-                                // When using combined chunk, prepend a border line
-                                // since we skipped the individual border render.
-                                if is_popup_mode {
-                                    let border = Line::from(Span::styled(
-                                        "\u{2500}".repeat(width as usize),
-                                        Style::default().add_modifier(Modifier::DIM),
-                                    ));
-                                    popup.insert(0, border);
-                                    // Pad to fill allocated height (editor_line_count + 4)
-                                    let target = chunks[i].height as usize;
-                                    while popup.len() < target {
-                                        popup.push(Line::from(""));
-                                    }
-                                }
+                                let popup = self.build_selection_popup_lines(width);
                                 frame.render_widget_ref(
                                     &Paragraph::new(ratatui::text::Text::from(popup)),
                                     chunks[i],
                                 );
                             }
                             AppState::TreeSelecting => {
-                                frame.render_widget_ref(&Clear, chunks[i]);
-                                let mut popup = self.render_tree_view_lines(width);
-                                if is_popup_mode {
-                                    let border = Line::from(Span::styled(
-                                        "\u{2500}".repeat(width as usize),
-                                        Style::default().add_modifier(Modifier::DIM),
-                                    ));
-                                    popup.insert(0, border);
-                                    let target = chunks[i].height as usize;
-                                    while popup.len() < target {
-                                        popup.push(Line::from(""));
-                                    }
-                                }
+                                let popup = self.render_tree_view_lines(width);
                                 frame.render_widget_ref(
                                     &Paragraph::new(ratatui::text::Text::from(popup)),
                                     chunks[i],
@@ -516,13 +483,8 @@ impl TuiApp {
                         }
                     }
                     i += 1;
-
-                    // In popup mode the combined chunk already includes the
-                    // bottom border; skip the individual border render.
-                    if !is_popup_mode {
-                        render_at!(i, top_border.clone());
-                        i += 1;
-                    }
+                    render_at!(i, top_border.clone());
+                    i += 1;
 
                     if !has_ac && !has_dialog {
                         render_at!(i, self.render_footer_line1(width));
