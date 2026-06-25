@@ -49,6 +49,7 @@ use pick_agent::tools::{create_coding_tools_with_goal_manager, create_extension_
 use pick_ai::providers::register::register_builtins;
 use pick_ai::types::{Message, UserMessage};
 use pick_mcp::McpManager;
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, RwLock};
 
 async fn run_update_command() -> anyhow::Result<()> {
@@ -517,6 +518,7 @@ async fn main() {
     // Determine mode and run
     let pm = Arc::new(permission_manager);
     let platform_sandbox = platform_sandbox; // shadow for clarity
+    let sandbox_enabled = Arc::new(AtomicBool::new(settings.get_permission().sandbox_enabled));
     let update_action = match args.mode.as_str() {
         "rpc" => {
             run_rpc_mode(
@@ -529,6 +531,7 @@ async fn main() {
                 agent_registry,
                 pm,
                 platform_sandbox,
+                sandbox_enabled,
             )
             .await;
             None
@@ -545,6 +548,7 @@ async fn main() {
                 agent_registry,
                 pm,
                 platform_sandbox,
+                sandbox_enabled,
             )
             .await;
             None
@@ -564,6 +568,7 @@ async fn main() {
                 mcp_cancelled,
                 pm,
                 platform_sandbox,
+                sandbox_enabled.clone(),
             )
             .await
         }
@@ -582,6 +587,7 @@ async fn main() {
                 mcp_cancelled,
                 pm,
                 platform_sandbox,
+                sandbox_enabled.clone(),
             )
             .await;
             None
@@ -601,6 +607,7 @@ async fn main() {
                 mcp_cancelled,
                 pm,
                 platform_sandbox,
+                sandbox_enabled.clone(),
             )
             .await
         }

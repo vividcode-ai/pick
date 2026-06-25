@@ -1,5 +1,6 @@
 //! Subagent runner - agent execution logic
 
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 
 use pick_ai::models::get_model;
@@ -38,6 +39,7 @@ fn build_subagent_loop_config(
     permission_manager: Option<Arc<PermissionManager>>,
     mode_rulesets: Option<Vec<Ruleset>>,
     sandbox: Option<Arc<dyn SandboxTrait>>,
+    sandbox_enabled: Option<Arc<AtomicBool>>,
 ) -> AgentLoopConfig {
     AgentLoopConfig {
         model,
@@ -69,6 +71,7 @@ fn build_subagent_loop_config(
         mode_rulesets,
         permission_manager,
         sandbox,
+        sandbox_enabled,
         cancel_signal_tx: None,
     }
 }
@@ -204,6 +207,7 @@ async fn run_subagent_turn(
         permission_manager,
         mode_rulesets,
         sandbox,
+        None, // subagents inherit parent sandbox_enabled via ToolContext
     );
 
     let initial_messages = vec![Message::User(UserMessage::text(format!("Task: {}", task)))];

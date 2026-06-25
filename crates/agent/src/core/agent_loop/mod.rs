@@ -10,6 +10,7 @@ pub use tools::*;
 
 use std::pin::Pin;
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 
 use pick_ai::types::Model;
 
@@ -87,6 +88,8 @@ pub struct AgentLoopConfig {
     pub permission_manager: Option<Arc<PermissionManager>>,
     /// Platform sandbox for process isolation (bwrap, seatbelt, restricted token)
     pub sandbox: Option<Arc<dyn crate::permission::sandbox::Sandbox>>,
+    /// Runtime toggle for sandbox isolation (can be changed mid-session)
+    pub sandbox_enabled: Option<Arc<AtomicBool>>,
     /// External cancellation signal: when the Sender is triggered, the agent loop
     /// stops cooperatively — the current LLM call is abandoned and any accumulated
     /// messages are returned as a normal result rather than an error.

@@ -11,6 +11,7 @@ pub(crate) async fn handle_settings_selection(ctx: &mut TuiContext, val: &str) {
 
     match val {
         "auto-compact" => settings_values::toggle_compact(&mut sm, ctx).await,
+        "sandbox" => settings_values::toggle_sandbox_enabled(&mut sm, ctx).await,
         "show-images" => settings_values::toggle_show_images(&mut sm, ctx).await,
         "auto-resize-images" => settings_values::toggle_auto_resize_images(&mut sm, ctx).await,
         "block-images" => settings_values::toggle_block_images(&mut sm, ctx).await,

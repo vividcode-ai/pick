@@ -37,6 +37,7 @@ pub async fn run_tui_mode(
     mcp_cancelled: Arc<AtomicBool>,
     permission_manager: Arc<pick_agent::permission::manager::PermissionManager>,
     platform_sandbox: Option<std::sync::Arc<dyn pick_agent::permission::sandbox::Sandbox>>,
+    sandbox_enabled: Arc<AtomicBool>,
 ) -> Option<UpdateAction> {
     // Phase 1: Initialize all TUI state
     let (mut ctx, mut cmd_rx, mut evt_rx) = init::init_tui_mode(
@@ -53,6 +54,7 @@ pub async fn run_tui_mode(
         mcp_cancelled,
         permission_manager,
         platform_sandbox,
+        sandbox_enabled,
     )
     .await;
 

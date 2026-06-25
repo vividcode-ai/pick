@@ -45,6 +45,7 @@ pub(crate) async fn init_tui_mode(
     mcp_cancelled: Arc<AtomicBool>,
     permission_manager: Arc<pick_agent::permission::manager::PermissionManager>,
     platform_sandbox: Option<Arc<dyn pick_agent::permission::sandbox::Sandbox>>,
+    sandbox_enabled: Arc<AtomicBool>,
 ) -> (
     TuiContext,
     mpsc::UnboundedReceiver<TuiCommand>,
@@ -329,6 +330,7 @@ pub(crate) async fn init_tui_mode(
         mcp_cancelled,
         permission_manager,
         platform_sandbox,
+        sandbox_enabled,
         auth,
         hide_thinking,
         show_images,

@@ -329,6 +329,7 @@ pub(crate) fn build_agent_config(
         permission_hooks: Some(permission_manager.hook_registry.clone()),
         permission_manager: Some(permission_manager.clone()),
         sandbox: ctx.platform_sandbox.clone(),
+        sandbox_enabled: Some(ctx.sandbox_enabled.clone()),
         cancel_signal_tx: None,
         on_turn_complete: Some(on_turn_complete),
         provider_max_retries: None,

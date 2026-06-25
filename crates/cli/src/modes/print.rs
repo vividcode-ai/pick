@@ -1,8 +1,8 @@
 //! Print mode - non-interactive agent execution with stdout output
 
 use std::io::Read;
-
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 
 use crate::args::Args;
 use crate::core::auth_storage::AuthStorage;
@@ -29,6 +29,7 @@ pub async fn run_print_mode(
     agent_registry: Arc<pick_agent::agent_registry::AgentRegistry>,
     permission_manager: Arc<pick_agent::permission::manager::PermissionManager>,
     platform_sandbox: Option<std::sync::Arc<dyn pick_agent::permission::sandbox::Sandbox>>,
+    sandbox_enabled: Arc<AtomicBool>,
 ) {
     // Resolve model + provider
     let provider = args.provider.as_deref().unwrap_or("anthropic");
@@ -190,6 +191,7 @@ pub async fn run_print_mode(
         permission_hooks: Some(permission_manager.hook_registry.clone()),
         permission_manager: Some(permission_manager.clone()),
         sandbox: platform_sandbox.clone(),
+        sandbox_enabled: Some(sandbox_enabled.clone()),
         cancel_signal_tx: None,
         on_event: Some(Arc::new(move |event| {
             if mode_is_json {

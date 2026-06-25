@@ -1,3 +1,4 @@
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex, RwLock};
 
 use crate::args::Args;
@@ -38,6 +39,7 @@ pub async fn run_interactive_mode(
     mcp_cancelled: Arc<std::sync::atomic::AtomicBool>,
     permission_manager: Arc<pick_agent::permission::manager::PermissionManager>,
     platform_sandbox: Option<std::sync::Arc<dyn pick_agent::permission::sandbox::Sandbox>>,
+    sandbox_enabled: Arc<AtomicBool>,
 ) {
     let provider = args.provider.as_deref().unwrap_or("anthropic");
     let model_id = args.model.as_deref().unwrap_or("claude-sonnet-4-20250514");
@@ -779,6 +781,7 @@ pub async fn run_interactive_mode(
                     mode_rulesets: Some(vec![mode_rules_for_hook.clone()]),
                     permission_manager: Some(permission_manager.clone()),
                     sandbox: platform_sandbox.clone(),
+                    sandbox_enabled: Some(sandbox_enabled.clone()),
                     cancel_signal_tx: None,
                     before_tool_call: Some(Arc::new({
                         let mode_rules = mode_rules_for_hook.clone();

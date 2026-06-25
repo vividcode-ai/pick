@@ -594,6 +594,7 @@ async fn handle_tool_execution(
             cwd: config.cwd.clone(),
             permission_manager: config.permission_manager.clone(),
             sandbox: config.sandbox.clone(),
+            sandbox_enabled: config.sandbox_enabled.clone(),
         };
 
         // Spawn a task to forward progress events while the tool executes
@@ -811,6 +812,7 @@ async fn handle_tool_execution(
         let agent_id = config.agent_id.clone();
         let agent_registry = config.agent_registry.clone();
         let default_model = config.model.clone();
+        let sandbox_enabled = config.sandbox_enabled.clone();
         for (tc, tool) in parallel_calls {
             let cancel_rx_clone = cancel_rx.clone();
             let approve = approve.clone();
@@ -821,6 +823,7 @@ async fn handle_tool_execution(
             let fs_policy = config.fs_policy.clone();
             let cwd = config.cwd.clone();
             let permission_manager = config.permission_manager.clone();
+            let sandbox_enabled = sandbox_enabled.clone();
             parallel_tool_infos.push((tc.name.clone(), tc.id.clone()));
             parallel_handles.push(tokio::spawn(async move {
                 let (progress_tx, _progress_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
@@ -836,6 +839,7 @@ async fn handle_tool_execution(
                     cwd: cwd.clone(),
                     permission_manager: permission_manager.clone(),
                     sandbox: None,
+                    sandbox_enabled: sandbox_enabled.clone(),
                 };
                 let validated_args =
                     match validate_tool_arguments(&tool, &tc.arguments, &tc.arguments) {

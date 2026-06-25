@@ -275,6 +275,26 @@ pub(crate) async fn toggle_terminal_progress(sm: &mut SettingsManager, ctx: &mut
     }
 }
 
+pub(crate) async fn toggle_sandbox_enabled(sm: &mut SettingsManager, ctx: &mut TuiContext) {
+    let current = sm.get_permission().sandbox_enabled;
+    let mut config = sm.get_permission();
+    config.sandbox_enabled = !current;
+    let mut update = Settings::default();
+    update.permission = Some(config);
+    match sm.set_global(update) {
+        Ok(()) => {
+            ctx.sandbox_enabled.store(!current, Ordering::Relaxed);
+            ctx.tui.chat.add_system_message(&format!(
+                "Sandbox \x1b[1m{}\x1b[0m (takes effect immediately).",
+                if !current { "enabled" } else { "disabled" }
+            ));
+        }
+        Err(e) => ctx
+            .tui
+            .show_error(&format!("Failed to save setting: {}", e)),
+    }
+}
+
 // ---- Apply setting values ----
 
 pub(crate) async fn apply_thinking_level(

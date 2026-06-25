@@ -1,5 +1,7 @@
 //! Bash tool - executes shell commands with streaming output
 
+use std::sync::atomic::Ordering;
+
 use pick_ai::types::ContentBlock;
 use tokio::io::{AsyncRead, AsyncReadExt};
 
@@ -144,6 +146,11 @@ pub fn create_bash_tool() -> AgentTool {
                 // Step 1: Try direct_spawn (Windows: CreateProcessAsUserW with restricted token)
                 if let Some(sandbox) = ctx.sandbox.as_ref()
                     && let Some(cwd) = ctx.cwd.as_ref()
+                    && ctx
+                        .sandbox_enabled
+                        .as_ref()
+                        .map(|f| f.load(Ordering::Relaxed))
+                        .unwrap_or(true)
                 {
                     let mut shell_args = shell_config.args.clone();
                     shell_args.push(command.to_string());
@@ -198,6 +205,11 @@ pub fn create_bash_tool() -> AgentTool {
                 let use_sandbox = 'sandbox: {
                     if let Some(ref sandbox) = ctx.sandbox
                         && let Some(ref cwd) = ctx.cwd
+                        && ctx
+                            .sandbox_enabled
+                            .as_ref()
+                            .map(|f| f.load(Ordering::Relaxed))
+                            .unwrap_or(true)
                     {
                         let mut shell_args = shell_config.args.clone();
                         shell_args.push(command.to_string());

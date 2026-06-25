@@ -2,6 +2,7 @@
 
 use std::future::Future;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use pick_ai::types::{ContentBlock, Message, Model};
 use tokio::sync::mpsc;
@@ -113,6 +114,7 @@ pub struct ToolContext {
     pub cwd: Option<std::path::PathBuf>,
     pub permission_manager: Option<Arc<PermissionManager>>,
     pub sandbox: Option<Arc<dyn SandboxTrait>>,
+    pub sandbox_enabled: Option<Arc<AtomicBool>>,
 }
 
 impl Clone for ToolContext {
@@ -129,6 +131,7 @@ impl Clone for ToolContext {
             cwd: self.cwd.clone(),
             permission_manager: self.permission_manager.clone(),
             sandbox: self.sandbox.clone(),
+            sandbox_enabled: self.sandbox_enabled.clone(),
         }
     }
 }
@@ -146,6 +149,13 @@ impl std::fmt::Debug for ToolContext {
                 &self.agent_registry.as_ref().map(|_| "AgentRegistry"),
             )
             .field("default_model", &self.default_model.as_ref().map(|m| &m.id))
+            .field(
+                "sandbox_enabled",
+                &self
+                    .sandbox_enabled
+                    .as_ref()
+                    .map(|a| a.load(Ordering::Relaxed)),
+            )
             .finish()
     }
 }

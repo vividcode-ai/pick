@@ -122,12 +122,14 @@ pub(crate) fn handle_settings_command(ctx: &mut TuiContext) {
     let collapse = sm.get_collapse_changelog();
     let quiet = sm.get_quiet_startup();
     let telemetry = sm.get().enable_install_telemetry.unwrap_or(false);
+    let sandbox = sm.get_permission().sandbox_enabled;
 
     let items = vec![
         SelectItem::new(
             format!("Auto-compact  [{}]", s(auto_compact)),
             "auto-compact",
         ),
+        SelectItem::new(format!("Sandbox  [{}]", s(sandbox)), "sandbox"),
         SelectItem::new(format!("Show images  [{}]", s(show_images)), "show-images"),
         SelectItem::new("Image width", "image-width-cells"),
         SelectItem::new(

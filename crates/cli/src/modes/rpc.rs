@@ -1,5 +1,6 @@
 use std::io::Write;
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 
 use tokio::io::AsyncBufReadExt;
 use tokio::sync::watch;
@@ -42,6 +43,7 @@ pub async fn run_rpc_mode(
     agent_registry: Arc<pick_agent::agent_registry::AgentRegistry>,
     permission_manager: Arc<pick_agent::permission::manager::PermissionManager>,
     platform_sandbox: Option<std::sync::Arc<dyn pick_agent::permission::sandbox::Sandbox>>,
+    sandbox_enabled: Arc<AtomicBool>,
 ) {
     let provider = args.provider.as_deref().unwrap_or("anthropic").to_string();
     let model_id = args
@@ -207,6 +209,7 @@ pub async fn run_rpc_mode(
                         permission_hooks: Some(permission_manager.hook_registry.clone()),
                         permission_manager: Some(permission_manager.clone()),
                         sandbox: platform_sandbox.clone(),
+                        sandbox_enabled: Some(sandbox_enabled.clone()),
                         cancel_signal_tx: None,
                         on_turn_complete: None,
                     };
