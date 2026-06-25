@@ -14,6 +14,7 @@ use super::types::AppState;
 use super::types::TreeView;
 use super::types::TuiAction;
 use super::types::TuiApp;
+use super::types::UpdateChoice;
 
 impl TuiApp {
     /// Create a new TUI app (enables raw mode for keyboard input)
@@ -764,28 +765,38 @@ impl TuiApp {
             KeyCode::Char('1') => {
                 self.update_prompt = None;
                 self.state = AppState::Input;
-                Some(TuiAction::UpdateResponse(true))
+                Some(TuiAction::UpdateResponse(UpdateChoice::UpdateNow))
             }
             KeyCode::Char('2') => {
+                // Skip — just hide the prompt, remind again on next startup
                 self.cancel_update_prompt();
                 None
             }
             KeyCode::Char('3') => {
+                // Don't remind for this version (persist to cache)
                 self.update_prompt = None;
                 self.state = AppState::Input;
-                Some(TuiAction::UpdateResponse(false))
+                Some(TuiAction::UpdateResponse(UpdateChoice::Dismiss))
             }
             KeyCode::Enter => {
-                let should_update = self.update_prompt.as_ref().is_some_and(|p| p.selected == 0);
-                let is_dismiss = self.update_prompt.as_ref().is_some_and(|p| p.selected == 2);
-                if is_dismiss {
-                    self.update_prompt = None;
-                    self.state = AppState::Input;
-                    Some(TuiAction::UpdateResponse(false))
-                } else {
-                    self.update_prompt = None;
-                    self.state = AppState::Input;
-                    Some(TuiAction::UpdateResponse(should_update))
+                match self.update_prompt.as_ref().map(|p| p.selected) {
+                    Some(0) => {
+                        // Update now
+                        self.update_prompt = None;
+                        self.state = AppState::Input;
+                        Some(TuiAction::UpdateResponse(UpdateChoice::UpdateNow))
+                    }
+                    Some(1) => {
+                        // Skip — just hide the prompt, remind again on next startup
+                        self.cancel_update_prompt();
+                        None
+                    }
+                    _ => {
+                        // Don't remind for this version (persist to cache)
+                        self.update_prompt = None;
+                        self.state = AppState::Input;
+                        Some(TuiAction::UpdateResponse(UpdateChoice::Dismiss))
+                    }
                 }
             }
             KeyCode::Esc => {

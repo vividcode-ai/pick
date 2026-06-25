@@ -43,16 +43,22 @@ pub(crate) async fn dispatch_action(ctx: &mut TuiContext, action: TuiAction) -> 
         TuiAction::QueueFollowUp(text) => {
             handle_follow_up_message(ctx, text).await;
         }
-        TuiAction::UpdateResponse(update_now) => {
-            if update_now {
-                if let Some(action) = crate::core::update_action::get_update_action() {
-                    ctx.pending_update = Some(action);
+        TuiAction::UpdateResponse(choice) => {
+            match choice {
+                pick_tui::app::UpdateChoice::UpdateNow => {
+                    if let Some(action) = crate::core::update_action::get_update_action() {
+                        ctx.pending_update = Some(action);
+                    }
+                    return true;
                 }
-            } else {
-                // Dismiss this version
-                updates::dismiss_version();
+                pick_tui::app::UpdateChoice::Skip => {
+                    // Nothing to persist — prompt will show again on next startup
+                }
+                pick_tui::app::UpdateChoice::Dismiss => {
+                    // Silence notifications for this version only
+                    updates::dismiss_version();
+                }
             }
-            return true;
         }
     }
     false

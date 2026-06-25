@@ -157,21 +157,22 @@ pub async fn get_upgrade_version(check_dismissed: bool) -> Option<String> {
         dismissed_version: None,
     });
 
-    // Check if dismissed
-    if check_dismissed
-        && let Some(ref dismissed) = cache.dismissed_version
-        && dismissed == &cache.latest_version
-    {
-        return None;
-    }
-
-    // Refresh cache if stale
+    // Refresh cache if stale (do this BEFORE the dismissed check so that
+    // a newer version supersedes a previously dismissed one)
     if cache.is_stale() {
         let ctx = InstallContext::current();
         if let Some(latest) = fetch_latest_version(ctx).await {
             cache.update(&latest);
             cache.save();
         }
+    }
+
+    // Check if dismissed (after refresh, so latest_version is up-to-date)
+    if check_dismissed
+        && let Some(ref dismissed) = cache.dismissed_version
+        && dismissed == &cache.latest_version
+    {
+        return None;
     }
 
     // Compare

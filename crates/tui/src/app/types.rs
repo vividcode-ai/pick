@@ -19,8 +19,8 @@ pub enum TuiAction {
     Interrupt,
     OpenTree,
     Quit,
-    /// Update prompt actions: true = update now, false = skip/dismiss
-    UpdateResponse(bool),
+    /// Update prompt actions
+    UpdateResponse(UpdateChoice),
     /// Queue a message to be injected into the running agent's steering queue
     /// (user typed while the agent was streaming)
     QueueMessage(String),
@@ -92,6 +92,17 @@ pub struct TreeView {
     pub(crate) show_label_timestamps: bool,
     pub edit_label_entry_id: Option<String>,
     pub edit_label_buffer: String,
+}
+
+/// User's choice from the update prompt dialog
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UpdateChoice {
+    /// Download and install the latest version (quits the TUI)
+    UpdateNow,
+    /// Just hide the prompt, remind again on next startup
+    Skip,
+    /// Silence notifications for the current version, re-prompt for newer ones
+    Dismiss,
 }
 
 /// The main TUI application with startup display and footer
