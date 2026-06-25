@@ -3,6 +3,9 @@ use std::sync::atomic::{AtomicU32, Ordering};
 
 use super::entries::GoalEntry;
 
+/// Maximum length of a goal objective string.
+pub const MAX_GOAL_OBJECTIVE_CHARS: usize = 1000;
+
 pub struct GoalManager {
     goal: RwLock<Option<GoalEntry>>,
     continuation_count: AtomicU32,
@@ -39,6 +42,13 @@ impl GoalManager {
         objective: String,
         token_budget: Option<i64>,
     ) -> Result<GoalEntry, String> {
+        if objective.chars().count() > MAX_GOAL_OBJECTIVE_CHARS {
+            return Err(format!(
+                "goal objective too long ({} chars, max {})",
+                objective.chars().count(),
+                MAX_GOAL_OBJECTIVE_CHARS
+            ));
+        }
         let mut guard = self.goal.write().map_err(|e| e.to_string())?;
         if guard.is_some() {
             return Err("cannot create a new goal because this thread already has a goal; use update_goal only when the existing goal is complete".to_string());
@@ -140,6 +150,13 @@ impl GoalManager {
     }
 
     pub fn set_objective(&self, objective: String) -> Result<GoalEntry, String> {
+        if objective.chars().count() > MAX_GOAL_OBJECTIVE_CHARS {
+            return Err(format!(
+                "goal objective too long ({} chars, max {})",
+                objective.chars().count(),
+                MAX_GOAL_OBJECTIVE_CHARS
+            ));
+        }
         let mut guard = self.goal.write().map_err(|e| e.to_string())?;
         let entry = guard
             .as_mut()

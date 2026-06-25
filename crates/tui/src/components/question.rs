@@ -30,7 +30,11 @@ impl QuestionDialog {
                 question: q,
                 header: h,
                 multiple: multi,
-                selected: if multi { Vec::new() } else { vec![0] },
+                selected: if multi || opts.is_empty() {
+                    Vec::new()
+                } else {
+                    vec![0]
+                },
                 options: opts
                     .into_iter()
                     .map(|(l, d)| QuestionOptionState {

@@ -601,6 +601,7 @@ impl TuiApp {
     fn question_navigate(&mut self, delta: isize) {
         if let Some(ref mut dialog) = self.question_dialog
             && let Some(q) = dialog.current()
+            && !q.options.is_empty()
         {
             let current = q.selected.first().copied().unwrap_or(0);
             let count = q.options.len();
@@ -621,6 +622,7 @@ impl TuiApp {
         if let Some(ref mut dialog) = self.question_dialog
             && let Some(q) = dialog.questions.get_mut(dialog.current_index)
             && q.multiple
+            && !q.options.is_empty()
         {
             let current = q.selected.first().copied().unwrap_or(0);
             if let Some(pos) = q.selected.iter().position(|&i| i == current) {

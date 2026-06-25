@@ -825,10 +825,23 @@ pub async fn run_interactive_mode(
                                     .remaining_tokens()
                                     .map(|r| format!("\nRemaining token budget: {}", r))
                                     .unwrap_or_default();
+                                let time_elapsed = {
+                                    let s = goal.time_used_seconds;
+                                    if s < 60 {
+                                        format!("{}s", s)
+                                    } else if s < 3600 {
+                                        format!("{}m", s / 60)
+                                    } else {
+                                        format!("{}h {}m", s / 3600, (s % 3600) / 60)
+                                    }
+                                };
                                 msgs.push(Message::User(UserMessage::text(format!(
-                                        "<goal_context>\nCurrent goal: {}\nTokens used: {}{}\n</goal_context>",
-                                        goal.objective, goal.tokens_used, remaining,
-                                    ))));
+                                    include_str!("../../templates/goals/steering_active.md"),
+                                    objective = goal.objective,
+                                    tokens_used = goal.tokens_used,
+                                    time_elapsed = time_elapsed,
+                                    remaining = remaining,
+                                ))));
                             }
                             msgs
                         }

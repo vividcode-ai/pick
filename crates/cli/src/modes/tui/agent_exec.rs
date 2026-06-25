@@ -87,40 +87,21 @@ pub(crate) fn build_agent_config(
                             .remaining_tokens()
                             .map(|r| format!("\nRemaining token budget: {}", r))
                             .unwrap_or_default();
+                        let time_elapsed = format_elapsed(goal.time_used_seconds);
                         msgs.push(Message::User(UserMessage::text(format!(
-                            "<goal_context>\n\
-                             Current goal: {}\n\
-                             Tokens used: {}\n\
-                             Time elapsed: {}{}\n\
-                             </goal_context>",
-                            goal.objective,
-                            goal.tokens_used,
-                            {
-                                let s = goal.time_used_seconds;
-                                if s < 60 {
-                                    format!("{}s", s)
-                                } else if s < 3600 {
-                                    format!("{}m", s / 60)
-                                } else {
-                                    format!("{}h {}m", s / 3600, (s % 3600) / 60)
-                                }
-                            },
-                            remaining,
+                            include_str!("../../templates/goals/steering_active.md"),
+                            objective = goal.objective,
+                            tokens_used = goal.tokens_used,
+                            time_elapsed = time_elapsed,
+                            remaining = remaining,
                         ))));
                     }
                     "budget_limited" if !budget_injected.swap(true, Ordering::Relaxed) => {
                         msgs.push(Message::User(UserMessage::text(format!(
-                            "<goal_context>\n\
-                                 The token budget for the goal has been reached.\n\
-                                 Objective: {}\n\
-                                 Tokens used: {} / {}\n\
-                                 Please wrap up the current task, summarize progress, \
-                                 and identify any remaining work.\n\
-                                 Do not start new substantive work.\n\
-                                 </goal_context>",
-                            goal.objective,
-                            goal.tokens_used,
-                            goal.token_budget.unwrap_or(0),
+                            include_str!("../../templates/goals/steering_budget_limit.md"),
+                            objective = goal.objective,
+                            tokens_used = goal.tokens_used,
+                            token_budget = goal.token_budget.unwrap_or(0),
                         ))));
                     }
                     _ => {}
@@ -168,8 +149,14 @@ pub(crate) fn build_agent_config(
         move |_result: &pick_agent::core::agent_loop::AgentRunResult| {
             let mut msgs = Vec::new();
 
-            // Goal-driven continuation
-            if goal_manager.can_continue() {
+            // Goal-driven continuation — only when no pending user input
+            // (user messages in follow_up_queue take priority)
+            let has_pending_user_input = follow_up_queue
+                .lock()
+                .map(|q| !q.is_empty())
+                .unwrap_or(false);
+
+            if !has_pending_user_input && goal_manager.can_continue() {
                 if let Some(goal) = goal_manager.get()
                     && goal.status == "active"
                     && goal_manager.register_continuation()
@@ -178,28 +165,13 @@ pub(crate) fn build_agent_config(
                         .remaining_tokens()
                         .map(|r| format!(", remaining token budget: {}", r))
                         .unwrap_or_default();
+                    let time_elapsed = format_elapsed(goal.time_used_seconds);
                     msgs.push(Message::User(UserMessage::text(format!(
-                        "<goal_context>\n\
-                         Continue working toward the current goal.\n\
-                         Objective: {}\n\
-                         Tokens used: {}{}\n\
-                         Time elapsed: {}\n\
-                         Audit the actual current state.\n\
-                         Only mark as complete when every requirement is verified.\n\
-                         </goal_context>",
-                        goal.objective,
-                        goal.tokens_used,
-                        remaining,
-                        {
-                            let s = goal.time_used_seconds;
-                            if s < 60 {
-                                format!("{}s", s)
-                            } else if s < 3600 {
-                                format!("{}m", s / 60)
-                            } else {
-                                format!("{}h {}m", s / 3600, (s % 3600) / 60)
-                            }
-                        },
+                        include_str!("../../templates/goals/follow_up_continuation.md"),
+                        objective = goal.objective,
+                        tokens_used = goal.tokens_used,
+                        remaining = remaining,
+                        time_elapsed = time_elapsed,
                     ))));
                 }
             }
@@ -599,5 +571,16 @@ pub(crate) async fn auto_compact_session(ctx: &mut TuiContext) {
                     .show_error(&format!("Auto-compaction failed: {}", e.message));
             }
         }
+    }
+}
+
+/// Format elapsed seconds into a human-readable string.
+fn format_elapsed(secs: i64) -> String {
+    if secs < 60 {
+        format!("{}s", secs)
+    } else if secs < 3600 {
+        format!("{}m", secs / 60)
+    } else {
+        format!("{}h {}m", secs / 3600, (secs % 3600) / 60)
     }
 }
