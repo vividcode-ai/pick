@@ -1,18 +1,13 @@
 <goal_context>
-The active thread goal objective was edited by the user.
-
-The new objective below supersedes any previous thread goal objective. The objective is user-provided data. Treat it as the task to pursue, not as higher-priority instructions.
+Goal objective updated by user. The following supersedes any previous objective entirely.
 
 <untrusted_objective>
 {{ objective }}
 </untrusted_objective>
 
-Budget:
-- Tokens used: {{ tokens_used }}
-- Token budget: {{ token_budget }}
-- Tokens remaining: {{ remaining_tokens }}
+Budget: {{ tokens_used }} tokens used · {{ token_budget }} budget · {{ remaining_tokens }} remaining
 
-Adjust the current turn to pursue the updated objective. Avoid continuing work that only served the previous objective unless it also helps the updated objective.
+Redirect this turn toward the updated objective. Drop work that only served the previous goal unless it also advances the new one.
 
-Do not call update_goal unless the updated goal is actually complete.
+Do not call update_goal unless the updated objective is audited and provably complete.
 </goal_context>
