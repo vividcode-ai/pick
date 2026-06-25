@@ -56,6 +56,8 @@ pub(crate) struct TuiContext {
     pub mcp_manager: Arc<McpManager>,
     pub mcp_cancelled: Arc<AtomicBool>,
     pub mcp_enabled: Arc<AtomicBool>,
+    /// Server names that are disabled (tools hidden, not auto-connected)
+    pub disabled_mcp_servers: Arc<Mutex<Vec<String>>>,
 
     // Permissions
     pub permission_manager: Arc<pick_agent::permission::manager::PermissionManager>,

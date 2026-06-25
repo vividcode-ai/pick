@@ -10,6 +10,9 @@ use crate::paste_burst::PasteBurst;
 pub enum TuiAction {
     Submit(String),
     SelectionResult(usize, String),
+    /// Fired when user presses Esc on a SelectList (without search text) to cancel it.
+    /// Handlers can use this for multi-level navigation (go back one level).
+    SelectionCancelled,
     CycleModel,
     CycleModelBackward,
     SelectModel,

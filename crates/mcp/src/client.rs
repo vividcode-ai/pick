@@ -41,10 +41,29 @@ pub struct ToolEntry {
     pub server_name: String,
 }
 
-/// A connected MCP server client with its discovered tools
+/// Metadata for a discovered MCP prompt
+#[derive(Clone)]
+pub struct PromptEntry {
+    pub name: String,
+    pub description: String,
+    pub server_name: String,
+}
+
+/// Metadata for a discovered MCP resource
+#[derive(Clone)]
+pub struct ResourceEntry {
+    pub uri: String,
+    pub name: String,
+    pub description: String,
+    pub server_name: String,
+}
+
+/// A connected MCP server client with its discovered tools, prompts, and resources
 pub struct ConnectedClient {
     pub client: Arc<Mutex<McpClient>>,
     pub tools: Vec<ToolEntry>,
+    pub prompts: Vec<PromptEntry>,
+    pub resources: Vec<ResourceEntry>,
     pub config: McpServerConfig,
 }
 
@@ -182,8 +201,8 @@ pub fn build_agent_tools(
         .collect()
 }
 
-/// Connect to an MCP server via stdio or HTTP, discover tools,
-/// and return a ConnectedClient.
+/// Connect to an MCP server via stdio or HTTP, discover tools, prompts,
+/// and resources, and return a ConnectedClient.
 pub async fn connect_and_discover(config: &McpServerConfig) -> Result<ConnectedClient, String> {
     let client = if config.url.is_some() {
         connect_http(config).await?
@@ -196,6 +215,29 @@ pub async fn connect_and_discover(config: &McpServerConfig) -> Result<ConnectedC
         .list_all_tools()
         .await
         .map_err(|e| format!("Failed to list tools from '{}': {}", config.name, e))?;
+
+    // Discover prompts (best-effort; some servers don't support prompts)
+    let prompts = client.list_all_prompts().await.unwrap_or_default();
+    let prompts = prompts
+        .into_iter()
+        .map(|p| PromptEntry {
+            name: p.name.clone(),
+            description: p.description.clone().unwrap_or_default(),
+            server_name: config.name.clone(),
+        })
+        .collect();
+
+    // Discover resources (best-effort; some servers don't support resources)
+    let resources = client.list_all_resources().await.unwrap_or_default();
+    let resources = resources
+        .into_iter()
+        .map(|r| ResourceEntry {
+            uri: r.uri.clone(),
+            name: r.name.clone(),
+            description: r.description.clone().unwrap_or_default(),
+            server_name: config.name.clone(),
+        })
+        .collect();
 
     // Auto-detect tool name conflicts and apply prefix if needed
     let prefix = config.tool_name_prefix.clone().unwrap_or_else(|| {
@@ -228,6 +270,8 @@ pub async fn connect_and_discover(config: &McpServerConfig) -> Result<ConnectedC
     Ok(ConnectedClient {
         client: Arc::new(Mutex::new(client)),
         tools: entries,
+        prompts,
+        resources,
         config: config.clone(),
     })
 }

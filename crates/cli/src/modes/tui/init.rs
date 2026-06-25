@@ -341,6 +341,7 @@ pub(crate) async fn init_tui_mode(
         mcp_manager,
         mcp_cancelled,
         mcp_enabled,
+        disabled_mcp_servers: Arc::new(Mutex::new(Vec::new())),
         permission_manager,
         platform_sandbox,
         sandbox_enabled,

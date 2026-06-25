@@ -8,6 +8,7 @@ use pick_tui::app::TuiAction;
 use crate::core::updates;
 
 use super::actions_login;
+use super::actions_mcp;
 use super::actions_model;
 use super::actions_session;
 use super::actions_settings;
@@ -31,6 +32,9 @@ pub(crate) async fn dispatch_action(ctx: &mut TuiContext, action: TuiAction) -> 
         TuiAction::CycleMode => actions_model::handle_cycle_mode(ctx).await,
         TuiAction::OpenTree => actions_session::handle_open_tree(ctx).await,
         TuiAction::ApiKeySubmit(key) => actions_login::handle_api_key_submit(ctx, &key).await,
+        TuiAction::SelectionCancelled => {
+            handle_selection_cancelled(ctx).await;
+        }
         TuiAction::SelectionResult(_idx, val) => {
             handle_selection_result(ctx, &val).await;
         }
@@ -262,6 +266,18 @@ async fn handle_selection_result(ctx: &mut TuiContext, val: &str) {
             }
         }
         Some("resume") => actions_session::handle_resume(ctx, val).await,
+        Some("mcp") => {
+            actions_mcp::handle_mcp_server_selected(ctx, val).await;
+            return; // pending_command handled internally
+        }
+        Some(cmd) if cmd.starts_with("mcp-server:") => {
+            actions_mcp::handle_mcp_server_action(ctx, val).await;
+            return; // pending_command handled internally
+        }
+        Some(cmd) if cmd.starts_with("mcp-caps:") => {
+            actions_mcp::handle_mcp_capabilities_selection(ctx, val).await;
+            return; // pending_command handled internally
+        }
         _ => {
             ctx.tui
                 .chat
@@ -271,6 +287,32 @@ async fn handle_selection_result(ctx: &mut TuiContext, val: &str) {
     // Only clear pending_command if the handler didn't chain to a new one.
     if ctx.pending_command == prev_cmd {
         ctx.pending_command = None;
+    }
+    ctx.tui.finalize_turn();
+}
+
+/// Handle SelectionCancelled — user pressed Esc on a SelectList.
+/// Used for multi-level navigation (e.g. MCP manager back/up one level).
+async fn handle_selection_cancelled(ctx: &mut TuiContext) {
+    let prev_cmd = ctx.pending_command.clone();
+    match prev_cmd.as_deref() {
+        Some(cmd) if cmd.starts_with("mcp-server:") => {
+            // Level 2 (server detail/actions) → go back to Level 1 (server list)
+            // Extract just the server name
+            actions_mcp::show_mcp_server_list(ctx).await;
+            // pending_command is set by show_mcp_server_list
+            return;
+        }
+        Some(cmd) if cmd.starts_with("mcp-caps:") => {
+            // Level 3 (capabilities) → go back to Level 2 (server detail/actions)
+            let name = cmd.strip_prefix("mcp-caps:").unwrap_or("");
+            actions_mcp::show_mcp_server_detail(ctx, name).await;
+            return;
+        }
+        _ => {
+            // No multi-level navigation: just clear pending_command
+            ctx.pending_command = None;
+        }
     }
     ctx.tui.finalize_turn();
 }

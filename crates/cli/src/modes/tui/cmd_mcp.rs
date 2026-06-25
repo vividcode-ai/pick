@@ -1,24 +1,16 @@
+use super::actions_mcp;
 use super::context::TuiContext;
 use super::init;
 
-/// Handle /mcp slash command
+/// Handle /mcp slash command — shows interactive MCP server manager
 pub(crate) async fn handle_mcp(ctx: &mut TuiContext, args: &[String]) {
     if args.is_empty() {
-        ctx.tui
-            .chat
-            .add_system_message("\x1b[1mMCP Server Management\x1b[0m");
-        ctx.tui.chat.add_system_message(
-            "  \x1b[2m/mcp list\x1b[0m              List connected MCP servers",
-        );
-        ctx.tui.chat.add_system_message(
-            "  \x1b[2m/mcp connect <name> ...\x1b[0m   Connect a new MCP server",
-        );
-        ctx.tui.chat.add_system_message(
-            "  \x1b[2m/mcp disconnect <name>\x1b[0m    Disconnect an MCP server",
-        );
+        // Show interactive MCP server list (Level 1)
+        actions_mcp::show_mcp_server_list(ctx).await;
         return;
     }
 
+    // Subcommands for backward compatibility / advanced usage
     match args[0].as_str() {
         "list" => {
             let info = ctx.mcp_manager.list_connections().await;

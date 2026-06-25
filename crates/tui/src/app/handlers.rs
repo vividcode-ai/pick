@@ -363,13 +363,15 @@ impl TuiApp {
                 if let Some(ref mut sel) = self.selection {
                     if sel.has_search() {
                         sel.clear_search();
+                        None
                     } else {
                         self.cancel_selection();
+                        Some(TuiAction::SelectionCancelled)
                     }
                 } else {
                     self.cancel_selection();
+                    None
                 }
-                None
             }
             _ => None,
         }

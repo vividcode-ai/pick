@@ -1,5 +1,6 @@
 mod action_dispatch;
 mod actions_login;
+mod actions_mcp;
 mod actions_model;
 mod actions_session;
 mod actions_settings;

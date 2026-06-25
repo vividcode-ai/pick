@@ -14,6 +14,14 @@ pub struct ConnectedServerInfo {
     pub transport: String,
     pub tool_count: usize,
     pub tool_names: Vec<String>,
+    pub prompt_count: usize,
+    pub prompt_names: Vec<String>,
+    pub resource_count: usize,
+    pub resource_names: Vec<String>,
+    pub command: Option<String>,
+    pub args: Option<Vec<String>>,
+    pub url: Option<String>,
+    pub is_connected: bool,
 }
 
 /// Runtime manager for MCP server connections.
@@ -128,17 +136,77 @@ impl McpManager {
         let ex = self.executor.lock().await;
         ex.clients()
             .iter()
-            .map(|c| {
-                let tool_names: Vec<String> =
-                    c.tools.iter().map(|t| t.prefixed_name.clone()).collect();
-                ConnectedServerInfo {
-                    name: c.config.name.clone(),
-                    transport: c.config.transport_type().to_string(),
-                    tool_count: c.tools.len(),
-                    tool_names,
-                }
-            })
+            .map(|c| build_connected_info(c))
             .collect()
+    }
+
+    /// Get info for all servers (both connected and configured-but-disconnected).
+    /// `configs` is the list of configured server configs (from settings).
+    /// For servers that are connected, full capability info is returned.
+    /// For servers that are not connected, only config info is returned.
+    pub async fn get_all_servers_info(
+        &self,
+        configs: &[McpServerConfig],
+    ) -> Vec<ConnectedServerInfo> {
+        let ex = self.executor.lock().await;
+        let mut result: Vec<ConnectedServerInfo> = Vec::new();
+
+        // Collect names of connected servers
+        let connected_names: std::collections::HashSet<String> =
+            ex.clients().iter().map(|c| c.config.name.clone()).collect();
+
+        // Add connected servers with full info
+        for client in ex.clients() {
+            result.push(build_connected_info(client));
+        }
+
+        // Add configured but disconnected servers (from settings)
+        for config in configs {
+            if !connected_names.contains(&config.name) {
+                result.push(ConnectedServerInfo {
+                    name: config.name.clone(),
+                    transport: config.transport_type().to_string(),
+                    tool_count: 0,
+                    tool_names: Vec::new(),
+                    prompt_count: 0,
+                    prompt_names: Vec::new(),
+                    resource_count: 0,
+                    resource_names: Vec::new(),
+                    command: config.command.clone(),
+                    args: config.args.clone(),
+                    url: config.url.clone(),
+                    is_connected: false,
+                });
+            }
+        }
+
+        result
+    }
+
+    /// Check if a server is currently connected
+    pub async fn is_server_connected(&self, name: &str) -> bool {
+        let ex = self.executor.lock().await;
+        ex.clients().iter().any(|c| c.config.name == name)
+    }
+}
+
+fn build_connected_info(c: &crate::client::ConnectedClient) -> ConnectedServerInfo {
+    let tool_names: Vec<String> = c.tools.iter().map(|t| t.prefixed_name.clone()).collect();
+    let prompt_names: Vec<String> = c.prompts.iter().map(|p| p.name.clone()).collect();
+    let resource_names: Vec<String> = c.resources.iter().map(|r| r.name.clone()).collect();
+    ConnectedServerInfo {
+        name: c.config.name.clone(),
+        transport: c.config.transport_type().to_string(),
+        tool_count: c.tools.len(),
+        tool_names,
+        prompt_count: c.prompts.len(),
+        prompt_names,
+        resource_count: c.resources.len(),
+        resource_names,
+        command: c.config.command.clone(),
+        args: c.config.args.clone(),
+        url: c.config.url.clone(),
+        is_connected: true,
     }
 }
 
