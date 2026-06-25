@@ -33,6 +33,7 @@ pub(crate) async fn handle_export(ctx: &mut TuiContext, args: &[String]) {
                         serde_json::json!({
                             "id": h.id,
                             "version": h.version,
+                            "timestamp": h.created_at,
                             "createdAt": h.created_at,
                             "updatedAt": h.updated_at,
                             "cwd": h.cwd,
@@ -57,10 +58,15 @@ pub(crate) async fn handle_export(ctx: &mut TuiContext, args: &[String]) {
                                 let mut message_obj = serde_json::json!({
                                     "role": role,
                                     "content": msg.content,
+                                    "timestamp": entry.timestamp,
                                 });
+                                // Lowercase stop_reason to match pi format (e.g. "stop" not "Stop")
                                 if let Some(sr) = &msg.stop_reason {
                                     message_obj["stopReason"] =
-                                        serde_json::Value::String(sr.clone());
+                                        serde_json::Value::String(sr.to_lowercase());
+                                }
+                                if let Some(api) = &msg.api {
+                                    message_obj["api"] = serde_json::Value::String(api.clone());
                                 }
                                 if let Some(model) = &msg.model {
                                     message_obj["model"] = serde_json::Value::String(model.clone());
@@ -167,25 +173,71 @@ pub(crate) async fn handle_export(ctx: &mut TuiContext, args: &[String]) {
                                 "targetId": l.target_id,
                                 "label": l.label,
                             }),
-                            _ => serde_json::json!({
+                            SessionEntryKind::Goal(g) => serde_json::json!({
                                 "id": entry.id,
                                 "parentId": entry.parent_id,
                                 "timestamp": entry.timestamp,
-                                "type": "other",
+                                "type": "goal",
+                                "status": g.status,
+                                "objective": g.objective,
+                            }),
+                            SessionEntryKind::TodoUpdate(_t) => serde_json::json!({
+                                "id": entry.id,
+                                "parentId": entry.parent_id,
+                                "timestamp": entry.timestamp,
+                                "type": "todo_update",
+                            }),
+                            SessionEntryKind::SessionInfo(s) => serde_json::json!({
+                                "id": entry.id,
+                                "parentId": entry.parent_id,
+                                "timestamp": entry.timestamp,
+                                "type": "session_info",
+                                "name": s.name,
+                            }),
+                            SessionEntryKind::LeafChange(lc) => serde_json::json!({
+                                "id": entry.id,
+                                "parentId": entry.parent_id,
+                                "timestamp": entry.timestamp,
+                                "type": "leaf_change",
+                                "targetId": lc.to,
+                            }),
+                            SessionEntryKind::AgentModeChange(ac) => serde_json::json!({
+                                "id": entry.id,
+                                "parentId": entry.parent_id,
+                                "timestamp": entry.timestamp,
+                                "type": "agent_mode_change",
+                                "from": ac.from,
+                                "to": ac.to,
                             }),
                         }
                     })
                     .collect();
 
                 use crate::core::export_html::export_html::{
-                    SessionData, derive_export_colors, export_session_to_html,
+                    SessionData, ToolDef, derive_export_colors, export_session_to_html,
+                };
+                let tools: Option<Vec<ToolDef>> = if ctx.tools.is_empty() {
+                    None
+                } else {
+                    Some(
+                        ctx.tools
+                            .iter()
+                            .map(|t| ToolDef {
+                                name: t.name.clone(),
+                                description: t.description.clone(),
+                                parameters: Some(
+                                    serde_json::to_value(&t.parameters).unwrap_or_default(),
+                                ),
+                            })
+                            .collect(),
+                    )
                 };
                 let session_data = SessionData {
                     header,
                     entries,
                     leaf_id,
                     system_prompt: Some(ctx.system_prompt.clone()),
-                    tools: None,
+                    tools,
                     rendered_tools: None,
                 };
                 let theme_colors = crate::core::theme::loader::get_resolved_theme_colors(None);

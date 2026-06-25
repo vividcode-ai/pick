@@ -65,6 +65,7 @@ impl TuiApp {
             }
             self.last_render_state.clone_from(&self.state);
         }
+
         let editor_line_count = self.compute_editor_line_count(width);
         let mut autocomplete_lines = if self.state == AppState::Selecting
             || self.state == AppState::TreeSelecting
@@ -432,12 +433,30 @@ impl TuiApp {
                     if i < chunks.len() {
                         match self.state {
                             AppState::Selecting => {
+                                // After clearing, mark trailing-space cells with Dim so
+                                // the buffer diff detects them (space→space with Dim)
+                                // and outputs them, clearing stale terminal content.
+                                // Content cells keep their normal Paragraph styles.
                                 frame.render_widget_ref(&Clear, chunks[i]);
-                                let popup = self.build_selection_popup_lines(width);
-                                frame.render_widget_ref(
-                                    &Paragraph::new(ratatui::text::Text::from(popup)),
-                                    chunks[i],
-                                );
+                                {
+                                    let popup = self.build_selection_popup_lines(width);
+                                    frame.render_widget_ref(
+                                        &Paragraph::new(ratatui::text::Text::from(popup)),
+                                        chunks[i],
+                                    );
+                                }
+                                {
+                                    let area = chunks[i];
+                                    let buf = frame.buffer_mut();
+                                    for y in area.top()..area.bottom() {
+                                        for x in area.left()..area.right() {
+                                            let cell = &mut buf[(x, y)];
+                                            if cell.symbol() == " " {
+                                                cell.modifier |= Modifier::DIM;
+                                            }
+                                        }
+                                    }
+                                }
                             }
                             AppState::TreeSelecting => {
                                 let popup = self.render_tree_view_lines(width);

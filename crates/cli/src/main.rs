@@ -272,9 +272,11 @@ async fn main() {
                         .first()
                         .and_then(|l| serde_json::from_str(l).ok())
                         .unwrap_or(serde_json::json!({}));
+                    let header = ensure_timestamp_field(header);
                     let entries: Vec<serde_json::Value> = lines[1..]
                         .iter()
                         .filter_map(|l| serde_json::from_str(l).ok())
+                        .map(restructure_entry)
                         .collect();
                     let options = ExportOptions {
                         output_path: Some(export_path.clone()),
@@ -625,4 +627,106 @@ async fn main() {
     {
         eprintln!("Error updating Pick: {}", e);
     }
+}
+
+/// Ensure the header JSON has a `timestamp` field for the HTML export template.
+/// The template.js renders Date from `header.timestamp`, but the JSONL file
+/// stores timestamps as `created_at` (serde snake_case default).
+fn ensure_timestamp_field(mut header: serde_json::Value) -> serde_json::Value {
+    if let Some(obj) = header.as_object_mut() {
+        if !obj.contains_key("timestamp") {
+            if let Some(created_at) = obj.get("created_at").or_else(|| obj.get("createdAt")) {
+                obj.insert("timestamp".to_string(), created_at.clone());
+            }
+        }
+    }
+    header
+}
+
+/// Restructure a raw JSONL entry (serde flattened format) into the nested
+/// format expected by the HTML export JS template.
+///
+/// The session file stores entries with `#[serde(flatten)]`, so message
+/// fields like `role`, `content`, `stop_reason` sit at the top level
+/// alongside `id`, `type`, `parent_id`, `timestamp`. The JS template
+/// expects message fields nested under `entry.message` with camelCase keys.
+fn restructure_entry(mut entry: serde_json::Value) -> serde_json::Value {
+    const SNAKE_TO_CAMEL_KEYS: &[(&str, &str)] = &[
+        ("parent_id", "parentId"),
+        ("stop_reason", "stopReason"),
+        ("tool_call_id", "toolCallId"),
+        ("tool_name", "toolName"),
+        ("is_error", "isError"),
+        ("error_message", "errorMessage"),
+        ("exit_code", "exitCode"),
+        ("token_count", "tokensBefore"),
+        ("thinking_signature", "thinkingSignature"),
+        ("response_id", "responseId"),
+    ];
+
+    let Some(obj) = entry.as_object_mut() else {
+        return entry;
+    };
+
+    // Rename snake_case fields to camelCase at the top level
+    for &(snake, camel) in SNAKE_TO_CAMEL_KEYS {
+        if let Some(val) = obj.remove(snake) {
+            obj.insert(camel.to_string(), val);
+        }
+    }
+
+    // For message-type entries, nest message-related fields under "message"
+    if obj.get("type").and_then(|v| v.as_str()) == Some("message") {
+        let mut message_obj = serde_json::Map::new();
+
+        for key in ["role", "content", "api", "provider", "model"] {
+            if let Some(val) = obj.remove(key) {
+                message_obj.insert(key.to_string(), val);
+            }
+        }
+
+        // camelCase fields that belong inside message
+        for key in [
+            "stopReason",
+            "toolCallId",
+            "toolName",
+            "isError",
+            "errorMessage",
+            "exitCode",
+            "usage",
+            "timestamp",
+            "responseId",
+        ] {
+            if let Some(val) = obj.remove(key) {
+                message_obj.insert(key.to_string(), val);
+            }
+        }
+
+        obj.insert(
+            "message".to_string(),
+            serde_json::Value::Object(message_obj),
+        );
+    }
+
+    // Map model_change fields: from/to → provider/modelId
+    if obj.get("type").and_then(|v| v.as_str()) == Some("model_change") {
+        if let Some(to_val) = obj.remove("to") {
+            obj.insert("modelId".to_string(), to_val);
+        }
+        if !obj.contains_key("provider") {
+            obj.insert(
+                "provider".to_string(),
+                serde_json::Value::String(String::new()),
+            );
+        }
+    }
+
+    // Map thinking_level_change: to → thinkingLevel
+    if obj.get("type").and_then(|v| v.as_str()) == Some("thinking_level_change") {
+        if let Some(to_val) = obj.remove("to") {
+            obj.insert("thinkingLevel".to_string(), to_val);
+        }
+    }
+
+    entry
 }
