@@ -1,3 +1,4 @@
+use pick_agent::session::entries::SessionEntryKind;
 use pick_agent::session::{SessionEntry, SessionManager};
 use pick_ai::types::{ContentBlock, Message};
 
@@ -41,36 +42,138 @@ pub(crate) async fn handle_export(ctx: &mut TuiContext, args: &[String]) {
                     })
                     .unwrap_or(serde_json::Value::Null);
 
+                let leaf_id = ctx.session_manager.get_leaf_id().map(|s| s.to_string());
                 let entries: Vec<serde_json::Value> = ctx
-                    .all_messages
+                    .session_manager
+                    .entries()
                     .iter()
-                    .map(|msg| {
-                        let id = uuid::Uuid::now_v7().to_string();
-                        let message_val = match msg {
-                            Message::User(u) => {
-                                serde_json::json!({"role": "user", "content": u.content})
+                    .map(|entry| {
+                        match &entry.kind {
+                            SessionEntryKind::Message(msg) => {
+                                let role = match msg.role.as_str() {
+                                    "tool_result" => "toolResult",
+                                    r => r,
+                                };
+                                let mut message_obj = serde_json::json!({
+                                    "role": role,
+                                    "content": msg.content,
+                                });
+                                if let Some(sr) = &msg.stop_reason {
+                                    message_obj["stopReason"] =
+                                        serde_json::Value::String(sr.clone());
+                                }
+                                if let Some(model) = &msg.model {
+                                    message_obj["model"] = serde_json::Value::String(model.clone());
+                                }
+                                if let Some(provider) = &msg.provider {
+                                    message_obj["provider"] =
+                                        serde_json::Value::String(provider.clone());
+                                }
+                                // Remap usage fields from snake_case to camelCase (JS expects)
+                                if let Some(usage) = &msg.usage {
+                                    if let Some(obj) = usage.as_object() {
+                                        let mut u = serde_json::Map::new();
+                                        let fields: &[(&str, &str)] = &[
+                                            ("input", "input"),
+                                            ("output", "output"),
+                                            ("cache_read", "cacheRead"),
+                                            ("cache_write", "cacheWrite"),
+                                            ("total_tokens", "totalTokens"),
+                                        ];
+                                        for &(from, to) in fields {
+                                            if let Some(v) = obj.get(from) {
+                                                u.insert(to.into(), v.clone());
+                                            }
+                                        }
+                                        // Remap cost sub-fields as well
+                                        if let Some(cost) = obj.get("cost") {
+                                            if let Some(cost_obj) = cost.as_object() {
+                                                let mut c = serde_json::Map::new();
+                                                let cost_fields: &[(&str, &str)] = &[
+                                                    ("input", "input"),
+                                                    ("output", "output"),
+                                                    ("cache_read", "cacheRead"),
+                                                    ("cache_write", "cacheWrite"),
+                                                    ("total", "total"),
+                                                ];
+                                                for &(from, to) in cost_fields {
+                                                    if let Some(v) = cost_obj.get(from) {
+                                                        c.insert(to.into(), v.clone());
+                                                    }
+                                                }
+                                                u.insert(
+                                                    "cost".into(),
+                                                    serde_json::Value::Object(c),
+                                                );
+                                            } else {
+                                                u.insert("cost".into(), cost.clone());
+                                            }
+                                        }
+                                        message_obj["usage"] = serde_json::Value::Object(u);
+                                    }
+                                }
+                                serde_json::json!({
+                                    "id": entry.id,
+                                    "parentId": entry.parent_id,
+                                    "timestamp": entry.timestamp,
+                                    "type": "message",
+                                    "message": message_obj,
+                                })
                             }
-                            Message::Assistant(a) => serde_json::json!({
-                                "role": "assistant",
-                                "content": a.content,
-                                "stopReason": format!("{:?}", a.stop_reason),
-                                "usage": {
-                                    "input": a.usage.input,
-                                    "output": a.usage.output,
-                                    "cacheRead": a.usage.cache_read,
-                                    "cacheWrite": a.usage.cache_write,
-                                    "totalTokens": a.usage.total_tokens,
-                                },
+                            SessionEntryKind::Compaction(c) => serde_json::json!({
+                                "id": entry.id,
+                                "parentId": entry.parent_id,
+                                "timestamp": entry.timestamp,
+                                "type": "compaction",
+                                "tokensBefore": c.token_count,
+                                "summary": c.summary,
                             }),
-                            Message::ToolResult(t) => serde_json::json!({
-                                "role": "toolResult",
-                                "content": t.content,
-                                "toolCallId": t.tool_call_id,
-                                "toolName": t.tool_name,
-                                "isError": t.is_error,
+                            SessionEntryKind::BranchSummary(b) => serde_json::json!({
+                                "id": entry.id,
+                                "parentId": entry.parent_id,
+                                "timestamp": entry.timestamp,
+                                "type": "branch_summary",
+                                "summary": b.summary,
                             }),
-                        };
-                        serde_json::json!({"id": id, "type": "message", "message": message_val})
+                            SessionEntryKind::ModelChange(mc) => serde_json::json!({
+                                "id": entry.id,
+                                "parentId": entry.parent_id,
+                                "timestamp": entry.timestamp,
+                                "type": "model_change",
+                                "provider": "",
+                                "modelId": mc.to,
+                            }),
+                            SessionEntryKind::ThinkingLevelChange(tc) => serde_json::json!({
+                                "id": entry.id,
+                                "parentId": entry.parent_id,
+                                "timestamp": entry.timestamp,
+                                "type": "thinking_level_change",
+                                "thinkingLevel": tc.to,
+                            }),
+                            SessionEntryKind::Custom(c) => serde_json::json!({
+                                "id": entry.id,
+                                "parentId": entry.parent_id,
+                                "timestamp": entry.timestamp,
+                                "type": "custom_message",
+                                "customType": c.kind,
+                                "content": c.data,
+                                "display": true,
+                            }),
+                            SessionEntryKind::Label(l) => serde_json::json!({
+                                "id": entry.id,
+                                "parentId": entry.parent_id,
+                                "timestamp": entry.timestamp,
+                                "type": "label",
+                                "targetId": l.target_id,
+                                "label": l.label,
+                            }),
+                            _ => serde_json::json!({
+                                "id": entry.id,
+                                "parentId": entry.parent_id,
+                                "timestamp": entry.timestamp,
+                                "type": "other",
+                            }),
+                        }
                     })
                     .collect();
 
@@ -80,7 +183,7 @@ pub(crate) async fn handle_export(ctx: &mut TuiContext, args: &[String]) {
                 let session_data = SessionData {
                     header,
                     entries,
-                    leaf_id: None,
+                    leaf_id,
                     system_prompt: Some(ctx.system_prompt.clone()),
                     tools: None,
                     rendered_tools: None,
@@ -315,7 +418,7 @@ pub(crate) fn handle_copy(ctx: &mut TuiContext) {
             Ok(mut clipboard) => match clipboard.set_text(text.clone()) {
                 Ok(()) => {
                     let preview = if text.len() > 80 {
-                        format!("{}...", &text[..80])
+                        crate::utils::truncate_utf8(text, 80)
                     } else {
                         text.clone()
                     };

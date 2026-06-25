@@ -156,7 +156,7 @@ fn load_template_from_file(file_path: &Path, source_info: SourceInfo) -> Option<
                 .map(|first_line| {
                     let trimmed = first_line.trim();
                     if trimmed.len() > 60 {
-                        format!("{}...", &trimmed[..60])
+                        crate::utils::truncate_utf8(trimmed, 60)
                     } else {
                         trimmed.to_string()
                     }

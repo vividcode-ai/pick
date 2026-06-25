@@ -36,6 +36,21 @@ pub async fn sleep_ms(ms: u64) {
     tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
 }
 
+/// Truncate a UTF-8 string to `max` bytes without splitting a multi-byte character.
+/// Appends "..." when truncation occurs.
+pub fn truncate_utf8(text: &str, max: usize) -> String {
+    if text.len() <= max {
+        return text.to_string();
+    }
+    let cut = text
+        .char_indices()
+        .map(|(i, _)| i)
+        .take_while(|&i| i <= max)
+        .last()
+        .unwrap_or(max);
+    format!("{}...", &text[..cut])
+}
+
 // ============================================================================
 // User Agent
 // ============================================================================

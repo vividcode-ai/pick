@@ -83,12 +83,14 @@ pub(crate) async fn show_mcp_server_detail(ctx: &mut TuiContext, server_name: &s
     // Build info lines for popup
     let mut info_lines: Vec<String> = Vec::new();
 
+    // Note: info_lines are rendered in a dimmed style by the popup;
+    // do NOT use ANSI escape codes here — they will show as raw text.
     let status_text = if is_disabled {
-        "\x1b[31mDisabled\x1b[0m".to_string()
+        "Disabled"
     } else if is_connected {
-        "\x1b[32mConnected\x1b[0m".to_string()
+        "Connected"
     } else {
-        "\x1b[33mDisconnected\x1b[0m".to_string()
+        "Disconnected"
     };
     info_lines.push(format!("Status: {}", status_text));
 

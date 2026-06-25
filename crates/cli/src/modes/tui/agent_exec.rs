@@ -446,7 +446,7 @@ pub(crate) fn spawn_title_generation(
                 .filter(|l| !l.is_empty())
                 .map(|l| {
                     if l.len() > 100 {
-                        format!("{}...", &l[..97])
+                        crate::utils::truncate_utf8(&l, 97)
                     } else {
                         l
                     }
@@ -489,7 +489,7 @@ pub(crate) fn spawn_title_generation(
 
         let final_title = title.unwrap_or_else(|| {
             if title_text.len() > 50 {
-                format!("{}...", &title_text[..47])
+                crate::utils::truncate_utf8(&title_text, 47)
             } else {
                 title_text
             }

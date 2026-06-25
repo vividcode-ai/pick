@@ -285,7 +285,9 @@ async fn handle_selection_result(ctx: &mut TuiContext, val: &str) {
         }
     }
     // Only clear pending_command if the handler didn't chain to a new one.
-    if ctx.pending_command == prev_cmd {
+    // If a sub-selector is now showing (ctx.tui.selection is Some), the handler
+    // chained to a deeper level — keep pending_command alive.
+    if ctx.pending_command == prev_cmd && ctx.tui.selection.is_none() {
         ctx.pending_command = None;
     }
     ctx.tui.finalize_turn();

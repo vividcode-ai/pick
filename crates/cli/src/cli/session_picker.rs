@@ -64,7 +64,7 @@ pub async fn select_session(
             ExtendedSelectResult::Preview(idx) => {
                 if let Some(session) = sessions.get(idx) {
                     let first_msg_preview = if session.first_message.len() > 60 {
-                        format!("{}...", &session.first_message[..57])
+                        crate::utils::truncate_utf8(&session.first_message, 57)
                     } else {
                         session.first_message.clone()
                     };
@@ -108,7 +108,7 @@ fn render_session_item(idx: usize, session: &SessionInfo) -> Vec<String> {
         .map(|n| n.to_string())
         .unwrap_or_else(|| {
             if session.first_message.len() > 80 {
-                format!("{}...", &session.first_message[..77])
+                crate::utils::truncate_utf8(&session.first_message, 77)
             } else {
                 session.first_message.clone()
             }

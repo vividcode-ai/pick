@@ -40,7 +40,7 @@ pub fn get_entry_display_text(
                         } else if let Some(ref err) = node.error_message {
                             let truncated = normalize(err);
                             let truncated = if truncated.len() > 80 {
-                                format!("{}...", &truncated[..80])
+                                crate::utils::truncate_utf8(&truncated, 80)
                             } else {
                                 truncated
                             };
@@ -153,7 +153,7 @@ fn format_tool_call(name: &str, args_json: &str) -> String {
         }
         "bash" => {
             let truncated = if args_json.len() > 50 {
-                format!("{}...", &args_json[..50])
+                crate::utils::truncate_utf8(&args_json, 50)
             } else {
                 args_json.to_string()
             };
@@ -162,7 +162,7 @@ fn format_tool_call(name: &str, args_json: &str) -> String {
         }
         _ => {
             let args_trunc = if args_json.len() > 40 {
-                format!("{}...", &args_json[..40])
+                crate::utils::truncate_utf8(&args_json, 40)
             } else {
                 args_json.to_string()
             };

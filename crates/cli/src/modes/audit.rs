@@ -138,7 +138,7 @@ fn display_paged(events: &[AuditEvent]) {
             };
             let layer = format!("{}", e.layer);
             let target = if e.target.len() > 60 {
-                format!("{}...", &e.target[..57])
+                crate::utils::truncate_utf8(&e.target, 57)
             } else {
                 e.target.clone()
             };

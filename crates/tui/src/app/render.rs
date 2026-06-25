@@ -211,11 +211,20 @@ impl TuiApp {
             constraints.push(Constraint::Length(1));
         }
         // Editor area: border + editor + border + status separator + context separator
-        constraints.push(Constraint::Length(1));
-        constraints.push(Constraint::Length(editor_line_count));
-        constraints.push(Constraint::Length(1));
-        constraints.push(Constraint::Length(1));
-        constraints.push(Constraint::Length(1));
+        // When popup replaces editor, combine the box (top border + content + bottom border)
+        // into one large chunk so Clear covers old autocomplete/dialog overlay positions.
+        // Keep the separators separate so footer lines still render.
+        if matches!(self.state, AppState::Selecting | AppState::TreeSelecting) {
+            constraints.push(Constraint::Length(editor_line_count + 2));
+            constraints.push(Constraint::Length(1));
+            constraints.push(Constraint::Length(1));
+        } else {
+            constraints.push(Constraint::Length(1));
+            constraints.push(Constraint::Length(editor_line_count));
+            constraints.push(Constraint::Length(1));
+            constraints.push(Constraint::Length(1));
+            constraints.push(Constraint::Length(1));
+        }
         if self.autocomplete_space_lines > 0 {
             constraints.push(Constraint::Length(self.autocomplete_space_lines));
         }
@@ -417,20 +426,54 @@ impl TuiApp {
                         i += 1;
                     }
 
-                    render_at!(i, top_border.clone());
-                    i += 1;
+                    let is_popup_mode =
+                        matches!(self.state, AppState::Selecting | AppState::TreeSelecting);
+
+                    // In popup mode the combined chunk already includes the
+                    // border; skip the individual border render.
+                    if !is_popup_mode {
+                        render_at!(i, top_border.clone());
+                        i += 1;
+                    }
 
                     if i < chunks.len() {
                         match self.state {
                             AppState::Selecting => {
-                                let popup = self.build_selection_popup_lines(width);
+                                frame.render_widget_ref(&Clear, chunks[i]);
+                                let mut popup = self.build_selection_popup_lines(width);
+                                // When using combined chunk, prepend a border line
+                                // since we skipped the individual border render.
+                                if is_popup_mode {
+                                    let border = Line::from(Span::styled(
+                                        "\u{2500}".repeat(width as usize),
+                                        Style::default().add_modifier(Modifier::DIM),
+                                    ));
+                                    popup.insert(0, border);
+                                    // Pad to fill allocated height (editor_line_count + 4)
+                                    let target = chunks[i].height as usize;
+                                    while popup.len() < target {
+                                        popup.push(Line::from(""));
+                                    }
+                                }
                                 frame.render_widget_ref(
                                     &Paragraph::new(ratatui::text::Text::from(popup)),
                                     chunks[i],
                                 );
                             }
                             AppState::TreeSelecting => {
-                                let popup = self.render_tree_view_lines(width);
+                                frame.render_widget_ref(&Clear, chunks[i]);
+                                let mut popup = self.render_tree_view_lines(width);
+                                if is_popup_mode {
+                                    let border = Line::from(Span::styled(
+                                        "\u{2500}".repeat(width as usize),
+                                        Style::default().add_modifier(Modifier::DIM),
+                                    ));
+                                    popup.insert(0, border);
+                                    let target = chunks[i].height as usize;
+                                    while popup.len() < target {
+                                        popup.push(Line::from(""));
+                                    }
+                                }
                                 frame.render_widget_ref(
                                     &Paragraph::new(ratatui::text::Text::from(popup)),
                                     chunks[i],
@@ -474,8 +517,12 @@ impl TuiApp {
                     }
                     i += 1;
 
-                    render_at!(i, top_border.clone());
-                    i += 1;
+                    // In popup mode the combined chunk already includes the
+                    // bottom border; skip the individual border render.
+                    if !is_popup_mode {
+                        render_at!(i, top_border.clone());
+                        i += 1;
+                    }
 
                     if !has_ac && !has_dialog {
                         render_at!(i, self.render_footer_line1(width));
@@ -875,7 +922,7 @@ impl TuiApp {
                 .as_ref()
                 .and_then(|s| s.selected())
                 .and_then(|i| i.description.as_ref())
-                .is_some();
+                .is_some_and(|d| !d.is_empty());
             let has_search = self.selection.as_ref().is_some_and(|s| s.has_search());
             let info_lines_count = self
                 .selection
@@ -1019,15 +1066,17 @@ impl TuiApp {
             }
             result.push(Line::from(""));
             if let Some(desc) = sel.selected().and_then(|i| i.description.as_ref()) {
-                let desc_trimmed: String = desc
-                    .chars()
-                    .take(width.saturating_sub(4) as usize)
-                    .collect();
-                result.push(Line::from(Span::styled(format!(" {}", desc_trimmed), dim)));
-                result.push(Line::from(""));
+                if !desc.is_empty() {
+                    let desc_trimmed: String = desc
+                        .chars()
+                        .take(width.saturating_sub(4) as usize)
+                        .collect();
+                    result.push(Line::from(Span::styled(format!(" {}", desc_trimmed), dim)));
+                    result.push(Line::from(""));
+                }
             }
             result.push(Line::from(Span::styled(
-                "\u{2191}\u{2193} Navigate \u{00B7} Enter/Space to select \u{00B7} Esc to cancel"
+                "\u{2191}\u{2193} or j/k Navigate \u{00B7} Enter to select \u{00B7} Esc to cancel"
                     .to_string(),
                 dim,
             )));

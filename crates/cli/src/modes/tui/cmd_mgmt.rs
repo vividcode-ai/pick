@@ -51,7 +51,7 @@ pub(crate) fn handle_fork_selector(ctx: &mut TuiContext) {
             .iter()
             .map(|(i, text)| {
                 let display = if text.len() > 60 {
-                    format!("{}...", &text[..60])
+                    crate::utils::truncate_utf8(text, 60)
                 } else {
                     text.clone()
                 };

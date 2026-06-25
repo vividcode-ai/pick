@@ -140,9 +140,17 @@ fn truncate_tail(text: &str) -> TruncationResult {
 
     let cutoff = MAX_OUTPUT_BYTES;
     let keep_prefix_len = cutoff.saturating_sub(100);
+    // Find the nearest char boundary at or before keep_prefix_len
+    // to avoid panicking on multi-byte UTF-8 characters.
+    let cut = text
+        .char_indices()
+        .map(|(i, _)| i)
+        .take_while(|&i| i <= keep_prefix_len)
+        .last()
+        .unwrap_or(keep_prefix_len);
     let truncated = format!(
         "{}...\n[Output truncated at {} bytes]",
-        &text[..keep_prefix_len],
+        &text[..cut],
         MAX_OUTPUT_BYTES
     );
     TruncationResult {
