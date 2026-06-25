@@ -47,6 +47,7 @@ fn merge_primitive(base: &mut Settings, overrides: &Settings) {
     merge_opt!(check_for_update_on_startup);
     merge_opt!(dismissed_update_version);
     merge_opt!(mcp_servers);
+    merge_opt!(disabled_mcp_servers);
     merge_opt!(permission);
     merge_opt!(packages);
     merge_opt!(themes);
@@ -373,6 +374,10 @@ impl SettingsManager {
 
     pub fn get_enable_mcp_tools(&self) -> bool {
         self.merged.enable_mcp_tools.unwrap_or(true)
+    }
+
+    pub fn get_disabled_mcp_servers(&self) -> Vec<String> {
+        self.merged.disabled_mcp_servers.clone().unwrap_or_default()
     }
 
     pub fn get_check_for_update_on_startup(&self) -> bool {

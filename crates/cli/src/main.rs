@@ -365,12 +365,18 @@ async fn main() {
     let mcp_manager = Arc::new(McpManager::new());
 
     // Parse MCP server configs (fast, no I/O)
-    let mcp_configs = settings
+    let mut mcp_configs: Vec<pick_mcp::McpServerConfig> = settings
         .get()
         .mcp_servers
         .clone()
         .map(|servers| pick_mcp::parse_mcp_configs_from_value(&serde_json::json!(servers)))
         .unwrap_or_default();
+
+    // Filter out disabled MCP servers (saved in settings)
+    let disabled_servers = settings.get_disabled_mcp_servers();
+    if !disabled_servers.is_empty() {
+        mcp_configs.retain(|c| !disabled_servers.contains(&c.name));
+    }
 
     // Create session manager (before tools so GoalManager is available)
     let session_dir = settings.session_dir().map(|p| p.to_path_buf());

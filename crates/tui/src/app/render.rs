@@ -877,14 +877,25 @@ impl TuiApp {
                 .and_then(|i| i.description.as_ref())
                 .is_some();
             let has_search = self.selection.as_ref().is_some_and(|s| s.has_search());
+            let info_lines_count = self
+                .selection
+                .as_ref()
+                .map(|s| s.info_lines.len() as u16)
+                .unwrap_or(0);
             // base: N items + title(1) + position(1) + empty(1) + hint(1) = N + 4
             // + desc: + desc(1) + empty(1) = N + 6
             // + search bar: +1 = N + 5 or N + 7
+            // + info_lines: info_lines + separator(1) = info_lines + 1
             let base: u16 = if has_desc { 6 } else { 4 };
             let search_extra: u16 = if has_search { 1 } else { 0 };
-            let reserved = base + search_extra;
+            let info_extra: u16 = if info_lines_count > 0 {
+                info_lines_count + 1
+            } else {
+                0
+            };
+            let reserved = base + search_extra + info_extra;
             let visible = std::cmp::min(item_count, 10) as u16;
-            (reserved + visible).clamp(5, 14)
+            (reserved + visible).clamp(5, 14 + info_extra)
         } else if self.state == AppState::TreeSelecting {
             let count = self
                 .tree_view
@@ -938,6 +949,19 @@ impl TuiApp {
             }
 
             result.push(Line::from(Span::styled(sel.title.clone(), bold)));
+
+            // Info lines (dimmed, shown after title)
+            if !sel.info_lines.is_empty() {
+                for line in &sel.info_lines {
+                    let trimmed: String = line
+                        .chars()
+                        .take(width.saturating_sub(2) as usize)
+                        .collect();
+                    result.push(Line::from(Span::styled(format!(" {}", trimmed), dim)));
+                }
+                result.push(Line::from(""));
+            }
+
             let label_max = std::cmp::min(32, width.saturating_sub(4) as usize);
             let start = sel.page_start();
             let end = sel.page_end();
@@ -1003,7 +1027,8 @@ impl TuiApp {
                 result.push(Line::from(""));
             }
             result.push(Line::from(Span::styled(
-                "Enter/Space to select \u{00B7} Esc to cancel".to_string(),
+                "\u{2191}\u{2193} Navigate \u{00B7} Enter/Space to select \u{00B7} Esc to cancel"
+                    .to_string(),
                 dim,
             )));
             result

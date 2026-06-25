@@ -36,6 +36,8 @@ pub struct SelectList {
     all_items: Vec<SelectItem>,
     /// Current search/filter query
     pub search_query: String,
+    /// Informational lines shown after the title in the popup (dimmed, not selectable)
+    pub info_lines: Vec<String>,
 }
 
 impl SelectList {
@@ -48,7 +50,13 @@ impl SelectList {
             page_size: 7,
             all_items: items,
             search_query: String::new(),
+            info_lines: Vec::new(),
         }
+    }
+
+    pub fn with_info_lines(mut self, lines: Vec<String>) -> Self {
+        self.info_lines = lines;
+        self
     }
 
     pub fn selected(&self) -> Option<&SelectItem> {
