@@ -68,8 +68,24 @@ pub(crate) async fn dispatch_action(ctx: &mut TuiContext, action: TuiAction) -> 
     false
 }
 
-/// Handle Interrupt action — cooperative cancellation for running agent
+/// Handle Interrupt action — cooperative cancellation for running agent or share
 async fn handle_interrupt(ctx: &mut TuiContext) {
+    // Check if a /share operation is in progress first
+    if let Some(cancel_tx) = ctx.share_cancel_tx.take() {
+        let _ = cancel_tx.send(true);
+        // Restore editor
+        let saved = std::mem::take(&mut ctx.share_saved_editor_text);
+        if saved.is_empty() {
+            ctx.tui.editor.clear();
+        } else {
+            ctx.tui.editor.set_text(&saved);
+        }
+        ctx.tui.state = pick_tui::app::AppState::Input;
+        ctx.tui.chat.add_system_message("Share cancelled.");
+        ctx.tui.finalize_turn();
+        return;
+    }
+
     if !ctx.agent_is_running {
         return;
     }
@@ -472,6 +488,12 @@ async fn handle_submit(ctx: &mut TuiContext, user_text: String) {
                 }
                 cmd_dispatch::SlashCommandResult::Consumed => {
                     ctx.tui.finalize_turn();
+                    // Restore loading state if share is running in background
+                    // (handle_share set it to Streaming; finalize_turn resets to Input)
+                    if ctx.share_cancel_tx.is_some() {
+                        ctx.tui.state = pick_tui::app::AppState::Streaming;
+                        let _ = ctx.tui.render_with_terminal(&mut ctx.terminal_manager);
+                    }
                     return;
                 }
                 cmd_dispatch::SlashCommandResult::ContinueSubmit => {

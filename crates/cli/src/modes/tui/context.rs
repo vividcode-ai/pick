@@ -107,6 +107,14 @@ pub(crate) struct TuiContext {
     pub args: Args,
     pub all_tools: Arc<RwLock<Vec<AgentTool>>>,
 
+    // ── Share command state ──────────────────────────────────────────────
+    /// Cancel signal sender for background share (gh gist create) operations.
+    /// When set, a share operation is in progress and Esc will cancel it.
+    pub share_cancel_tx: Option<tokio::sync::watch::Sender<bool>>,
+    /// The editor text saved before showing the share loading spinner,
+    /// so it can be restored on completion or cancellation.
+    pub share_saved_editor_text: String,
+
     // Environment
     pub cwd: std::path::PathBuf,
     pub version: &'static str,

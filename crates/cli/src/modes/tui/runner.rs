@@ -15,6 +15,7 @@ use pick_tui::app::TuiAction;
 use super::action_dispatch;
 use super::cleanup;
 use super::commands;
+use super::context::TuiContext;
 use super::init;
 use super::key_events;
 use super::types::TuiCommand;
@@ -120,6 +121,9 @@ pub async fn run_tui_mode(
                         Some(TuiCommand::AgentFinished { result, prev_len, cancel_requested }) => {
                             action_dispatch::handle_agent_finished(&mut ctx, result, prev_len, cancel_requested).await;
                         }
+                        Some(TuiCommand::ShareResult { url, error }) => {
+                            handle_share_result(&mut ctx, url, error);
+                        }
                         Some(cmd) => commands::apply_tui_command(&mut ctx.tui, cmd),
                         None => break 'input TuiAction::Quit,
                     }
@@ -176,6 +180,9 @@ pub async fn run_tui_mode(
                         )
                         .await;
                     }
+                    Ok(TuiCommand::ShareResult { url, error }) => {
+                        handle_share_result(&mut ctx, url, error);
+                    }
                     Ok(cmd) => commands::apply_tui_command(&mut ctx.tui, cmd),
                     Err(_) => break,
                 }
@@ -193,6 +200,41 @@ pub async fn run_tui_mode(
 
     // Return pending update action
     ctx.pending_update.take()
+}
+
+/// Handle ShareResult from a background share operation.
+/// Restores the editor, clears share state, and shows the result in chat.
+fn handle_share_result(ctx: &mut TuiContext, url: Option<String>, error: Option<String>) {
+    // Check if cancel already handled this (share_cancel_tx was already taken
+    // by handle_interrupt on Esc). If so, the editor is already restored.
+    if ctx.share_cancel_tx.take().is_some() {
+        // We took the cancel_tx — this is a normal (non-cancel) completion.
+        let saved = std::mem::take(&mut ctx.share_saved_editor_text);
+        if saved.is_empty() {
+            ctx.tui.editor.clear();
+        } else {
+            ctx.tui.editor.set_text(&saved);
+        }
+        ctx.tui.state = pick_tui::app::AppState::Input;
+    }
+    // If share_cancel_tx was already None, the editor was already restored
+    // by handle_interrupt. Nothing more to do for the editor.
+
+    match (url, error) {
+        (Some(url), _) => {
+            ctx.tui.chat.add_system_message(&format!(
+                "Session shared as secret gist: \x1b[1m{}\x1b[0m",
+                url
+            ));
+        }
+        (_, Some(err)) => {
+            ctx.tui.show_error(&format!("Share failed: {}", err));
+        }
+        (None, None) => {
+            // Cancelled — message is already shown by handle_interrupt
+        }
+    }
+    ctx.tui.finalize_turn();
 }
 
 /// Read git branch from .git/HEAD for TUI footer display

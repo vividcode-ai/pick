@@ -64,6 +64,11 @@ pub(crate) enum TuiCommand {
     /// naturally stopped) and should be moved from "follow-up pending" to
     /// a rendered user message bubble.
     FollowUpMessageConsumed(String),
+    /// Result of a /share operation — carries the gist URL or error message.
+    ShareResult {
+        url: Option<String>,
+        error: Option<String>,
+    },
 }
 
 /// TUI approval hook that shows a permission dialog in the TUI viewport

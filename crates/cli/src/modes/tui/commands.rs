@@ -129,6 +129,8 @@ pub(crate) fn apply_tui_command(tui: &mut TuiApp, cmd: TuiCommand) {
             }
             tui.chat.add_user_message(&text);
         }
+        // ShareResult is handled in runner.rs with TuiContext access
+        TuiCommand::ShareResult { .. } => {}
     }
 }
 

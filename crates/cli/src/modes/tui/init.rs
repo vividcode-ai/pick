@@ -375,6 +375,8 @@ pub(crate) async fn init_tui_mode(
         version,
         app_name,
         pending_update: None,
+        share_cancel_tx: None,
+        share_saved_editor_text: String::new(),
     };
 
     (ctx, cmd_rx, evt_rx)
