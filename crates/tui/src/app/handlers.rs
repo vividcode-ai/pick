@@ -922,26 +922,22 @@ impl TuiApp {
         }
 
         match code {
-            // Ctrl+Enter: insert a new line at the cursor position.
-            // Handle Enter and Char('\n')/\r because different terminals
-            // and platforms (especially Windows) report Ctrl+Enter
-            // differently. Without the CONTROL modifier check, some
-            // terminals would treat Ctrl+Enter as plain Enter (submit).
-            KeyCode::Enter if modifiers.contains(KeyModifiers::CONTROL) => {
+            // Ctrl+Enter (or Shift+Enter): insert a new line at the cursor.
+            // On Windows, some terminals report Ctrl+Enter with the SHIFT
+            // modifier instead of CONTROL, so we check for either (or both).
+            KeyCode::Enter if modifiers.intersects(KeyModifiers::SHIFT | KeyModifiers::CONTROL) => {
                 if self.editor.is_autocomplete_active() {
                     self.editor.cancel_autocomplete();
                 }
-                // Flush any paste-accumulated text into the editor buffer
-                // before inserting the newline, so the newline appears
-                // after (not before) the accumulated text.
                 self.force_flush_paste_accumulator();
                 self.editor.insert_newline_auto_indent();
             }
-            // Handle Ctrl+Enter when the terminal reports it as
-            // Char('\n') or Char('\r') with the CONTROL modifier.
-            KeyCode::Char('\n') | KeyCode::Char('\r')
-                if modifiers.contains(KeyModifiers::CONTROL) =>
-            {
+            // '\n' and '\r' are unprintable control characters that should
+            // never be inserted into the visible text buffer.  Always treat
+            // them as newline insertion regardless of modifiers.  This is
+            // the safety net for Windows terminals that report Ctrl+Enter
+            // (or Shift+Enter) as a bare control character with no flags.
+            KeyCode::Char('\n') | KeyCode::Char('\r') => {
                 if self.editor.is_autocomplete_active() {
                     self.editor.cancel_autocomplete();
                 }
@@ -949,6 +945,9 @@ impl TuiApp {
                 self.editor.insert_newline_auto_indent();
             }
             KeyCode::Enter => {
+                // Flush any paste-accumulated text into the editor so
+                // that submit_input() sees the full buffer content.
+                self.force_flush_paste_accumulator();
                 if self.state == AppState::Streaming {
                     let text = self.editor.text().to_string();
                     self.editor.clear();
@@ -1055,6 +1054,15 @@ impl TuiApp {
                     return None;
                 }
                 if !modifiers.contains(KeyModifiers::CONTROL) {
+                    // Reject ASCII control characters (0x00-0x1F) except
+                    // tab (\t, 0x09), newline (\n, 0x0A), and carriage
+                    // return (\r, 0x0D) which can arrive as keyboard input
+                    // on some terminals.  Other control characters (NUL,
+                    // BEL, BS, etc.) have no visible glyph and would
+                    // corrupt the buffer if inserted.
+                    if (c as u32) <= 0x1F && !matches!(c, '\t' | '\n' | '\r') {
+                        return None;
+                    }
                     self.editor.insert_char(c);
                 }
             }

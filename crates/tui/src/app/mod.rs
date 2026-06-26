@@ -1342,4 +1342,255 @@ mod tests {
             app.editor.buffer,
         );
     }
+
+    // ===== Ctrl+Enter integration tests =====
+    // These simulate the exact user workflow through handle_key (the same
+    // path that process_key_event calls after modifier resolution).
+    // The two bugs they guard against:
+    //   1. "hello" + Ctrl+Enter → buffer cleared (text lost)
+    //   2. After Ctrl+Enter, continuing to typing inserts stray \n
+
+    #[test]
+    fn test_ctrl_enter_preserves_text_on_first_line() {
+        let mut app = TuiApp::new_inner(
+            "anthropic",
+            "claude-sonnet-4-20250514",
+            "Pick",
+            TEST_VERSION,
+            vec![],
+            vec![],
+            "/tmp",
+            None,
+            "off",
+            None,
+            "test",
+            "",
+        );
+        for c in "hello".chars() {
+            app.handle_key(KeyCode::Char(c), KeyModifiers::NONE);
+        }
+        assert_eq!(app.editor.buffer, "hello");
+        assert_eq!(app.editor.cursor, 5);
+
+        let action = app.handle_key(KeyCode::Enter, KeyModifiers::CONTROL);
+
+        assert_eq!(
+            app.editor.buffer, "hello\n",
+            "BUG 1: Ctrl+Enter cleared text! buffer={:?} cursor={}",
+            app.editor.buffer, app.editor.cursor,
+        );
+        assert_eq!(app.editor.cursor, 6);
+        assert!(action.is_none(), "Ctrl+Enter should not trigger an action");
+    }
+
+    #[test]
+    fn test_ctrl_enter_followed_by_typing_no_auto_newline() {
+        let mut app = TuiApp::new_inner(
+            "anthropic",
+            "claude-sonnet-4-20250514",
+            "Pick",
+            TEST_VERSION,
+            vec![],
+            vec![],
+            "/tmp",
+            None,
+            "off",
+            None,
+            "test",
+            "",
+        );
+        for c in "hello".chars() {
+            app.handle_key(KeyCode::Char(c), KeyModifiers::NONE);
+        }
+        app.handle_key(KeyCode::Enter, KeyModifiers::CONTROL);
+        assert_eq!(app.editor.buffer, "hello\n");
+        assert_eq!(app.editor.cursor, 6);
+
+        for c in "world".chars() {
+            app.handle_key(KeyCode::Char(c), KeyModifiers::NONE);
+        }
+        assert_eq!(
+            app.editor.buffer, "hello\nworld",
+            "BUG 2: typing after Ctrl+Enter inserted stray newline! buffer={:?} cursor={}",
+            app.editor.buffer, app.editor.cursor,
+        );
+        assert_eq!(app.editor.cursor, 11);
+    }
+
+    #[test]
+    fn test_multiple_ctrl_enter_inserts_multiple_lines() {
+        let mut app = TuiApp::new_inner(
+            "anthropic",
+            "claude-sonnet-4-20250514",
+            "Pick",
+            TEST_VERSION,
+            vec![],
+            vec![],
+            "/tmp",
+            None,
+            "off",
+            None,
+            "test",
+            "",
+        );
+        app.handle_key(KeyCode::Char('a'), KeyModifiers::NONE);
+        app.handle_key(KeyCode::Enter, KeyModifiers::CONTROL);
+        app.handle_key(KeyCode::Char('b'), KeyModifiers::NONE);
+        app.handle_key(KeyCode::Enter, KeyModifiers::CONTROL);
+        app.handle_key(KeyCode::Char('c'), KeyModifiers::NONE);
+        assert_eq!(
+            app.editor.buffer, "a\nb\nc",
+            "multiple Ctrl+Enter failed: {:?}",
+            app.editor.buffer,
+        );
+    }
+
+    #[test]
+    fn test_ctrl_enter_via_char_newline_handler() {
+        let mut app = TuiApp::new_inner(
+            "anthropic",
+            "claude-sonnet-4-20250514",
+            "Pick",
+            TEST_VERSION,
+            vec![],
+            vec![],
+            "/tmp",
+            None,
+            "off",
+            None,
+            "test",
+            "",
+        );
+        for c in "hi".chars() {
+            app.handle_key(KeyCode::Char(c), KeyModifiers::NONE);
+        }
+        app.handle_key(KeyCode::Char('\n'), KeyModifiers::CONTROL);
+        assert_eq!(
+            app.editor.buffer, "hi\n",
+            "Ctrl+Enter as Char('\\n') cleared text! buffer={:?}",
+            app.editor.buffer,
+        );
+        for c in "there".chars() {
+            app.handle_key(KeyCode::Char(c), KeyModifiers::NONE);
+        }
+        assert_eq!(
+            app.editor.buffer, "hi\nthere",
+            "typing after Char('\\n') Ctrl+Enter got stray newline! buffer={:?}",
+            app.editor.buffer,
+        );
+    }
+
+    #[test]
+    fn test_ctrl_enter_via_char_newline_no_modifier() {
+        let mut app = TuiApp::new_inner(
+            "anthropic",
+            "claude-sonnet-4-20250514",
+            "Pick",
+            TEST_VERSION,
+            vec![],
+            vec![],
+            "/tmp",
+            None,
+            "off",
+            None,
+            "test",
+            "",
+        );
+        app.handle_key(KeyCode::Char('x'), KeyModifiers::NONE);
+        app.handle_key(KeyCode::Char('\n'), KeyModifiers::NONE);
+        assert_eq!(
+            app.editor.buffer, "x\n",
+            "Ctrl+Enter as Char('\\n')/NONE cleared text! buffer={:?}",
+            app.editor.buffer,
+        );
+        app.handle_key(KeyCode::Char('y'), KeyModifiers::NONE);
+        assert_eq!(
+            app.editor.buffer, "x\ny",
+            "typing after Char('\\n')/NONE got stray newline! buffer={:?}",
+            app.editor.buffer,
+        );
+    }
+
+    #[test]
+    fn test_plain_enter_still_submits() {
+        let mut app = TuiApp::new_inner(
+            "anthropic",
+            "claude-sonnet-4-20250514",
+            "Pick",
+            TEST_VERSION,
+            vec![],
+            vec![],
+            "/tmp",
+            None,
+            "off",
+            None,
+            "test",
+            "",
+        );
+        for c in "submit me".chars() {
+            app.handle_key(KeyCode::Char(c), KeyModifiers::NONE);
+        }
+        let action = app.handle_key(KeyCode::Enter, KeyModifiers::NONE);
+        assert!(
+            matches!(action, Some(TuiAction::Submit(_))),
+            "plain Enter should submit, got {:?}",
+            action,
+        );
+        if let Some(TuiAction::Submit(t)) = action {
+            assert_eq!(t, "submit me");
+        }
+    }
+
+    #[test]
+    fn test_ascii_control_chars_rejected() {
+        let mut app = TuiApp::new_inner(
+            "anthropic",
+            "claude-sonnet-4-20250514",
+            "Pick",
+            TEST_VERSION,
+            vec![],
+            vec![],
+            "/tmp",
+            None,
+            "off",
+            None,
+            "test",
+            "",
+        );
+        app.handle_key(KeyCode::Char('a'), KeyModifiers::NONE);
+        app.handle_key(KeyCode::Char('\x00'), KeyModifiers::NONE);
+        app.handle_key(KeyCode::Char('\x05'), KeyModifiers::NONE);
+        app.handle_key(KeyCode::Char('b'), KeyModifiers::NONE);
+        app.handle_key(KeyCode::Char('\t'), KeyModifiers::NONE);
+        assert_eq!(
+            app.editor.buffer, "ab\t",
+            "control chars leaked: {:?}",
+            app.editor.buffer
+        );
+    }
+
+    #[test]
+    fn test_ctrl_enter_shift_modifier_fallback() {
+        let mut app = TuiApp::new_inner(
+            "anthropic",
+            "claude-sonnet-4-20250514",
+            "Pick",
+            TEST_VERSION,
+            vec![],
+            vec![],
+            "/tmp",
+            None,
+            "off",
+            None,
+            "test",
+            "",
+        );
+        app.handle_key(KeyCode::Char('z'), KeyModifiers::NONE);
+        app.handle_key(KeyCode::Enter, KeyModifiers::SHIFT);
+        assert_eq!(
+            app.editor.buffer, "z\n",
+            "Ctrl+Enter as Enter+SHIFT cleared text! buffer={:?}",
+            app.editor.buffer,
+        );
+    }
 }
