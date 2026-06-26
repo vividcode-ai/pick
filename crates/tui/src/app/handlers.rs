@@ -95,6 +95,7 @@ impl TuiApp {
             todo_scroll_offset: 0,
             show_hardware_cursor: true,
             usage_display: None,
+            pending_share_url: None,
         })
     }
 
@@ -174,6 +175,7 @@ impl TuiApp {
             todo_scroll_offset: 0,
             show_hardware_cursor: true,
             usage_display: None,
+            pending_share_url: None,
         }
     }
 

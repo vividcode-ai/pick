@@ -173,6 +173,9 @@ pub struct TuiApp {
     /// Last turn usage stats displayed above the editor after a conversation ends.
     /// Set by show_usage(), cleared on next user message or /new.
     pub usage_display: Option<String>,
+    /// URL for a share result, written as an OSC 8 clickable hyperlink directly
+    /// to stdout after the next frame render so the user can single-click to open.
+    pub pending_share_url: Option<String>,
 }
 
 /// Format token counts for compact display (e.g. 1500 → "1.5k", 15000 → "15k")

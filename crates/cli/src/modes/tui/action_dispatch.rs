@@ -73,13 +73,8 @@ async fn handle_interrupt(ctx: &mut TuiContext) {
     // Check if a /share operation is in progress first
     if let Some(cancel_tx) = ctx.share_cancel_tx.take() {
         let _ = cancel_tx.send(true);
-        // Restore editor
-        let saved = std::mem::take(&mut ctx.share_saved_editor_text);
-        if saved.is_empty() {
-            ctx.tui.editor.clear();
-        } else {
-            ctx.tui.editor.set_text(&saved);
-        }
+        ctx.share_saved_editor_text.clear();
+        ctx.tui.editor.clear();
         ctx.tui.state = pick_tui::app::AppState::Input;
         ctx.tui.chat.add_system_message("Share cancelled.");
         ctx.tui.finalize_turn();

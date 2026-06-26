@@ -22,6 +22,7 @@ use super::types::set_windows_terminal_title;
 
 impl TuiApp {
     /// Full render: write chat content to stdout and redraw editor at bottom.
+    /// Returns Ok(()) on success.
     pub fn render_with_terminal<B>(
         &mut self,
         manager: &mut TerminalManager<B>,

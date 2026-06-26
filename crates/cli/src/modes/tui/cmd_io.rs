@@ -6,70 +6,16 @@ use super::context::TuiContext;
 use super::message_utils;
 use super::types::TuiCommand;
 
-/// Build a markdown summary of the session for gist sharing.
-/// Uses only text content blocks (no tool calls, thinking blocks, or images).
-fn build_share_markdown(ctx: &TuiContext) -> String {
-    use std::fmt::Write;
-
-    let mut md = String::new();
-    let header = ctx.session_manager.header();
-
-    writeln!(md, "# Pick Session").ok();
-    md.push('\n');
-    if let Some(h) = header {
-        if let Some(ref m) = h.model {
-            let _ = writeln!(md, "- **Model:** {}", m);
-        }
-        let _ = writeln!(md, "- **Date:** {}", h.created_at);
-        if let Some(ref cwd) = h.cwd {
-            if !cwd.is_empty() {
-                let _ = writeln!(md, "- **Directory:** `{}`", cwd);
-            }
-        }
-        md.push('\n');
-    }
-
-    for msg in &ctx.all_messages {
-        md.push_str("---\n\n");
-        match msg {
-            Message::User(u) => {
-                md.push_str("## User\n\n");
-                for block in &u.content {
-                    if let ContentBlock::Text(t) = block {
-                        md.push_str(&t.text);
-                        md.push('\n');
-                    }
-                }
-            }
-            Message::Assistant(a) => {
-                let has_text = a.content.iter().any(|b| matches!(b, ContentBlock::Text(_)));
-                if has_text {
-                    md.push_str("## Assistant\n\n");
-                    for block in &a.content {
-                        if let ContentBlock::Text(t) = block {
-                            md.push_str(&t.text);
-                            md.push('\n');
-                        }
-                    }
-                }
-            }
-            _ => {}
-        }
-        md.push('\n');
-    }
-
-    md
-}
-
-/// Spawn `gh gist create` in background, pipe markdown content via stdin,
+/// Spawn `gh gist create` in background with an HTML file path,
 /// and send the result (gist URL or error) back through `cmd_tx`.
 /// Checks `cancel_rx` for early cancellation (Escape key).
+/// Cleans up the temp HTML file on completion or cancellation.
 async fn run_share_gh_gist(
-    md_content: String,
+    html_path: std::path::PathBuf,
     cmd_tx: tokio::sync::mpsc::UnboundedSender<TuiCommand>,
     mut cancel_rx: tokio::sync::watch::Receiver<bool>,
 ) {
-    use tokio::io::AsyncWriteExt;
+    let path_str = html_path.to_string_lossy().to_string();
 
     let mut child = match tokio::process::Command::new("gh")
         .args([
@@ -77,10 +23,9 @@ async fn run_share_gh_gist(
             "create",
             "--public=false",
             "--filename",
-            "session.md",
-            "-", // read from stdin
+            "session.html",
+            &path_str,
         ])
-        .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
@@ -95,17 +40,7 @@ async fn run_share_gh_gist(
         }
     };
 
-    // Write markdown content to gh's stdin, then close it
-    if let Some(mut stdin) = child.stdin.take() {
-        let _ = stdin.write_all(md_content.as_bytes()).await;
-        let _ = stdin.shutdown().await;
-    }
-    // stdin is dropped here, closing the pipe so gh starts processing
-
-    // Wait for gh to finish, with cancellation support.
-    // We use child.wait() (borrows) + manual stdout/stderr collection
-    // instead of wait_with_output() (consumes) to keep child accessible
-    // in the cancel branch.
+    // Read stdout/stderr before waiting (borrows child, keeps it alive for cancel)
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     if let Some(out) = child.stdout.as_mut() {
@@ -149,15 +84,17 @@ async fn run_share_gh_gist(
             }
         }
         _ = cancel_rx.changed() => {
-            // User cancelled — kill the gh process
             let _ = child.kill().await;
-            let _ = child.wait().await; // reap zombie
+            let _ = child.wait().await;
             let _ = cmd_tx.send(TuiCommand::ShareResult {
                 url: None,
                 error: None,
             });
         }
     }
+
+    // Cleanup temp file
+    let _ = std::fs::remove_file(&html_path);
 }
 
 /// Build SessionData from TuiContext and export to HTML file.
@@ -499,9 +436,12 @@ pub(crate) async fn handle_import(ctx: &mut TuiContext, args: &[String]) {
 
 /// Handle /share slash command
 ///
-/// Non-blocking: checks `gh` auth synchronously, then spawns the gist
-/// creation in a background task. The editor shows a loading spinner
-/// and the user can press Escape to cancel.
+/// Exports the session as a full HTML file (same format as /export),
+/// then uploads it to GitHub as a secret gist for easy sharing.
+///
+/// Non-blocking: checks `gh` auth synchronously, then spawns the
+/// gist creation in a background task. The editor shows a loading
+/// spinner and the user can press Escape to cancel.
 /// The result (gist URL or error) is delivered via `cmd_rx` / `ShareResult`.
 pub(crate) async fn handle_share(ctx: &mut TuiContext) {
     // ── Phase 1: Verify GitHub CLI availability and auth ──────────────
@@ -529,26 +469,43 @@ pub(crate) async fn handle_share(ctx: &mut TuiContext) {
         }
     }
 
-    // ── Phase 2: Build markdown content and snapshot data ─────────
-    let md_content = build_share_markdown(ctx);
-    let cmd_tx = ctx.cmd_tx.clone();
+    // ── Phase 2: Export session to HTML (reuses /export code path) ──
+    let session_id = ctx
+        .session_manager
+        .header()
+        .map(|h| h.id.as_str())
+        .unwrap_or("unknown")
+        .to_string();
+    let tmp_path = std::env::temp_dir().join(format!("Pick-session-{}.html", session_id));
 
-    // ── Phase 3: Setup loading spinner in editor ──────────────────
-    let saved_text = ctx.tui.editor.text().to_string();
-    ctx.share_saved_editor_text = saved_text;
-    ctx.tui
-        .editor
-        .set_text(" ⠴ Creating gist…  (Esc to cancel)");
-    ctx.tui.state = pick_tui::app::AppState::Streaming;
+    // Remove any stale file from a previous failed share
+    let _ = std::fs::remove_file(&tmp_path);
 
-    // ── Phase 4: Create cancel channel and spawn background task ──
-    let (cancel_tx, cancel_rx) = tokio::sync::watch::channel(false);
-    ctx.share_cancel_tx = Some(cancel_tx);
+    match export_session_html(ctx, &tmp_path) {
+        Ok(_) => {
+            // ── Phase 3: Setup loading spinner in editor ──────────
+            let cmd_tx = ctx.cmd_tx.clone();
+            ctx.share_saved_editor_text = String::new();
+            ctx.tui.editor.clear();
+            ctx.tui
+                .editor
+                .set_text(" ⠴ Creating gist…  (Esc to cancel)");
+            ctx.tui.state = pick_tui::app::AppState::Streaming;
 
-    tokio::spawn(async move {
-        run_share_gh_gist(md_content, cmd_tx, cancel_rx).await;
-    });
-    // ── Return immediately — result flows through cmd_rx ─────────
+            // ── Phase 4: Spawn background gist creation ──────────
+            let (cancel_tx, cancel_rx) = tokio::sync::watch::channel(false);
+            ctx.share_cancel_tx = Some(cancel_tx);
+
+            tokio::spawn(async move {
+                run_share_gh_gist(tmp_path, cmd_tx, cancel_rx).await;
+            });
+            // ── Return immediately — result flows through cmd_rx ─
+        }
+        Err(e) => {
+            ctx.tui
+                .show_error(&format!("Failed to export session: {}", e));
+        }
+    }
 }
 
 /// Handle /copy slash command
