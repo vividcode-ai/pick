@@ -78,26 +78,19 @@ pub async fn run_tui_mode(
                 break 'input TuiAction::Quit;
             }
 
-            // After frame rendered: if there is a pending share URL, write it
-            // as an OSC 8 clickable hyperlink to stdout at the bottom of the
-            // terminal. This makes the URL single-clickable in any terminal
-            // that supports OSC 8 (Windows Terminal, VSCode, Kitty, WezTerm,
-            // iTerm2, Alacritty, etc.).
+            // After frame rendered: if there is a pending share URL, write
+            // it as an OSC 8 clickable hyperlink to stderr. Stderr appears
+            // in the same terminal below the TUI content without interfering
+            // with crossterm/ratatui's stdout-based rendering. The URL is
+            // single-clickable (Ctrl+Click or single-click depending on
+            // terminal) in Windows Terminal, VSCode, Kitty, WezTerm, etc.
             if let Some(url) = ctx.tui.pending_share_url.take() {
-                use crossterm::cursor::MoveTo;
-                use crossterm::execute;
-                use crossterm::style::Print;
-                if let Ok((_, screen_h)) = crossterm::terminal::size() {
-                    // Move to the last visible row, write hyperlink + newline
-                    // which scrolls content on most terminals, making the
-                    // clickable URL visible at the bottom of the terminal.
-                    let _ = execute!(
-                        std::io::stdout(),
-                        MoveTo(0, screen_h.saturating_sub(1)),
-                        Print(pick_tui::terminal_image::hyperlink(&url, &url)),
-                        Print("\r\n"),
-                    );
-                }
+                use std::io::Write;
+                let _ = writeln!(
+                    std::io::stderr(),
+                    "{}",
+                    pick_tui::terminal_image::hyperlink(&url, &url)
+                );
             }
 
             // Check for pending command continuation
@@ -145,6 +138,9 @@ pub async fn run_tui_mode(
                         }
                         Some(TuiCommand::ShareResult { url, error }) => {
                             handle_share_result(&mut ctx, url, error);
+                            // Force an immediate render so the restored editor
+                            // is visible without waiting for the next loop iteration.
+                            let _ = ctx.tui.render_with_terminal(&mut ctx.terminal_manager);
                         }
                         Some(cmd) => commands::apply_tui_command(&mut ctx.tui, cmd),
                         None => break 'input TuiAction::Quit,
@@ -204,6 +200,7 @@ pub async fn run_tui_mode(
                     }
                     Ok(TuiCommand::ShareResult { url, error }) => {
                         handle_share_result(&mut ctx, url, error);
+                        let _ = ctx.tui.render_with_terminal(&mut ctx.terminal_manager);
                     }
                     Ok(cmd) => commands::apply_tui_command(&mut ctx.tui, cmd),
                     Err(_) => break,
@@ -238,9 +235,9 @@ fn handle_share_result(ctx: &mut TuiContext, url: Option<String>, error: Option<
     match (url, error) {
         (Some(url), _) => {
             ctx.tui.pending_share_url = Some(url.clone());
-            ctx.tui
-                .chat
-                .add_system_message(&format!("🔗 \x1b[1m\x1b[94m{}\x1b[0m", url));
+            ctx.tui.chat.add_system_message(
+                "Session shared as secret gist — click the link below to open.",
+            );
         }
         (_, Some(err)) => {
             ctx.tui.show_error(&format!("Share failed: {}", err));
