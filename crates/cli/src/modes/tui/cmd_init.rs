@@ -1,3 +1,4 @@
+use pick_agent::session::SessionEntry;
 use pick_ai::types::{Message, UserMessage};
 
 use super::context::TuiContext;
@@ -30,9 +31,17 @@ pub(crate) async fn handle_init(ctx: &mut TuiContext, args: &[String]) -> bool {
         .chat
         .add_system_message("\x1b[36m→\x1b[0m \x1b[1mInitializing AGENTS.md...\x1b[0m");
 
-    // Inject into agent messages (not shown in chat UI)
-    ctx.all_messages
-        .push(Message::User(UserMessage::text(&prompt)));
+    let msg = Message::User(UserMessage::text(&prompt));
+
+    // Persist to session_manager first so HTML export (reads session_manager.entries())
+    // can see this prompt. Without this, only JSONL export (reads ctx.all_messages) has it.
+    ctx.session_manager
+        .append(SessionEntry::from(&msg))
+        .await
+        .ok();
+
+    // Then inject into agent messages (not shown in chat UI)
+    ctx.all_messages.push(msg);
 
     // Return false → ContinueSubmit: raw "/init" not added as a user message
     false
