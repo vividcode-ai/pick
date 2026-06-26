@@ -1,0 +1,66 @@
+Create or update `${path}/AGENTS.md` with precise, actionable facts that help AI assistants work effectively in this codebase.
+
+## Investigation (in order)
+
+1. **Build & test config** — `Cargo.toml`, `package.json`, `Makefile`, `Justfile`, `Taskfile`, lockfiles. Extract exact commands and required toolchain.
+2. **CI pipelines** — `.github/workflows/`, `.gitlab-ci.yml`, etc. These are the ground truth for what "passing" means.
+3. **Existing instructions** — `AGENTS.md`, `CLAUDE.md`, `CONTEXT.md`, `.cursor/rules/`, `.cursorrules`, `.github/copilot-instructions.md`. Preserve verified guidance, flag conflicts.
+4. **Project layout** — workspace members, crate boundaries, entrypoints. Enough to understand where things live.
+5. **Style & convention** — `rustfmt.toml`, `clippy.toml`, `.editorconfig`, `.gitignore`, code samples. Note anything non-default.
+
+Stop reading once you have enough to write the file. Do not read exhaustively.
+
+## What to include
+
+Only facts meeting ALL three criteria:
+- **Non-obvious** — an agent would likely guess wrong or waste time discovering it
+- **Verifiable** — you found it in config, CI, or code, not inferred
+- **Actionable** — it changes how an agent writes code or runs commands
+
+Good examples:
+- `cargo test -p foo -- --ignored` to run ignored tests
+- Build requires `OPENAPI_KEY` env var set
+- Generated code lives in `src/gen/` — edit the template, not the output
+
+Bad examples:
+- "Use `cargo build` to build" (obvious)
+- "The project seems well-structured" (not actionable)
+- "Tests are in the tests directory" (generic)
+
+## Output format
+
+```markdown
+# <project-name>
+
+## Commands
+
+- **Build**: `<exact command>`
+- **Test single**: `<exact command>`
+- **Lint**: `<exact command>`
+- **Format**: `<exact command>`
+- **Other**: `<anything non-obvious>`
+
+## Structure
+
+<3-5 lines: workspace layout, key crates/packages, entrypoints>
+
+## Conventions
+
+- <bullet per non-default convention found>
+
+## Notes
+
+- <bullet per gotcha, quirk, or dependency constraint>
+```
+
+No empty sections. If a section has nothing to say, omit it entirely.
+
+## If AGENTS.md exists
+
+Read it first. Identify what is stale, wrong, or missing. Keep verified content. Fix inaccuracies. Remove speculation. Add what's missing. The result should be strictly better than the original.
+
+## Quality checks before writing
+
+- Can every command be copy-pasted and work? (if not, fix it or leave it out)
+- Is every claim backed by something you read? (if not, remove it)
+- Would this save an agent at least one mistake per section? (if not, cut the section)

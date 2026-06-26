@@ -103,6 +103,21 @@ pick --list-models
 pick --agent-mode plan -P "这个模块应该如何重构？"
 ```
 
+## 文档
+
+详细文档（英文）见 [docs/](docs/README.md) 目录：
+
+| 文档 | 说明 |
+|------|------|
+| [Quickstart](docs/quickstart.md) | 安装和快速上手 |
+| [CLI Reference](docs/cli.md) | 命令行参数参考 |
+| [Architecture](docs/architecture.md) | 项目结构和工作区概览 |
+| [Extensions](docs/extensions.md) | 扩展机制和生命周期 |
+| [Skills](docs/skills.md) | 可复用的指令文件 |
+| [Permissions](docs/permissions.md) | 访问控制和审计 |
+| [MCP](docs/mcp.md) | MCP 服务器配置 |
+| [Settings](docs/settings.md) | 配置参考 |
+
 ## 配置
 
 配置文件分为两层：

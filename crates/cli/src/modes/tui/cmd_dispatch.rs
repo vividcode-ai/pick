@@ -1,5 +1,6 @@
 use super::cmd_core;
 use super::cmd_goal;
+use super::cmd_init;
 use super::cmd_io;
 use super::cmd_mcp;
 use super::cmd_mgmt;
@@ -96,6 +97,14 @@ pub(crate) async fn handle_slash_command(
         }
         "goal" => {
             let should_add = cmd_goal::handle_goal(ctx, args).await;
+            if should_add {
+                SlashCommandResult::Consumed
+            } else {
+                SlashCommandResult::ContinueSubmit
+            }
+        }
+        "init" => {
+            let should_add = cmd_init::handle_init(ctx, args).await;
             if should_add {
                 SlashCommandResult::Consumed
             } else {

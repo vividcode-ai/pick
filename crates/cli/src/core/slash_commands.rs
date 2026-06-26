@@ -144,6 +144,10 @@ pub const BUILTIN_SLASH_COMMANDS: &[BuiltinSlashCommand] = &[
         name: "goal",
         description: "Set or show a persistent goal. /goal <text> to create, /goal edit|pause|resume|clear",
     },
+    BuiltinSlashCommand {
+        name: "init",
+        description: "Guided AGENTS.md setup — analyze project and generate AGENTS.md",
+    },
 ];
 
 /// New commands added beyond the original built-in list
@@ -203,11 +207,11 @@ mod tests {
     }
 
     #[test]
-    fn test_exactly_27_commands() {
+    fn test_exactly_28_commands() {
         assert_eq!(
             BUILTIN_SLASH_COMMANDS.len(),
-            27,
-            "must have exactly 27 built-in slash commands"
+            28,
+            "must have exactly 28 built-in slash commands"
         );
     }
 

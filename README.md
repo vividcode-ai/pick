@@ -104,6 +104,21 @@ pick --list-models
 pick --agent-mode plan -P "How should I refactor this?"
 ```
 
+## Documentation
+
+See [docs/](docs/README.md) for in-depth documentation:
+
+| Document | Description |
+|----------|-------------|
+| [Quickstart](docs/quickstart.md) | Installation and first steps |
+| [CLI Reference](docs/cli.md) | Command-line options reference |
+| [Architecture](docs/architecture.md) | Project structure and crate overview |
+| [Extensions](docs/extensions.md) | Extension system and lifecycle hooks |
+| [Skills](docs/skills.md) | Reusable instruction files |
+| [Permissions](docs/permissions.md) | Access control and audit system |
+| [MCP](docs/mcp.md) | Model Context Protocol server setup |
+| [Settings](docs/settings.md) | Configuration reference |
+
 ## Configuration
 
 Settings are stored in two tiers:

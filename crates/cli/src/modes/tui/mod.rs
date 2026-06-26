@@ -9,6 +9,7 @@ mod cleanup;
 mod cmd_core;
 mod cmd_dispatch;
 mod cmd_goal;
+mod cmd_init;
 mod cmd_io;
 mod cmd_mcp;
 mod cmd_mgmt;
@@ -63,6 +64,7 @@ mod tests {
             "plan_exit",
             "mcp",
             "goal",
+            "init",
         ]
         .into_iter()
         .collect();
