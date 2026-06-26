@@ -20,6 +20,20 @@ fn thinking_budget_from_level(level: ThinkingLevel) -> Option<u64> {
     }
 }
 
+/// Map a ThinkingLevel to its string representation for protocol-level reasoning_effort.
+/// This preserves the semantic level for providers (OpenAI, DeepSeek) that use
+/// `reasoning_effort` rather than raw token budgets.
+fn thinking_effort_from_level(level: ThinkingLevel) -> Option<&'static str> {
+    match level {
+        ThinkingLevel::Off => None,
+        ThinkingLevel::Minimal => Some("minimal"),
+        ThinkingLevel::Low => Some("low"),
+        ThinkingLevel::Medium => Some("medium"),
+        ThinkingLevel::High => Some("high"),
+        ThinkingLevel::XHigh => Some("xhigh"),
+    }
+}
+
 /// Make a single LLM call
 pub async fn call_llm(
     model: &Model,
@@ -42,6 +56,7 @@ pub async fn call_llm(
     let thinking_budget = thinking_budget_from_level(thinking_level);
     // When thinking is enabled, max_tokens must include room for both thinking and visible output
     let max_tokens = thinking_budget.map(|budget| model.max_tokens + budget);
+    let reasoning = thinking_effort_from_level(thinking_level).map(|s| s.to_string());
 
     let stream_options = StreamOptions {
         temperature: None,
@@ -55,6 +70,7 @@ pub async fn call_llm(
         max_retries: provider_max_retries.or(Some(3)),
         max_retry_delay_ms: provider_max_retry_delay_ms,
         thinking_budget,
+        reasoning,
         metadata: None,
         signal: cancel_signal.clone(),
     };

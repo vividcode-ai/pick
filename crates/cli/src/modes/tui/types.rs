@@ -7,6 +7,7 @@ use crate::core::resource_loader::ResourceLoader;
 use crate::core::system_prompt::build_system_prompt_with_defaults_and_mode;
 use async_trait::async_trait;
 use pick_agent::core::state::{AgentTool, QuestionPrompt};
+use pick_agent::skills::Skill;
 use pick_ai::types::ContentBlock;
 
 /// Commands sent from the agent event callback to the TUI
@@ -150,6 +151,7 @@ pub(crate) fn build_prompt(
     override_prompt: Option<&str>,
     extra_append: &[String],
     agent_mode: Option<&AgentMode>,
+    enable_skills: bool,
 ) -> String {
     let custom_prompt = override_prompt.or_else(|| resource_loader.system_prompt());
     let loader_append = resource_loader.append_system_prompt().join("\n");
@@ -168,9 +170,16 @@ pub(crate) fn build_prompt(
             model_id
         )
     };
+    // When skills are disabled, pass an empty slice so the system prompt
+    // excludes <available_skills>...</available_skills>
+    let skills: &[Skill] = if enable_skills {
+        resource_loader.skills()
+    } else {
+        &[]
+    };
     build_system_prompt_with_defaults_and_mode(
         tools,
-        resource_loader.skills(),
+        skills,
         resource_loader.agents_files(),
         custom_prompt,
         Some(&append_text),

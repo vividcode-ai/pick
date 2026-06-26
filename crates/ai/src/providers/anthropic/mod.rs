@@ -93,7 +93,58 @@ pub fn stream_anthropic(
             "messages": messages,
         });
 
-        if let Some(budget) = opts.and_then(|o| o.thinking_budget) {
+        // Build thinking config from options.
+        // Priority:
+        //   1. If reasoning string is provided, use it to map through thinking_level_map
+        //      to determine the appropriate thinking mode (adaptive, budget, or disabled).
+        //   2. Fall back to the raw thinking_budget (legacy behavior).
+        //   3. If neither is set and the model supports reasoning, default to disabled.
+        if let Some(reasoning_str) = opts.and_then(|o| o.reasoning.as_ref()) {
+            let is_adaptive = model
+                .compat
+                .as_ref()
+                .and_then(|c| c.anthropic_messages.as_ref())
+                .and_then(|a| a.force_adaptive_thinking)
+                .unwrap_or(false);
+
+            if reasoning_str == "off"
+                && model
+                    .thinking_level_map
+                    .as_ref()
+                    .and_then(|tlm| tlm.get("off"))
+                    .map(|v| v.is_some())
+                    .unwrap_or(true)
+            {
+                // Explicitly disabled — only send if model allows it
+                body["thinking"] = serde_json::json!({ "type": "disabled" });
+            } else if reasoning_str == "off" {
+                // Model does not support disabling thinking (e.g. claude-opus-4-7) — skip param
+            } else if is_adaptive {
+                // Adaptive thinking: e.g. claude-opus-4-7 with output_config.effort
+                let effort = model
+                    .thinking_level_map
+                    .as_ref()
+                    .and_then(|tlm| tlm.get(reasoning_str))
+                    .and_then(|v| v.as_ref())
+                    .map(|s| s.as_str())
+                    .unwrap_or(reasoning_str);
+                body["thinking"] = serde_json::json!({
+                    "type": "adaptive",
+                    "display": "summarized"
+                });
+                body["output_config"] = serde_json::json!({
+                    "effort": effort
+                });
+            } else if model.reasoning {
+                // Legacy token-budget-based thinking
+                let budget = opts.and_then(|o| o.thinking_budget).unwrap_or(8192);
+                body["thinking"] = serde_json::json!({
+                    "type": "enabled",
+                    "budget_tokens": budget
+                });
+            }
+        } else if let Some(budget) = opts.and_then(|o| o.thinking_budget) {
+            // Legacy: raw token budget without reasoning string
             body["thinking"] = serde_json::json!({
                 "type": "enabled",
                 "budget_tokens": budget
@@ -108,6 +159,15 @@ pub fn stream_anthropic(
         }
 
         let is_cloudflare_gateway = cloudflare::is_cloudflare_ai_gateway(&model.provider);
+
+        // Determine if interleaved-thinking beta header is needed (legacy budget-based thinking)
+        let use_interleaved_thinking = model.reasoning
+            && !model
+                .compat
+                .as_ref()
+                .and_then(|c| c.anthropic_messages.as_ref())
+                .and_then(|a| a.force_adaptive_thinking)
+                .unwrap_or(false);
 
         for attempt in 0..=max_retries {
             if let Some(signal) = opts.and_then(|o| o.signal.as_ref())
@@ -161,10 +221,15 @@ pub fn stream_anthropic(
                 .await;
 
             let client = reqwest::Client::new();
-            let request_builder = client
+            let mut request_builder = client
                 .post(&url)
                 .header("anthropic-version", "2023-06-01")
                 .header("content-type", "application/json");
+            // Add interleaved-thinking beta header for legacy budget-based thinking
+            if use_interleaved_thinking {
+                request_builder =
+                    request_builder.header("anthropic-beta", "interleaved-thinking-2");
+            }
             let request_builder = if is_cloudflare_gateway {
                 request_builder.header("cf-aig-authorization", format!("Bearer {}", api_key))
             } else {
@@ -330,6 +395,9 @@ pub(crate) fn map_anthropic_stop_reason(reason: &str) -> StopReason {
         "max_tokens" => StopReason::Length,
         "stop_sequence" => StopReason::Stop,
         "tool_use" => StopReason::ToolUse,
+        "refusal" => StopReason::Stop,
+        "pause_turn" => StopReason::Stop,
+        "sensitive" => StopReason::Error,
         _ => StopReason::Stop,
     }
 }
@@ -359,7 +427,14 @@ pub(crate) fn try_parse_json(s: &str) -> serde_json::Value {
 pub fn stream_simple_anthropic(
     model: Model,
     context: Context,
-    _options: Option<crate::types::SimpleStreamOptions>,
+    options: Option<crate::types::SimpleStreamOptions>,
 ) -> tokio::sync::mpsc::Receiver<StreamEvent> {
-    stream_anthropic(model, context, None)
+    let stream_opts = options.map(|o| {
+        let mut opts = o.base;
+        if o.reasoning.is_some() {
+            opts.reasoning = o.reasoning;
+        }
+        opts
+    });
+    stream_anthropic(model, context, stream_opts)
 }

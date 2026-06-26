@@ -105,12 +105,36 @@ pub(crate) fn handle_select_model(ctx: &mut TuiContext) {
 
 /// Handle CycleThinking action
 pub(crate) fn handle_cycle_thinking(ctx: &mut TuiContext) {
-    let levels = [
-        pick_agent::core::state::ThinkingLevel::Off,
-        pick_agent::core::state::ThinkingLevel::Low,
-        pick_agent::core::state::ThinkingLevel::Medium,
-        pick_agent::core::state::ThinkingLevel::High,
-    ];
+    use pick_ai::models::get_supported_thinking_levels;
+    use pick_ai::types::ThinkingLevel as AiThinkingLevel;
+
+    // Get model-supported levels for cycling, falling back to common defaults
+    let ai_model = pick_ai::models::get_model(&ctx.provider, &ctx.model_id);
+    let ai_supported = ai_model
+        .as_ref()
+        .map(|m| get_supported_thinking_levels(m))
+        .unwrap_or_default();
+    let levels: Vec<pick_agent::core::state::ThinkingLevel> = if ai_supported.is_empty() {
+        vec![
+            pick_agent::core::state::ThinkingLevel::Off,
+            pick_agent::core::state::ThinkingLevel::Low,
+            pick_agent::core::state::ThinkingLevel::Medium,
+            pick_agent::core::state::ThinkingLevel::High,
+        ]
+    } else {
+        ai_supported
+            .iter()
+            .map(|l| match l {
+                AiThinkingLevel::Off => pick_agent::core::state::ThinkingLevel::Off,
+                AiThinkingLevel::Minimal => pick_agent::core::state::ThinkingLevel::Minimal,
+                AiThinkingLevel::Low => pick_agent::core::state::ThinkingLevel::Low,
+                AiThinkingLevel::Medium => pick_agent::core::state::ThinkingLevel::Medium,
+                AiThinkingLevel::High => pick_agent::core::state::ThinkingLevel::High,
+                AiThinkingLevel::XHigh => pick_agent::core::state::ThinkingLevel::XHigh,
+            })
+            .collect()
+    };
+
     let current_idx = levels
         .iter()
         .position(|l| *l == ctx.thinking_level)

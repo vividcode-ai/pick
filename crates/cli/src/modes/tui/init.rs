@@ -86,6 +86,8 @@ pub(crate) async fn init_tui_mode(
     resource_loader.reload(&args.extensions).await;
 
     // Build system prompt
+    let enable_skills =
+        crate::core::settings::SettingsManager::load(&cwd).get_enable_skill_commands();
     let system_prompt = build_prompt(
         &tools,
         &resource_loader,
@@ -95,6 +97,7 @@ pub(crate) async fn init_tui_mode(
         args.system_prompt.as_deref(),
         &args.append_system_prompt,
         Some(&agent_mode),
+        enable_skills,
     );
 
     let context_file_names = build_context_display_names(&resource_loader);
@@ -551,6 +554,7 @@ pub(crate) fn rebuild_system_prompt(
     append_system_prompt: &[String],
     agent_mode: Option<&AgentMode>,
 ) -> String {
+    let enable_skills = SettingsManager::load(cwd).get_enable_skill_commands();
     build_prompt(
         tools,
         resource_loader,
@@ -560,5 +564,6 @@ pub(crate) fn rebuild_system_prompt(
         system_prompt_override,
         append_system_prompt,
         agent_mode,
+        enable_skills,
     )
 }

@@ -397,6 +397,7 @@ pub(crate) fn spawn_title_generation(
                 max_retries: Some(3),
                 max_retry_delay_ms: None,
                 thinking_budget: None,
+                reasoning: None,
                 metadata: None,
                 signal: None,
             };

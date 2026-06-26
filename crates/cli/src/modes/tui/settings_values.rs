@@ -4,6 +4,7 @@ use pick_agent::core::message_queue::QueueMode;
 use pick_tui::autocomplete::{CombinedAutocompleteProvider, SlashCommand as TuiSlashCommand};
 
 use super::context::TuiContext;
+use super::init;
 use crate::core::settings::{
     CompactionSettings, ImageSettings, Settings, SettingsManager, TerminalSettings,
     WarningsSettings,
@@ -35,6 +36,18 @@ pub(crate) fn toggle_enable_skill_commands(sm: &mut SettingsManager, ctx: &mut T
 
     // Rebuild autocomplete provider so the change takes effect immediately
     rebuild_autocomplete_provider(ctx, sm.get_enable_skill_commands());
+
+    // Rebuild system prompt to include or exclude <available_skills> section
+    ctx.system_prompt = init::rebuild_system_prompt(
+        &ctx.tools,
+        &ctx.resource_loader,
+        &ctx.cwd,
+        &ctx.provider,
+        &ctx.model_id,
+        ctx.args.system_prompt.as_deref(),
+        &ctx.args.append_system_prompt,
+        Some(&ctx.agent_mode),
+    );
 }
 
 pub(crate) fn rebuild_autocomplete_provider(ctx: &mut TuiContext, include_skills: bool) {
@@ -328,9 +341,11 @@ pub(crate) async fn apply_thinking_level(
     match sm.set_global(update) {
         Ok(()) => {
             ctx.thinking_level = match level {
+                "minimal" => pick_agent::core::state::ThinkingLevel::Minimal,
                 "low" => pick_agent::core::state::ThinkingLevel::Low,
                 "medium" => pick_agent::core::state::ThinkingLevel::Medium,
                 "high" => pick_agent::core::state::ThinkingLevel::High,
+                "xhigh" => pick_agent::core::state::ThinkingLevel::XHigh,
                 _ => pick_agent::core::state::ThinkingLevel::Off,
             };
             ctx.tui.thinking_level = level.to_string();

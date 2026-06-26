@@ -168,6 +168,29 @@ pub fn stream_openai_responses(
             body["tools"] = serde_json::json!(tools_json);
         }
 
+        // Apply reasoning parameters for o-series models
+        if model.reasoning {
+            if let Some(ref opts) = options {
+                if let Some(ref reasoning) = opts.reasoning {
+                    if reasoning != "off" {
+                        // Map through thinking_level_map for provider-specific effort value
+                        let effort = model
+                            .thinking_level_map
+                            .as_ref()
+                            .and_then(|tlm| tlm.get(reasoning.as_str()))
+                            .and_then(|v| v.as_ref())
+                            .map(|s| s.as_str())
+                            .unwrap_or(reasoning.as_str());
+                        body["reasoning"] = serde_json::json!({
+                            "effort": effort,
+                            "summary": "auto"
+                        });
+                        body["include"] = serde_json::json!(["reasoning.encrypted_content"]);
+                    }
+                }
+            }
+        }
+
         let is_cloudflare_gateway = cloudflare::is_cloudflare_ai_gateway(&model.provider);
 
         for attempt in 0..=max_retries {
@@ -233,6 +256,7 @@ pub fn stream_openai_responses(
 
                     let mut parser = crate::sse::SseParser::new();
                     let mut text_block_idx: Option<usize> = None;
+                    let mut thinking_block_idx: Option<usize> = None;
                     let mut response_id: Option<String> = None;
 
                     use futures::StreamExt;
@@ -247,6 +271,7 @@ pub fn stream_openai_responses(
                                         &sse,
                                         &mut output,
                                         &mut text_block_idx,
+                                        &mut thinking_block_idx,
                                         &mut response_id,
                                     )
                                     .await;
@@ -319,6 +344,7 @@ async fn process_responses_event(
     sse: &SseEvent,
     output: &mut AssistantMessage,
     text_block_idx: &mut Option<usize>,
+    thinking_block_idx: &mut Option<usize>,
     _response_id: &mut Option<String>,
 ) {
     let data: serde_json::Value = match serde_json::from_str(&sse.data) {
@@ -436,6 +462,52 @@ async fn process_responses_event(
                 }
             }
         }
+        "response.output_item.added" => {
+            // Check if this is a reasoning item
+            if let Some(item_type) = data
+                .get("item")
+                .and_then(|i| i.get("type"))
+                .and_then(|v| v.as_str())
+            {
+                if item_type == "reasoning" {
+                    // Start a thinking block for reasoning content
+                    let idx = output.content.len();
+                    output
+                        .content
+                        .push(ContentBlock::Thinking(crate::types::ThinkingContent {
+                            thinking: String::new(),
+                            thinking_signature: None,
+                            redacted: false,
+                        }));
+                    *thinking_block_idx = Some(idx);
+                    let _ = tx
+                        .send(StreamEvent::ThinkingStart {
+                            content_index: idx,
+                            partial: partial_from_output(output),
+                        })
+                        .await;
+                }
+            }
+        }
+        "response.reasoning.summary.added" | "response.reasoning.summary.delta" => {
+            if let Some(delta) = data.get("delta").and_then(|v| v.as_str()) {
+                let idx = *thinking_block_idx;
+                if let Some(idx) = idx {
+                    if idx < output.content.len() {
+                        if let ContentBlock::Thinking(ref mut tc) = output.content[idx] {
+                            tc.thinking.push_str(delta);
+                        }
+                        let _ = tx
+                            .send(StreamEvent::ThinkingDelta {
+                                content_index: idx,
+                                delta: delta.to_string(),
+                                partial: partial_from_output(output),
+                            })
+                            .await;
+                    }
+                }
+            }
+        }
         "response.incomplete" => {
             output.stop_reason = StopReason::Length;
         }
@@ -474,7 +546,14 @@ fn partial_from_output(output: &AssistantMessage) -> crate::types::PartialAssist
 pub fn stream_simple_openai_responses(
     model: Model,
     context: Context,
-    _options: Option<crate::types::SimpleStreamOptions>,
+    options: Option<crate::types::SimpleStreamOptions>,
 ) -> tokio::sync::mpsc::Receiver<StreamEvent> {
-    stream_openai_responses(model, context, None)
+    let stream_opts = options.map(|o| {
+        let mut opts = o.base;
+        if o.reasoning.is_some() {
+            opts.reasoning = o.reasoning;
+        }
+        opts
+    });
+    stream_openai_responses(model, context, stream_opts)
 }

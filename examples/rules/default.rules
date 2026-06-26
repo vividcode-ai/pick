@@ -1,0 +1,73 @@
+# ExecPolicy rules - command classification
+# Each line: <command pattern> -> <allow|prompt|forbid>
+# Patterns are case-insensitive token prefixes
+
+# Read-only commands - always allow
+ls -> allow
+cat -> allow
+head -> allow
+tail -> allow
+pwd -> allow
+echo -> allow
+which -> allow
+type -> allow
+where -> allow
+dir -> allow
+
+# Git read-only commands - allow
+git diff -> allow
+git log -> allow
+git show -> allow
+git status -> allow
+git branch -> allow
+git ls-files -> allow
+git rev-parse -> allow
+git rev-list -> allow
+git describe -> allow
+git config -> allow
+
+# NPM read-only commands - allow
+npm list -> allow
+npm view -> allow
+npm pack -> allow
+npm config -> allow
+
+# Cargo read-only commands - allow
+cargo check -> allow
+cargo metadata -> allow
+cargo tree -> allow
+cargo doc -> allow
+cargo search -> allow
+
+# Destructive commands - forbid (prompt first, forbid if approval_policy=never)
+rm -rf -> prompt
+sudo -> prompt
+chmod -> prompt
+chown -> prompt
+mkfs -> prompt
+dd -> prompt
+shutdown -> prompt
+reboot -> prompt
+kill -> prompt
+pkill -> prompt
+iptables -> prompt
+
+# Git write commands - prompt
+git push -> prompt
+git commit -> prompt
+git merge -> prompt
+git rebase -> prompt
+git reset -> prompt
+git checkout -> prompt
+git clean -> prompt
+
+# Package install - prompt
+npm install -> prompt
+npm run -> prompt
+cargo build -> prompt
+cargo run -> prompt
+cargo test -> prompt
+pip install -> prompt
+
+# Default: prompt for unrecognized commands
+* -> prompt

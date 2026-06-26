@@ -551,7 +551,14 @@ fn partial_from_output(output: &AssistantMessage) -> crate::types::PartialAssist
 pub fn stream_simple_google_vertex(
     model: Model,
     context: Context,
-    _options: Option<crate::types::SimpleStreamOptions>,
+    options: Option<crate::types::SimpleStreamOptions>,
 ) -> tokio::sync::mpsc::Receiver<StreamEvent> {
-    stream_google_vertex(model, context, None)
+    let stream_opts = options.map(|o| {
+        let mut opts = o.base;
+        if o.reasoning.is_some() {
+            opts.reasoning = o.reasoning;
+        }
+        opts
+    });
+    stream_google_vertex(model, context, stream_opts)
 }

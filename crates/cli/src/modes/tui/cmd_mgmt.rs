@@ -421,9 +421,11 @@ pub(crate) async fn handle_reload(ctx: &mut TuiContext) {
     }
     if let Some(new_think_level) = &settings.default_thinking_level {
         ctx.thinking_level = match new_think_level.as_str() {
+            "minimal" => pick_agent::core::state::ThinkingLevel::Minimal,
             "low" => pick_agent::core::state::ThinkingLevel::Low,
             "medium" => pick_agent::core::state::ThinkingLevel::Medium,
             "high" => pick_agent::core::state::ThinkingLevel::High,
+            "xhigh" => pick_agent::core::state::ThinkingLevel::XHigh,
             _ => pick_agent::core::state::ThinkingLevel::Off,
         };
         ctx.tui.thinking_level = new_think_level.clone();

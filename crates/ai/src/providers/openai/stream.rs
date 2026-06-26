@@ -13,6 +13,180 @@ struct StreamingBlock {
     arguments: serde_json::Value,
 }
 
+// ============================================================================
+// Thinking format auto-detection from base URL
+// ============================================================================
+
+/// Known provider patterns for thinking format detection.
+/// Mirrors pi's detectCompat() logic.
+/// Known provider URL patterns for thinking format auto-detection.
+/// Maps a base_url substring to a thinking format identifier.
+fn detect_thinking_format_from_url(url: &str) -> Option<&'static str> {
+    let url_lower = url.to_lowercase();
+    let pairs: &[(&[&str], &str)] = &[
+        (&["deepseek.com"], "deepseek"),
+        (&["openrouter.ai"], "openrouter"),
+        (&["together.xyz", "together.ai", "api.together"], "together"),
+        (&["z.ai", "open.bigmodel.cn"], "zai"),
+        (&["moonshot.ai", "kimi.moonshot"], "moonshot"),
+        (&["nvidia.com"], "nvidia"),
+        (&["cerebras.ai"], "cerebras"),
+        (&["x.ai"], "xai"),
+        (&["chutes.ai"], "chutes"),
+        (&["opencode.global"], "opencode"),
+    ];
+    for (patterns, format) in pairs {
+        for pattern in *patterns {
+            if url_lower.contains(pattern) {
+                return Some(format);
+            }
+        }
+    }
+    None
+}
+
+/// Detect the thinking format from a model's base URL and compat config.
+/// Returns a string identifying the format (e.g. "openai", "deepseek", "openrouter", etc.)
+fn detect_thinking_format(model: &Model) -> &str {
+    // 1. If model has an explicit compat config with thinking_format, use it
+    if let Some(ref compat) = model.compat {
+        if let Some(ref oc) = compat.openai_completions {
+            if let Some(ref tf) = oc.thinking_format {
+                return tf;
+            }
+        }
+    }
+
+    // 2. Auto-detect from base_url
+    if let Some(format) = detect_thinking_format_from_url(&model.base_url) {
+        return format;
+    }
+
+    // 3. Default to standard OpenAI format
+    "openai"
+}
+
+/// Check if the model's compat config indicates it supports reasoning_effort
+fn supports_reasoning_effort(model: &Model) -> bool {
+    if let Some(ref compat) = model.compat {
+        if let Some(ref oc) = compat.openai_completions {
+            return oc.supports_reasoning_effort.unwrap_or(true);
+        }
+    }
+    true
+}
+
+/// Resolve the provider-specific reasoning effort value from the model's thinking_level_map.
+/// If the model has no thinking_level_map, falls back to the raw level string.
+/// If the model's thinking_level_map marks a level as null (unsupported), returns None.
+fn resolve_reasoning_effort<'a>(model: &'a Model, level: &'a str) -> Option<&'a str> {
+    if let Some(ref tlm) = model.thinking_level_map {
+        match tlm.get(level) {
+            // Entry exists and has a value: use that value
+            Some(Some(mapped)) => Some(mapped.as_str()),
+            // Entry exists but is null: level is explicitly unsupported
+            Some(None) => None,
+            // No entry for this level: use the raw level string
+            None => Some(level),
+        }
+    } else {
+        // No thinking_level_map at all: use the raw level string if reasoning is enabled
+        if model.reasoning { Some(level) } else { None }
+    }
+}
+
+/// Build thinking/reasoning parameters for the request body based on
+/// the detected thinking format and resolved reasoning effort.
+fn build_thinking_params(
+    model: &Model,
+    reasoning_level: Option<&str>,
+) -> Option<serde_json::Value> {
+    let format = detect_thinking_format(model);
+    let supports_effort = supports_reasoning_effort(model);
+
+    // Check if "off" is supported in thinking_level_map.
+    // If off is null, the model always thinks and cannot disable it.
+    let off_supported = model
+        .thinking_level_map
+        .as_ref()
+        .and_then(|tlm| tlm.get("off"))
+        .map(|v| v.is_some())
+        .unwrap_or(true);
+
+    match reasoning_level {
+        None | Some("off") if format == "deepseek" && !off_supported => {
+            // DeepSeek models that always think: no params needed
+            None
+        }
+        None | Some("off") if format == "deepseek" => {
+            // DeepSeek with thinking disabled: send thinking: { type: "disabled" }
+            Some(serde_json::json!({ "thinking": { "type": "disabled" } }))
+        }
+        None | Some("off") if format == "zai" && off_supported => {
+            // z.ai disabled: thinking: { type: "disabled" }
+            Some(serde_json::json!({ "thinking": { "type": "disabled" } }))
+        }
+        None | Some("off") => {
+            // For most providers, don't send any reasoning params when disabled
+            None
+        }
+        Some(level) => {
+            // Resolve provider-specific effort string
+            let effort = resolve_reasoning_effort(model, level)?;
+
+            match format {
+                "deepseek" => {
+                    // DeepSeek: thinking: { type: "enabled" } + reasoning_effort: <value>
+                    let mut params = serde_json::json!({
+                        "thinking": { "type": "enabled" }
+                    });
+                    if supports_effort {
+                        params["reasoning_effort"] = serde_json::Value::String(effort.to_string());
+                    }
+                    Some(params)
+                }
+                "openrouter" => {
+                    // OpenRouter: reasoning: { effort: <value> }
+                    Some(serde_json::json!({
+                        "reasoning": { "effort": effort }
+                    }))
+                }
+                "together" => {
+                    // Together: reasoning: { enabled: true } + reasoning_effort: <value>
+                    let mut params = serde_json::json!({
+                        "reasoning": { "enabled": true }
+                    });
+                    if supports_effort {
+                        params["reasoning_effort"] = serde_json::Value::String(effort.to_string());
+                    }
+                    Some(params)
+                }
+                "zai" => {
+                    // z.ai: thinking: { type: "enabled" } + optionally reasoning_effort
+                    let mut params = serde_json::json!({
+                        "thinking": { "type": "enabled" }
+                    });
+                    if supports_effort {
+                        params["reasoning_effort"] = serde_json::Value::String(effort.to_string());
+                    }
+                    Some(params)
+                }
+                "openai" | _ => {
+                    // Standard OpenAI format: reasoning_effort: <value>
+                    if supports_effort {
+                        Some(serde_json::json!({
+                            "reasoning_effort": effort
+                        }))
+                    } else {
+                        // Provider doesn't support reasoning_effort at all — send nothing
+                        None
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// Stream a response from OpenAI's Chat Completions API
 pub fn stream_openai_completions(
     model: Model,
@@ -80,7 +254,8 @@ pub fn stream_openai_completions(
         };
         let url = format!("{}/v1/chat/completions", base_url.trim_end_matches('/'));
 
-        let messages: Vec<serde_json::Value> = super::convert_to_openai_messages(&context.messages);
+        let messages: Vec<serde_json::Value> =
+            super::convert_to_openai_messages(&context.messages, Some(&model));
 
         let mut body = serde_json::json!({
             "model": model.id,
@@ -102,6 +277,27 @@ pub fn stream_openai_completions(
                 })
                 .collect();
             body["tools"] = serde_json::json!(tools_json);
+        }
+
+        // Apply thinking/reasoning parameters from the reasoning level string.
+        // This replaces the old approach of passing raw token budgets — we now
+        // pass the semantic level and let each provider format map it appropriately
+        // (reasoning_effort for OpenAI/DeepSeek, thinking budget for Anthropic, etc.).
+        if let Some(ref opts) = options {
+            if let Some(ref reasoning) = opts.reasoning {
+                let reasoning_level = if reasoning == "off" {
+                    None
+                } else {
+                    Some(reasoning.as_str())
+                };
+                if let Some(thinking_params) = build_thinking_params(&model, reasoning_level) {
+                    if let Some(obj) = thinking_params.as_object() {
+                        for (k, v) in obj {
+                            body[k] = v.clone();
+                        }
+                    }
+                }
+            }
         }
 
         let is_cloudflare_gateway = cloudflare::is_cloudflare_ai_gateway(&model.provider);

@@ -377,16 +377,53 @@ fn show_thinking_selector(
     _sm: &SettingsManager,
     current_level: &pick_agent::core::state::ThinkingLevel,
 ) {
+    use pick_ai::models::{clamp_thinking_level, get_supported_thinking_levels};
+    use pick_ai::types::ThinkingLevel as AiThinkingLevel;
+
     ctx.pending_command = Some("settings".to_string());
-    let levels = ["off", "low", "medium", "high"];
+
+    // Get model-supported levels, defaulting to all if model not available
+    let ai_model = pick_ai::models::get_model(&ctx.provider, &ctx.model_id);
+    let supported: Vec<AiThinkingLevel> = match &ai_model {
+        Some(m) => get_supported_thinking_levels(m),
+        None => vec![
+            AiThinkingLevel::Off,
+            AiThinkingLevel::Low,
+            AiThinkingLevel::Medium,
+            AiThinkingLevel::High,
+        ],
+    };
+
     let current_str = format!("{:?}", current_level).to_lowercase();
-    let items: Vec<SelectItem> = levels
+    let current_ai = match current_str.as_str() {
+        "off" => AiThinkingLevel::Off,
+        "minimal" => AiThinkingLevel::Minimal,
+        "low" => AiThinkingLevel::Low,
+        "medium" => AiThinkingLevel::Medium,
+        "high" => AiThinkingLevel::High,
+        "xhigh" => AiThinkingLevel::XHigh,
+        _ => AiThinkingLevel::Off,
+    };
+
+    // Clamp current selection to available levels
+    let effective = ai_model
+        .as_ref()
+        .map(|m| clamp_thinking_level(m, current_ai))
+        .unwrap_or(current_ai);
+
+    let items: Vec<SelectItem> = supported
         .iter()
         .map(|l| {
-            let desc = if *l == current_str { "current" } else { "" };
-            SelectItem::new(l.to_string(), format!("thinking-{}", l)).with_description(desc)
+            let label = format!("{:?}", l).to_lowercase();
+            let is_current = *l == effective;
+            let mut item = SelectItem::new(label.clone(), format!("thinking-{}", label));
+            if is_current {
+                item = item.with_description("current");
+            }
+            item
         })
         .collect();
+
     let select = SelectList::new("Thinking Level", items);
     ctx.tui.start_selection(select);
     ctx.tui.finalize_turn();

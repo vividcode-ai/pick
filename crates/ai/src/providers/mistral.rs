@@ -48,7 +48,7 @@ pub fn stream_mistral(
         );
 
         let messages: Vec<serde_json::Value> =
-            crate::providers::openai::convert_to_openai_messages(&context.messages);
+            crate::providers::openai::convert_to_openai_messages(&context.messages, None);
 
         let mut body = serde_json::json!({
             "model": model.id,
@@ -64,6 +64,24 @@ pub fn stream_mistral(
                 all_messages.extend(arr.clone());
             }
             body["messages"] = serde_json::json!(all_messages);
+        }
+
+        // Apply reasoning_effort if model supports reasoning
+        if model.reasoning {
+            if let Some(ref opts) = options {
+                if let Some(ref reasoning) = opts.reasoning {
+                    if reasoning != "off" {
+                        let effort = model
+                            .thinking_level_map
+                            .as_ref()
+                            .and_then(|tlm| tlm.get(reasoning.as_str()))
+                            .and_then(|v| v.as_ref())
+                            .map(|s| s.as_str())
+                            .unwrap_or(reasoning.as_str());
+                        body["reasoning_effort"] = serde_json::Value::String(effort.to_string());
+                    }
+                }
+            }
         }
 
         for attempt in 0..=max_retries {
@@ -129,6 +147,7 @@ pub fn stream_mistral(
 
                     let mut parser = SseParser::new();
                     let mut text_block_idx: Option<usize> = None;
+                    let mut thinking_block_idx: Option<usize> = None;
                     let mut tool_blocks: Vec<(usize, String, String, String)> = Vec::new(); // (stream_idx, id, name, partial_json)
 
                     use futures::StreamExt;
@@ -143,6 +162,7 @@ pub fn stream_mistral(
                                         &sse,
                                         &mut output,
                                         &mut text_block_idx,
+                                        &mut thinking_block_idx,
                                         &mut tool_blocks,
                                     )
                                     .await;
@@ -215,6 +235,7 @@ async fn process_mistral_line(
     sse: &crate::sse::SseEvent,
     output: &mut AssistantMessage,
     text_block_idx: &mut Option<usize>,
+    thinking_block_idx: &mut Option<usize>,
     tool_blocks: &mut Vec<(usize, String, String, String)>,
 ) {
     if sse.data.trim() == "[DONE]" {
@@ -301,6 +322,44 @@ async fn process_mistral_line(
                 partial: partial_from_output(output),
             })
             .await;
+    }
+
+    // Thinking/reasoning content (OpenAI-compatible reasoning_content field)
+    for thinking_field in &["reasoning_content", "reasoning", "reasoning_text"] {
+        if let Some(reasoning) = delta.get(*thinking_field).and_then(|v| v.as_str())
+            && !reasoning.is_empty()
+        {
+            let idx = if let Some(idx) = thinking_block_idx {
+                *idx
+            } else {
+                let idx = output.content.len();
+                output
+                    .content
+                    .push(ContentBlock::Thinking(crate::types::ThinkingContent {
+                        thinking: String::new(),
+                        thinking_signature: None,
+                        redacted: false,
+                    }));
+                *thinking_block_idx = Some(idx);
+                let _ = tx
+                    .send(StreamEvent::ThinkingStart {
+                        content_index: idx,
+                        partial: partial_from_output(output),
+                    })
+                    .await;
+                idx
+            };
+            if let ContentBlock::Thinking(ref mut tc) = output.content[idx] {
+                tc.thinking.push_str(reasoning);
+            }
+            let _ = tx
+                .send(StreamEvent::ThinkingDelta {
+                    content_index: idx,
+                    delta: reasoning.to_string(),
+                    partial: partial_from_output(output),
+                })
+                .await;
+        }
     }
 
     // Tool calls
@@ -432,7 +491,14 @@ fn partial_from_output(output: &AssistantMessage) -> crate::types::PartialAssist
 pub fn stream_simple_mistral(
     model: Model,
     context: Context,
-    _options: Option<crate::types::SimpleStreamOptions>,
+    options: Option<crate::types::SimpleStreamOptions>,
 ) -> tokio::sync::mpsc::Receiver<StreamEvent> {
-    stream_mistral(model, context, None)
+    let stream_opts = options.map(|o| {
+        let mut opts = o.base;
+        if o.reasoning.is_some() {
+            opts.reasoning = o.reasoning;
+        }
+        opts
+    });
+    stream_mistral(model, context, stream_opts)
 }
