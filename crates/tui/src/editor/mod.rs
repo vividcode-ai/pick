@@ -243,16 +243,13 @@ impl Editor {
             self.cursor = self.buffer.len();
             return;
         }
-        let next_next_line_start = next_line_start
-            + self.buffer[next_line_start..]
-                .find('\n')
-                .map(|i| i + 1)
-                .unwrap_or(self.buffer.len() - next_line_start);
-        self.cursor = self.offset_from_visual_col(
-            next_line_start,
-            next_next_line_start.saturating_sub(1),
-            target_col,
-        );
+        // Find the exclusive end of the target line — either the \n position
+        // (always a char boundary since \n is ASCII) or buffer.len() for the last line
+        let next_line_end = self.buffer[next_line_start..]
+            .find('\n')
+            .map(|i| next_line_start + i) // position of \n = exclusive end
+            .unwrap_or(self.buffer.len()); // end of buffer = exclusive end
+        self.cursor = self.offset_from_visual_col(next_line_start, next_line_end, target_col);
         self.mark = None;
         self.kill_accumulating = false;
     }

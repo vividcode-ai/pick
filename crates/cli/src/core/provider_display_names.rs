@@ -31,6 +31,9 @@ fn built_in_provider_display_names() -> HashMap<&'static str, &'static str> {
     m.insert("vercel-ai-gateway", "Vercel AI Gateway");
     m.insert("xai", "xAI");
     m.insert("zai", "ZAI");
+    m.insert("zai-coding-cn", "Z.AI Coding (China)");
+    m.insert("nvidia", "NVIDIA");
+    m.insert("openrouter-images", "OpenRouter Images");
     m.insert("xiaomi", "Xiaomi MiMo");
     m.insert("xiaomi-token-plan-cn", "Xiaomi MiMo Token Plan (China)");
     m.insert(
