@@ -129,6 +129,25 @@ impl TuiApp {
             self.cached_lines_entry_count = entry_count;
         }
 
+        // Inject any raw pending history lines (e.g. OSC 8 clickable URLs
+        // that must bypass ratatui's style layer to preserve the escape
+        // sequences). These appear after the chat lines in scrollback.
+        if !self.pending_history_lines.is_empty() {
+            let raw = std::mem::take(&mut self.pending_history_lines);
+            manager.insert_history(raw);
+        }
+
+        // Update the editor spinner animation when share is in progress.
+        // The status_frame is incremented by advance_spinner() every 100ms
+        // in the main loop, providing the animated rotation.
+        if self.share_in_progress {
+            const SPINNER_FRAMES: [&'static str; 10] =
+                ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+            let frame = SPINNER_FRAMES[self.status_frame % SPINNER_FRAMES.len()];
+            self.editor
+                .set_text(&format!("{} Creating gist…  (Esc to cancel)", frame));
+        }
+
         let stream_lines = if self.state == AppState::Streaming {
             self.chat.render_active_stream(width as usize)
         } else {

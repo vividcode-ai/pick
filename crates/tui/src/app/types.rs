@@ -173,9 +173,14 @@ pub struct TuiApp {
     /// Last turn usage stats displayed above the editor after a conversation ends.
     /// Set by show_usage(), cleared on next user message or /new.
     pub usage_display: Option<String>,
-    /// URL for a share result, written as an OSC 8 clickable hyperlink directly
-    /// to stdout after the next frame render so the user can single-click to open.
-    pub pending_share_url: Option<String>,
+    /// Raw history lines to inject into terminal scrollback on the next render.
+    /// Used to output clickable OSC 8 hyperlinks that bypass ratatui's style layer
+    /// (which would strip the escape sequences). The content bytes are written
+    /// directly to the terminal via write_history_line.
+    pub pending_history_lines: Vec<ratatui::text::Line<'static>>,
+    /// When true, the editor shows a spinner animation (share in progress).
+    /// Set by /share command, cleared on completion or cancel.
+    pub share_in_progress: bool,
 }
 
 /// Format token counts for compact display (e.g. 1500 → "1.5k", 15000 → "15k")

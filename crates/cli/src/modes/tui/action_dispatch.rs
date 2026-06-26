@@ -73,6 +73,7 @@ async fn handle_interrupt(ctx: &mut TuiContext) {
     // Check if a /share operation is in progress first
     if let Some(cancel_tx) = ctx.share_cancel_tx.take() {
         let _ = cancel_tx.send(true);
+        ctx.tui.share_in_progress = false;
         ctx.share_saved_editor_text.clear();
         ctx.tui.editor.clear();
         ctx.tui.state = pick_tui::app::AppState::Input;

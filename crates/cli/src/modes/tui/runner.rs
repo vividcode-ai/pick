@@ -78,21 +78,6 @@ pub async fn run_tui_mode(
                 break 'input TuiAction::Quit;
             }
 
-            // After frame rendered: if there is a pending share URL, write
-            // it as an OSC 8 clickable hyperlink to stderr. Stderr appears
-            // in the same terminal below the TUI content without interfering
-            // with crossterm/ratatui's stdout-based rendering. The URL is
-            // single-clickable (Ctrl+Click or single-click depending on
-            // terminal) in Windows Terminal, VSCode, Kitty, WezTerm, etc.
-            if let Some(url) = ctx.tui.pending_share_url.take() {
-                use std::io::Write;
-                let _ = writeln!(
-                    std::io::stderr(),
-                    "{}",
-                    pick_tui::terminal_image::hyperlink(&url, &url)
-                );
-            }
-
             // Check for pending command continuation
             if let Some(text) = ctx.pending_command.take() {
                 if text.starts_with('/') || ctx.tui.state != pick_tui::app::AppState::Input {
@@ -232,12 +217,24 @@ fn handle_share_result(ctx: &mut TuiContext, url: Option<String>, error: Option<
         ctx.tui.state = pick_tui::app::AppState::Input;
     }
 
+    // Clear share-in-progress flag so the spinner stops
+    ctx.tui.share_in_progress = false;
+
     match (url, error) {
         (Some(url), _) => {
-            ctx.tui.pending_share_url = Some(url.clone());
-            ctx.tui.chat.add_system_message(
-                "Session shared as secret gist — click the link below to open.",
+            // OSC 8 hyperlink — the only reliably clickable link in TUI
+            // scrollback. Emit \x1b[24m and \x1b[4:0m inside the hyperlink
+            // span to remove the text underline; the terminal's link layer
+            // may still show a subtle dotted line (unavoidable for OSC 8).
+            use ratatui::text::{Line, Span};
+            let clickable = format!(
+                "\x1b]8;;{}\x1b\\\x1b[24m\x1b[4:0m{}\x1b]8;;\x1b\\",
+                &url, &url
             );
+            ctx.tui.pending_history_lines.push(Line::from(vec![
+                Span::raw("🔗 Session shared: "),
+                Span::raw(clickable),
+            ]));
         }
         (_, Some(err)) => {
             ctx.tui.show_error(&format!("Share failed: {}", err));

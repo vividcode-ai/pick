@@ -95,7 +95,8 @@ impl TuiApp {
             todo_scroll_offset: 0,
             show_hardware_cursor: true,
             usage_display: None,
-            pending_share_url: None,
+            pending_history_lines: Vec::new(),
+            share_in_progress: false,
         })
     }
 
@@ -175,7 +176,8 @@ impl TuiApp {
             todo_scroll_offset: 0,
             show_hardware_cursor: true,
             usage_display: None,
-            pending_share_url: None,
+            pending_history_lines: Vec::new(),
+            share_in_progress: false,
         }
     }
 

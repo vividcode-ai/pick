@@ -486,10 +486,11 @@ pub(crate) async fn handle_share(ctx: &mut TuiContext) {
             // ── Phase 3: Setup loading spinner in editor ──────────
             let cmd_tx = ctx.cmd_tx.clone();
             ctx.share_saved_editor_text = String::new();
-            ctx.tui.editor.clear();
-            ctx.tui
-                .editor
-                .set_text(" ⠴ Creating gist…  (Esc to cancel)");
+            // Set spinner text immediately. No leading space — the braille
+            // spinner character ⠋ is visually distinct from the / in /share,
+            // ensuring ratatui buffer-diff properly overwrites the stale /.
+            ctx.tui.editor.set_text("⠋ Creating gist…  (Esc to cancel)");
+            ctx.tui.share_in_progress = true;
             ctx.tui.state = pick_tui::app::AppState::Streaming;
 
             // ── Phase 4: Spawn background gist creation ──────────
