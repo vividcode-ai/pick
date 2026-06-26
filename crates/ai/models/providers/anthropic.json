@@ -156,6 +156,34 @@
       "max_tokens": 4096
     },
     {
+      "id": "claude-fable-5",
+      "name": "Claude Fable 5",
+      "api": "anthropic-messages",
+      "base_url": "https://api.anthropic.com",
+      "reasoning": true,
+      "thinking_level_map": {
+        "off": null,
+        "xhigh": "xhigh"
+      },
+      "compat": {
+        "anthropic_messages": {
+          "force_adaptive_thinking": true
+        }
+      },
+      "input_capabilities": [
+        "text",
+        "image"
+      ],
+      "cost": {
+        "input": 10,
+        "output": 50,
+        "cache_read": 1,
+        "cache_write": 12.5
+      },
+      "context_window": 1000000,
+      "max_tokens": 128000
+    },
+    {
       "id": "claude-haiku-4-5",
       "name": "Claude Haiku 4.5 (latest)",
       "api": "anthropic-messages",
@@ -316,6 +344,11 @@
       "thinking_level_map": {
         "xhigh": "max"
       },
+      "compat": {
+        "anthropic_messages": {
+          "force_adaptive_thinking": true
+        }
+      },
       "input_capabilities": [
         "text",
         "image"
@@ -337,6 +370,38 @@
       "reasoning": true,
       "thinking_level_map": {
         "xhigh": "xhigh"
+      },
+      "compat": {
+        "anthropic_messages": {
+          "force_adaptive_thinking": true
+        }
+      },
+      "input_capabilities": [
+        "text",
+        "image"
+      ],
+      "cost": {
+        "input": 5,
+        "output": 25,
+        "cache_read": 0.5,
+        "cache_write": 6.25
+      },
+      "context_window": 1000000,
+      "max_tokens": 128000
+    },
+    {
+      "id": "claude-opus-4-8",
+      "name": "Claude Opus 4.8",
+      "api": "anthropic-messages",
+      "base_url": "https://api.anthropic.com",
+      "reasoning": true,
+      "thinking_level_map": {
+        "xhigh": "xhigh"
+      },
+      "compat": {
+        "anthropic_messages": {
+          "force_adaptive_thinking": true
+        }
       },
       "input_capabilities": [
         "text",
@@ -433,6 +498,11 @@
       "api": "anthropic-messages",
       "base_url": "https://api.anthropic.com",
       "reasoning": true,
+      "compat": {
+        "anthropic_messages": {
+          "force_adaptive_thinking": true
+        }
+      },
       "input_capabilities": [
         "text",
         "image"

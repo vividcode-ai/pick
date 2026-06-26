@@ -16,6 +16,12 @@
         "high": "high",
         "xhigh": "max"
       },
+      "compat": {
+        "openai_completions": {
+          "thinking_format": "deepseek",
+          "requires_reasoning_content_on_assistant_messages": true
+        }
+      },
       "input_capabilities": [
         "text"
       ],
@@ -40,6 +46,12 @@
         "medium": null,
         "high": "high",
         "xhigh": "max"
+      },
+      "compat": {
+        "openai_completions": {
+          "thinking_format": "deepseek",
+          "requires_reasoning_content_on_assistant_messages": true
+        }
       },
       "input_capabilities": [
         "text"

@@ -95,6 +95,17 @@ fn main() {
             let cost_cache_read = model_val["cost"]["cache_read"].as_f64().unwrap_or(0.0);
             let cost_cache_write = model_val["cost"]["cache_write"].as_f64().unwrap_or(0.0);
 
+            // Compat config
+            let compat = if let Some(c) = model_val.get("compat") {
+                if c.is_null() {
+                    serde_json::Value::Null
+                } else {
+                    c.clone()
+                }
+            } else {
+                serde_json::Value::Null
+            };
+
             // Thinking level map
             let thinking_level_map = if let Some(tlm) = model_val.get("thinking_level_map") {
                 if tlm.is_null() {
@@ -145,6 +156,7 @@ fn main() {
                 "base_url": base_url,
                 "reasoning": reasoning,
                 "thinking_level_map": thinking_level_map,
+                "compat": compat,
                 "input_capabilities": caps,
                 "cost": {
                     "input": cost_input,

@@ -47,6 +47,13 @@ pub struct StreamOptions {
     pub max_retry_delay_ms: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub thinking_budget: Option<u64>,
+    /// Reasoning/thinking level as a string (e.g. "off", "low", "medium", "high", "xhigh").
+    /// Each provider maps this to its own protocol-specific parameter
+    /// (reasoning_effort for OpenAI, budget_tokens for Anthropic, etc.).
+    /// When set alongside thinking_budget, providers should prefer this
+    /// semantic level over the raw token budget.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<HashMap<String, String>>,
     /// Signal receiver for cancellation
