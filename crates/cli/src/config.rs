@@ -58,3 +58,8 @@ pub fn get_readme_path() -> PathBuf {
 pub fn get_examples_path() -> PathBuf {
     get_agent_dir().join("examples")
 }
+
+/// Get path to workspace trust file (~/.pick/pick.json)
+pub fn get_workspaces_path() -> PathBuf {
+    get_pick_dir().join("pick.json")
+}

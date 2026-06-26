@@ -47,3 +47,4 @@ pub mod slash_commands;
 pub mod tools;
 pub mod update_action;
 pub mod updates;
+pub mod workspace_trust;

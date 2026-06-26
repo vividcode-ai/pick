@@ -193,6 +193,17 @@ async fn main() {
         }
     }
 
+    // Workspace trust check: verify the current directory is trusted before
+    // proceeding. Skip for non-interactive modes (print/json/rpc).
+    let is_interactive =
+        (args.mode.is_empty() && !args.print) || args.mode == "tui" || args.mode == "interactive";
+    if is_interactive
+        && !core::workspace_trust::is_workspace_trusted(&cwd)
+        && !core::workspace_trust::confirm_and_trust_workspace(&cwd)
+    {
+        std::process::exit(0);
+    }
+
     // Load settings for default provider/model
     let mut settings = SettingsManager::load(&cwd);
 
