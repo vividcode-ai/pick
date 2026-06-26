@@ -922,10 +922,30 @@ impl TuiApp {
         }
 
         match code {
-            KeyCode::Enter if modifiers.intersects(KeyModifiers::SHIFT | KeyModifiers::CONTROL) => {
+            // Ctrl+Enter: insert a new line at the cursor position.
+            // Handle Enter and Char('\n')/\r because different terminals
+            // and platforms (especially Windows) report Ctrl+Enter
+            // differently. Without the CONTROL modifier check, some
+            // terminals would treat Ctrl+Enter as plain Enter (submit).
+            KeyCode::Enter if modifiers.contains(KeyModifiers::CONTROL) => {
                 if self.editor.is_autocomplete_active() {
                     self.editor.cancel_autocomplete();
                 }
+                // Flush any paste-accumulated text into the editor buffer
+                // before inserting the newline, so the newline appears
+                // after (not before) the accumulated text.
+                self.force_flush_paste_accumulator();
+                self.editor.insert_newline_auto_indent();
+            }
+            // Handle Ctrl+Enter when the terminal reports it as
+            // Char('\n') or Char('\r') with the CONTROL modifier.
+            KeyCode::Char('\n') | KeyCode::Char('\r')
+                if modifiers.contains(KeyModifiers::CONTROL) =>
+            {
+                if self.editor.is_autocomplete_active() {
+                    self.editor.cancel_autocomplete();
+                }
+                self.force_flush_paste_accumulator();
                 self.editor.insert_newline_auto_indent();
             }
             KeyCode::Enter => {
@@ -1131,6 +1151,33 @@ impl TuiApp {
         if self.editor.is_autocomplete_active() || self.editor.text().trim_start().starts_with('/')
         {
             self.editor.trigger_autocomplete();
+        }
+    }
+
+    /// Force-flush paste accumulator, ignoring the 50ms timing threshold.
+    /// Ensures accumulated typed text is inserted into the editor buffer before
+    /// a CONTROL/ALT key or Enter is processed, preventing the key handler from
+    /// operating on an empty buffer with pending text.
+    pub fn force_flush_paste_accumulator(&mut self) {
+        if self.paste_accumulator.is_empty() && self.editor.pending_pastes.is_empty() {
+            return;
+        }
+        if !self.editor.pending_pastes.is_empty() {
+            let raw = self.editor.text().to_string();
+            let expanded = self.editor.expand_pending_pastes(&raw);
+            self.editor.pending_pastes.clear();
+            self.editor.set_text(&expanded);
+        }
+        if !self.paste_accumulator.is_empty() {
+            let text = std::mem::take(&mut self.paste_accumulator);
+            self.last_paste_time = None;
+            self.editor.insert_str(&text);
+        }
+        let trimmed = self.editor.text().trim_start();
+        if trimmed.starts_with('/') && !trimmed[1..].contains(' ') {
+            self.editor.trigger_autocomplete();
+        } else {
+            self.editor.cancel_autocomplete();
         }
     }
 

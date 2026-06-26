@@ -936,7 +936,7 @@ mod tests {
         assert_eq!(app.editor.buffer, "hello");
         assert_eq!(app.editor.line_count(), 1);
 
-        app.handle_key(KeyCode::Enter, KeyModifiers::SHIFT);
+        app.handle_key(KeyCode::Enter, KeyModifiers::CONTROL);
         assert_eq!(app.editor.buffer, "hello\n");
         assert_eq!(app.editor.line_count(), 2);
 
@@ -1205,5 +1205,141 @@ mod tests {
             }
             prev = Some(count);
         }
+    }
+
+    #[test]
+    fn test_ctrl_enter_with_paste_accumulator_on_first_line() {
+        // Simulate the exact user scenario:
+        // 1. Type "abc" quickly (chars go to paste_accumulator)
+        // 2. Press Ctrl+Enter
+        // Expected: buffer = "abc\n", cursor after \n
+        let mut app = TuiApp::new_inner(
+            "anthropic",
+            "claude-sonnet-4-20250514",
+            "Pick",
+            TEST_VERSION,
+            vec![],
+            vec![],
+            "/tmp",
+            None,
+            "off",
+            None,
+            "test",
+            "",
+        );
+
+        // Simulate fast typing: chars go to paste_accumulator
+        app.paste_accumulator.push_str("abc");
+        app.last_paste_time = Some(std::time::Instant::now());
+
+        // Now press Ctrl+Enter
+        let action = app.handle_key(KeyCode::Enter, KeyModifiers::CONTROL);
+
+        // force_flush_paste_accumulator should have flushed "abc"
+        // then insert_newline_auto_indent should have added \n
+        assert_eq!(
+            app.editor.buffer, "abc\n",
+            "Buffer should be 'abc\\n' after Ctrl+Enter, got {:?}",
+            app.editor.buffer,
+        );
+        assert_eq!(
+            app.editor.cursor, 4,
+            "Cursor should be at position 4 (past newline), got {}",
+            app.editor.cursor,
+        );
+        assert!(
+            app.paste_accumulator.is_empty(),
+            "Paste accumulator should be empty after flush",
+        );
+        assert!(action.is_none(), "Ctrl+Enter should not produce an action");
+
+        // Now type 'd' (simulating slow typing where it goes directly to editor)
+        // First simulate what process_key_event does: if no pending paste, insert via handle_key
+        app.editor.insert_char('d');
+        assert_eq!(
+            app.editor.buffer, "abc\nd",
+            "Typing 'd' after Ctrl+Enter should add it on line 2, got {:?}",
+            app.editor.buffer,
+        );
+    }
+
+    #[test]
+    fn test_ctrl_enter_with_empty_accumulator_on_first_line() {
+        // Text already in editor buffer (not in paste accumulator), press Ctrl+Enter
+        let mut app = TuiApp::new_inner(
+            "anthropic",
+            "claude-sonnet-4-20250514",
+            "Pick",
+            TEST_VERSION,
+            vec![],
+            vec![],
+            "/tmp",
+            None,
+            "off",
+            None,
+            "test",
+            "",
+        );
+
+        // Text already in editor
+        app.editor.insert_str("hello");
+        assert_eq!(app.editor.buffer, "hello");
+        assert_eq!(app.editor.cursor, 5);
+
+        // Ctrl+Enter
+        let action = app.handle_key(KeyCode::Enter, KeyModifiers::CONTROL);
+
+        assert_eq!(
+            app.editor.buffer, "hello\n",
+            "Buffer should be 'hello\\n' after Ctrl+Enter, got {:?}",
+            app.editor.buffer,
+        );
+        assert_eq!(
+            app.editor.cursor, 6,
+            "Cursor should be past newline, got {}",
+            app.editor.cursor,
+        );
+        assert!(action.is_none(), "Ctrl+Enter should not produce an action");
+    }
+
+    #[test]
+    fn test_ctrl_enter_with_chars_via_key_char_handler() {
+        // Simulate what happens when individual chars arrive through
+        // the KeyCode::Char(c) handler (after paste accumulator flush).
+        // This is the slow-typing path.
+        let mut app = TuiApp::new_inner(
+            "anthropic",
+            "claude-sonnet-4-20250514",
+            "Pick",
+            TEST_VERSION,
+            vec![],
+            vec![],
+            "/tmp",
+            None,
+            "off",
+            None,
+            "test",
+            "",
+        );
+
+        // Type 'a', 'b', 'c' through the handle_key Char handler
+        // (simulating what process_key_event does after flushing accumulator)
+        app.handle_key(KeyCode::Char('a'), KeyModifiers::NONE);
+        app.handle_key(KeyCode::Char('b'), KeyModifiers::NONE);
+        app.handle_key(KeyCode::Char('c'), KeyModifiers::NONE);
+        assert_eq!(app.editor.buffer, "abc");
+
+        // Ctrl+Enter
+        app.handle_key(KeyCode::Enter, KeyModifiers::CONTROL);
+        assert_eq!(app.editor.buffer, "abc\n");
+        assert_eq!(app.editor.cursor, 4);
+
+        // Type 'd' normally - should go to line 2 (after the newline)
+        app.handle_key(KeyCode::Char('d'), KeyModifiers::NONE);
+        assert_eq!(
+            app.editor.buffer, "abc\nd",
+            "Buffer should be 'abc\\nd' after typing 'd', got {:?}",
+            app.editor.buffer,
+        );
     }
 }

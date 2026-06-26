@@ -30,7 +30,7 @@ pub(crate) fn process_key_event(
     // In Selecting or ApiKeyInput state: route char keys directly to
     // search / API key input, skip paste accumulation.
     if tui.state == AppState::Selecting || tui.state == AppState::ApiKeyInput {
-        tui.finalize_paste_accumulator(now);
+        tui.force_flush_paste_accumulator();
         // In ApiKeyInput state, Ctrl+V reads clipboard and pastes
         if tui.state == AppState::ApiKeyInput
             && key.code == KeyCode::Char('v')
@@ -61,7 +61,7 @@ pub(crate) fn process_key_event(
         match key.code {
             KeyCode::Char(c) if c as u32 <= 0x1F => {
                 // ASCII control character: route directly to handle_key
-                tui.finalize_paste_accumulator(now);
+                tui.force_flush_paste_accumulator();
                 return tui.handle_key(key.code, key.modifiers);
             }
             KeyCode::Char(c) => {
@@ -70,9 +70,12 @@ pub(crate) fn process_key_event(
                 paste_handled = true;
             }
             KeyCode::Enter if !tui.paste_accumulator.is_empty() => {
-                tui.paste_accumulator.push('\n');
-                tui.last_paste_time = Some(now);
-                paste_handled = true;
+                // Force-flush accumulated text into editor, then handle
+                // Enter normally (submit for plain Enter, newline for Ctrl+Enter).
+                // This prevents fast typing from being treated as a paste where
+                // Enter would push \n into the accumulator instead of submitting.
+                tui.force_flush_paste_accumulator();
+                return tui.handle_key(key.code, key.modifiers);
             }
             KeyCode::Enter => {}
             _ => {}
@@ -80,7 +83,12 @@ pub(crate) fn process_key_event(
     }
 
     if !paste_handled {
-        tui.finalize_paste_accumulator(now);
+        // Force-flush paste accumulator so that text typed quickly
+        // is in the editor buffer before CONTROL/ALT/other keys are
+        // processed.  Without this, insert_newline_auto_indent (Ctrl+Enter)
+        // or other handlers can operate on an empty buffer, inserting \n
+        // before the accumulated text.
+        tui.force_flush_paste_accumulator();
         return tui.handle_key(key.code, key.modifiers);
     }
 
@@ -112,7 +120,7 @@ pub(crate) fn process_key_event_during_agent(
 
     // Esc always aborts agent
     if key.code == KeyCode::Esc {
-        tui.finalize_paste_accumulator(now);
+        tui.force_flush_paste_accumulator();
         return Some(TuiAction::Quit);
     }
 
@@ -125,7 +133,7 @@ pub(crate) fn process_key_event_during_agent(
     {
         match key.code {
             KeyCode::Char(c) if c as u32 <= 0x1F => {
-                tui.finalize_paste_accumulator(now);
+                tui.force_flush_paste_accumulator();
                 return tui.handle_key(key.code, key.modifiers);
             }
             KeyCode::Char(c) => {
@@ -134,7 +142,8 @@ pub(crate) fn process_key_event_during_agent(
                 paste_handled = true;
             }
             KeyCode::Enter if !tui.paste_accumulator.is_empty() => {
-                tui.finalize_paste_accumulator(now);
+                tui.force_flush_paste_accumulator();
+                return tui.handle_key(key.code, key.modifiers);
             }
             KeyCode::Enter => {}
             _ => {}
@@ -142,7 +151,7 @@ pub(crate) fn process_key_event_during_agent(
     }
 
     if !paste_handled {
-        tui.finalize_paste_accumulator(now);
+        tui.force_flush_paste_accumulator();
         return tui.handle_key(key.code, key.modifiers);
     }
 
@@ -154,7 +163,7 @@ pub(crate) fn process_key_event_during_agent(
 pub(crate) fn drain_key_events(
     tui: &mut TuiApp,
     evt_rx: &mut tokio::sync::mpsc::UnboundedReceiver<crossterm::event::Event>,
-    now: Instant,
+    _now: Instant,
 ) -> Option<TuiAction> {
     loop {
         let mut had_action = false;
@@ -170,7 +179,7 @@ pub(crate) fn drain_key_events(
                 {
                     // During selecting or api-key input, route chars directly
                     if tui.state == AppState::Selecting || tui.state == AppState::ApiKeyInput {
-                        tui.finalize_paste_accumulator(now);
+                        tui.force_flush_paste_accumulator();
                         if let Some(a) = tui.handle_key(key.code, key.modifiers) {
                             action = Some(a);
                             had_action = true;
@@ -182,7 +191,7 @@ pub(crate) fn drain_key_events(
                             // ASCII control character (e.g. \x03 = Ctrl+C,
                             // \x04 = Ctrl+D arriving without CONTROL
                             // modifier on Windows). Route to handle_key.
-                            tui.finalize_paste_accumulator(now);
+                            tui.force_flush_paste_accumulator();
                             if let Some(a) = tui.handle_key(key.code, key.modifiers) {
                                 action = Some(a);
                                 had_action = true;
@@ -198,7 +207,7 @@ pub(crate) fn drain_key_events(
                             continue;
                         }
                         _ => {
-                            tui.finalize_paste_accumulator(now);
+                            tui.force_flush_paste_accumulator();
                             if let Some(a) = tui.handle_key(key.code, key.modifiers) {
                                 action = Some(a);
                                 had_action = true;
@@ -211,7 +220,7 @@ pub(crate) fn drain_key_events(
                     if key.kind == KeyEventKind::Press
                         && key.modifiers.intersects(KeyModifiers::CONTROL) =>
                 {
-                    tui.finalize_paste_accumulator(now);
+                    tui.force_flush_paste_accumulator();
                     if let Some(a) = tui.handle_key(key.code, key.modifiers) {
                         action = Some(a);
                         had_action = true;
@@ -222,7 +231,7 @@ pub(crate) fn drain_key_events(
                     if key.kind == KeyEventKind::Press
                         && key.modifiers.intersects(KeyModifiers::ALT) =>
                 {
-                    tui.finalize_paste_accumulator(now);
+                    tui.force_flush_paste_accumulator();
                     if let Some(a) = tui.handle_key(key.code, key.modifiers) {
                         action = Some(a);
                         had_action = true;
@@ -233,7 +242,7 @@ pub(crate) fn drain_key_events(
                     continue;
                 }
                 Ok(crossterm::event::Event::Paste(text)) => {
-                    tui.finalize_paste_accumulator(now);
+                    tui.force_flush_paste_accumulator();
                     tui.handle_paste(&text);
                     continue;
                 }
@@ -247,7 +256,7 @@ pub(crate) fn drain_key_events(
             }
         }
 
-        tui.finalize_paste_accumulator(now);
+        tui.force_flush_paste_accumulator();
 
         if had_action {
             return action;
@@ -262,7 +271,7 @@ pub(crate) fn drain_key_events(
 pub(crate) fn drain_key_events_during_agent(
     tui: &mut TuiApp,
     evt_rx: &mut tokio::sync::mpsc::UnboundedReceiver<crossterm::event::Event>,
-    now: Instant,
+    _now: Instant,
     abort_on_esc: &mut bool,
 ) -> Option<TuiAction> {
     loop {
@@ -279,7 +288,7 @@ pub(crate) fn drain_key_events_during_agent(
                 {
                     match key.code {
                         KeyCode::Char(c) if (c as u32) <= 0x1F => {
-                            tui.finalize_paste_accumulator(now);
+                            tui.force_flush_paste_accumulator();
                             if let Some(a) = tui.handle_key(key.code, key.modifiers) {
                                 if matches!(a, TuiAction::Quit) {
                                     action = Some(a);
@@ -296,7 +305,7 @@ pub(crate) fn drain_key_events_during_agent(
                             continue;
                         }
                         KeyCode::Enter => {
-                            tui.finalize_paste_accumulator(now);
+                            tui.force_flush_paste_accumulator();
                             if let Some(a) = tui.handle_key(KeyCode::Enter, KeyModifiers::NONE) {
                                 if matches!(a, TuiAction::Quit) {
                                     action = Some(a);
@@ -309,7 +318,7 @@ pub(crate) fn drain_key_events_during_agent(
                             continue;
                         }
                         _ => {
-                            tui.finalize_paste_accumulator(now);
+                            tui.force_flush_paste_accumulator();
                             if key.code == KeyCode::Esc {
                                 *abort_on_esc = true;
                                 break;
@@ -331,7 +340,7 @@ pub(crate) fn drain_key_events_during_agent(
                     if key.kind == KeyEventKind::Press
                         && key.modifiers.intersects(KeyModifiers::CONTROL) =>
                 {
-                    tui.finalize_paste_accumulator(now);
+                    tui.force_flush_paste_accumulator();
                     if let Some(a) = tui.handle_key(key.code, key.modifiers) {
                         if matches!(a, TuiAction::Quit) {
                             action = Some(a);
@@ -350,7 +359,7 @@ pub(crate) fn drain_key_events_during_agent(
                     if key.kind == KeyEventKind::Press
                         && key.modifiers.intersects(KeyModifiers::ALT) =>
                 {
-                    tui.finalize_paste_accumulator(now);
+                    tui.force_flush_paste_accumulator();
                     if let Some(a) = tui.handle_key(key.code, key.modifiers) {
                         if matches!(
                             a,
@@ -368,7 +377,7 @@ pub(crate) fn drain_key_events_during_agent(
                     continue;
                 }
                 Ok(crossterm::event::Event::Paste(text)) => {
-                    tui.finalize_paste_accumulator(now);
+                    tui.force_flush_paste_accumulator();
                     tui.handle_paste(&text);
                     continue;
                 }
@@ -382,7 +391,7 @@ pub(crate) fn drain_key_events_during_agent(
             }
         }
 
-        tui.finalize_paste_accumulator(now);
+        tui.force_flush_paste_accumulator();
 
         if had_action {
             return action;

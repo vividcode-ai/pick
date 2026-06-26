@@ -104,6 +104,8 @@ impl Editor {
     /// Insert a character at cursor position
     pub fn insert_char(&mut self, c: char) {
         self.push_undo();
+        // Any manual edit exits history browsing
+        self.history_index = None;
         self.buffer.insert(self.cursor, c);
         self.cursor += c.len_utf8();
         self.mark = None;
@@ -124,6 +126,8 @@ impl Editor {
         if s.is_empty() {
             return;
         }
+        // Any manual edit exits history browsing
+        self.history_index = None;
         self.push_undo();
         self.buffer.insert_str(self.cursor, s);
         self.cursor += s.len();
@@ -180,6 +184,8 @@ impl Editor {
     /// Insert auto-indent (newline + matching indent)
     pub fn insert_newline_auto_indent(&mut self) {
         self.push_undo();
+        // Any manual edit exits history browsing
+        self.history_index = None;
         // Get current line's leading whitespace
         let line_start = self.buffer[..self.cursor]
             .rfind('\n')
@@ -482,6 +488,8 @@ impl Editor {
         if self.cursor == 0 {
             return;
         }
+        // Any manual edit exits history browsing
+        self.history_index = None;
         // If there's a selection, delete it
         if self.mark.is_some() {
             self.delete_selection();
@@ -523,6 +531,8 @@ impl Editor {
         if self.cursor >= self.buffer.len() {
             return;
         }
+        // Any manual edit exits history browsing
+        self.history_index = None;
         if self.mark.is_some() {
             self.delete_selection();
             return;
@@ -1042,14 +1052,21 @@ impl Editor {
         // Find the line start and compute visual column from there
         let mut line_starts = 0;
         let mut line_start_offset = 0;
+        let mut found = false;
         for (i, c) in self.buffer.char_indices() {
             if line_starts == row {
                 line_start_offset = i;
+                found = true;
                 break;
             }
             if c == '\n' {
                 line_starts += 1;
             }
+        }
+        // Exhausted the buffer without finding the line start:
+        // the cursor must be on the last (empty) line.
+        if !found && line_starts == row {
+            line_start_offset = self.buffer.len();
         }
         let col_in_line = self.cursor - line_start_offset;
         // Count visual width (tabs = 4)
@@ -1091,6 +1108,54 @@ impl Editor {
         }
         // Each \n starts a new line (editor convention, not Unix file convention)
         self.buffer.matches('\n').count() + 1
+    }
+
+    /// Auto-adjust scroll_offset to keep the cursor in the visible area.
+    /// Called before render so the cursor line is always shown.
+    pub fn ensure_cursor_visible(&mut self, width: usize, max_height: usize) {
+        if max_height == 0 {
+            return;
+        }
+        // Count visual lines before the cursor
+        let mut visual_before_cursor = 0usize;
+        let mut pos = 0;
+        let cursor_line_start = self.buffer[..self.cursor]
+            .rfind('\n')
+            .map(|i| i + 1)
+            .unwrap_or(0);
+        loop {
+            if pos >= cursor_line_start {
+                break;
+            }
+            let nl = self.buffer[pos..]
+                .find('\n')
+                .map(|i| pos + i)
+                .unwrap_or(self.buffer.len());
+            let line = &self.buffer[pos..nl];
+            if width > 0 {
+                visual_before_cursor += wrap_by_display_width(line, width).len();
+            } else {
+                visual_before_cursor += 1;
+            }
+            pos = nl + 1;
+        }
+        // Cursor is within the cursor's logical line; count its visual row within that line
+        let col_in_line = self.cursor - cursor_line_start;
+        let cursor_line_text = &self.buffer[cursor_line_start..];
+        let prefix = &cursor_line_text[..col_in_line];
+        let prefix_visual_lines = if width > 0 && prefix.width() > width {
+            wrap_by_display_width(prefix, width).len().saturating_sub(1)
+        } else {
+            0
+        };
+        let cursor_visual_line = visual_before_cursor + prefix_visual_lines;
+
+        // Adjust scroll_offset so cursor is visible
+        if cursor_visual_line < self.scroll_offset {
+            self.scroll_offset = cursor_visual_line;
+        } else if cursor_visual_line >= self.scroll_offset + max_height {
+            self.scroll_offset = cursor_visual_line.saturating_sub(max_height.saturating_sub(1));
+        }
     }
 
     /// Number of visual lines when wrapped to `width`, accounting for
@@ -1309,9 +1374,22 @@ impl Editor {
             }
         }
 
-        if !found_cursor && self.cursor <= cursor_line_start + cursor_col_in_line {
-            cursor_row = 0;
-            cursor_col = 0;
+        if !found_cursor {
+            // Cursor line wasn't rendered: clamp to whichever end of the visible
+            // output the cursor is on, so the user sees the cursor near where
+            // they are editing rather than jumping to (0,0).
+            if lines.is_empty() {
+                cursor_row = 0;
+                cursor_col = 0;
+            } else if self.cursor < cursor_line_start {
+                // Cursor is above the visible area
+                cursor_row = 0;
+                cursor_col = 0;
+            } else {
+                // Cursor is below the visible area (clipped by max_height)
+                cursor_row = lines.len().saturating_sub(1);
+                cursor_col = 0;
+            }
         }
 
         // Trim trailing empty lines
@@ -1767,5 +1845,329 @@ mod tests {
         ed.clear();
         assert!(ed.buffer.is_empty());
         assert_eq!(ed.cursor, 0);
+    }
+
+    // --- Cursor movement edge case tests ---
+
+    #[test]
+    fn test_cursor_up_down_chinese_text() {
+        // User scenario: paste Chinese text with multiple lines
+        let mut ed = Editor::new();
+        ed.insert_str("magegen — 生成或编辑位图图片\n3. hv-analysis — 横纵分析法");
+        ed.cursor = 0;
+
+        // Move down to line 2
+        ed.cursor_down();
+        assert_eq!(
+            ed.cursor_row_col().0,
+            1,
+            "cursor_down should move to line 2 (row=1)",
+        );
+
+        // Move up back to line 1
+        ed.cursor_up();
+        assert_eq!(
+            ed.cursor_row_col().0,
+            0,
+            "cursor_up from line 2 should move to line 1 (row=0)",
+        );
+    }
+
+    #[test]
+    fn test_cursor_up_down_with_trailing_newline() {
+        // Buffer ends with \n — the last line is empty
+        let mut ed = Editor::new();
+        ed.insert_str("hello\nworld\n");
+        ed.cursor = ed.buffer.len(); // on the empty last line
+
+        // visual_col_at_line on last empty line
+        let (row, _col) = ed.cursor_row_col();
+        assert!(row > 0, "cursor should be on a non-first row");
+
+        ed.cursor_up();
+        // Should have moved to line 2 (row=1)
+        assert_eq!(
+            ed.cursor_row_col().0,
+            1,
+            "cursor_up from (trailing) empty last line should move to row=1",
+        );
+    }
+
+    #[test]
+    fn test_cursor_down_from_last_line_does_not_wrap() {
+        // Pressing down on last line should stay at end
+        let mut ed = Editor::new();
+        ed.insert_str("line1\nline2\nline3");
+        ed.cursor = ed.buffer.len(); // end of last line
+
+        ed.cursor_down();
+        assert_eq!(
+            ed.cursor,
+            ed.buffer.len(),
+            "cursor_down on last line should stay at end",
+        );
+
+        // Second press should also stay at end
+        ed.cursor_down();
+        assert_eq!(
+            ed.cursor,
+            ed.buffer.len(),
+            "cursor_down on last line (2nd press) should stay at end",
+        );
+    }
+
+    #[test]
+    fn test_cursor_up_from_first_line_stays_at_start() {
+        let mut ed = Editor::new();
+        ed.insert_str("multi\nline\ntext");
+
+        // cursor_up from first line start
+        ed.cursor = 0;
+        ed.cursor_up();
+        assert_eq!(ed.cursor, 0, "cursor_up from line 1 start should stay at 0",);
+
+        // cursor_up from middle of first line
+        ed.cursor = 3;
+        ed.cursor_up();
+        assert_eq!(
+            ed.cursor, 0,
+            "cursor_up from middle of line 1 should go to 0",
+        );
+    }
+
+    #[test]
+    fn test_cursor_up_down_multi_line_paste_scenario() {
+        // Simulate pasting text that ends with \n (common clipboard behavior)
+        let mut ed = Editor::new();
+        ed.insert_str("aa\nbb\ncc\n");
+
+        // Cursor is at end (after trailing \n, on empty last line)
+        assert_eq!(
+            ed.cursor_row_col().0,
+            3,
+            "cursor should be on row 3 (0-indexed, 4th line)",
+        );
+
+        // Move up to line 3
+        ed.cursor_up();
+        assert_eq!(ed.cursor_row_col().0, 2, "should be on row 2 (line 'cc')");
+
+        // Move up to line 2
+        ed.cursor_up();
+        assert_eq!(ed.cursor_row_col().0, 1, "should be on row 1 (line 'bb')");
+
+        // Move up to line 1
+        ed.cursor_up();
+        assert_eq!(ed.cursor_row_col().0, 0, "should be on row 0 (line 'aa')");
+
+        // Move up again — stays on line 1
+        ed.cursor_up();
+        assert_eq!(
+            ed.cursor_row_col().0,
+            0,
+            "should stay on row 0 after extra cursor_up",
+        );
+    }
+
+    #[test]
+    fn test_cursor_preserves_visual_column_across_lines() {
+        let mut ed = Editor::new();
+        ed.insert_str("abc\ndefg\nh");
+
+        // Place cursor at column 3 on line 2 ('g' in "defg")
+        ed.cursor = 6; // position of 'g': "abc\n"=4, "def"=5, "g"=6
+        let (row, col) = ed.cursor_row_col();
+        assert_eq!(row, 1, "cursor should be on row 1 (0-indexed), got {row}",);
+        assert_eq!(
+            col, 2,
+            "cursor should be byte-offset 2 in line 2, got {col}"
+        );
+
+        // Move up to line 1 — cursor should move to 'c' (col 2, same visual column)
+        ed.cursor_up();
+        let (new_row, _new_col) = ed.cursor_row_col();
+        assert_eq!(new_row, 0, "cursor_up should move to row 0, got {new_row}",);
+
+        // Move down back to line 2
+        ed.cursor_down();
+        let (down_row, down_col) = ed.cursor_row_col();
+        assert_eq!(
+            down_row, 1,
+            "cursor_down should return to row 1, got {down_row}",
+        );
+        assert_eq!(
+            down_col, 2,
+            "cursor_down should preserve visual col, got byte offset {down_col}",
+        );
+    }
+
+    #[test]
+    fn test_visual_col_at_line_after_trailing_newline() {
+        // Directly test visual_col_at_line via cursor movement position
+        let mut ed = Editor::new();
+        ed.insert_str("ab\nc\n");
+        // Bytes: a=0, b=1, \n=2, c=3, \n=4
+        // Lines: 0="ab", 1="c", 2=""
+
+        // Place cursor at end of empty last line
+        ed.cursor = ed.buffer.len(); // position 5 (past all content)
+
+        // Move up to line 2
+        ed.cursor_up();
+        assert_eq!(ed.cursor_row_col().0, 1, "should move to row 1 (line 'c')");
+
+        // Move up to line 1
+        ed.cursor_up();
+        assert_eq!(ed.cursor_row_col().0, 0, "should move to row 0 (line 'ab')");
+    }
+
+    #[test]
+    fn test_cursor_down_then_up_sequence() {
+        // Comprehensive sequence: up/down across all lines
+        let mut ed = Editor::new();
+        ed.insert_str("alpha\nbeta\n gamma \ndelta");
+
+        // Start at beginning
+        ed.cursor = 0;
+
+        // Down to line 2
+        ed.cursor_down();
+        assert_eq!(ed.cursor_row_col().0, 1, "down → row 1");
+        // Down to line 3
+        ed.cursor_down();
+        assert_eq!(ed.cursor_row_col().0, 2, "down → row 2");
+        // Down to line 4
+        ed.cursor_down();
+        assert_eq!(ed.cursor_row_col().0, 3, "down → row 3");
+        // Down again — should stay on line 4
+        ed.cursor_down();
+        assert_eq!(ed.cursor_row_col().0, 3, "down at end → still row 3");
+
+        // Up to line 3
+        ed.cursor_up();
+        assert_eq!(ed.cursor_row_col().0, 2, "up → row 2");
+        // Up to line 2
+        ed.cursor_up();
+        assert_eq!(ed.cursor_row_col().0, 1, "up → row 1");
+        // Up to line 1
+        ed.cursor_up();
+        assert_eq!(ed.cursor_row_col().0, 0, "up → row 0");
+        // Up again — should stay on line 1
+        ed.cursor_up();
+        assert_eq!(ed.cursor_row_col().0, 0, "up at top → still row 0");
+    }
+
+    #[test]
+    fn test_cursor_movement_with_fullwidth_chars() {
+        // Fullwidth Chinese and emoji
+        let mut ed = Editor::new();
+        ed.insert_str("ＡＢ\nＣ\nＤＥＦ");
+
+        ed.cursor = 0;
+        // Move down through all lines
+        ed.cursor_down();
+        assert_eq!(ed.cursor_row_col().0, 1, "fullwidth: down → row 1");
+        ed.cursor_down();
+        assert_eq!(ed.cursor_row_col().0, 2, "fullwidth: down → row 2");
+        ed.cursor_down();
+        assert_eq!(
+            ed.cursor_row_col().0,
+            2,
+            "fullwidth: down at end → still row 2",
+        );
+
+        // Move up back to start
+        ed.cursor_up();
+        assert_eq!(ed.cursor_row_col().0, 1, "fullwidth: up → row 1");
+        ed.cursor_up();
+        assert_eq!(ed.cursor_row_col().0, 0, "fullwidth: up → row 0");
+        ed.cursor_up();
+        assert_eq!(
+            ed.cursor_row_col().0,
+            0,
+            "fullwidth: up at top → still row 0",
+        );
+    }
+
+    #[test]
+    fn test_insert_newline_auto_indent_creates_new_line() {
+        let mut ed = Editor::new();
+        ed.insert_str("hello");
+        assert_eq!(ed.buffer, "hello");
+        assert_eq!(ed.cursor, 5);
+
+        // Ctrl+Enter inserts a newline and places cursor on the new line
+        ed.insert_newline_auto_indent();
+        assert_eq!(ed.buffer, "hello\n", "Ctrl+Enter should insert newline");
+        assert_eq!(
+            ed.cursor, 6,
+            "cursor should move past the newline, got {}",
+            ed.cursor,
+        );
+        let (row, col) = ed.cursor_row_col();
+        assert_eq!(
+            row, 1,
+            "cursor should be on line 2 (row=1), got row={}",
+            row,
+        );
+        assert_eq!(
+            col, 0,
+            "cursor should be at column 0 of the new line, got col={}",
+            col,
+        );
+
+        // Typing a character should work on the new line
+        ed.insert_char('x');
+        assert_eq!(
+            ed.buffer, "hello\nx",
+            "typing after Ctrl+Enter should insert on new line",
+        );
+        assert_eq!(ed.cursor, 7, "cursor should be after 'x'");
+    }
+
+    #[test]
+    fn test_ctrl_enter_render_shows_cursor_on_new_line() {
+        // Simulate: type "hello", Ctrl+Enter, then render and check cursor position
+        let mut ed = Editor::new();
+        ed.show_prompt = true;
+        ed.prompt = "❯ ".to_string();
+        ed.insert_str("hello");
+        ed.insert_newline_auto_indent();
+
+        // Render with a height big enough to fit both lines
+        let (lines, cursor_row, cursor_col) = ed.render(80, 10);
+        assert_eq!(
+            lines.len(),
+            2,
+            "render should output 2 lines (prompt + empty)"
+        );
+        assert_eq!(
+            cursor_row, 1,
+            "cursor should be on rendered line 1 (0-indexed), got {cursor_row}",
+        );
+        assert_eq!(
+            cursor_col, 0,
+            "cursor col should be 0 on the empty new line, got {cursor_col}",
+        );
+    }
+
+    #[test]
+    fn test_ctrl_enter_on_nonempty_line_with_content_after() {
+        let mut ed = Editor::new();
+        ed.insert_str("abc\ndef");
+        // Cursor at end of buffer (position 7 = after 'f')
+        ed.cursor = ed.buffer.len();
+        ed.insert_newline_auto_indent();
+
+        assert_eq!(
+            ed.buffer, "abc\ndef\n",
+            "Ctrl+Enter at end should append newline"
+        );
+        let (row, col) = ed.cursor_row_col();
+        assert_eq!(
+            row, 2,
+            "cursor should be on the new blank line (row=2, col=0), got row={row}",
+        );
+        assert_eq!(col, 0, "cursor col should be 0 on the new line, got {col}",);
     }
 }

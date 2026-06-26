@@ -67,7 +67,7 @@ impl TuiApp {
             self.last_render_state.clone_from(&self.state);
         }
 
-        let editor_line_count = self.compute_editor_line_count(width);
+        let editor_line_count = self.compute_editor_line_count(width, height);
         let mut autocomplete_lines = if self.state == AppState::Selecting
             || self.state == AppState::TreeSelecting
             || self.state == AppState::ApiKeyInput
@@ -505,6 +505,8 @@ impl TuiApp {
                             }
                             _ => {
                                 let editor_max = editor_line_count as usize;
+                                self.editor
+                                    .ensure_cursor_visible(width as usize, editor_max);
                                 let (editor_lines, cursor_row, cursor_col) =
                                     self.editor.render(width as usize, editor_max);
                                 frame.render_widget_ref(
@@ -915,7 +917,7 @@ impl TuiApp {
     }
 
     /// Compute editor line count for layout
-    pub fn compute_editor_line_count(&self, width: u16) -> u16 {
+    pub fn compute_editor_line_count(&self, width: u16, height: u16) -> u16 {
         if self.state == AppState::Selecting {
             let item_count = self.selection.as_ref().map(|s| s.items.len()).unwrap_or(0);
             let has_desc = self
@@ -959,7 +961,16 @@ impl TuiApp {
         } else if self.editor.buffer.is_empty() {
             1_u16
         } else {
-            std::cmp::max(1, self.editor.visual_line_count(width as usize).min(5)) as u16
+            // Use up to the full available height, leaving 4 rows for the editor
+            // border (top + bottom), status separator, and context separator.
+            let max_editor = height.saturating_sub(4);
+            std::cmp::max(
+                1,
+                std::cmp::min(
+                    self.editor.visual_line_count(width as usize) as u16,
+                    max_editor,
+                ),
+            )
         }
     }
 
