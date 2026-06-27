@@ -276,6 +276,7 @@ pub fn create_bash_tool() -> AgentTool {
                                 path_str,
                                 pm,
                                 ctx.question.as_ref(),
+                                ctx.tool_event_bus.as_ref(),
                             )
                             .await?
                         } else {

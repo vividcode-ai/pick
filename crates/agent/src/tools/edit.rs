@@ -318,7 +318,7 @@ pub fn create_edit_tool() -> AgentTool {
                         // External paths: check authorization
                         if let Some(ref pm) = ctx.permission_manager {
                             let authorized = crate::permission::external_dir::check_authorization(
-                                "Edit", file_path, pm, ctx.question.as_ref(),
+                                "Edit", file_path, pm, ctx.question.as_ref(), ctx.tool_event_bus.as_ref(),
                             ).await?;
                             if !authorized {
                                 return Ok(AgentToolResult {

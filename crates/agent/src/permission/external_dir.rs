@@ -1,5 +1,5 @@
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum AuthType {
@@ -210,7 +210,9 @@ pub async fn check_authorization(
     path: &str,
     pm: &crate::permission::manager::PermissionManager,
     question: Option<&crate::core::state::QuestionFn>,
+    tool_event_bus: Option<&Arc<crate::core::hooks::ToolEventBus>>,
 ) -> Result<bool, String> {
+    use crate::core::hooks::{ToolEvent, WaitingKind};
     use crate::core::state::{QuestionOption, QuestionPrompt};
 
     if pm.external_auth.has_permanent(tool, path) {
@@ -221,6 +223,19 @@ pub async fn check_authorization(
     }
 
     if let Some(ask) = question {
+        // Publish WaitingForUser event before prompting the user
+        if let Some(bus) = tool_event_bus {
+            bus.publish(&ToolEvent::WaitingForUser {
+                tool_name: tool.to_string(),
+                tool_call_id: String::new(),
+                input: serde_json::json!({"path": path}),
+                kind: WaitingKind::Permission {
+                    permission: format!("external_dir_{}", tool),
+                },
+                summary: format!("Tool '{}' requires access to '{}'", tool, path),
+            })
+            .await;
+        }
         let answers = ask(vec![QuestionPrompt {
             header: "External Directory Access".into(),
             question: format!(
