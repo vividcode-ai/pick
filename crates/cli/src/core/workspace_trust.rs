@@ -1,10 +1,11 @@
 use std::io::Write;
 use std::path::Path;
 
-use crossterm::cursor::{Hide, Show};
 use crossterm::event::{Event, KeyCode, KeyEventKind, KeyModifiers};
 use crossterm::queue;
-use crossterm::terminal::{Clear, ClearType, disable_raw_mode, enable_raw_mode};
+use crossterm::terminal::{
+    EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::config::get_workspaces_path;
@@ -39,7 +40,7 @@ fn save(list: &WorkspaceList) {
 /// Normalize a path for comparison (canonicalize if possible, otherwise just
 /// convert to an absolute path with forward-slash normalization).
 fn normalize_path(path: &Path) -> String {
-    if let Ok(canon) = std::fs::canonicalize(path) {
+    if let Ok(canon) = dunce::canonicalize(path) {
         return canon.to_string_lossy().replace('\\', "/");
     }
     // Fallback: try to make it absolute
@@ -74,7 +75,7 @@ pub fn is_workspace_trusted(cwd: &Path) -> bool {
     }
 }
 
-/// Show a workspace trust confirmation dialog.
+/// Show a workspace trust confirmation dialog in the alternate screen buffer.
 /// Returns `true` if the user trusts the folder, `false` otherwise.
 pub fn confirm_and_trust_workspace(cwd: &Path) -> bool {
     if enable_raw_mode().is_err() {
@@ -82,11 +83,10 @@ pub fn confirm_and_trust_workspace(cwd: &Path) -> bool {
     }
 
     let mut stdout = std::io::stdout();
-    let _ = queue!(stdout, Hide);
-    let _ = queue!(stdout, Clear(ClearType::All));
+    let _ = queue!(stdout, EnterAlternateScreen);
     let _ = stdout.flush();
 
-    let (width, height) = crossterm::terminal::size().unwrap_or((80, 24));
+    let width = crossterm::terminal::size().map(|(w, _)| w).unwrap_or(80);
     let cwd_display = cwd.to_string_lossy();
     let sep = "\u{2500}".repeat(width as usize);
     let dim = "\x1b[2m";
@@ -94,6 +94,12 @@ pub fn confirm_and_trust_workspace(cwd: &Path) -> bool {
 
     let mut selected: usize = 0;
     let options = ["Yes, trust this workspace", "No, exit"];
+
+    let leave_alternate = |stdout: &mut std::io::Stdout| {
+        let _ = queue!(stdout, LeaveAlternateScreen);
+        let _ = stdout.flush();
+        let _ = disable_raw_mode();
+    };
 
     loop {
         let mut lines: Vec<String> = Vec::new();
@@ -118,17 +124,12 @@ pub fn confirm_and_trust_workspace(cwd: &Path) -> bool {
         lines.push(format!("  {dim}Enter/\u{2191}\u{2193} select  \u{00b7} 1/2 shortcut  \u{00b7} Esc cancel{reset}"));
         lines.push(format!("{dim}{sep}{reset}"));
 
-        let _ = queue!(stdout, crossterm::cursor::MoveTo(0, 0));
         for (row, line) in lines.iter().enumerate() {
             let _ = queue!(
                 stdout,
                 crossterm::cursor::MoveTo(0, row as u16),
                 crossterm::style::Print(line)
             );
-        }
-        for row in lines.len()..(height as usize).min(30) {
-            let _ = queue!(stdout, crossterm::cursor::MoveTo(0, row as u16));
-            let _ = queue!(stdout, crossterm::style::Print(" ".repeat(width as usize)));
         }
         let _ = stdout.flush();
 
@@ -147,18 +148,15 @@ pub fn confirm_and_trust_workspace(cwd: &Path) -> bool {
                     if trusted {
                         add_workspace(cwd);
                     }
-                    let _ = queue!(stdout, Show);
-                    let _ = disable_raw_mode();
+                    leave_alternate(&mut stdout);
                     return trusted;
                 }
                 KeyCode::Esc => {
-                    let _ = queue!(stdout, Show);
-                    let _ = disable_raw_mode();
+                    leave_alternate(&mut stdout);
                     return false;
                 }
                 KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                    let _ = queue!(stdout, Show);
-                    let _ = disable_raw_mode();
+                    leave_alternate(&mut stdout);
                     std::process::exit(130);
                 }
                 _ => {}
