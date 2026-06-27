@@ -27,7 +27,7 @@ impl ToolEventObserver for SystemNotificationObserver {
                         (format!("🔒 Pick — {}", perm_desc), truncate(summary, 120))
                     }
                     WaitingKind::Question { header, .. } => {
-                        (format!("💬 Pick — {}", header), truncate(summary, 120))
+                        ("💬 Pick — Question tool".to_string(), header.clone())
                     }
                 };
 

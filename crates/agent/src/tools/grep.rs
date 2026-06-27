@@ -120,8 +120,44 @@ pub fn create_grep_tool() -> AgentTool {
                 let path = Path::new(path_str);
                 let cwd = ctx.cwd.as_deref().unwrap_or_else(|| Path::new("."));
                 // Check fs_policy on the search root path
-                if let Some(ref fp) = ctx.fs_policy {
-                    fp.can_read(path, cwd)?;
+                if let Some(ref policy) = ctx.fs_policy {
+                    if let Err(e) = policy.can_read(path, cwd) {
+                        // Protected paths (e.g. .git/**) are hard denied
+                        if policy.is_path_protected(path, cwd).unwrap_or(false) {
+                            return Ok(AgentToolResult {
+                                content: vec![ContentBlock::text(format!("FsPolicy: {}", e))],
+                                is_error: true,
+                                terminate: false,
+                            });
+                        }
+                        // External paths: check authorization
+                        if let Some(ref pm) = ctx.permission_manager {
+                            let authorized =
+                                crate::permission::external_dir::check_authorization(
+                                    "Grep",
+                                    path_str,
+                                    pm,
+                                    ctx.question.as_ref(),
+                                )
+                                .await?;
+                            if !authorized {
+                                return Ok(AgentToolResult {
+                                    content: vec![ContentBlock::text(format!(
+                                        "Error: Access denied: '{}' is outside the allowed workspace",
+                                        path_str
+                                    ))],
+                                    is_error: true,
+                                    terminate: false,
+                                });
+                            }
+                        } else {
+                            return Ok(AgentToolResult {
+                                content: vec![ContentBlock::text(format!("FsPolicy: {}", e))],
+                                is_error: true,
+                                terminate: false,
+                            });
+                        }
+                    }
                 }
                 let glob_filter = args.get("glob").and_then(|v| v.as_str());
                 let ignore_case = args.get("ignoreCase").and_then(|v| v.as_bool()).unwrap_or(false);
