@@ -80,6 +80,8 @@ pub struct AgentLoopConfig {
     pub provider_max_retries: Option<u32>,
     /// Maximum provider-level retry delay in ms (default: 60000)
     pub provider_max_retry_delay_ms: Option<u64>,
+    /// General‑purpose tool event bus (independent of permission hooks)
+    pub tool_event_bus: Option<std::sync::Arc<super::hooks::ToolEventBus>>,
     /// File system policy for path sandboxing
     pub fs_policy: Option<Arc<FileSystemPolicy>>,
     /// Current working directory for path resolution

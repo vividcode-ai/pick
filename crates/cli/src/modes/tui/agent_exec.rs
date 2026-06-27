@@ -2,6 +2,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use pick_agent::core::agent_loop::AgentLoopConfig;
+use pick_agent::core::hooks::ToolEventBus;
 use pick_agent::extensions::types::{
     ExtensionEvent, SessionBeforeCompactEvent, SessionCompactEvent,
 };
@@ -18,6 +19,10 @@ pub(crate) fn build_agent_config(
     ctx: &mut TuiContext,
     cmd_tx: mpsc::UnboundedSender<TuiCommand>,
 ) -> AgentLoopConfig {
+    // Create the tool event bus and register the system notification observer
+    let tool_event_bus = Arc::new(ToolEventBus::new());
+    tool_event_bus.subscribe(Arc::new(crate::notification::SystemNotificationObserver));
+
     let mode_rules = ctx.agent_mode.ruleset();
     let was_interrupted = ctx.was_interrupted.clone();
     let permission_manager = ctx.permission_manager.clone();
@@ -343,6 +348,7 @@ pub(crate) fn build_agent_config(
         agent_id: None,
         agent_registry: Some(ctx.agent_registry.clone()),
         on_event: Some(ctx.on_event.clone()),
+        tool_event_bus: Some(tool_event_bus.clone()),
         fs_policy: permission_manager.fs_policy(),
         cwd: Some(std::env::current_dir().unwrap_or_default()),
         permission_hooks: Some(permission_manager.hook_registry.clone()),

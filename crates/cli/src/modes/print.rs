@@ -190,6 +190,7 @@ pub async fn run_print_mode(
         cwd: Some(std::env::current_dir().unwrap_or_default()),
         permission_hooks: Some(permission_manager.hook_registry.clone()),
         permission_manager: Some(permission_manager.clone()),
+        tool_event_bus: None,
         sandbox: platform_sandbox.clone(),
         sandbox_enabled: Some(sandbox_enabled.clone()),
         cancel_signal_tx: None,

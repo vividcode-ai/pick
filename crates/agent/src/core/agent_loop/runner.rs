@@ -11,6 +11,7 @@ use super::tools::validate_tool_arguments;
 use super::{
     AgentLoopConfig, AgentRunResult, MAX_CONSECUTIVE_TOOL_ERRORS, PLAN_RECOVERY_THRESHOLD,
 };
+use crate::core::hooks::{ToolEvent, WaitingKind};
 use crate::extensions::types::{
     AgentEndEvent, AgentStartEvent, BeforeAgentStartEvent, ExtensionEvent, MessageEndEvent,
     ToolCallEvent, ToolResultEvent, TurnEndEvent, TurnStartEvent,
@@ -308,6 +309,28 @@ async fn handle_tool_execution(
                     }
                     _ => {
                         if hook_registry.has_permission_hooks() {
+                            // Notify observers that we are about to wait for user approval
+                            if let Some(ref bus) = config.tool_event_bus {
+                                let args_str = crate::permission::evaluate::extract_tool_args(tc);
+                                bus.publish(&ToolEvent::WaitingForUser {
+                                    tool_name: tc.name.clone(),
+                                    tool_call_id: tc.id.clone(),
+                                    input: tc.arguments.clone(),
+                                    kind: WaitingKind::Permission {
+                                        permission: crate::permission::tool_to_permission_key(
+                                            &tc.name,
+                                        )
+                                        .to_string(),
+                                    },
+                                    summary: format!(
+                                        "Tool '{}' requires approval. Args: {}",
+                                        tc.name,
+                                        truncate_for_display(&args_str, 80)
+                                    ),
+                                })
+                                .await;
+                            }
+
                             let perm_ctx = crate::permission::hooks::PermissionRequestContext {
                                 tool_name: tc.name.clone(),
                                 tool_args: crate::permission::evaluate::extract_tool_args(tc),
@@ -595,6 +618,7 @@ async fn handle_tool_execution(
             permission_manager: config.permission_manager.clone(),
             sandbox: config.sandbox.clone(),
             sandbox_enabled: config.sandbox_enabled.clone(),
+            tool_event_bus: config.tool_event_bus.clone(),
         };
 
         // Spawn a task to forward progress events while the tool executes
@@ -652,6 +676,16 @@ async fn handle_tool_execution(
             None => tc.arguments.clone(),
         };
 
+        // Fire BeforeExecute event
+        if let Some(ref bus) = config.tool_event_bus {
+            bus.publish(&ToolEvent::BeforeExecute {
+                tool_name: tc.name.clone(),
+                tool_call_id: tc.id.clone(),
+                input: tc.arguments.clone(),
+            })
+            .await;
+        }
+
         let result = if let Some(tool) = tool {
             let execute_fn = tool.execute.clone();
             let tool_call_id = tc.id.clone();
@@ -679,6 +713,12 @@ async fn handle_tool_execution(
         } else {
             Err(format!("Unknown tool: {}", tc.name))
         };
+
+        // Capture output for AfterExecute event before result is consumed
+        let (after_output, after_is_error) = result.as_ref().map_or_else(
+            |e| (serde_json::json!({"error": e}), true),
+            |r| (serde_json::json!({"content": r.content}), r.is_error),
+        );
 
         match result {
             Ok(tool_result) => {
@@ -801,6 +841,18 @@ async fn handle_tool_execution(
                 tool_results.push(error_msg);
             }
         }
+
+        // Fire AfterExecute event
+        if let Some(ref bus) = config.tool_event_bus {
+            bus.publish(&ToolEvent::AfterExecute {
+                tool_name: tc.name.clone(),
+                tool_call_id: tc.id.clone(),
+                input: tc.arguments.clone(),
+                output: after_output,
+                is_error: after_is_error,
+            })
+            .await;
+        }
     }
 
     // Execute parallel tools concurrently
@@ -814,6 +866,22 @@ async fn handle_tool_execution(
         let default_model = config.model.clone();
         let sandbox_enabled = config.sandbox_enabled.clone();
         for (tc, tool) in parallel_calls {
+            // Fire BeforeExecute event
+            if let Some(ref bus) = config.tool_event_bus {
+                let bus = bus.clone();
+                let name = tc.name.clone();
+                let id = tc.id.clone();
+                let args = tc.arguments.clone();
+                tokio::spawn(async move {
+                    bus.publish(&ToolEvent::BeforeExecute {
+                        tool_name: name,
+                        tool_call_id: id,
+                        input: args,
+                    })
+                    .await;
+                });
+            }
+
             let cancel_rx_clone = cancel_rx.clone();
             let approve = approve.clone();
             let question = question.clone();
@@ -824,6 +892,7 @@ async fn handle_tool_execution(
             let cwd = config.cwd.clone();
             let permission_manager = config.permission_manager.clone();
             let sandbox_enabled = sandbox_enabled.clone();
+            let tool_event_bus = config.tool_event_bus.clone();
             parallel_tool_infos.push((tc.name.clone(), tc.id.clone()));
             parallel_handles.push(tokio::spawn(async move {
                 let (progress_tx, _progress_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
@@ -840,6 +909,7 @@ async fn handle_tool_execution(
                     permission_manager: permission_manager.clone(),
                     sandbox: None,
                     sandbox_enabled: sandbox_enabled.clone(),
+                    tool_event_bus: tool_event_bus.clone(),
                 };
                 let validated_args =
                     match validate_tool_arguments(&tool, &tc.arguments, &tc.arguments) {
@@ -899,6 +969,17 @@ async fn handle_tool_execution(
                         .messages
                         .push(Message::ToolResult(tool_result_msg.clone()));
                     tool_results.push(tool_result_msg);
+                    // Fire AfterExecute
+                    if let Some(ref bus) = config.tool_event_bus {
+                        bus.publish(&ToolEvent::AfterExecute {
+                            tool_name: tc.name.clone(),
+                            tool_call_id: tc.id.clone(),
+                            input: tc.arguments.clone(),
+                            output: serde_json::json!({"content": tool_result.content}),
+                            is_error: tool_result.is_error,
+                        })
+                        .await;
+                    }
                 }
                 Ok((tc, Err(e))) => {
                     state.consecutive_tool_errors += 1;
@@ -919,6 +1000,17 @@ async fn handle_tool_execution(
                     );
                     state.messages.push(Message::ToolResult(error_msg.clone()));
                     tool_results.push(error_msg);
+                    // Fire AfterExecute
+                    if let Some(ref bus) = config.tool_event_bus {
+                        bus.publish(&ToolEvent::AfterExecute {
+                            tool_name: tc.name.clone(),
+                            tool_call_id: tc.id.clone(),
+                            input: tc.arguments.clone(),
+                            output: serde_json::json!({"error": e}),
+                            is_error: true,
+                        })
+                        .await;
+                    }
                 }
                 Err(join_err) => {
                     all_terminate = false;
@@ -951,6 +1043,17 @@ async fn handle_tool_execution(
                     );
                     state.messages.push(Message::ToolResult(error_msg.clone()));
                     tool_results.push(error_msg);
+                    // Fire AfterExecute
+                    if let Some(ref bus) = config.tool_event_bus {
+                        bus.publish(&ToolEvent::AfterExecute {
+                            tool_name: tool_name.clone(),
+                            tool_call_id: tool_id.clone(),
+                            input: serde_json::json!({}),
+                            output: serde_json::json!({"error": error_text}),
+                            is_error: true,
+                        })
+                        .await;
+                    }
                 }
             }
         }
@@ -1479,6 +1582,18 @@ pub async fn run_agent_loop(
         messages: state.messages,
         usage: accumulated_usage,
     })
+}
+
+/// Truncate a string to at most `max` characters for use in notification
+/// summaries.  If truncation occurs an ellipsis is appended.
+fn truncate_for_display(s: &str, max: usize) -> String {
+    if s.len() <= max {
+        s.to_string()
+    } else {
+        let mut t = s[..max.saturating_sub(3)].to_string();
+        t.push_str("...");
+        t
+    }
 }
 
 /// Continue an agent loop with additional messages (retry / continue support).

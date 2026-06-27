@@ -5,6 +5,7 @@ pub mod compaction;
 pub mod config;
 pub mod diagnostics;
 pub mod events;
+pub mod hooks;
 pub mod message_queue;
 pub mod state;
 

@@ -69,6 +69,7 @@ fn build_subagent_loop_config(
             .as_ref()
             .map(|pm| pm.hook_registry.clone()),
         mode_rulesets,
+        tool_event_bus: None,
         permission_manager,
         sandbox,
         sandbox_enabled,

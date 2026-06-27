@@ -889,6 +889,7 @@ pub async fn run_interactive_mode(
                     )),
                     agent_id: None,
                     agent_registry: Some(agent_registry.clone()),
+                    tool_event_bus: None,
                     on_turn_complete: None,
                     on_event: Some(Arc::new(move |event| {
                         match event {

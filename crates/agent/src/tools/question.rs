@@ -81,6 +81,24 @@ pub fn create_question_tool() -> AgentTool {
                     });
                 }
 
+                // Notify observers that we are about to wait for user input
+                if let Some(ref bus) = ctx.tool_event_bus {
+                    if let Some(first) = prompts.first() {
+                        let kind = crate::core::hooks::WaitingKind::Question {
+                            header: first.header.clone(),
+                            question: first.question.clone(),
+                        };
+                        bus.publish(&crate::core::hooks::ToolEvent::WaitingForUser {
+                            tool_name: "question".to_string(),
+                            tool_call_id: _tool_call_id.to_string(),
+                            input: questions_val.clone(),
+                            kind,
+                            summary: format!("[{}] {}", first.header, first.question),
+                        })
+                        .await;
+                    }
+                }
+
                 let answers = match ctx.question {
                     Some(ref q_fn) => q_fn(prompts.clone())
                         .await

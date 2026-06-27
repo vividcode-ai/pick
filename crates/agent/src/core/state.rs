@@ -115,6 +115,7 @@ pub struct ToolContext {
     pub permission_manager: Option<Arc<PermissionManager>>,
     pub sandbox: Option<Arc<dyn SandboxTrait>>,
     pub sandbox_enabled: Option<Arc<AtomicBool>>,
+    pub tool_event_bus: Option<std::sync::Arc<super::hooks::ToolEventBus>>,
 }
 
 impl Clone for ToolContext {
@@ -132,6 +133,7 @@ impl Clone for ToolContext {
             permission_manager: self.permission_manager.clone(),
             sandbox: self.sandbox.clone(),
             sandbox_enabled: self.sandbox_enabled.clone(),
+            tool_event_bus: self.tool_event_bus.clone(),
         }
     }
 }
@@ -155,6 +157,10 @@ impl std::fmt::Debug for ToolContext {
                     .sandbox_enabled
                     .as_ref()
                     .map(|a| a.load(Ordering::Relaxed)),
+            )
+            .field(
+                "tool_event_bus",
+                &self.tool_event_bus.as_ref().map(|_| "ToolEventBus"),
             )
             .finish()
     }

@@ -26,6 +26,7 @@ mod cli;
 mod config;
 mod core;
 mod modes;
+mod notification;
 mod utils;
 
 use pick_agent::permission::sandbox::Sandbox as _;
