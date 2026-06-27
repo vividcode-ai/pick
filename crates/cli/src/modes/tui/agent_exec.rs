@@ -21,7 +21,9 @@ pub(crate) fn build_agent_config(
 ) -> AgentLoopConfig {
     // Create the tool event bus and register the system notification observer
     let tool_event_bus = Arc::new(ToolEventBus::new());
-    tool_event_bus.subscribe(Arc::new(crate::notification::SystemNotificationObserver));
+    if ctx.system_notifications_enabled.load(Ordering::Relaxed) {
+        tool_event_bus.subscribe(Arc::new(crate::notification::SystemNotificationObserver));
+    }
 
     let mode_rules = ctx.agent_mode.ruleset();
     let was_interrupted = ctx.was_interrupted.clone();

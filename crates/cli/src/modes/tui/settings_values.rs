@@ -31,6 +31,27 @@ macro_rules! toggle_bool_setting {
     }};
 }
 
+pub(crate) fn toggle_system_notifications(sm: &mut SettingsManager, ctx: &mut TuiContext) {
+    use std::sync::atomic::Ordering;
+    let current = sm.get().enable_system_notifications.unwrap_or(true);
+    let new = !current;
+    let mut update = Settings::default();
+    update.enable_system_notifications = Some(new);
+    match sm.set_global(update) {
+        Ok(()) => {
+            ctx.system_notifications_enabled
+                .store(new, Ordering::Relaxed);
+            ctx.tui.chat.add_system_message(&format!(
+                "System notifications \x1b[1m{}\x1b[0m (takes effect on next agent run).",
+                if new { "enabled" } else { "disabled" }
+            ));
+        }
+        Err(e) => ctx
+            .tui
+            .show_error(&format!("Failed to save setting: {}", e)),
+    }
+}
+
 pub(crate) fn toggle_enable_skill_commands(sm: &mut SettingsManager, ctx: &mut TuiContext) {
     toggle_bool_setting!(sm, ctx, enable_skill_commands, "Skill commands");
 

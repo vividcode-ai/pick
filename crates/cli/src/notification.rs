@@ -52,6 +52,7 @@ fn permission_description(key: &str) -> String {
         "network" | "webfetch" => "Network Access Requested".to_string(),
         "subagent" => "Subagent Spawn Requested".to_string(),
         "extension" => "Extension Execution Requested".to_string(),
+        _ if key.starts_with("external_dir_") => "Permission Required".to_string(),
         other => format!("Permission Required ({})", other),
     }
 }

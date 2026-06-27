@@ -296,6 +296,8 @@ pub(crate) async fn init_tui_mode(
     let show_images = Arc::new(AtomicBool::new(settings.get_show_images()));
     let block_images = Arc::new(AtomicBool::new(settings.get_block_images()));
     let mcp_enabled = Arc::new(AtomicBool::new(settings.get_enable_mcp_tools()));
+    let system_notifications_enabled =
+        Arc::new(AtomicBool::new(settings.get_enable_system_notifications()));
     let steer_mode = match settings.get_steering_mode() {
         "all" => QueueMode::All,
         _ => QueueMode::OneAtATime,
@@ -348,6 +350,7 @@ pub(crate) async fn init_tui_mode(
         permission_manager,
         platform_sandbox,
         sandbox_enabled,
+        system_notifications_enabled,
         auth,
         hide_thinking,
         show_images,

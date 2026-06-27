@@ -24,6 +24,7 @@ pub(crate) async fn handle_settings_selection(ctx: &mut TuiContext, val: &str) {
         "quiet-startup" => settings_values::toggle_quiet_startup(&mut sm, ctx),
         "mcp-tools" => settings_values::toggle_mcp_tools(&mut sm, ctx),
         "install-telemetry" => settings_values::toggle_enable_install_telemetry(&mut sm, ctx),
+        "system-notifications" => settings_values::toggle_system_notifications(&mut sm, ctx),
         "image-width-cells" => show_image_width_selector(ctx, &sm),
         "editor-padding-x" => show_editor_padding_selector(ctx, &sm),
         "autocomplete-max-visible" => show_ac_max_visible_selector(ctx, &sm),

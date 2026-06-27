@@ -46,6 +46,7 @@ fn merge_primitive(base: &mut Settings, overrides: &Settings) {
     merge_opt!(enable_mcp_tools);
     merge_opt!(check_for_update_on_startup);
     merge_opt!(dismissed_update_version);
+    merge_opt!(enable_system_notifications);
     merge_opt!(mcp_servers);
     merge_opt!(disabled_mcp_servers);
     merge_opt!(permission);
@@ -382,6 +383,10 @@ impl SettingsManager {
 
     pub fn get_check_for_update_on_startup(&self) -> bool {
         self.merged.check_for_update_on_startup.unwrap_or(true)
+    }
+
+    pub fn get_enable_system_notifications(&self) -> bool {
+        self.merged.enable_system_notifications.unwrap_or(true)
     }
 
     pub fn get_permission(&self) -> PermissionConfig {

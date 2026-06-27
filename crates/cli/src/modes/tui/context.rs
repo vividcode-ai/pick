@@ -63,6 +63,7 @@ pub(crate) struct TuiContext {
     pub permission_manager: Arc<pick_agent::permission::manager::PermissionManager>,
     pub platform_sandbox: Option<Arc<dyn pick_agent::permission::sandbox::Sandbox>>,
     pub sandbox_enabled: Arc<AtomicBool>,
+    pub system_notifications_enabled: Arc<AtomicBool>,
 
     // Auth
     pub auth: Arc<AuthStorage>,

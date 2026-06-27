@@ -187,6 +187,8 @@ pub struct Settings {
     pub check_for_update_on_startup: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dismissed_update_version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enable_system_notifications: Option<bool>,
     #[serde(flatten)]
     pub extra: HashMap<String, serde_json::Value>,
 }
