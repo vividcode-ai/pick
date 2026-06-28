@@ -1,5 +1,7 @@
 //! Data types for the TUI application
 
+use crossterm::event::KeyModifiers;
+
 use crate::components::chat::ChatView;
 use crate::components::select::SelectList;
 use crate::editor::Editor;
@@ -181,6 +183,25 @@ pub struct TuiApp {
     /// When true, the editor shows a spinner animation (share in progress).
     /// Set by /share command, cleared on completion or cancel.
     pub share_in_progress: bool,
+
+    // --- Modifier state tracking for Ctrl+Enter dedup ---
+    /// The last non-NONE modifiers detected from any key event (used as
+    /// fallback when `resolve_modifiers` fails to detect Ctrl/Shift for
+    /// Enter due to `GetAsyncKeyState` race conditions on Windows).
+    pub last_detected_modifiers: KeyModifiers,
+    /// Timestamp of the last key event. Combined with
+    /// `last_detected_modifiers` to determine if a modifier was recently
+    /// held when a bare-Enter with NONE arrives.
+    pub last_key_event_time: Option<std::time::Instant>,
+    /// Set to true when a `KeyCode::Char('\n')` or Ctrl+Enter was just
+    /// processed in `process_key_event`. Used to deduplicate stale
+    /// `KeyCode::Enter` events that some Windows terminals generate
+    /// alongside the `\n` for the same Ctrl+Enter keystroke.
+    pub just_processed_newline: bool,
+    /// Timestamp when `just_processed_newline` was last set.  Used for
+    /// timeout-based expiry to prevent stale flags from affecting
+    /// unrelated keystrokes.
+    pub last_newline_time: Option<std::time::Instant>,
 }
 
 /// Format token counts for compact display (e.g. 1500 → "1.5k", 15000 → "15k")

@@ -1156,6 +1156,17 @@ impl Editor {
         } else if cursor_visual_line >= self.scroll_offset + max_height {
             self.scroll_offset = cursor_visual_line.saturating_sub(max_height.saturating_sub(1));
         }
+
+        // Clamp so scroll_offset never exceeds the last content line.
+        // `visual_line_count` does NOT count a trailing empty line after
+        // `\n`, but `cursor_visual_line` CAN land on it (e.g. after
+        // Shift+Enter inserts `\n` and cursor moves past it).  Without
+        // clamping, the unadjusted scroll_offset pushes all content past
+        // `visible_top`, making the editor appear empty even though the
+        // buffer still holds the text.
+        let total_visual = self.visual_line_count(width);
+        let max_scroll = total_visual.saturating_sub(max_height);
+        self.scroll_offset = self.scroll_offset.min(max_scroll);
     }
 
     /// Number of visual lines when wrapped to `width`, accounting for
@@ -1186,7 +1197,14 @@ impl Editor {
                 pos += 1;
             }
         }
-        count
+        // Trailing \n adds one empty line (the cursor lands here after
+        // Shift+Enter, and the editor needs at least 2 lines to show
+        // both the content and the trailing blank line).
+        if self.buffer.ends_with('\n') {
+            count + 1
+        } else {
+            count
+        }
     }
 
     /// Get a specific line (0-indexed)

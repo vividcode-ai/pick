@@ -350,12 +350,21 @@ pub(crate) fn handle_hotkeys(ctx: &mut TuiContext) {
         .add_system_message("  \x1b[2mPageUp/Down\x1b[0m    Scroll chat");
     ctx.tui.chat.add_system_message("");
     ctx.tui.chat.add_system_message("\x1b[1mEditing\x1b[0m");
-    ctx.tui
-        .chat
-        .add_system_message("  \x1b[2mEnter\x1b[0m            Send message");
-    ctx.tui
-        .chat
-        .add_system_message("  \x1b[2mShift+Enter\x1b[0m     New line");
+    if pick_tui::keyboard_enhancement::is_enhanced() {
+        ctx.tui
+            .chat
+            .add_system_message("  \x1b[2mEnter\x1b[0m            Send message");
+        ctx.tui
+            .chat
+            .add_system_message("  \x1b[2mShift+Enter\x1b[0m     New line");
+    } else {
+        ctx.tui
+            .chat
+            .add_system_message("  \x1b[2mEnter\x1b[0m            New line");
+        ctx.tui
+            .chat
+            .add_system_message("  \x1b[2mCtrl+Enter\x1b[0m      Send message");
+    }
     ctx.tui
         .chat
         .add_system_message("  \x1b[2mTab\x1b[0m              Autocomplete / next suggestion");

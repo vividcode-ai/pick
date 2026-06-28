@@ -134,6 +134,62 @@ pub async fn run_tui_mode(
 
                 evt = evt_rx.recv() => {
                     match evt {
+                        Some(crossterm::event::Event::Key(key))
+                            if key.kind == crossterm::event::KeyEventKind::Press
+                                && key.code == crossterm::event::KeyCode::Enter =>
+                        {
+                            let now = Instant::now();
+                            // Peek for pending \n/\r (dual-event Windows terminal
+                            // bug: some terminals generate both Enter + \n for a
+                            // single modified-Enter keystroke with arbitrary ordering).
+                            // If \n is queued behind Enter, consume it and let the
+                            // Enter go through normal process_key_event which handles
+                            // Shift+Enter (newline) vs Ctrl+Enter (submit) correctly.
+                            match evt_rx.try_recv() {
+                                Ok(crossterm::event::Event::Key(nl_key))
+                                    if nl_key.kind == crossterm::event::KeyEventKind::Press
+                                        && matches!(nl_key.code, crossterm::event::KeyCode::Char('\n') | crossterm::event::KeyCode::Char('\r')) =>
+                                {
+                                    // Dual-event: capture modifiers from the \n
+                                    // BEFORE consuming it.  On Windows without
+                                    // keyboard enhancement, the \n carries the
+                                    // Shift/Ctrl state via GetAsyncKeyState.
+                                    // Without this, the subsequent Enter+NONE
+                                    // processing loses the modifier and submits.
+                                    key_events::track_modifiers(&mut ctx.tui, &nl_key, now);
+                                    // \n consumed, Enter goes through normal
+                                    // processing which uses the tracked modifiers.
+                                    if let Some(action) = key_events::process_key_event(&mut ctx.tui, key, now) {
+                                        break 'input action;
+                                    }
+                                }
+                                Ok(crossterm::event::Event::Key(other_key))
+                                    if other_key.kind == crossterm::event::KeyEventKind::Press =>
+                                {
+                                    // Peeked a non-\n key event. Process both
+                                    // the original Enter and the consumed event.
+                                    if let Some(action) = key_events::process_key_event(&mut ctx.tui, key, now) {
+                                        break 'input action;
+                                    }
+                                    if let Some(action) = key_events::process_key_event(&mut ctx.tui, other_key, now) {
+                                        break 'input action;
+                                    }
+                                }
+                                Ok(_) => {
+                                    // Non-key event consumed (Resize, Paste).
+                                    // Process original Enter normally.
+                                    if let Some(action) = key_events::process_key_event(&mut ctx.tui, key, now) {
+                                        break 'input action;
+                                    }
+                                }
+                                Err(_) => {
+                                    // No pending events — process Enter normally.
+                                    if let Some(action) = key_events::process_key_event(&mut ctx.tui, key, now) {
+                                        break 'input action;
+                                    }
+                                }
+                            }
+                        }
                         Some(crossterm::event::Event::Key(key)) => {
                             let now = Instant::now();
                             if let Some(action) = key_events::process_key_event(&mut ctx.tui, key, now) {

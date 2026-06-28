@@ -97,6 +97,10 @@ impl TuiApp {
             usage_display: None,
             pending_history_lines: Vec::new(),
             share_in_progress: false,
+            last_detected_modifiers: KeyModifiers::NONE,
+            last_key_event_time: None,
+            just_processed_newline: false,
+            last_newline_time: None,
         })
     }
 
@@ -178,11 +182,16 @@ impl TuiApp {
             usage_display: None,
             pending_history_lines: Vec::new(),
             share_in_progress: false,
+            last_detected_modifiers: KeyModifiers::NONE,
+            last_key_event_time: None,
+            just_processed_newline: false,
+            last_newline_time: None,
         }
     }
 
     /// Clean up terminal state and position shell prompt below all TUI content.
     pub fn cleanup(&mut self) {
+        crate::keyboard_enhancement::disable();
         let _ = disable_raw_mode();
         let _ = writeln!(std::io::stdout());
         let _ = std::io::stdout().flush();
@@ -922,32 +931,57 @@ impl TuiApp {
         }
 
         match code {
-            // Ctrl+Enter (or Shift+Enter): insert a new line at the cursor.
-            // On Windows, some terminals report Ctrl+Enter with the SHIFT
-            // modifier instead of CONTROL, so we check for either (or both).
-            KeyCode::Enter if modifiers.intersects(KeyModifiers::SHIFT | KeyModifiers::CONTROL) => {
+            // Shift+Enter: insert a new line at the cursor.
+            // Ctrl+Enter: no-op (not match, no action).
+            KeyCode::Enter if modifiers.contains(KeyModifiers::SHIFT) => {
                 if self.editor.is_autocomplete_active() {
                     self.editor.cancel_autocomplete();
                 }
                 self.force_flush_paste_accumulator();
                 self.editor.insert_newline_auto_indent();
             }
-            // '\n' and '\r' are unprintable control characters that should
-            // never be inserted into the visible text buffer.  Always treat
-            // them as newline insertion regardless of modifiers.  This is
-            // the safety net for Windows terminals that report Ctrl+Enter
-            // (or Shift+Enter) as a bare control character with no flags.
+            // '\n' and '\r' are unprintable control characters that
+            // should never be inserted into the visible text buffer.
+            // On Windows without keyboard enhancement, both Ctrl+Enter
+            // and Shift+Enter may be reported as \n+NONE (or \n+CONTROL).
+            // We rely on last_detected_modifiers from track_modifiers
+            // to distinguish them via GetAsyncKeyState.  When modifiers
+            // are ambiguous, default to newline (this prevents data loss
+            // and matches the expected behavior for the common case
+            // of Shift+Enter on non-enhanced Windows terminals).
             KeyCode::Char('\n') | KeyCode::Char('\r') => {
                 if self.editor.is_autocomplete_active() {
                     self.editor.cancel_autocomplete();
                 }
                 self.force_flush_paste_accumulator();
-                self.editor.insert_newline_auto_indent();
+                if modifiers.contains(KeyModifiers::SHIFT)
+                    || self.last_detected_modifiers.contains(KeyModifiers::SHIFT)
+                {
+                    self.editor.insert_newline_auto_indent();
+                } else if modifiers.contains(KeyModifiers::CONTROL)
+                    || self.last_detected_modifiers.contains(KeyModifiers::CONTROL)
+                {
+                    // Ctrl+Enter: no-op.
+                } else {
+                    // Ambiguous modifier — likely \n from a modified
+                    // Enter on a terminal that doesn't report modifiers
+                    // correctly.  Default to newline to avoid data loss.
+                    self.editor.insert_newline_auto_indent();
+                }
             }
             KeyCode::Enter => {
                 // Flush any paste-accumulated text into the editor so
                 // that submit_input() sees the full buffer content.
                 self.force_flush_paste_accumulator();
+
+                // Ctrl+Enter: no-op (neither submit nor insert newline).
+                // Check AFTER flushing so pending text isn't lost.
+                if modifiers.contains(KeyModifiers::CONTROL)
+                    || self.last_detected_modifiers.contains(KeyModifiers::CONTROL)
+                {
+                    return None;
+                }
+
                 if self.state == AppState::Streaming {
                     let text = self.editor.text().to_string();
                     self.editor.clear();

@@ -22,6 +22,7 @@ pub mod components;
 pub mod editor;
 pub mod fuzzy;
 pub mod keybindings;
+pub mod keyboard_enhancement;
 pub mod keys;
 pub mod kill_ring;
 pub mod native_modifiers;

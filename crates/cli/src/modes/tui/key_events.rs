@@ -15,13 +15,94 @@ unsafe extern "system" {
 #[cfg(windows)]
 const VK_CONTROL: i32 = 0x11;
 #[cfg(windows)]
+const VK_LCONTROL: i32 = 0xA2;
+#[cfg(windows)]
+const VK_RCONTROL: i32 = 0xA3;
+#[cfg(windows)]
 const VK_SHIFT: i32 = 0x10;
 #[cfg(windows)]
+const VK_LSHIFT: i32 = 0xA0;
+#[cfg(windows)]
+const VK_RSHIFT: i32 = 0xA1;
+#[cfg(windows)]
 fn windows_is_key_down(vk: i32) -> bool {
-    // GetAsyncKeyState returns a SHORT (i16).  The high bit (sign)
-    // is set when the key is currently down, so a negative result
-    // means the key is pressed.
-    unsafe { GetAsyncKeyState(vk) < 0 }
+    let state = unsafe { GetAsyncKeyState(vk) };
+    state < 0
+}
+
+#[cfg(windows)]
+fn windows_ctrl_active() -> bool {
+    windows_is_key_down(VK_CONTROL)
+        || windows_is_key_down(VK_LCONTROL)
+        || windows_is_key_down(VK_RCONTROL)
+}
+
+#[cfg(windows)]
+fn windows_shift_active() -> bool {
+    windows_is_key_down(VK_SHIFT)
+        || windows_is_key_down(VK_LSHIFT)
+        || windows_is_key_down(VK_RSHIFT)
+}
+
+/// Maximum age (ms) for `last_detected_modifiers` to be used as a
+/// fallback when `resolve_modifiers` returns NONE for an Enter event.
+const MODIFIER_FALLBACK_MS: u128 = 100;
+
+/// Maximum age (ms) for the `just_processed_newline` dedup flag.
+const NEWLINE_DEDUP_TIMEOUT_MS: u128 = 50;
+
+/// Check whether a recent newline was processed (dedup flag with timeout).
+fn check_newline_dedup(tui: &mut TuiApp, now: Instant) -> bool {
+    if tui.just_processed_newline {
+        if let Some(t) = tui.last_newline_time {
+            if now.duration_since(t).as_millis() <= NEWLINE_DEDUP_TIMEOUT_MS {
+                tui.just_processed_newline = false;
+                return true;
+            }
+        }
+        tui.just_processed_newline = false;
+    }
+    false
+}
+
+/// Resolve modifiers for Enter with fallback to tracked state.
+fn resolve_enter_modifiers(
+    tui: &TuiApp,
+    event: &crossterm::event::KeyEvent,
+    now: Instant,
+) -> KeyModifiers {
+    let os_mods = resolve_modifiers(event);
+    if os_mods.intersects(KeyModifiers::SHIFT | KeyModifiers::CONTROL) {
+        return os_mods;
+    }
+    if let Some(last_time) = tui.last_key_event_time {
+        if now.duration_since(last_time).as_millis() <= MODIFIER_FALLBACK_MS
+            && tui
+                .last_detected_modifiers
+                .intersects(KeyModifiers::SHIFT | KeyModifiers::CONTROL)
+        {
+            return tui.last_detected_modifiers;
+        }
+    }
+    os_mods
+}
+
+/// Track modifier state from a key event for Enter resolution fallback.
+pub(crate) fn track_modifiers(tui: &mut TuiApp, key: &crossterm::event::KeyEvent, now: Instant) {
+    if key.code == KeyCode::Enter {
+        let probe = resolve_modifiers(key);
+        tui.last_detected_modifiers = probe;
+        if probe != KeyModifiers::NONE {
+            tui.last_key_event_time = Some(now);
+        }
+    }
+    if matches!(key.code, KeyCode::Char('\n') | KeyCode::Char('\r')) {
+        let mods = resolve_modifiers(key);
+        tui.last_detected_modifiers = mods;
+        if mods != KeyModifiers::NONE {
+            tui.last_key_event_time = Some(now);
+        }
+    }
 }
 
 /// Resolve the actual modifier state for a key event.
@@ -30,12 +111,11 @@ fn windows_is_key_down(vk: i32) -> bool {
 /// We supplement it by polling the OS-level key state.
 #[cfg(windows)]
 fn resolve_modifiers(event: &crossterm::event::KeyEvent) -> KeyModifiers {
-    let raw = event.modifiers;
-    let mut m = raw;
-    if windows_is_key_down(VK_CONTROL) {
+    let mut m = event.modifiers;
+    if windows_ctrl_active() {
         m |= KeyModifiers::CONTROL;
     }
-    if windows_is_key_down(VK_SHIFT) {
+    if windows_shift_active() {
         m |= KeyModifiers::SHIFT;
     }
     m
@@ -85,31 +165,44 @@ pub(crate) fn process_key_event(
             }
             return None;
         }
+        track_modifiers(tui, &key, now);
         return tui.handle_key(key.code, key.modifiers);
     }
+
+    // Track modifier state for Enter-key modifier resolution fallback.
+    track_modifiers(tui, &key, now);
 
     // ---- Enter key: special handling ----
     // On Windows some terminals report Ctrl+Enter / Shift+Enter
     // as plain Enter+NONE without the CONTROL/SHIFT modifiers.
-    // We query the OS-level key state to catch these cases.
+    // We query the OS-level key state to catch these cases, with
+    // an additional fallback to recently-tracked modifiers.
     if key.code == KeyCode::Enter {
-        let resolved = resolve_modifiers(&key);
+        let resolved = resolve_enter_modifiers(tui, &key, now);
 
-        // If Ctrl or Shift is actually held, treat as newline insert
-        // regardless of what crossterm reported.
-        if resolved.intersects(KeyModifiers::SHIFT | KeyModifiers::CONTROL) {
+        // Shift+Enter: insert newline.
+        // Ctrl+Enter: no-op (neither submit nor insert newline).
+        if resolved.contains(KeyModifiers::SHIFT) {
             tui.force_flush_paste_accumulator();
             tui.editor.insert_newline_auto_indent();
+            tui.just_processed_newline = true;
+            tui.last_newline_time = Some(now);
+            return None;
+        }
+        if resolved.contains(KeyModifiers::CONTROL) {
+            tui.force_flush_paste_accumulator();
             return None;
         }
 
-        // Genuine bare Enter (no modifiers): check paste accumulator.
+        // Flush paste accumulator to editor before submitting.
         if !tui.paste_accumulator.is_empty() {
-            // Fast typing — text is still in the accumulator.
-            // Append \n, flush, and let the editor show it.
-            tui.paste_accumulator.push('\n');
-            tui.last_paste_time = Some(now);
             tui.force_flush_paste_accumulator();
+        }
+
+        // Dedup: if a Char('\n') was just processed (which also inserted
+        // a newline), this Enter event is a stale duplicate from a
+        // terminal that generates both event types for a single keystroke.
+        if check_newline_dedup(tui, now) {
             return None;
         }
 
@@ -132,9 +225,31 @@ pub(crate) fn process_key_event(
     {
         match key.code {
             KeyCode::Char(c) if c as u32 <= 0x1F => {
-                // ASCII control character: route directly to handle_key
                 tui.force_flush_paste_accumulator();
-                return tui.handle_key(key.code, key.modifiers);
+                if (c == '\n' || c == '\r') && check_newline_dedup(tui, now) {
+                    return None;
+                }
+                if c == '\n' || c == '\r' {
+                    // Use the same modifier resolution as Enter. This
+                    // handles Shift+Enter (newline), Ctrl+Enter (no-op),
+                    // and bare Enter (submit) when the terminal reports
+                    // a modified Enter as a bare control character.
+                    let resolved = resolve_enter_modifiers(tui, &key, now);
+                    if resolved.contains(KeyModifiers::SHIFT) {
+                        tui.editor.insert_newline_auto_indent();
+                        tui.just_processed_newline = true;
+                        tui.last_newline_time = Some(now);
+                        return None;
+                    }
+                    if resolved.contains(KeyModifiers::CONTROL) {
+                        return None;
+                    }
+                    // Bare \n/r: flush accumulator and submit.
+                    tui.force_flush_paste_accumulator();
+                    return tui.handle_key(KeyCode::Enter, KeyModifiers::NONE);
+                }
+                let result = tui.handle_key(key.code, key.modifiers);
+                return result;
             }
             KeyCode::Char(c) => {
                 tui.paste_accumulator.push(c);
@@ -176,26 +291,35 @@ pub(crate) fn process_key_event_during_agent(
         return None;
     }
 
-    // Esc always aborts agent
-    if key.code == KeyCode::Esc {
-        tui.force_flush_paste_accumulator();
-        return Some(TuiAction::Quit);
-    }
+    // Track modifier state for Enter-key modifier resolution fallback.
+    track_modifiers(tui, &key, now);
 
-    // ---- Enter: resolve modifiers on Windows ----
+    // ---- Enter: resolve modifiers with fallback ----
     if key.code == KeyCode::Enter {
-        let resolved = resolve_modifiers(&key);
-        if resolved.intersects(KeyModifiers::SHIFT | KeyModifiers::CONTROL) {
+        let resolved = resolve_enter_modifiers(tui, &key, now);
+
+        // Shift+Enter: insert newline.
+        // Ctrl+Enter: no-op.
+        if resolved.contains(KeyModifiers::SHIFT) {
             tui.force_flush_paste_accumulator();
             tui.editor.insert_newline_auto_indent();
+            tui.just_processed_newline = true;
+            tui.last_newline_time = Some(now);
             return None;
         }
-        if !tui.paste_accumulator.is_empty() {
-            tui.paste_accumulator.push('\n');
-            tui.last_paste_time = Some(now);
+        if resolved.contains(KeyModifiers::CONTROL) {
             tui.force_flush_paste_accumulator();
             return None;
         }
+        // Flush paste accumulator to editor before submitting.
+        if !tui.paste_accumulator.is_empty() {
+            tui.force_flush_paste_accumulator();
+        }
+        if check_newline_dedup(tui, now) {
+            return None;
+        }
+
+        // Bare Enter with empty accumulator: normal submit.
         tui.force_flush_paste_accumulator();
         return tui.handle_key(key.code, key.modifiers);
     }
@@ -210,7 +334,30 @@ pub(crate) fn process_key_event_during_agent(
         match key.code {
             KeyCode::Char(c) if c as u32 <= 0x1F => {
                 tui.force_flush_paste_accumulator();
-                return tui.handle_key(key.code, key.modifiers);
+                if (c == '\n' || c == '\r') && check_newline_dedup(tui, now) {
+                    return None;
+                }
+                if c == '\n' || c == '\r' {
+                    // Use the same modifier resolution as Enter. This
+                    // handles Shift+Enter (newline), Ctrl+Enter (no-op),
+                    // and bare Enter (submit) when the terminal reports
+                    // a modified Enter as a bare control character.
+                    let resolved = resolve_enter_modifiers(tui, &key, now);
+                    if resolved.contains(KeyModifiers::SHIFT) {
+                        tui.editor.insert_newline_auto_indent();
+                        tui.just_processed_newline = true;
+                        tui.last_newline_time = Some(now);
+                        return None;
+                    }
+                    if resolved.contains(KeyModifiers::CONTROL) {
+                        return None;
+                    }
+                    // Bare \n/r: flush accumulator and submit.
+                    tui.force_flush_paste_accumulator();
+                    return tui.handle_key(KeyCode::Enter, KeyModifiers::NONE);
+                }
+                let result = tui.handle_key(key.code, key.modifiers);
+                return result;
             }
             KeyCode::Char(c) => {
                 tui.paste_accumulator.push(c);
@@ -259,13 +406,26 @@ pub(crate) fn drain_key_events(
                     }
                     match key.code {
                         KeyCode::Char(c) if (c as u32) <= 0x1F => {
-                            // Handle \n/\r as newline insertion (Ctrl+Enter
-                            // on terminals that report it as a bare control
-                            // character).  Other ASCII control chars route
-                            // to handle_key as before.
+                            // Handle \n/\r as newline insertion if
+                            // Shift or Ctrl is held (modified Enter).
+                            // Bare \n without modifiers is also inserted
+                            // as newline (it's an unprintable control char
+                            // that would corrupt the buffer if inserted
+                            // as text — and in drain this is a leftover
+                            // from a modified Enter, not a submit action).
                             if c == '\n' || c == '\r' {
+                                if check_newline_dedup(tui, Instant::now()) {
+                                    continue;
+                                }
                                 tui.force_flush_paste_accumulator();
-                                tui.editor.insert_newline_auto_indent();
+                                if tui
+                                    .last_detected_modifiers
+                                    .intersects(KeyModifiers::SHIFT | KeyModifiers::CONTROL)
+                                {
+                                    tui.editor.insert_newline_auto_indent();
+                                    tui.just_processed_newline = true;
+                                    tui.last_newline_time = Some(Instant::now());
+                                }
                                 continue;
                             }
                             tui.force_flush_paste_accumulator();
@@ -304,8 +464,28 @@ pub(crate) fn drain_key_events(
                     if key.kind == KeyEventKind::Press
                         && key.modifiers.intersects(KeyModifiers::CONTROL) =>
                 {
+                    // Dedup: Enter, \n, or \r with CONTROL can be a
+                    // duplicate of a Ctrl+Enter already handled in
+                    // process_key_event (dual-event Windows terminal).
+                    if matches!(
+                        key.code,
+                        KeyCode::Enter | KeyCode::Char('\n') | KeyCode::Char('\r')
+                    ) && check_newline_dedup(tui, Instant::now())
+                    {
+                        continue;
+                    }
                     tui.force_flush_paste_accumulator();
-                    if let Some(a) = tui.handle_key(key.code, key.modifiers) {
+                    let action_result = tui.handle_key(key.code, key.modifiers);
+                    if action_result.is_none()
+                        && matches!(
+                            key.code,
+                            KeyCode::Enter | KeyCode::Char('\n') | KeyCode::Char('\r')
+                        )
+                    {
+                        tui.just_processed_newline = true;
+                        tui.last_newline_time = Some(Instant::now());
+                    }
+                    if let Some(a) = action_result {
                         action = Some(a);
                         had_action = true;
                     }
@@ -358,6 +538,9 @@ pub(crate) fn drain_key_events_during_agent(
     _now: Instant,
     abort_on_esc: &mut bool,
 ) -> Option<TuiAction> {
+    // Track modifiers from the outer-scope event that triggered draining.
+    // We can't get the key event here, but last_detected_modifiers is
+    // already populated by process_key_event_during_agent's track_modifiers.
     loop {
         let mut had_action = false;
         let mut action: Option<TuiAction> = None;
@@ -372,11 +555,22 @@ pub(crate) fn drain_key_events_during_agent(
                 {
                     match key.code {
                         KeyCode::Char(c) if (c as u32) <= 0x1F => {
-                            // Handle \n/\r as newline insertion (Ctrl+Enter
-                            // on terminals that report it as bare control char).
+                            // Handle \n/\r as newline insertion if
+                            // dedup allows it.  In drain these are
+                            // leftovers from modified-Enter events.
                             if c == '\n' || c == '\r' {
+                                if check_newline_dedup(tui, Instant::now()) {
+                                    continue;
+                                }
                                 tui.force_flush_paste_accumulator();
-                                tui.editor.insert_newline_auto_indent();
+                                if tui
+                                    .last_detected_modifiers
+                                    .intersects(KeyModifiers::SHIFT | KeyModifiers::CONTROL)
+                                {
+                                    tui.editor.insert_newline_auto_indent();
+                                    tui.just_processed_newline = true;
+                                    tui.last_newline_time = Some(Instant::now());
+                                }
                                 continue;
                             }
                             tui.force_flush_paste_accumulator();
@@ -427,8 +621,28 @@ pub(crate) fn drain_key_events_during_agent(
                     if key.kind == KeyEventKind::Press
                         && key.modifiers.intersects(KeyModifiers::CONTROL) =>
                 {
+                    // Dedup: Enter, \n, or \r with CONTROL can be a
+                    // duplicate of a Ctrl+Enter already handled in
+                    // process_key_event_during_agent.
+                    if matches!(
+                        key.code,
+                        KeyCode::Enter | KeyCode::Char('\n') | KeyCode::Char('\r')
+                    ) && check_newline_dedup(tui, Instant::now())
+                    {
+                        continue;
+                    }
                     tui.force_flush_paste_accumulator();
-                    if let Some(a) = tui.handle_key(key.code, key.modifiers) {
+                    let action_result = tui.handle_key(key.code, key.modifiers);
+                    if action_result.is_none()
+                        && matches!(
+                            key.code,
+                            KeyCode::Enter | KeyCode::Char('\n') | KeyCode::Char('\r')
+                        )
+                    {
+                        tui.just_processed_newline = true;
+                        tui.last_newline_time = Some(Instant::now());
+                    }
+                    if let Some(a) = action_result {
                         if matches!(a, TuiAction::Quit) {
                             action = Some(a);
                             had_action = true;
@@ -538,11 +752,10 @@ mod tests {
         result
     }
 
-    // ===== BUG 1: Ctrl+Enter clears text =====
+    // ===== Ctrl+Enter (no-op) =====
 
     #[test]
     fn test_pke_ctrl_enter_preserves_text_on_first_line() {
-        // Normal typing: "hello" + Ctrl+Enter → "hello\n"
         let mut app = pick_tui::app::TuiApp::new_inner(
             "anthropic",
             "claude-sonnet-4-20250514",
@@ -558,24 +771,18 @@ mod tests {
             "",
         );
         type_str(&mut app, "hello");
-        assert_eq!(
-            app.editor.buffer, "hello",
-            "slow typing should insert into buffer"
-        );
+        assert_eq!(app.editor.buffer, "hello");
 
         let result = press_key(&mut app, enter(KeyModifiers::CONTROL));
         assert!(result.is_none(), "Ctrl+Enter should not submit");
         assert_eq!(
-            app.editor.buffer, "hello\n",
-            "BUG 1: Ctrl+Enter cleared text! buffer={:?}",
-            app.editor.buffer,
+            app.editor.buffer, "hello",
+            "Ctrl+Enter should not modify buffer"
         );
     }
 
     #[test]
     fn test_pke_ctrl_enter_text_not_lost_when_cursor_not_at_end() {
-        // Type "abcdef", move cursor to position 2, Ctrl+Enter.
-        // Verify "ab" is preserved, newline inserted after cursor.
         let mut app = pick_tui::app::TuiApp::new_inner(
             "anthropic",
             "claude-sonnet-4-20250514",
@@ -591,19 +798,15 @@ mod tests {
             "",
         );
         type_str(&mut app, "abcdef");
-        // Move cursor to position 2 (after "ab")
         app.editor.cursor = 2;
 
         let result = press_key(&mut app, enter(KeyModifiers::CONTROL));
         assert!(result.is_none());
         assert_eq!(
-            app.editor.buffer, "ab\ncdef",
-            "Ctrl+Enter in middle of text lost characters! buffer={:?}",
-            app.editor.buffer,
+            app.editor.buffer, "abcdef",
+            "Ctrl+Enter should not modify buffer"
         );
     }
-
-    // ===== BUG 2: typing after Ctrl+Enter adds stray newline =====
 
     #[test]
     fn test_pke_ctrl_enter_then_type_no_stray_newline() {
@@ -623,14 +826,10 @@ mod tests {
         );
         type_str(&mut app, "hello");
         press_key(&mut app, enter(KeyModifiers::CONTROL));
-        assert_eq!(app.editor.buffer, "hello\n");
+        assert_eq!(app.editor.buffer, "hello");
 
         type_str(&mut app, "world");
-        assert_eq!(
-            app.editor.buffer, "hello\nworld",
-            "BUG 2: typing after Ctrl+Enter inserted stray newline! buffer={:?}",
-            app.editor.buffer,
-        );
+        assert_eq!(app.editor.buffer, "helloworld");
     }
 
     #[test]
@@ -654,10 +853,10 @@ mod tests {
         type_str(&mut app, "b");
         press_key(&mut app, enter(KeyModifiers::CONTROL));
         type_str(&mut app, "c");
-        assert_eq!(app.editor.buffer, "a\nb\nc");
+        assert_eq!(app.editor.buffer, "abc");
     }
 
-    // ===== Ctrl+Enter reported in various ways by terminals =====
+    // ===== Ctrl+Enter reported as \n+CONTROL or \n+NONE =====
 
     #[test]
     fn test_pke_ctrl_enter_as_char_newline_with_control() {
@@ -676,15 +875,14 @@ mod tests {
             "",
         );
         type_str(&mut app, "ab");
-        press_key(&mut app, char_nl(KeyModifiers::CONTROL));
-        assert_eq!(app.editor.buffer, "ab\n");
-        type_str(&mut app, "cd");
-        assert_eq!(app.editor.buffer, "ab\ncd");
+        let result = press_key(&mut app, char_nl(KeyModifiers::CONTROL));
+        assert!(result.is_none(), "Ctrl+Enter should not submit");
+        assert_eq!(app.editor.buffer, "ab", "\\n+CONTROL should be no-op");
     }
 
     #[test]
     fn test_pke_ctrl_enter_as_char_newline_no_modifier() {
-        // Worst case: terminal reports Ctrl+Enter as Char('\n')/NONE.
+        // \n+NONE with no recent modifier state: treat as bare Enter → submit.
         let mut app = pick_tui::app::TuiApp::new_inner(
             "anthropic",
             "claude-sonnet-4-20250514",
@@ -700,15 +898,16 @@ mod tests {
             "",
         );
         type_str(&mut app, "x");
-        press_key(&mut app, char_nl(KeyModifiers::NONE));
-        assert_eq!(app.editor.buffer, "x\n");
-        type_str(&mut app, "y");
-        assert_eq!(app.editor.buffer, "x\ny");
+        let result = press_key(&mut app, char_nl(KeyModifiers::NONE));
+        assert!(
+            matches!(result, Some(TuiAction::Submit(t)) if t == "x"),
+            "\\n+NONE should submit text"
+        );
+        assert!(app.editor.buffer.is_empty(), "editor cleared after submit");
     }
 
     #[test]
     fn test_pke_ctrl_enter_as_shift_modifier() {
-        // Some Windows terminals report Ctrl+Enter as Enter+SHIFT.
         let mut app = pick_tui::app::TuiApp::new_inner(
             "anthropic",
             "claude-sonnet-4-20250514",
@@ -724,7 +923,8 @@ mod tests {
             "",
         );
         type_str(&mut app, "z");
-        press_key(&mut app, enter(KeyModifiers::SHIFT));
+        let result = press_key(&mut app, enter(KeyModifiers::SHIFT));
+        assert!(result.is_none(), "Shift+Enter should not submit");
         assert_eq!(app.editor.buffer, "z\n");
     }
 
@@ -761,8 +961,6 @@ mod tests {
 
     #[test]
     fn test_pke_fast_typing_ctrl_enter_flushes_accumulator() {
-        // Fast typing chars (in accumulator) then Ctrl+Enter.
-        // Must flush, then insert newline.
         let mut app = pick_tui::app::TuiApp::new_inner(
             "anthropic",
             "claude-sonnet-4-20250514",
@@ -778,27 +976,24 @@ mod tests {
             "",
         );
         let now = Instant::now();
-        // Fast typing: chars stay in accumulator
         for c in "hello".chars() {
             process_key_event(&mut app, key(c), now);
         }
-        assert!(
-            app.editor.buffer.is_empty(),
-            "buffer empty during fast typing"
-        );
         assert_eq!(app.paste_accumulator, "hello");
 
-        // Ctrl+Enter flushes accumulator + inserts newline
+        // Ctrl+Enter flushes accumulator, no-op (no newline, no submit)
         let result = process_key_event(&mut app, enter(KeyModifiers::CONTROL), now);
         assert!(result.is_none());
-        assert_eq!(app.editor.buffer, "hello\n");
+        assert_eq!(
+            app.editor.buffer, "hello",
+            "Ctrl+Enter flushes but no newline"
+        );
         assert!(app.paste_accumulator.is_empty());
     }
 
     #[test]
     fn test_pke_fast_typing_enter_with_accumulator_adds_newline() {
-        // Fast typing + plain Enter (no modifiers, text in accumulator).
-        // Should add \n and flush, NOT submit.
+        // Fast typing + plain Enter: must flush accumulator and submit.
         let mut app = pick_tui::app::TuiApp::new_inner(
             "anthropic",
             "claude-sonnet-4-20250514",
@@ -819,13 +1014,13 @@ mod tests {
         }
         assert_eq!(app.paste_accumulator, "fast");
 
-        // Plain Enter with non-empty accumulator = paste-enter (add newline)
         let result = process_key_event(&mut app, enter(KeyModifiers::NONE), now);
         assert!(
-            result.is_none(),
-            "Enter with non-empty accumulator should not submit"
+            matches!(&result, Some(TuiAction::Submit(t)) if t == "fast"),
+            "Enter with non-empty accumulator should flush and submit, got {:?}",
+            result,
         );
-        assert_eq!(app.editor.buffer, "fast\n");
+        assert!(app.paste_accumulator.is_empty());
     }
 
     // ===== drain_key_events integration tests =====
@@ -858,8 +1053,7 @@ mod tests {
 
     #[test]
     fn test_drain_ctrl_enter_as_newline() {
-        // Simulate: terminal sends \n (Ctrl+Enter) through the drain path.
-        // drain_key_events must treat \n as newline insertion.
+        // \n+NONE in drain with no modifiers tracked: drain skips it (no-op).
         let mut app = pick_tui::app::TuiApp::new_inner(
             "anthropic",
             "claude-sonnet-4-20250514",
@@ -878,17 +1072,13 @@ mod tests {
         app.editor.cursor = 3;
 
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
-        send_newline(&tx); // drain sees Char('\n')
+        send_newline(&tx);
 
         let result = drain_key_events(&mut app, &mut rx, Instant::now());
-        assert!(
-            result.is_none(),
-            "drain should not return an action for Ctrl+Enter"
-        );
+        assert!(result.is_none());
         assert_eq!(
-            app.editor.buffer, "abc\n",
-            "drain: Ctrl+Enter as \\n should insert newline, got {:?}",
-            app.editor.buffer,
+            app.editor.buffer, "abc",
+            "drain \\n+NONE should not modify buffer"
         );
     }
 
@@ -968,6 +1158,7 @@ mod tests {
 
     #[test]
     fn test_drain_during_agent_ctrl_enter_as_newline() {
+        // \n+NONE in agent drain with no modifiers tracked: no-op.
         let mut app = pick_tui::app::TuiApp::new_inner(
             "anthropic",
             "claude-sonnet-4-20250514",
@@ -991,7 +1182,10 @@ mod tests {
         let result = drain_key_events_during_agent(&mut app, &mut rx, Instant::now(), &mut abort);
         assert!(result.is_none());
         assert!(!abort, "\\n should not trigger abort");
-        assert_eq!(app.editor.buffer, "abc\n");
+        assert_eq!(
+            app.editor.buffer, "abc",
+            "\\n+NONE in agent drain should not modify buffer"
+        );
     }
 
     #[test]

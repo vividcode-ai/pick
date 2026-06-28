@@ -284,6 +284,12 @@ pub(crate) async fn init_tui_mode(
     print!("\x1b[?2004h");
     let _ = std::io::Write::flush(&mut std::io::stdout());
 
+    // Enable keyboard enhancement protocol (Kitty protocol).
+    // On supported terminals (Windows Terminal, Alacritty, Wezterm, kitty,
+    // iTerm2, etc.), modified keys like Ctrl+Enter, Shift+Enter report
+    // correct modifiers.  Unsupported terminals silently ignore this.
+    pick_tui::keyboard_enhancement::enable();
+
     // Tool tracking state
     let tool_start_times: Arc<Mutex<HashMap<String, Instant>>> =
         Arc::new(Mutex::new(HashMap::new()));

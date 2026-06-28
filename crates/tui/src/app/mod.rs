@@ -936,7 +936,7 @@ mod tests {
         assert_eq!(app.editor.buffer, "hello");
         assert_eq!(app.editor.line_count(), 1);
 
-        app.handle_key(KeyCode::Enter, KeyModifiers::CONTROL);
+        app.handle_key(KeyCode::Enter, KeyModifiers::SHIFT);
         assert_eq!(app.editor.buffer, "hello\n");
         assert_eq!(app.editor.line_count(), 2);
 
@@ -957,7 +957,7 @@ mod tests {
         assert_eq!(app.editor.buffer, "hello");
         assert_eq!(app.editor.line_count(), 1);
 
-        app.handle_key(KeyCode::Enter, KeyModifiers::CONTROL);
+        app.handle_key(KeyCode::Enter, KeyModifiers::SHIFT);
         assert_eq!(app.editor.buffer, "hello\n");
         assert_eq!(app.editor.line_count(), 2);
     }
@@ -1208,11 +1208,8 @@ mod tests {
     }
 
     #[test]
-    fn test_ctrl_enter_with_paste_accumulator_on_first_line() {
-        // Simulate the exact user scenario:
-        // 1. Type "abc" quickly (chars go to paste_accumulator)
-        // 2. Press Ctrl+Enter
-        // Expected: buffer = "abc\n", cursor after \n
+    fn test_ctrl_enter_with_paste_accumulator_flushes_and_does_nothing() {
+        // Ctrl+Enter with paste accumulator: flush but no newline.
         let mut app = TuiApp::new_inner(
             "anthropic",
             "claude-sonnet-4-20250514",
@@ -1228,44 +1225,29 @@ mod tests {
             "",
         );
 
-        // Simulate fast typing: chars go to paste_accumulator
         app.paste_accumulator.push_str("abc");
         app.last_paste_time = Some(std::time::Instant::now());
 
-        // Now press Ctrl+Enter
         let action = app.handle_key(KeyCode::Enter, KeyModifiers::CONTROL);
 
-        // force_flush_paste_accumulator should have flushed "abc"
-        // then insert_newline_auto_indent should have added \n
-        assert_eq!(
-            app.editor.buffer, "abc\n",
-            "Buffer should be 'abc\\n' after Ctrl+Enter, got {:?}",
-            app.editor.buffer,
-        );
-        assert_eq!(
-            app.editor.cursor, 4,
-            "Cursor should be at position 4 (past newline), got {}",
-            app.editor.cursor,
-        );
         assert!(
             app.paste_accumulator.is_empty(),
             "Paste accumulator should be empty after flush",
         );
-        assert!(action.is_none(), "Ctrl+Enter should not produce an action");
-
-        // Now type 'd' (simulating slow typing where it goes directly to editor)
-        // First simulate what process_key_event does: if no pending paste, insert via handle_key
-        app.editor.insert_char('d');
+        assert!(
+            action.is_none(),
+            "Ctrl+Enter should not produce an action, got {:?}",
+            action,
+        );
         assert_eq!(
-            app.editor.buffer, "abc\nd",
-            "Typing 'd' after Ctrl+Enter should add it on line 2, got {:?}",
+            app.editor.buffer, "abc",
+            "Buffer should be 'abc' (no newline) after Ctrl+Enter with accumulator, got {:?}",
             app.editor.buffer,
         );
     }
 
     #[test]
-    fn test_ctrl_enter_with_empty_accumulator_on_first_line() {
-        // Text already in editor buffer (not in paste accumulator), press Ctrl+Enter
+    fn test_ctrl_enter_with_empty_accumulator_does_nothing() {
         let mut app = TuiApp::new_inner(
             "anthropic",
             "claude-sonnet-4-20250514",
@@ -1281,32 +1263,23 @@ mod tests {
             "",
         );
 
-        // Text already in editor
         app.editor.insert_str("hello");
-        assert_eq!(app.editor.buffer, "hello");
-        assert_eq!(app.editor.cursor, 5);
-
-        // Ctrl+Enter
         let action = app.handle_key(KeyCode::Enter, KeyModifiers::CONTROL);
 
+        assert!(
+            action.is_none(),
+            "Ctrl+Enter should be a no-op, got {:?}",
+            action,
+        );
         assert_eq!(
-            app.editor.buffer, "hello\n",
-            "Buffer should be 'hello\\n' after Ctrl+Enter, got {:?}",
+            app.editor.buffer, "hello",
+            "Buffer should be unchanged after Ctrl+Enter, got {:?}",
             app.editor.buffer,
         );
-        assert_eq!(
-            app.editor.cursor, 6,
-            "Cursor should be past newline, got {}",
-            app.editor.cursor,
-        );
-        assert!(action.is_none(), "Ctrl+Enter should not produce an action");
     }
 
     #[test]
-    fn test_ctrl_enter_with_chars_via_key_char_handler() {
-        // Simulate what happens when individual chars arrive through
-        // the KeyCode::Char(c) handler (after paste accumulator flush).
-        // This is the slow-typing path.
+    fn test_ctrl_enter_with_chars_does_nothing() {
         let mut app = TuiApp::new_inner(
             "anthropic",
             "claude-sonnet-4-20250514",
@@ -1322,36 +1295,36 @@ mod tests {
             "",
         );
 
-        // Type 'a', 'b', 'c' through the handle_key Char handler
-        // (simulating what process_key_event does after flushing accumulator)
         app.handle_key(KeyCode::Char('a'), KeyModifiers::NONE);
         app.handle_key(KeyCode::Char('b'), KeyModifiers::NONE);
         app.handle_key(KeyCode::Char('c'), KeyModifiers::NONE);
         assert_eq!(app.editor.buffer, "abc");
 
-        // Ctrl+Enter
-        app.handle_key(KeyCode::Enter, KeyModifiers::CONTROL);
-        assert_eq!(app.editor.buffer, "abc\n");
-        assert_eq!(app.editor.cursor, 4);
+        let action = app.handle_key(KeyCode::Enter, KeyModifiers::CONTROL);
+        assert!(
+            action.is_none(),
+            "Ctrl+Enter should be a no-op, got {:?}",
+            action,
+        );
+        assert_eq!(
+            app.editor.buffer, "abc",
+            "Buffer should be unchanged after Ctrl+Enter, got {:?}",
+            app.editor.buffer,
+        );
 
-        // Type 'd' normally - should go to line 2 (after the newline)
+        // Typing after Ctrl+Enter should work normally
         app.handle_key(KeyCode::Char('d'), KeyModifiers::NONE);
         assert_eq!(
-            app.editor.buffer, "abc\nd",
-            "Buffer should be 'abc\\nd' after typing 'd', got {:?}",
+            app.editor.buffer, "abcd",
+            "Typing after Ctrl+Enter should continue on same line, got {:?}",
             app.editor.buffer,
         );
     }
 
-    // ===== Ctrl+Enter integration tests =====
-    // These simulate the exact user workflow through handle_key (the same
-    // path that process_key_event calls after modifier resolution).
-    // The two bugs they guard against:
-    //   1. "hello" + Ctrl+Enter → buffer cleared (text lost)
-    //   2. After Ctrl+Enter, continuing to typing inserts stray \n
+    // ===== Only Shift+Enter inserts newline =====
 
     #[test]
-    fn test_ctrl_enter_preserves_text_on_first_line() {
+    fn test_ctrl_enter_with_control_modifier_does_nothing() {
         let mut app = TuiApp::new_inner(
             "anthropic",
             "claude-sonnet-4-20250514",
@@ -1369,84 +1342,21 @@ mod tests {
         for c in "hello".chars() {
             app.handle_key(KeyCode::Char(c), KeyModifiers::NONE);
         }
-        assert_eq!(app.editor.buffer, "hello");
-        assert_eq!(app.editor.cursor, 5);
-
         let action = app.handle_key(KeyCode::Enter, KeyModifiers::CONTROL);
-
+        assert!(
+            action.is_none(),
+            "Ctrl+Enter should be a no-op, got {:?}",
+            action,
+        );
         assert_eq!(
-            app.editor.buffer, "hello\n",
-            "BUG 1: Ctrl+Enter cleared text! buffer={:?} cursor={}",
-            app.editor.buffer, app.editor.cursor,
-        );
-        assert_eq!(app.editor.cursor, 6);
-        assert!(action.is_none(), "Ctrl+Enter should not trigger an action");
-    }
-
-    #[test]
-    fn test_ctrl_enter_followed_by_typing_no_auto_newline() {
-        let mut app = TuiApp::new_inner(
-            "anthropic",
-            "claude-sonnet-4-20250514",
-            "Pick",
-            TEST_VERSION,
-            vec![],
-            vec![],
-            "/tmp",
-            None,
-            "off",
-            None,
-            "test",
-            "",
-        );
-        for c in "hello".chars() {
-            app.handle_key(KeyCode::Char(c), KeyModifiers::NONE);
-        }
-        app.handle_key(KeyCode::Enter, KeyModifiers::CONTROL);
-        assert_eq!(app.editor.buffer, "hello\n");
-        assert_eq!(app.editor.cursor, 6);
-
-        for c in "world".chars() {
-            app.handle_key(KeyCode::Char(c), KeyModifiers::NONE);
-        }
-        assert_eq!(
-            app.editor.buffer, "hello\nworld",
-            "BUG 2: typing after Ctrl+Enter inserted stray newline! buffer={:?} cursor={}",
-            app.editor.buffer, app.editor.cursor,
-        );
-        assert_eq!(app.editor.cursor, 11);
-    }
-
-    #[test]
-    fn test_multiple_ctrl_enter_inserts_multiple_lines() {
-        let mut app = TuiApp::new_inner(
-            "anthropic",
-            "claude-sonnet-4-20250514",
-            "Pick",
-            TEST_VERSION,
-            vec![],
-            vec![],
-            "/tmp",
-            None,
-            "off",
-            None,
-            "test",
-            "",
-        );
-        app.handle_key(KeyCode::Char('a'), KeyModifiers::NONE);
-        app.handle_key(KeyCode::Enter, KeyModifiers::CONTROL);
-        app.handle_key(KeyCode::Char('b'), KeyModifiers::NONE);
-        app.handle_key(KeyCode::Enter, KeyModifiers::CONTROL);
-        app.handle_key(KeyCode::Char('c'), KeyModifiers::NONE);
-        assert_eq!(
-            app.editor.buffer, "a\nb\nc",
-            "multiple Ctrl+Enter failed: {:?}",
+            app.editor.buffer, "hello",
+            "Buffer should be unchanged after Ctrl+Enter, got {:?}",
             app.editor.buffer,
         );
     }
 
     #[test]
-    fn test_ctrl_enter_via_char_newline_handler() {
+    fn test_ctrl_enter_via_char_newline_with_control_does_nothing() {
         let mut app = TuiApp::new_inner(
             "anthropic",
             "claude-sonnet-4-20250514",
@@ -1464,24 +1374,24 @@ mod tests {
         for c in "hi".chars() {
             app.handle_key(KeyCode::Char(c), KeyModifiers::NONE);
         }
-        app.handle_key(KeyCode::Char('\n'), KeyModifiers::CONTROL);
-        assert_eq!(
-            app.editor.buffer, "hi\n",
-            "Ctrl+Enter as Char('\\n') cleared text! buffer={:?}",
-            app.editor.buffer,
+        let action = app.handle_key(KeyCode::Char('\n'), KeyModifiers::CONTROL);
+        assert!(
+            action.is_none(),
+            "Ctrl+Enter as Char('\\n')+CONTROL should be no-op, got {:?}",
+            action,
         );
-        for c in "there".chars() {
-            app.handle_key(KeyCode::Char(c), KeyModifiers::NONE);
-        }
         assert_eq!(
-            app.editor.buffer, "hi\nthere",
-            "typing after Char('\\n') Ctrl+Enter got stray newline! buffer={:?}",
+            app.editor.buffer, "hi",
+            "Buffer should be unchanged after \\n+CONTROL, got {:?}",
             app.editor.buffer,
         );
     }
 
     #[test]
-    fn test_ctrl_enter_via_char_newline_no_modifier() {
+    fn test_char_newline_no_modifier_inserts_newline() {
+        // \n+NONE without modifier detection defaults to newline
+        // since \n always comes from a modified Enter on non-enhanced
+        // terminals (it's never from bare Enter or text input).
         let mut app = TuiApp::new_inner(
             "anthropic",
             "claude-sonnet-4-20250514",
@@ -1497,16 +1407,50 @@ mod tests {
             "",
         );
         app.handle_key(KeyCode::Char('x'), KeyModifiers::NONE);
-        app.handle_key(KeyCode::Char('\n'), KeyModifiers::NONE);
+        let action = app.handle_key(KeyCode::Char('\n'), KeyModifiers::NONE);
+        assert!(
+            action.is_none(),
+            "\\n+NONE should insert newline (not submit), got {:?}",
+            action,
+        );
         assert_eq!(
             app.editor.buffer, "x\n",
-            "Ctrl+Enter as Char('\\n')/NONE cleared text! buffer={:?}",
+            "\\n+NONE should produce 'x\\n', got {:?}",
             app.editor.buffer,
         );
+        // Subsequent typing works normally
         app.handle_key(KeyCode::Char('y'), KeyModifiers::NONE);
         assert_eq!(
             app.editor.buffer, "x\ny",
-            "typing after Char('\\n')/NONE got stray newline! buffer={:?}",
+            "typing after \\n+NONE should continue on new line, got {:?}",
+            app.editor.buffer,
+        );
+    }
+
+    #[test]
+    fn test_multiple_shift_enter_inserts_multiple_lines() {
+        let mut app = TuiApp::new_inner(
+            "anthropic",
+            "claude-sonnet-4-20250514",
+            "Pick",
+            TEST_VERSION,
+            vec![],
+            vec![],
+            "/tmp",
+            None,
+            "off",
+            None,
+            "test",
+            "",
+        );
+        app.handle_key(KeyCode::Char('a'), KeyModifiers::NONE);
+        app.handle_key(KeyCode::Enter, KeyModifiers::SHIFT);
+        app.handle_key(KeyCode::Char('b'), KeyModifiers::NONE);
+        app.handle_key(KeyCode::Enter, KeyModifiers::SHIFT);
+        app.handle_key(KeyCode::Char('c'), KeyModifiers::NONE);
+        assert_eq!(
+            app.editor.buffer, "a\nb\nc",
+            "multiple Shift+Enter failed: {:?}",
             app.editor.buffer,
         );
     }
@@ -1570,7 +1514,7 @@ mod tests {
     }
 
     #[test]
-    fn test_ctrl_enter_shift_modifier_fallback() {
+    fn test_shift_enter_via_enter_modifier() {
         let mut app = TuiApp::new_inner(
             "anthropic",
             "claude-sonnet-4-20250514",
@@ -1589,7 +1533,7 @@ mod tests {
         app.handle_key(KeyCode::Enter, KeyModifiers::SHIFT);
         assert_eq!(
             app.editor.buffer, "z\n",
-            "Ctrl+Enter as Enter+SHIFT cleared text! buffer={:?}",
+            "Shift+Enter as Enter+SHIFT should insert newline, buffer={:?}",
             app.editor.buffer,
         );
     }
