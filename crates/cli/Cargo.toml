@@ -43,3 +43,5 @@ arboard.workspace = true
 nix = { version = "0.29", default-features = false, features = ["signal", "process"] }
 fs2 = "0.4"
 notify-rust = "4"
+pick-server = { path = "../server" }
+open = "5"

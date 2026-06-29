@@ -65,6 +65,10 @@ pub struct Args {
     pub audit_decision: Option<String>,
     pub audit_layer: Option<String>,
     pub audit_json: bool,
+    /// Web serve mode
+    pub port: Option<u16>,
+    pub host: Option<String>,
+    pub open_browser: bool,
     /// Unknown flags (potentially extension flags) - map of flag name to value
     pub unknown_flags: HashMap<String, ArgValue>,
     /// Diagnostics collected during parsing (warnings, errors)
@@ -262,6 +266,19 @@ pub fn parse_args(args: Vec<String>) -> Args {
                 }
             }
             "--json" => parsed.audit_json = true,
+            "--port" => {
+                i += 1;
+                if i < args.len() {
+                    parsed.port = args[i].parse::<u16>().ok();
+                }
+            }
+            "--host" => {
+                i += 1;
+                if i < args.len() {
+                    parsed.host = Some(args[i].clone());
+                }
+            }
+            "--open" => parsed.open_browser = true,
             _ => {
                 if arg.starts_with("--") {
                     // Unknown flag (potentially extension-registered)
@@ -309,6 +326,16 @@ pub fn parse_args(args: Vec<String>) -> Args {
         parsed.messages.remove(0);
     }
 
+    // Check if first positional argument is "serve" subcommand
+    if !parsed.messages.is_empty()
+        && parsed.messages[0] == "serve"
+        && parsed.mode.is_empty()
+        && !parsed.print
+    {
+        parsed.mode = "serve".to_string();
+        parsed.messages.remove(0);
+    }
+
     parsed
 }
 
@@ -351,6 +378,10 @@ pub fn print_help() {
     println!("  --list-models [FILTER]  List available models");
     println!();
     println!("  update                  Update Pick to the latest version");
+    println!("  serve                   Start web server with SPA");
+    println!("    --port <PORT>           Port (default: random available)");
+    println!("    --host <HOST>           Host address (default: 127.0.0.1)");
+    println!("    --open                  Open browser automatically");
     println!();
     println!("AUDIT:");
     println!("  --audit                 View permission audit trail");

@@ -57,8 +57,12 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
 
                         match msg_type {
                             "create_session" => {
-                                let model_id = payload.and_then(|p| p.get("model_id")).and_then(|v| v.as_str()).unwrap_or("claude-sonnet-4-20250514");
-                                let provider = payload.and_then(|p| p.get("provider")).and_then(|v| v.as_str()).unwrap_or("anthropic");
+                                let model_id = payload.and_then(|p| p.get("model_id")).and_then(|v| v.as_str())
+                                    .or(state.default_model.as_deref())
+                                    .unwrap_or("claude-sonnet-4-20250514");
+                                let provider = payload.and_then(|p| p.get("provider")).and_then(|v| v.as_str())
+                                    .or(state.default_provider.as_deref())
+                                    .unwrap_or("anthropic");
                                 let system_prompt = state.build_system_prompt(provider, model_id);
                                 let tools = state.get_tools();
 
@@ -182,6 +186,12 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
                                     }) as std::pin::Pin<Box<dyn std::future::Future<Output = Result<Vec<Vec<String>>, String>> + Send>>
                                 }) as pick_agent::core::state::QuestionFn);
 
+                                let api_key = state.api_keys.get(&session.provider).cloned();
+                                let get_api_key = api_key.map(|key| {
+                                    std::sync::Arc::new(move || Some(key.clone()))
+                                        as std::sync::Arc<dyn Fn() -> Option<String> + Send + Sync>
+                                });
+
                                 let config = AgentLoopConfig {
                                     model: model.clone(),
                                     system_prompt: session.system_prompt.clone(),
@@ -191,7 +201,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
                                     temperature: None,
                                     extension_runner: None,
                                     transform_context: None,
-                                    get_api_key: None,
+                                    get_api_key,
                                     before_tool_call: None,
                                     should_stop_after_turn: None,
                                     get_steering_messages: None,

@@ -329,6 +329,31 @@ async fn main() {
         auth.set_runtime_api_key(provider, api_key.clone());
     }
 
+    // Early dispatch for serve mode (skip heavy init)
+    if args.mode == "serve" {
+        let default_provider = settings.default_provider().map(String::from);
+        let default_model = settings.default_model().map(String::from);
+
+        let mut api_keys = std::collections::HashMap::new();
+        for provider in &[
+            "anthropic",
+            "openai",
+            "google",
+            "bedrock",
+            "vertex",
+            "github",
+        ] {
+            // Check runtime override first, then config file, then env vars
+            let key = auth.get_api_key(provider, true).await;
+            if let Some(k) = key {
+                api_keys.insert(provider.to_string(), k);
+            }
+        }
+
+        modes::run_serve_mode(args, default_provider, default_model, api_keys).await;
+        return;
+    }
+
     // Discover and load extensions (skipped if --no-extensions)
     let load_result = if args.no_extensions {
         pick_agent::extensions::types::LoadExtensionsResult {
@@ -591,6 +616,10 @@ async fn main() {
                 sandbox_enabled.clone(),
             )
             .await
+        }
+        "serve" => {
+            // Serve mode handled by early return above; unreachable.
+            unreachable!()
         }
         "interactive" => {
             run_interactive_mode(
