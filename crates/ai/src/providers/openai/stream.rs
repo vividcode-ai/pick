@@ -201,7 +201,10 @@ pub fn stream_openai_completions(
         .unwrap_or(60000);
 
     tokio::spawn(async move {
-        let api_key = crate::utils::env_api_keys::get_env_api_key(model.provider.as_str())
+        let api_key = options
+            .as_ref()
+            .and_then(|o| o.api_key.clone())
+            .or_else(|| crate::utils::env_api_keys::get_env_api_key(model.provider.as_str()))
             .or_else(|| std::env::var("OPENAI_API_KEY").ok())
             .unwrap_or_default();
 

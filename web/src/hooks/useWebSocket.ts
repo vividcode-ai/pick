@@ -186,7 +186,16 @@ export function useAgentSession(wsUrl: string) {
       case "turn_end":
         break;
       case "error":
-        console.error("Agent error:", msg.payload?.message);
+        setStreaming(false);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            role: "system",
+            content: "Error: " + (msg.payload?.message || "Unknown error"),
+            timestamp: Date.now(),
+          },
+        ]);
         break;
     }
   }, []);

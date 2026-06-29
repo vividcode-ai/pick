@@ -133,8 +133,6 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
                                 current_cancel_tx = Some(cancel_tx.clone());
 
                                 let et = event_tx.clone();
-                                let sid_clone = sid.clone();
-                                let state_clone = state.clone();
 
                                 let pa = pending_approvals.clone();
                                 let pq = pending_questions.clone();
@@ -230,54 +228,53 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
                                     on_turn_complete: None,
                                 };
 
-                                let agent_handle = tokio::spawn(async move {
-                                    pick_agent::core::agent_loop::run_agent_loop(
+                                let et_agent = event_tx.clone();
+                                let sid_agent = sid.clone();
+                                let state_agent = state.clone();
+
+                                tokio::spawn(async move {
+                                    let result = pick_agent::core::agent_loop::run_agent_loop(
                                         config,
                                         all_msgs,
                                     )
-                                    .await
+                                    .await;
+
+                                    match result {
+                                        Ok(agent_result) => {
+                                            let total_input: u64 = agent_result.messages.iter()
+                                                .filter_map(|m| {
+                                                    if let AiMessage::Assistant(a) = m {
+                                                        Some(a.usage.input)
+                                                    } else {
+                                                        None
+                                                    }
+                                                })
+                                                .sum();
+                                            let total_output: u64 = agent_result.messages.iter()
+                                                .filter_map(|m| {
+                                                    if let AiMessage::Assistant(a) = m {
+                                                        Some(a.usage.output)
+                                                    } else {
+                                                        None
+                                                    }
+                                                })
+                                                .sum();
+
+                                            let _ = et_agent.send(events::serialize_agent_end(total_input, total_output));
+
+                                            state_agent.session_manager.update_messages(&sid_agent, agent_result.messages).await;
+                                        }
+                                        Err(e) => {
+                                            tracing::error!("Agent loop error for session {}: {}", sid_agent, e);
+                                            let _ = et_agent.send(WsEvent {
+                                                event_type: "error".to_string(),
+                                                payload: serde_json::json!({"message": e}),
+                                            });
+                                        }
+                                    }
                                 });
 
-                                let result = agent_handle.await;
-
-                                match result {
-                                    Ok(Ok(agent_result)) => {
-                                        let total_input: u64 = agent_result.messages.iter()
-                                            .filter_map(|m| {
-                                                if let AiMessage::Assistant(a) = m {
-                                                    Some(a.usage.input)
-                                                } else {
-                                                    None
-                                                }
-                                            })
-                                            .sum();
-                                        let total_output: u64 = agent_result.messages.iter()
-                                            .filter_map(|m| {
-                                                if let AiMessage::Assistant(a) = m {
-                                                    Some(a.usage.output)
-                                                } else {
-                                                    None
-                                                }
-                                            })
-                                            .sum();
-
-                                        let _ = event_tx.send(events::serialize_agent_end(total_input, total_output));
-
-                                        state_clone.session_manager.update_messages(&sid_clone, agent_result.messages).await;
-                                    }
-                                    Ok(Err(e)) => {
-                                        let _ = event_tx.send(WsEvent {
-                                            event_type: "error".to_string(),
-                                            payload: serde_json::json!({"message": e}),
-                                        });
-                                    }
-                                    Err(e) => {
-                                        let _ = event_tx.send(WsEvent {
-                                            event_type: "error".to_string(),
-                                            payload: serde_json::json!({"message": format!("Agent task failed: {}", e)}),
-                                        });
-                                    }
-                                }
+                                tracing::info!("Agent spawned for session {}", sid);
                             }
                             "cancel" => {
                                 if let Some(ref tx) = current_cancel_tx {

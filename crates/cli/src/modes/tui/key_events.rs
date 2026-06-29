@@ -272,8 +272,7 @@ pub(crate) fn process_key_event(
                 return result;
             }
             KeyCode::Char(c) => {
-                tui.paste_accumulator.push(c);
-                tui.last_paste_time = Some(now);
+                tui.handle_char_for_paste(c, now);
                 paste_handled = true;
             }
             _ => {}
@@ -400,8 +399,7 @@ pub(crate) fn process_key_event_during_agent(
                 return result;
             }
             KeyCode::Char(c) => {
-                tui.paste_accumulator.push(c);
-                tui.last_paste_time = Some(now);
+                tui.handle_char_for_paste(c, now);
                 paste_handled = true;
             }
             _ => {}
@@ -487,8 +485,7 @@ pub(crate) fn drain_key_events(
                             continue;
                         }
                         KeyCode::Char(c) => {
-                            tui.paste_accumulator.push(c);
-                            tui.last_paste_time = Some(Instant::now());
+                            tui.handle_char_for_paste(c, Instant::now());
                             had_paste_push = true;
                             continue;
                         }
@@ -563,6 +560,7 @@ pub(crate) fn drain_key_events(
                 Ok(crossterm::event::Event::Paste(text)) => {
                     tui.force_flush_paste_accumulator();
                     tui.handle_paste(&text);
+                    tui.last_paste_time = Some(Instant::now());
                     continue;
                 }
                 Ok(crossterm::event::Event::Resize(_, _)) => {
@@ -654,8 +652,7 @@ pub(crate) fn drain_key_events_during_agent(
                             continue;
                         }
                         KeyCode::Char(c) => {
-                            tui.paste_accumulator.push(c);
-                            tui.last_paste_time = Some(Instant::now());
+                            tui.handle_char_for_paste(c, Instant::now());
                             had_paste_push = true;
                             continue;
                         }
@@ -752,6 +749,7 @@ pub(crate) fn drain_key_events_during_agent(
                 Ok(crossterm::event::Event::Paste(text)) => {
                     tui.force_flush_paste_accumulator();
                     tui.handle_paste(&text);
+                    tui.last_paste_time = Some(Instant::now());
                     continue;
                 }
                 Ok(crossterm::event::Event::Resize(_, _)) => {

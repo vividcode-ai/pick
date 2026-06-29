@@ -21,7 +21,11 @@ pub fn stream_openai_responses(
         .unwrap_or(60000);
 
     tokio::spawn(async move {
-        let api_key = std::env::var("OPENAI_API_KEY").unwrap_or_default();
+        let api_key = options
+            .as_ref()
+            .and_then(|o| o.api_key.clone())
+            .or_else(|| std::env::var("OPENAI_API_KEY").ok())
+            .unwrap_or_default();
         if api_key.is_empty() {
             let mut msg = AssistantMessage::new(
                 vec![],

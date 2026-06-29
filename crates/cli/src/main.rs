@@ -335,18 +335,20 @@ async fn main() {
         let default_model = settings.default_model().map(String::from);
 
         let mut api_keys = std::collections::HashMap::new();
-        for provider in &[
-            "anthropic",
-            "openai",
-            "google",
-            "bedrock",
-            "vertex",
-            "github",
-        ] {
-            // Check runtime override first, then config file, then env vars
-            let key = auth.get_api_key(provider, true).await;
-            if let Some(k) = key {
-                api_keys.insert(provider.to_string(), k);
+
+        // 1. Default provider
+        if let Some(ref prov) = default_provider {
+            if let Some(key) = auth.get_api_key(prov, true).await {
+                api_keys.insert(prov.clone(), key);
+            }
+        }
+
+        // 2. All providers with stored credentials
+        for provider in auth.list_providers() {
+            if !api_keys.contains_key(&provider) {
+                if let Some(key) = auth.get_api_key(&provider, true).await {
+                    api_keys.insert(provider, key);
+                }
             }
         }
 
