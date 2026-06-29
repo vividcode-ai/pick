@@ -73,7 +73,7 @@ pub fn convert_to_openai_messages(
                 }
 
                 let content = if text_parts.is_empty() {
-                    serde_json::Value::Null
+                    serde_json::Value::String(String::new())
                 } else {
                     serde_json::Value::String(text_parts.join(""))
                 };

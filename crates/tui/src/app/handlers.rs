@@ -1211,9 +1211,16 @@ impl TuiApp {
             self.editor.set_text(&expanded);
         }
         if !self.paste_accumulator.is_empty() {
-            let text = std::mem::take(&mut self.paste_accumulator);
-            self.last_paste_time = None;
-            self.editor.insert_str(&text);
+            let char_count = self.paste_accumulator.chars().count();
+            if char_count > Self::LARGE_PASTE_CHAR_THRESHOLD {
+                let text = std::mem::take(&mut self.paste_accumulator);
+                self.last_paste_time = None;
+                self.editor.add_paste_placeholder(char_count, &text);
+            } else {
+                let text = std::mem::take(&mut self.paste_accumulator);
+                self.last_paste_time = None;
+                self.editor.insert_str(&text);
+            }
         }
         let trimmed = self.editor.text().trim_start();
         if trimmed.starts_with('/') && !trimmed[1..].contains(' ') {

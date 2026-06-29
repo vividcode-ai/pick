@@ -194,8 +194,19 @@ pub(crate) fn process_key_event(
             return None;
         }
 
-        // Flush paste accumulator to editor before submitting.
+        // During a paste burst (chars arriving <50ms apart), accumulate
+        // \n so the entire paste stays in the accumulator for the 100-char
+        // placeholder check instead of flushing partial content to the
+        // editor as raw text.  Windows may report pasted newlines as
+        // KeyCode::Enter (not Char('\n')), so this guard is essential.
         if !tui.paste_accumulator.is_empty() {
+            if let Some(t) = tui.last_paste_time
+                && now.duration_since(t).as_millis() < 50
+            {
+                tui.paste_accumulator.push('\n');
+                tui.last_paste_time = Some(now);
+                return None;
+            }
             tui.force_flush_paste_accumulator();
         }
 
@@ -225,15 +236,23 @@ pub(crate) fn process_key_event(
     {
         match key.code {
             KeyCode::Char(c) if c as u32 <= 0x1F => {
-                tui.force_flush_paste_accumulator();
                 if (c == '\n' || c == '\r') && check_newline_dedup(tui, now) {
                     return None;
                 }
                 if c == '\n' || c == '\r' {
+                    // During a paste burst (accumulator non-empty), push \n
+                    // into the accumulator to keep the paste content together
+                    // for the 100-char threshold check, instead of submitting.
+                    if !tui.paste_accumulator.is_empty() {
+                        tui.paste_accumulator.push(c);
+                        tui.last_paste_time = Some(now);
+                        return None;
+                    }
                     // Use the same modifier resolution as Enter. This
                     // handles Shift+Enter (newline), Ctrl+Enter (no-op),
                     // and bare Enter (submit) when the terminal reports
                     // a modified Enter as a bare control character.
+                    tui.force_flush_paste_accumulator();
                     let resolved = resolve_enter_modifiers(tui, &key, now);
                     if resolved.contains(KeyModifiers::SHIFT) {
                         tui.editor.insert_newline_auto_indent();
@@ -248,6 +267,7 @@ pub(crate) fn process_key_event(
                     tui.force_flush_paste_accumulator();
                     return tui.handle_key(KeyCode::Enter, KeyModifiers::NONE);
                 }
+                tui.force_flush_paste_accumulator();
                 let result = tui.handle_key(key.code, key.modifiers);
                 return result;
             }
@@ -311,8 +331,19 @@ pub(crate) fn process_key_event_during_agent(
             tui.force_flush_paste_accumulator();
             return None;
         }
-        // Flush paste accumulator to editor before submitting.
+        // During a paste burst (chars arriving <50ms apart), accumulate
+        // \n so the entire paste stays in the accumulator for the 100-char
+        // placeholder check instead of flushing partial content to the
+        // editor as raw text.  Windows may report pasted newlines as
+        // KeyCode::Enter (not Char('\n')), so this guard is essential.
         if !tui.paste_accumulator.is_empty() {
+            if let Some(t) = tui.last_paste_time
+                && now.duration_since(t).as_millis() < 50
+            {
+                tui.paste_accumulator.push('\n');
+                tui.last_paste_time = Some(now);
+                return None;
+            }
             tui.force_flush_paste_accumulator();
         }
         if check_newline_dedup(tui, now) {
@@ -333,15 +364,23 @@ pub(crate) fn process_key_event_during_agent(
     {
         match key.code {
             KeyCode::Char(c) if c as u32 <= 0x1F => {
-                tui.force_flush_paste_accumulator();
                 if (c == '\n' || c == '\r') && check_newline_dedup(tui, now) {
                     return None;
                 }
                 if c == '\n' || c == '\r' {
+                    // During a paste burst (accumulator non-empty), push \n
+                    // into the accumulator to keep the paste content together
+                    // for the 100-char threshold check, instead of submitting.
+                    if !tui.paste_accumulator.is_empty() {
+                        tui.paste_accumulator.push(c);
+                        tui.last_paste_time = Some(now);
+                        return None;
+                    }
                     // Use the same modifier resolution as Enter. This
                     // handles Shift+Enter (newline), Ctrl+Enter (no-op),
                     // and bare Enter (submit) when the terminal reports
                     // a modified Enter as a bare control character.
+                    tui.force_flush_paste_accumulator();
                     let resolved = resolve_enter_modifiers(tui, &key, now);
                     if resolved.contains(KeyModifiers::SHIFT) {
                         tui.editor.insert_newline_auto_indent();
@@ -356,6 +395,7 @@ pub(crate) fn process_key_event_during_agent(
                     tui.force_flush_paste_accumulator();
                     return tui.handle_key(KeyCode::Enter, KeyModifiers::NONE);
                 }
+                tui.force_flush_paste_accumulator();
                 let result = tui.handle_key(key.code, key.modifiers);
                 return result;
             }
@@ -381,10 +421,11 @@ pub(crate) fn process_key_event_during_agent(
 pub(crate) fn drain_key_events(
     tui: &mut TuiApp,
     evt_rx: &mut tokio::sync::mpsc::UnboundedReceiver<crossterm::event::Event>,
-    _now: Instant,
+    now: Instant,
 ) -> Option<TuiAction> {
     loop {
         let mut had_action = false;
+        let mut had_paste_push = false;
         let mut action: Option<TuiAction> = None;
 
         loop {
@@ -417,14 +458,24 @@ pub(crate) fn drain_key_events(
                                 if check_newline_dedup(tui, Instant::now()) {
                                     continue;
                                 }
-                                tui.force_flush_paste_accumulator();
-                                if tui
-                                    .last_detected_modifiers
-                                    .intersects(KeyModifiers::SHIFT | KeyModifiers::CONTROL)
-                                {
-                                    tui.editor.insert_newline_auto_indent();
-                                    tui.just_processed_newline = true;
-                                    tui.last_newline_time = Some(Instant::now());
+                                // During a paste burst (accumulator non-empty),
+                                // push \n into the accumulator so the entire
+                                // paste content stays together for the 100-char
+                                // threshold check and placeholder creation.
+                                if !tui.paste_accumulator.is_empty() {
+                                    tui.paste_accumulator.push(c);
+                                    tui.last_paste_time = Some(Instant::now());
+                                    had_paste_push = true;
+                                } else {
+                                    if tui
+                                        .last_detected_modifiers
+                                        .intersects(KeyModifiers::SHIFT | KeyModifiers::CONTROL)
+                                    {
+                                        tui.force_flush_paste_accumulator();
+                                        tui.editor.insert_newline_auto_indent();
+                                        tui.just_processed_newline = true;
+                                        tui.last_newline_time = Some(Instant::now());
+                                    }
                                 }
                                 continue;
                             }
@@ -437,6 +488,8 @@ pub(crate) fn drain_key_events(
                         }
                         KeyCode::Char(c) => {
                             tui.paste_accumulator.push(c);
+                            tui.last_paste_time = Some(Instant::now());
+                            had_paste_push = true;
                             continue;
                         }
                         KeyCode::Enter => {
@@ -446,6 +499,8 @@ pub(crate) fn drain_key_events(
                             // already in a paste batch; otherwise skip.
                             if !tui.paste_accumulator.is_empty() {
                                 tui.paste_accumulator.push('\n');
+                                tui.last_paste_time = Some(Instant::now());
+                                had_paste_push = true;
                                 continue;
                             }
                             continue;
@@ -520,7 +575,9 @@ pub(crate) fn drain_key_events(
             }
         }
 
-        tui.force_flush_paste_accumulator();
+        if !had_paste_push {
+            tui.finalize_paste_accumulator(now);
+        }
 
         if had_action {
             return action;
@@ -535,7 +592,7 @@ pub(crate) fn drain_key_events(
 pub(crate) fn drain_key_events_during_agent(
     tui: &mut TuiApp,
     evt_rx: &mut tokio::sync::mpsc::UnboundedReceiver<crossterm::event::Event>,
-    _now: Instant,
+    now: Instant,
     abort_on_esc: &mut bool,
 ) -> Option<TuiAction> {
     // Track modifiers from the outer-scope event that triggered draining.
@@ -543,6 +600,7 @@ pub(crate) fn drain_key_events_during_agent(
     // already populated by process_key_event_during_agent's track_modifiers.
     loop {
         let mut had_action = false;
+        let mut had_paste_push = false;
         let mut action: Option<TuiAction> = None;
 
         loop {
@@ -562,14 +620,24 @@ pub(crate) fn drain_key_events_during_agent(
                                 if check_newline_dedup(tui, Instant::now()) {
                                     continue;
                                 }
-                                tui.force_flush_paste_accumulator();
-                                if tui
-                                    .last_detected_modifiers
-                                    .intersects(KeyModifiers::SHIFT | KeyModifiers::CONTROL)
-                                {
-                                    tui.editor.insert_newline_auto_indent();
-                                    tui.just_processed_newline = true;
-                                    tui.last_newline_time = Some(Instant::now());
+                                // During a paste burst (accumulator non-empty),
+                                // push \n into the accumulator so the entire
+                                // paste content stays together for the 100-char
+                                // threshold check and placeholder creation.
+                                if !tui.paste_accumulator.is_empty() {
+                                    tui.paste_accumulator.push(c);
+                                    tui.last_paste_time = Some(Instant::now());
+                                    had_paste_push = true;
+                                } else {
+                                    if tui
+                                        .last_detected_modifiers
+                                        .intersects(KeyModifiers::SHIFT | KeyModifiers::CONTROL)
+                                    {
+                                        tui.force_flush_paste_accumulator();
+                                        tui.editor.insert_newline_auto_indent();
+                                        tui.just_processed_newline = true;
+                                        tui.last_newline_time = Some(Instant::now());
+                                    }
                                 }
                                 continue;
                             }
@@ -587,6 +655,8 @@ pub(crate) fn drain_key_events_during_agent(
                         }
                         KeyCode::Char(c) => {
                             tui.paste_accumulator.push(c);
+                            tui.last_paste_time = Some(Instant::now());
+                            had_paste_push = true;
                             continue;
                         }
                         KeyCode::Enter => {
@@ -594,6 +664,8 @@ pub(crate) fn drain_key_events_during_agent(
                             // \n if already in a paste batch; skip otherwise.
                             if !tui.paste_accumulator.is_empty() {
                                 tui.paste_accumulator.push('\n');
+                                tui.last_paste_time = Some(Instant::now());
+                                had_paste_push = true;
                                 continue;
                             }
                             continue;
@@ -692,7 +764,9 @@ pub(crate) fn drain_key_events_during_agent(
             }
         }
 
-        tui.force_flush_paste_accumulator();
+        if !had_paste_push {
+            tui.finalize_paste_accumulator(now);
+        }
 
         if had_action {
             return action;
@@ -993,7 +1067,8 @@ mod tests {
 
     #[test]
     fn test_pke_fast_typing_enter_with_accumulator_adds_newline() {
-        // Fast typing + plain Enter: must flush accumulator and submit.
+        // When chars and Enter arrive within <50ms (paste burst), Enter
+        // accumulates \n in the accumulator instead of flushing and submitting.
         let mut app = pick_tui::app::TuiApp::new_inner(
             "anthropic",
             "claude-sonnet-4-20250514",
@@ -1014,13 +1089,14 @@ mod tests {
         }
         assert_eq!(app.paste_accumulator, "fast");
 
+        // Enter at same timestamp is treated as paste burst → accumulate \n
         let result = process_key_event(&mut app, enter(KeyModifiers::NONE), now);
-        assert!(
-            matches!(&result, Some(TuiAction::Submit(t)) if t == "fast"),
-            "Enter with non-empty accumulator should flush and submit, got {:?}",
-            result,
-        );
-        assert!(app.paste_accumulator.is_empty());
+        assert!(result.is_none());
+        assert_eq!(app.paste_accumulator, "fast\n");
+
+        // After idle timeout, finalize flushes to editor
+        app.finalize_paste_accumulator(now + std::time::Duration::from_millis(100));
+        assert_eq!(app.editor.buffer, "fast\n");
     }
 
     // ===== drain_key_events integration tests =====
@@ -1120,9 +1196,9 @@ mod tests {
     #[test]
     fn test_drain_enter_during_paste_accumulates() {
         // If there IS text in the paste accumulator, drain's Enter should
-        // accumulate \n for the paste batch.  On exit drain calls
-        // force_flush_paste_accumulator which moves the accumulated
-        // text + \n into the editor buffer.
+        // accumulate \n for the paste batch.  During a paste burst drain
+        // does NOT force-flush — the accumulator keeps growing so the full
+        // paste content stays together for the 100-char threshold check.
         let mut app = pick_tui::app::TuiApp::new_inner(
             "anthropic",
             "claude-sonnet-4-20250514",
@@ -1144,15 +1220,17 @@ mod tests {
         send_enter(&tx); // drain should accumulate \n since accumulator is non-empty
 
         let _ = drain_key_events(&mut app, &mut rx, Instant::now());
-        // force_flush moved "hello\n" to the editor buffer
+        // During a paste burst, drain does NOT flush — the \n stays in the
+        // accumulator alongside "hello".  Flush happens later via the timer
+        // (finalize_paste_accumulator) or the next non-paste event.
         assert_eq!(
-            app.editor.buffer, "hello\n",
-            "Enter during paste should produce 'hello\\n' in editor, got {:?}",
-            app.editor.buffer,
+            app.paste_accumulator, "hello\n",
+            "Enter during paste should produce 'hello\\n' in accumulator, got {:?}",
+            app.paste_accumulator,
         );
         assert!(
-            app.paste_accumulator.is_empty(),
-            "paste accumulator should be flushed"
+            app.editor.buffer.is_empty(),
+            "editor buffer should be empty during a paste burst"
         );
     }
 
@@ -1218,9 +1296,10 @@ mod tests {
 
     #[test]
     fn test_drain_accumulator_enter_then_char_produces_newline() {
-        // Simulate: user is fast-typing, chars in accumulator, then Enter
-        // then more chars. All through drain. On exit drain force-flushes
-        // the accumulated batch ("abc\nd") into the editor buffer.
+        // Simulate: chars in accumulator, then Enter, then more chars.
+        // All through drain. During a paste burst drain does NOT force-flush
+        // — the accumulator keeps growing to keep the full paste content
+        // together for the 100-char threshold check.
         let mut app = pick_tui::app::TuiApp::new_inner(
             "anthropic",
             "claude-sonnet-4-20250514",
@@ -1247,16 +1326,17 @@ mod tests {
             result.is_none(),
             "drain with batch should not produce action"
         );
-        // After drain exits (calling force_flush), the editor buffer
-        // should have the combined text: "abc\nd"
+        // During a paste burst, drain does NOT flush — "abc\nd" stays in
+        // the accumulator.  Flush happens later via the timer
+        // (finalize_paste_accumulator) or the next non-paste event.
         assert_eq!(
-            app.editor.buffer, "abc\nd",
-            "drain paste batch should flush 'abc\\nd' to editor, got {:?}",
-            app.editor.buffer,
+            app.paste_accumulator, "abc\nd",
+            "drain paste batch should accumulate 'abc\\nd', got {:?}",
+            app.paste_accumulator,
         );
         assert!(
-            app.paste_accumulator.is_empty(),
-            "accumulator should be flushed"
+            app.editor.buffer.is_empty(),
+            "editor buffer should be empty during a paste burst"
         );
     }
 }
