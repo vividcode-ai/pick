@@ -148,7 +148,7 @@ impl Editor {
     }
 
     /// Generate a unique placeholder string, adding `#2`, `#3` … if duplicates exist.
-    fn unique_placeholder(&self, base: &str) -> String {
+    pub(crate) fn unique_placeholder(&self, base: &str) -> String {
         let mut max_suffix = 0usize;
         for pp in &self.pending_pastes {
             if pp.placeholder == base {

@@ -1177,10 +1177,32 @@ impl TuiApp {
         let pasted = text.replace("\r\n", "\n").replace('\r', "\n");
 
         if !self.editor.pending_pastes.is_empty() {
-            let raw = self.editor.text().to_string();
-            let expanded = self.editor.expand_pending_pastes(&raw);
-            self.editor.pending_pastes.clear();
-            self.editor.set_text(&expanded);
+            // Merge into last pending paste instead of expanding,
+            // so existing paste placeholders stay visible.
+            let (old_placeholder, old_len, current_text) = {
+                let last = self.editor.pending_pastes.last().unwrap();
+                (
+                    last.placeholder.clone(),
+                    last.actual.chars().count(),
+                    self.editor.text().to_string(),
+                )
+            };
+            let new_len = old_len + pasted.chars().count();
+            let base = format!("[Pasted Content {} chars]", new_len);
+            let new_placeholder = self.editor.unique_placeholder(&base);
+            if current_text.contains(&old_placeholder) {
+                self.editor
+                    .set_text(&current_text.replace(&old_placeholder, &new_placeholder));
+            }
+            if let Some(last) = self.editor.pending_pastes.last_mut() {
+                last.actual.push_str(&pasted);
+                last.placeholder = new_placeholder;
+            }
+            if self.editor.is_autocomplete_active()
+                || self.editor.text().trim_start().starts_with('/')
+            {
+                self.editor.trigger_autocomplete();
+            }
             return;
         }
 
@@ -1205,10 +1227,34 @@ impl TuiApp {
             return;
         }
         if !self.editor.pending_pastes.is_empty() {
-            let raw = self.editor.text().to_string();
-            let expanded = self.editor.expand_pending_pastes(&raw);
-            self.editor.pending_pastes.clear();
-            self.editor.set_text(&expanded);
+            if !self.paste_accumulator.is_empty() {
+                // Merge accumulator into last pending paste instead of expanding,
+                // so the paste placeholder stays visible and doesn't get replaced
+                // with raw text before the user submits.
+                let text = std::mem::take(&mut self.paste_accumulator);
+                self.last_paste_time = None;
+                // Extract data before mutable borrow
+                let (old_placeholder, old_len, current_text) = {
+                    let last = self.editor.pending_pastes.last().unwrap();
+                    (
+                        last.placeholder.clone(),
+                        last.actual.chars().count(),
+                        self.editor.text().to_string(),
+                    )
+                };
+                let new_len = old_len + text.chars().count();
+                let base = format!("[Pasted Content {} chars]", new_len);
+                let new_placeholder = self.editor.unique_placeholder(&base);
+                if current_text.contains(&old_placeholder) {
+                    self.editor
+                        .set_text(&current_text.replace(&old_placeholder, &new_placeholder));
+                }
+                if let Some(last) = self.editor.pending_pastes.last_mut() {
+                    last.actual.push_str(&text);
+                    last.placeholder = new_placeholder;
+                }
+            }
+            return;
         }
         if !self.paste_accumulator.is_empty() {
             let char_count = self.paste_accumulator.chars().count();
@@ -1237,12 +1283,29 @@ impl TuiApp {
         }
 
         if !self.editor.pending_pastes.is_empty() {
-            let raw = self.editor.text().to_string();
-            let expanded = self.editor.expand_pending_pastes(&raw);
-            self.editor.pending_pastes.clear();
-            self.editor.set_text(&expanded);
-            self.paste_accumulator.clear();
+            // Merge accumulator into last pending paste instead of expanding,
+            // so the paste placeholder stays visible until submit.
+            let text = std::mem::take(&mut self.paste_accumulator);
             self.last_paste_time = None;
+            let (old_placeholder, old_len, current_text) = {
+                let last = self.editor.pending_pastes.last().unwrap();
+                (
+                    last.placeholder.clone(),
+                    last.actual.chars().count(),
+                    self.editor.text().to_string(),
+                )
+            };
+            let new_len = old_len + text.chars().count();
+            let base = format!("[Pasted Content {} chars]", new_len);
+            let new_placeholder = self.editor.unique_placeholder(&base);
+            if current_text.contains(&old_placeholder) {
+                self.editor
+                    .set_text(&current_text.replace(&old_placeholder, &new_placeholder));
+            }
+            if let Some(last) = self.editor.pending_pastes.last_mut() {
+                last.actual.push_str(&text);
+                last.placeholder = new_placeholder;
+            }
             return true;
         }
 
