@@ -134,10 +134,7 @@ impl McpManager {
     /// List all connected servers
     pub async fn list_connections(&self) -> Vec<ConnectedServerInfo> {
         let ex = self.executor.lock().await;
-        ex.clients()
-            .iter()
-            .map(|c| build_connected_info(c))
-            .collect()
+        ex.clients().iter().map(build_connected_info).collect()
     }
 
     /// Get info for all servers (both connected and configured-but-disconnected).

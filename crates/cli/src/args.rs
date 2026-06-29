@@ -326,13 +326,13 @@ pub fn parse_args(args: Vec<String>) -> Args {
         parsed.messages.remove(0);
     }
 
-    // Check if first positional argument is "serve" subcommand
+    // Check if first positional argument is "server" subcommand
     if !parsed.messages.is_empty()
-        && parsed.messages[0] == "serve"
+        && parsed.messages[0] == "server"
         && parsed.mode.is_empty()
         && !parsed.print
     {
-        parsed.mode = "serve".to_string();
+        parsed.mode = "server".to_string();
         parsed.messages.remove(0);
     }
 
@@ -378,7 +378,7 @@ pub fn print_help() {
     println!("  --list-models [FILTER]  List available models");
     println!();
     println!("  update                  Update Pick to the latest version");
-    println!("  serve                   Start web server with SPA");
+    println!("  server                  Start web server with SPA");
     println!("    --port <PORT>           Port (default: random available)");
     println!("    --host <HOST>           Host address (default: 127.0.0.1)");
     println!("    --open                  Open browser automatically");

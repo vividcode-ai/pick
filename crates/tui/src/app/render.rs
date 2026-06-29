@@ -141,8 +141,7 @@ impl TuiApp {
         // The status_frame is incremented by advance_spinner() every 100ms
         // in the main loop, providing the animated rotation.
         if self.share_in_progress {
-            const SPINNER_FRAMES: [&'static str; 10] =
-                ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+            const SPINNER_FRAMES: [&str; 10] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
             let frame = SPINNER_FRAMES[self.status_frame % SPINNER_FRAMES.len()];
             self.editor
                 .set_text(&format!("{} Creating gist…  (Esc to cancel)", frame));
@@ -1077,15 +1076,15 @@ impl TuiApp {
                 )));
             }
             result.push(Line::from(""));
-            if let Some(desc) = sel.selected().and_then(|i| i.description.as_ref()) {
-                if !desc.is_empty() {
-                    let desc_trimmed: String = desc
-                        .chars()
-                        .take(width.saturating_sub(4) as usize)
-                        .collect();
-                    result.push(Line::from(Span::styled(format!(" {}", desc_trimmed), dim)));
-                    result.push(Line::from(""));
-                }
+            if let Some(desc) = sel.selected().and_then(|i| i.description.as_ref())
+                && !desc.is_empty()
+            {
+                let desc_trimmed: String = desc
+                    .chars()
+                    .take(width.saturating_sub(4) as usize)
+                    .collect();
+                result.push(Line::from(Span::styled(format!(" {}", desc_trimmed), dim)));
+                result.push(Line::from(""));
             }
             result.push(Line::from(Span::styled(
                 "\u{2191}\u{2193} or j/k Navigate \u{00B7} Enter to select \u{00B7} Esc to cancel"

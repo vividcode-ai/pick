@@ -152,44 +152,42 @@ fn export_session_html(ctx: &TuiContext, output_path: &std::path::Path) -> Resul
                         message_obj["provider"] = serde_json::Value::String(provider.clone());
                     }
                     // Remap usage fields from snake_case to camelCase (JS expects)
-                    if let Some(usage) = &msg.usage {
-                        if let Some(obj) = usage.as_object() {
-                            let mut u = serde_json::Map::new();
-                            let fields: &[(&str, &str)] = &[
-                                ("input", "input"),
-                                ("output", "output"),
-                                ("cache_read", "cacheRead"),
-                                ("cache_write", "cacheWrite"),
-                                ("total_tokens", "totalTokens"),
-                            ];
-                            for &(from, to) in fields {
-                                if let Some(v) = obj.get(from) {
-                                    u.insert(to.into(), v.clone());
-                                }
+                    if let Some(obj) = msg.usage.as_ref().and_then(|u| u.as_object()) {
+                        let mut u = serde_json::Map::new();
+                        let fields: &[(&str, &str)] = &[
+                            ("input", "input"),
+                            ("output", "output"),
+                            ("cache_read", "cacheRead"),
+                            ("cache_write", "cacheWrite"),
+                            ("total_tokens", "totalTokens"),
+                        ];
+                        for &(from, to) in fields {
+                            if let Some(v) = obj.get(from) {
+                                u.insert(to.into(), v.clone());
                             }
-                            // Remap cost sub-fields as well
-                            if let Some(cost) = obj.get("cost") {
-                                if let Some(cost_obj) = cost.as_object() {
-                                    let mut c = serde_json::Map::new();
-                                    let cost_fields: &[(&str, &str)] = &[
-                                        ("input", "input"),
-                                        ("output", "output"),
-                                        ("cache_read", "cacheRead"),
-                                        ("cache_write", "cacheWrite"),
-                                        ("total", "total"),
-                                    ];
-                                    for &(from, to) in cost_fields {
-                                        if let Some(v) = cost_obj.get(from) {
-                                            c.insert(to.into(), v.clone());
-                                        }
-                                    }
-                                    u.insert("cost".into(), serde_json::Value::Object(c));
-                                } else {
-                                    u.insert("cost".into(), cost.clone());
-                                }
-                            }
-                            message_obj["usage"] = serde_json::Value::Object(u);
                         }
+                        // Remap cost sub-fields as well
+                        if let Some(cost) = obj.get("cost") {
+                            if let Some(cost_obj) = cost.as_object() {
+                                let mut c = serde_json::Map::new();
+                                let cost_fields: &[(&str, &str)] = &[
+                                    ("input", "input"),
+                                    ("output", "output"),
+                                    ("cache_read", "cacheRead"),
+                                    ("cache_write", "cacheWrite"),
+                                    ("total", "total"),
+                                ];
+                                for &(from, to) in cost_fields {
+                                    if let Some(v) = cost_obj.get(from) {
+                                        c.insert(to.into(), v.clone());
+                                    }
+                                }
+                                u.insert("cost".into(), serde_json::Value::Object(c));
+                            } else {
+                                u.insert("cost".into(), cost.clone());
+                            }
+                        }
+                        message_obj["usage"] = serde_json::Value::Object(u);
                     }
                     serde_json::json!({
                         "id": entry.id,

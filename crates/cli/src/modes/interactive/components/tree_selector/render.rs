@@ -153,7 +153,7 @@ fn format_tool_call(name: &str, args_json: &str) -> String {
         }
         "bash" => {
             let truncated = if args_json.len() > 50 {
-                crate::utils::truncate_utf8(&args_json, 50)
+                crate::utils::truncate_utf8(args_json, 50)
             } else {
                 args_json.to_string()
             };
@@ -162,7 +162,7 @@ fn format_tool_call(name: &str, args_json: &str) -> String {
         }
         _ => {
             let args_trunc = if args_json.len() > 40 {
-                crate::utils::truncate_utf8(&args_json, 40)
+                crate::utils::truncate_utf8(args_json, 40)
             } else {
                 args_json.to_string()
             };

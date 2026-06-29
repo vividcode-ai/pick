@@ -67,21 +67,19 @@ pub fn stream_mistral(
         }
 
         // Apply reasoning_effort if model supports reasoning
-        if model.reasoning {
-            if let Some(ref opts) = options {
-                if let Some(ref reasoning) = opts.reasoning {
-                    if reasoning != "off" {
-                        let effort = model
-                            .thinking_level_map
-                            .as_ref()
-                            .and_then(|tlm| tlm.get(reasoning.as_str()))
-                            .and_then(|v| v.as_ref())
-                            .map(|s| s.as_str())
-                            .unwrap_or(reasoning.as_str());
-                        body["reasoning_effort"] = serde_json::Value::String(effort.to_string());
-                    }
-                }
-            }
+        if model.reasoning
+            && let Some(ref opts) = options
+            && let Some(ref reasoning) = opts.reasoning
+            && reasoning != "off"
+        {
+            let effort = model
+                .thinking_level_map
+                .as_ref()
+                .and_then(|tlm| tlm.get(reasoning.as_str()))
+                .and_then(|v| v.as_ref())
+                .map(|s| s.as_str())
+                .unwrap_or(reasoning.as_str());
+            body["reasoning_effort"] = serde_json::Value::String(effort.to_string());
         }
 
         for attempt in 0..=max_retries {

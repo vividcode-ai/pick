@@ -49,12 +49,11 @@ fn detect_thinking_format_from_url(url: &str) -> Option<&'static str> {
 /// Returns a string identifying the format (e.g. "openai", "deepseek", "openrouter", etc.)
 fn detect_thinking_format(model: &Model) -> &str {
     // 1. If model has an explicit compat config with thinking_format, use it
-    if let Some(ref compat) = model.compat {
-        if let Some(ref oc) = compat.openai_completions {
-            if let Some(ref tf) = oc.thinking_format {
-                return tf;
-            }
-        }
+    if let Some(ref compat) = model.compat
+        && let Some(ref oc) = compat.openai_completions
+        && let Some(ref tf) = oc.thinking_format
+    {
+        return tf;
     }
 
     // 2. Auto-detect from base_url
@@ -68,10 +67,10 @@ fn detect_thinking_format(model: &Model) -> &str {
 
 /// Check if the model's compat config indicates it supports reasoning_effort
 fn supports_reasoning_effort(model: &Model) -> bool {
-    if let Some(ref compat) = model.compat {
-        if let Some(ref oc) = compat.openai_completions {
-            return oc.supports_reasoning_effort.unwrap_or(true);
-        }
+    if let Some(ref compat) = model.compat
+        && let Some(ref oc) = compat.openai_completions
+    {
+        return oc.supports_reasoning_effort.unwrap_or(true);
     }
     true
 }
@@ -171,7 +170,7 @@ fn build_thinking_params(
                     }
                     Some(params)
                 }
-                "openai" | _ => {
+                _ => {
                     // Standard OpenAI format: reasoning_effort: <value>
                     if supports_effort {
                         Some(serde_json::json!({
@@ -283,19 +282,19 @@ pub fn stream_openai_completions(
         // This replaces the old approach of passing raw token budgets — we now
         // pass the semantic level and let each provider format map it appropriately
         // (reasoning_effort for OpenAI/DeepSeek, thinking budget for Anthropic, etc.).
-        if let Some(ref opts) = options {
-            if let Some(ref reasoning) = opts.reasoning {
-                let reasoning_level = if reasoning == "off" {
-                    None
-                } else {
-                    Some(reasoning.as_str())
-                };
-                if let Some(thinking_params) = build_thinking_params(&model, reasoning_level) {
-                    if let Some(obj) = thinking_params.as_object() {
-                        for (k, v) in obj {
-                            body[k] = v.clone();
-                        }
-                    }
+        if let Some(ref opts) = options
+            && let Some(ref reasoning) = opts.reasoning
+        {
+            let reasoning_level = if reasoning == "off" {
+                None
+            } else {
+                Some(reasoning.as_str())
+            };
+            if let Some(thinking_params) = build_thinking_params(&model, reasoning_level)
+                && let Some(obj) = thinking_params.as_object()
+            {
+                for (k, v) in obj {
+                    body[k] = v.clone();
                 }
             }
         }

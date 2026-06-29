@@ -1167,22 +1167,22 @@ async fn execute_turn(
     // Track skill files that were read in this turn
     if !config.skill_paths.is_empty() {
         for tc in &tool_calls {
-            if tc.name == "read" {
-                if let Some(path_val) = tc.arguments.get("path").and_then(|v| v.as_str()) {
-                    let read_path = std::path::Path::new(path_val);
-                    let abs_read = if read_path.is_absolute() {
-                        read_path.to_path_buf()
-                    } else if let Some(ref cwd) = config.cwd {
-                        cwd.join(read_path)
-                    } else {
-                        continue;
-                    };
-                    let canon_read = abs_read.canonicalize().unwrap_or(abs_read);
-                    if config.skill_paths.iter().any(|sp| *sp == canon_read)
-                        && !state.read_skill_paths.contains(&canon_read)
-                    {
-                        state.read_skill_paths.push(canon_read);
-                    }
+            if tc.name == "read"
+                && let Some(path_val) = tc.arguments.get("path").and_then(|v| v.as_str())
+            {
+                let read_path = std::path::Path::new(path_val);
+                let abs_read = if read_path.is_absolute() {
+                    read_path.to_path_buf()
+                } else if let Some(ref cwd) = config.cwd {
+                    cwd.join(read_path)
+                } else {
+                    continue;
+                };
+                let canon_read = abs_read.canonicalize().unwrap_or(abs_read);
+                if config.skill_paths.contains(&canon_read)
+                    && !state.read_skill_paths.contains(&canon_read)
+                {
+                    state.read_skill_paths.push(canon_read);
                 }
             }
         }

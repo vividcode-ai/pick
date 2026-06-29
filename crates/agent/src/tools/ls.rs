@@ -52,8 +52,9 @@ pub fn create_ls_tool() -> AgentTool {
                 let cwd = ctx.cwd.as_deref().unwrap_or_else(|| Path::new("."));
 
                 // Check fs_policy
-                if let Some(ref policy) = ctx.fs_policy {
-                    if let Err(e) = policy.can_read(path, cwd) {
+                if let Some(ref policy) = ctx.fs_policy
+                    && let Err(e) = policy.can_read(path, cwd)
+                {
                         // Protected paths (e.g. .git/**) are hard denied
                         if policy.is_path_protected(path, cwd).unwrap_or(false) {
                             return Ok(AgentToolResult {
@@ -90,7 +91,6 @@ pub fn create_ls_tool() -> AgentTool {
                                 terminate: false,
                             });
                         }
-                    }
                 }
 
                 let mut entries = tokio::fs::read_dir(path).await

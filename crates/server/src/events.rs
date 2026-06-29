@@ -143,16 +143,12 @@ pub fn serialize_event(event: &AgentEvent) -> Option<WsEvent> {
                     .and_then(|v| v.as_str())
                     .unwrap_or("Unknown error")
                     .to_string()
-            } else if let Some(content) = result.get("content") {
-                if let Some(texts) = content.as_array() {
-                    texts
-                        .iter()
-                        .filter_map(|t| t.as_str())
-                        .collect::<Vec<_>>()
-                        .join("")
-                } else {
-                    String::new()
-                }
+            } else if let Some(texts) = result.get("content").and_then(|c| c.as_array()) {
+                texts
+                    .iter()
+                    .filter_map(|t| t.as_str())
+                    .collect::<Vec<_>>()
+                    .join("")
             } else {
                 String::new()
             };

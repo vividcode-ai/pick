@@ -330,7 +330,7 @@ async fn main() {
     }
 
     // Early dispatch for serve mode (skip heavy init)
-    if args.mode == "serve" {
+    if args.mode == "server" {
         let default_provider = settings.default_provider().map(String::from);
         let default_model = settings.default_model().map(String::from);
 
@@ -617,8 +617,8 @@ async fn main() {
             )
             .await
         }
-        "serve" => {
-            // Serve mode handled by early return above; unreachable.
+        "server" => {
+            // Server mode handled by early return above; unreachable.
             unreachable!()
         }
         "interactive" => {

@@ -130,8 +130,9 @@ pub fn create_find_tool() -> AgentTool {
                 let path = Path::new(path_str);
                 let cwd = ctx.cwd.as_deref().unwrap_or_else(|| Path::new("."));
                 // Check fs_policy on the search root path
-                if let Some(ref policy) = ctx.fs_policy {
-                    if let Err(e) = policy.can_read(path, cwd) {
+                if let Some(ref policy) = ctx.fs_policy
+                    && let Err(e) = policy.can_read(path, cwd)
+                {
                         // Protected paths (e.g. .git/**) are hard denied
                         if policy.is_path_protected(path, cwd).unwrap_or(false) {
                             return Ok(AgentToolResult {
@@ -168,7 +169,6 @@ pub fn create_find_tool() -> AgentTool {
                                 terminate: false,
                             });
                         }
-                    }
                 }
                 let limit = args.get("limit").and_then(|v| v.as_u64()).unwrap_or(1000) as usize;
 

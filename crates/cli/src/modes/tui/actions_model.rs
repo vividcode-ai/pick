@@ -112,7 +112,7 @@ pub(crate) fn handle_cycle_thinking(ctx: &mut TuiContext) {
     let ai_model = pick_ai::models::get_model(&ctx.provider, &ctx.model_id);
     let ai_supported = ai_model
         .as_ref()
-        .map(|m| get_supported_thinking_levels(m))
+        .map(get_supported_thinking_levels)
         .unwrap_or_default();
     let levels: Vec<pick_agent::core::state::ThinkingLevel> = if ai_supported.is_empty() {
         vec![

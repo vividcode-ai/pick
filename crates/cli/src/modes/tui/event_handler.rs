@@ -98,17 +98,13 @@ pub(crate) fn create_on_event(
                     .and_then(|v| v.as_str())
                     .unwrap_or("Unknown error")
                     .to_string()
-            } else if let Some(content) = result.get("content") {
-                if let Some(texts) = content.as_array() {
-                    texts
-                        .iter()
-                        .filter_map(|t| t.as_str())
-                        .filter(|t| !t.is_empty())
-                        .collect::<Vec<_>>()
-                        .join("")
-                } else {
-                    String::new()
-                }
+            } else if let Some(texts) = result.get("content").and_then(|c| c.as_array()) {
+                texts
+                    .iter()
+                    .filter_map(|t| t.as_str())
+                    .filter(|t| !t.is_empty())
+                    .collect::<Vec<_>>()
+                    .join("")
             } else {
                 String::new()
             };

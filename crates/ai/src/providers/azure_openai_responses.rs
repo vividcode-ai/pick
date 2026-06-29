@@ -143,25 +143,23 @@ pub fn stream_azure_openai_responses(
         }
 
         // Apply reasoning parameters for o-series models
-        if model.reasoning {
-            if let Some(ref opts) = options {
-                if let Some(ref reasoning) = opts.reasoning {
-                    if reasoning != "off" {
-                        let effort = model
-                            .thinking_level_map
-                            .as_ref()
-                            .and_then(|tlm| tlm.get(reasoning.as_str()))
-                            .and_then(|v| v.as_ref())
-                            .map(|s| s.as_str())
-                            .unwrap_or(reasoning.as_str());
-                        body["reasoning"] = serde_json::json!({
-                            "effort": effort,
-                            "summary": "auto"
-                        });
-                        body["include"] = serde_json::json!(["reasoning.encrypted_content"]);
-                    }
-                }
-            }
+        if model.reasoning
+            && let Some(ref opts) = options
+            && let Some(ref reasoning) = opts.reasoning
+            && reasoning != "off"
+        {
+            let effort = model
+                .thinking_level_map
+                .as_ref()
+                .and_then(|tlm| tlm.get(reasoning.as_str()))
+                .and_then(|v| v.as_ref())
+                .map(|s| s.as_str())
+                .unwrap_or(reasoning.as_str());
+            body["reasoning"] = serde_json::json!({
+                "effort": effort,
+                "summary": "auto"
+            });
+            body["include"] = serde_json::json!(["reasoning.encrypted_content"]);
         }
 
         for attempt in 0..=max_retries {
@@ -391,42 +389,41 @@ async fn process_azure_event(
                 .get("item")
                 .and_then(|i| i.get("type"))
                 .and_then(|v| v.as_str())
+                && item_type == "reasoning"
             {
-                if item_type == "reasoning" {
-                    let idx = output.content.len();
-                    output
-                        .content
-                        .push(ContentBlock::Thinking(crate::types::ThinkingContent {
-                            thinking: String::new(),
-                            thinking_signature: None,
-                            redacted: false,
-                        }));
-                    *thinking_block_idx = Some(idx);
-                    let _ = tx
-                        .send(StreamEvent::ThinkingStart {
-                            content_index: idx,
-                            partial: partial_from_output(output),
-                        })
-                        .await;
-                }
+                let idx = output.content.len();
+                output
+                    .content
+                    .push(ContentBlock::Thinking(crate::types::ThinkingContent {
+                        thinking: String::new(),
+                        thinking_signature: None,
+                        redacted: false,
+                    }));
+                *thinking_block_idx = Some(idx);
+                let _ = tx
+                    .send(StreamEvent::ThinkingStart {
+                        content_index: idx,
+                        partial: partial_from_output(output),
+                    })
+                    .await;
             }
         }
         "response.reasoning.summary.added" | "response.reasoning.summary.delta" => {
             if let Some(delta) = data.get("delta").and_then(|v| v.as_str()) {
                 let idx = *thinking_block_idx;
-                if let Some(idx) = idx {
-                    if idx < output.content.len() {
-                        if let ContentBlock::Thinking(ref mut tc) = output.content[idx] {
-                            tc.thinking.push_str(delta);
-                        }
-                        let _ = tx
-                            .send(StreamEvent::ThinkingDelta {
-                                content_index: idx,
-                                delta: delta.to_string(),
-                                partial: partial_from_output(output),
-                            })
-                            .await;
+                if let Some(idx) = idx
+                    && idx < output.content.len()
+                {
+                    if let ContentBlock::Thinking(ref mut tc) = output.content[idx] {
+                        tc.thinking.push_str(delta);
                     }
+                    let _ = tx
+                        .send(StreamEvent::ThinkingDelta {
+                            content_index: idx,
+                            delta: delta.to_string(),
+                            partial: partial_from_output(output),
+                        })
+                        .await;
                 }
             }
         }

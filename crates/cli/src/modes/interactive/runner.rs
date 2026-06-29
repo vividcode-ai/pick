@@ -980,19 +980,19 @@ pub async fn run_interactive_mode(
                                         " {}",
                                         ToolTheme::fg("error", &format!("[Error: {}]", error_text))
                                     );
-                                } else if let Some(content) = result.get("content") {
-                                    if let Some(texts) = content.as_array() {
-                                        let mut has_output = false;
-                                        for t in texts {
-                                            if let Some(text) = t.as_str()
-                                                && !text.is_empty()
-                                            {
-                                                if !has_output {
-                                                    println!();
-                                                    has_output = true;
-                                                }
-                                                print!("{}", ToolTheme::fg("toolOutput", text));
+                                } else if let Some(texts) =
+                                    result.get("content").and_then(|c| c.as_array())
+                                {
+                                    let mut has_output = false;
+                                    for t in texts {
+                                        if let Some(text) = t.as_str()
+                                            && !text.is_empty()
+                                        {
+                                            if !has_output {
+                                                println!();
+                                                has_output = true;
                                             }
+                                            print!("{}", ToolTheme::fg("toolOutput", text));
                                         }
                                     }
                                 } else {

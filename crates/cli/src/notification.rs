@@ -19,26 +19,23 @@ impl ToolEventObserver for SystemNotificationObserver {
     }
 
     async fn on_tool_event(&self, event: &ToolEvent) {
-        match event {
-            ToolEvent::WaitingForUser { kind, summary, .. } => {
-                let (title, body) = match kind {
-                    WaitingKind::Permission { permission } => {
-                        let perm_desc = permission_description(permission);
-                        (format!("🔒 Pick — {}", perm_desc), truncate(summary, 120))
-                    }
-                    WaitingKind::Question { header, .. } => {
-                        ("💬 Pick — Question tool".to_string(), header.clone())
-                    }
-                };
+        if let ToolEvent::WaitingForUser { kind, summary, .. } = event {
+            let (title, body) = match kind {
+                WaitingKind::Permission { permission } => {
+                    let perm_desc = permission_description(permission);
+                    (format!("🔒 Pick — {}", perm_desc), truncate(summary, 120))
+                }
+                WaitingKind::Question { header, .. } => {
+                    ("💬 Pick — Question tool".to_string(), header.clone())
+                }
+            };
 
-                let _ = Notification::new()
-                    .summary(&title)
-                    .body(&body)
-                    .appname("Pick")
-                    .timeout(Timeout::Milliseconds(10000))
-                    .show();
-            }
-            _ => {}
+            let _ = Notification::new()
+                .summary(&title)
+                .body(&body)
+                .appname("Pick")
+                .timeout(Timeout::Milliseconds(10000))
+                .show();
         }
     }
 }

@@ -12,6 +12,7 @@ pub struct PendingApproval {
 
 #[derive(Clone)]
 pub struct PendingQuestion {
+    #[allow(clippy::type_complexity)]
     pub response_tx:
         Arc<tokio::sync::Mutex<Option<oneshot::Sender<Result<Vec<Vec<String>>, String>>>>>,
 }
@@ -47,6 +48,12 @@ impl AgentSession {
 
 pub struct SessionManager {
     sessions: RwLock<HashMap<String, AgentSession>>,
+}
+
+impl Default for SessionManager {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl SessionManager {
