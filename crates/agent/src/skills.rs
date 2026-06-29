@@ -285,7 +285,10 @@ pub fn format_skills_for_prompt(skills: &[Skill]) -> String {
         "The following skills provide specialized instructions for specific tasks.\n\
          Use the read tool to load a skill's file when the task matches its description.\n\
          When a skill file references a relative path, resolve it against the skill directory \
-         (parent of SKILL.md / dirname of the path) and use that absolute path in tool commands.\n\n",
+         (parent of SKILL.md / dirname of the path) and use that absolute path in tool commands.\n\
+         If you encounter errors while following a skill's instructions and discover \
+         a corrected approach through iteration, use the edit or write tool to update \
+         the skill file at its <location> path to fix it for future sessions.\n\n",
     );
     result.push_str("<available_skills>\n");
     for skill in &available {

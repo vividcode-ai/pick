@@ -331,6 +331,18 @@ pub(crate) fn build_agent_config(
         }
     });
 
+    let sm = crate::core::settings::SettingsManager::load(&ctx.cwd);
+    let enable_skills = sm.get_enable_skill_commands();
+    let skill_paths: Vec<std::path::PathBuf> = if enable_skills {
+        ctx.resource_loader
+            .skills()
+            .iter()
+            .map(|s| s.file_path.clone())
+            .collect()
+    } else {
+        Vec::new()
+    };
+
     AgentLoopConfig {
         model: ctx.model.clone(),
         system_prompt: ctx.system_prompt.clone(),
@@ -362,6 +374,7 @@ pub(crate) fn build_agent_config(
         provider_max_retries: None,
         provider_max_retry_delay_ms: None,
         approve: None,
+        skill_paths,
     }
 }
 

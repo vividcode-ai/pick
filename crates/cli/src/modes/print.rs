@@ -194,6 +194,7 @@ pub async fn run_print_mode(
         sandbox: platform_sandbox.clone(),
         sandbox_enabled: Some(sandbox_enabled.clone()),
         cancel_signal_tx: None,
+        skill_paths: Vec::new(),
         on_event: Some(Arc::new(move |event| {
             if mode_is_json {
                 let json_line = agent_event_to_json_value(&event);

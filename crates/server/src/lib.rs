@@ -1,8 +1,10 @@
 pub mod events;
 pub mod rest;
 pub mod session;
+pub mod spa;
 pub mod ws;
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use axum::Router;
@@ -15,6 +17,9 @@ use tracing::info;
 pub struct AppState {
     pub session_manager: session::SessionManager,
     pub config: ServerConfig,
+    pub default_provider: Option<String>,
+    pub default_model: Option<String>,
+    pub api_keys: HashMap<String, String>,
 }
 
 impl AppState {
@@ -22,6 +27,9 @@ impl AppState {
         Self {
             session_manager: session::SessionManager::new(),
             config,
+            default_provider: None,
+            default_model: None,
+            api_keys: HashMap::new(),
         }
     }
 
@@ -37,7 +45,6 @@ impl AppState {
 
     pub fn get_tools(&self) -> Vec<pick_agent::core::state::AgentTool> {
         use pick_agent::tools::registry;
-        use std::sync::Arc;
         let gm = Arc::new(GoalManager::new());
         let agent_mode: Option<String> = None;
         registry::create_coding_tools_with_goal_manager(agent_mode, gm)
@@ -59,10 +66,8 @@ impl Default for ServerConfig {
     }
 }
 
-pub async fn run_server(config: ServerConfig) -> Result<(), Box<dyn std::error::Error>> {
-    let state = Arc::new(AppState::new(config.clone()));
-
-    let app = Router::new()
+pub fn create_app(state: Arc<AppState>) -> Router {
+    Router::new()
         .route("/health", get(rest::health))
         .route(
             "/sessions",
@@ -74,8 +79,14 @@ pub async fn run_server(config: ServerConfig) -> Result<(), Box<dyn std::error::
         )
         .route("/providers", get(rest::list_providers))
         .route("/ws", get(ws::handle_ws))
+        .fallback(spa::spa_handler)
         .layer(CorsLayer::permissive())
-        .with_state(state);
+        .with_state(state)
+}
+
+pub async fn run_server(config: ServerConfig) -> Result<(), Box<dyn std::error::Error>> {
+    let state = Arc::new(AppState::new(config.clone()));
+    let app = create_app(state);
 
     let addr = format!("{}:{}", config.host, config.port);
     info!("pick-server starting on {}", addr);
@@ -91,23 +102,18 @@ pub async fn run_server_on_listener(
     config: ServerConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let state = Arc::new(AppState::new(config));
-
-    let app = Router::new()
-        .route("/health", get(rest::health))
-        .route(
-            "/sessions",
-            get(rest::list_sessions).post(rest::create_session),
-        )
-        .route(
-            "/sessions/{id}",
-            get(rest::get_session).delete(rest::delete_session),
-        )
-        .route("/providers", get(rest::list_providers))
-        .route("/ws", get(ws::handle_ws))
-        .layer(CorsLayer::permissive())
-        .with_state(state);
+    let app = create_app(state);
 
     axum::serve(listener, app).await?;
 
+    Ok(())
+}
+
+pub async fn serve_with_state(
+    listener: TcpListener,
+    state: Arc<AppState>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let app = create_app(state);
+    axum::serve(listener, app).await?;
     Ok(())
 }

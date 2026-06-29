@@ -74,6 +74,7 @@ fn build_subagent_loop_config(
         sandbox,
         sandbox_enabled,
         cancel_signal_tx: None,
+        skill_paths: Vec::new(),
     }
 }
 

@@ -16,3 +16,5 @@ tracing = { workspace = true }
 futures = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
+rust-embed = "8"
+mime_guess = "2"

@@ -96,6 +96,10 @@ pub struct AgentLoopConfig {
     /// stops cooperatively — the current LLM call is abandoned and any accumulated
     /// messages are returned as a normal result rather than an error.
     pub cancel_signal_tx: Option<std::sync::Arc<tokio::sync::watch::Sender<bool>>>,
+    /// Paths to known skill files. When populated, the agent loop tracks which
+    /// skills the LLM reads; if consecutive tool errors occur after reading a
+    /// skill, a steering message suggests updating the skill file.
+    pub skill_paths: Vec<std::path::PathBuf>,
 }
 
 /// Result from a single agent run

@@ -216,6 +216,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<AppState>) {
                                     sandbox: None,
                                     sandbox_enabled: None,
                                     cancel_signal_tx: Some(Arc::new(cancel_tx)),
+                                    skill_paths: Vec::new(),
                                     on_turn_complete: None,
                                 };
 

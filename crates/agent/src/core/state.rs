@@ -186,6 +186,9 @@ pub struct AgentState {
     pub error_message: Option<String>,
     pub consecutive_tool_errors: u32,
     pub plan_awareness_triggered: bool,
+    /// Skill file paths that the LLM has read during this session.
+    /// Used to decide whether to suggest skill file updates after errors.
+    pub read_skill_paths: Vec<std::path::PathBuf>,
 }
 
 /// Agent context snapshot

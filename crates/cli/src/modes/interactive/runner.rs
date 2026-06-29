@@ -765,6 +765,12 @@ pub async fn run_interactive_mode(
                 // so MessageUpdate events only print the delta (not the full text).
                 let printed_offset = std::sync::atomic::AtomicUsize::new(0);
 
+                let skill_paths: Vec<std::path::PathBuf> = resource_loader
+                    .skills()
+                    .iter()
+                    .map(|s| s.file_path.clone())
+                    .collect();
+
                 let config = AgentLoopConfig {
                     model: model.clone(),
                     system_prompt: system_prompt.clone(),
@@ -1001,6 +1007,7 @@ pub async fn run_interactive_mode(
                         use std::io::Write;
                         std::io::stdout().flush().ok();
                     })),
+                    skill_paths,
                 };
 
                 match crate::core::agent_session::run_agent_loop_with_retry(
