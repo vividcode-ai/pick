@@ -17,7 +17,11 @@ async function detectServerUrl(): Promise<string> {
     } catch {}
   }
 
-  return localStorage.getItem("pick_server_url") || DEFAULT_WS_URL;
+  // Derive from current page URL (covers pick server random port)
+  const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  const derivedUrl = `${wsProtocol}//${window.location.host}/ws`;
+
+  return localStorage.getItem("pick_server_url") || derivedUrl;
 }
 
 export default function App() {
