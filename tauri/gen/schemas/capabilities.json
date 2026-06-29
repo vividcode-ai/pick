@@ -1,0 +1,1 @@
+{"default":{"identifier":"default","description":"Default capabilities for Pick","local":true,"windows":["main"],"permissions":["core:default","shell:allow-open","dialog:default","clipboard-manager:default","notification:default","os:default"]}}

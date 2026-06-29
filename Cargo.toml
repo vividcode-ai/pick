@@ -7,12 +7,15 @@ members = [
     "crates/cli",
     "crates/mcp",
     "crates/sandbox",
+    "crates/server",
+    "tauri",
 ]
 
 [workspace.package]
 version = "0.1.16"
 edition = "2024"
 license = "MIT"
+authors = ["Pick Contributors"]
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
@@ -51,3 +54,5 @@ textwrap = { version = "0.16", features = ["unicode-width"] }
 itertools = "0.14"
 derive_more = { version = "2", features = ["is_variant"] }
 walkdir = "2"
+axum = { version = "0.8", features = ["ws"] }
+tower-http = { version = "0.6", features = ["cors", "compression-gzip"] }

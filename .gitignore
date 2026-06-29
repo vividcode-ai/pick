@@ -7,3 +7,7 @@ dist/
 __pycache__/
 *.pyc
 !examples/**/.pick/
+node_modules/
+web/dist/
+tauri/icons/icon.png
+*.log
