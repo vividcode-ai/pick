@@ -1232,6 +1232,15 @@ impl TuiApp {
                 self.last_paste_time = Some(now);
                 return;
             }
+            // last_paste_time being None means the paste burst was just
+            // finalized (accumulator flushed to a placeholder).  A char
+            // arriving immediately after is likely a late paste character,
+            // not user typing — accumulate it.
+            if self.last_paste_time.is_none() {
+                self.paste_accumulator.push(c);
+                self.last_paste_time = Some(now);
+                return;
+            }
             let raw = self.editor.text().to_string();
             let expanded = self.editor.expand_pending_pastes(&raw);
             self.editor.pending_pastes.clear();
@@ -1260,9 +1269,10 @@ impl TuiApp {
                 if let Some(t) = self.last_paste_time
                     && Instant::now().duration_since(t).as_millis() < 50
                 {
-                    // Still within paste burst: merge into pending paste
+                    // Still within paste burst: merge into pending paste.
+                    // Keep last_paste_time so subsequent chars can still
+                    // be recognised as paste continuation via timing check.
                     let text = std::mem::take(&mut self.paste_accumulator);
-                    self.last_paste_time = None;
                     let (old_placeholder, old_len, current_text) = {
                         let last = self.editor.pending_pastes.last().unwrap();
                         (
@@ -1301,11 +1311,9 @@ impl TuiApp {
             let char_count = self.paste_accumulator.chars().count();
             if char_count > Self::LARGE_PASTE_CHAR_THRESHOLD {
                 let text = std::mem::take(&mut self.paste_accumulator);
-                self.last_paste_time = None;
                 self.editor.add_paste_placeholder(char_count, &text);
             } else {
                 let text = std::mem::take(&mut self.paste_accumulator);
-                self.last_paste_time = None;
                 self.editor.insert_str(&text);
             }
         }
@@ -1326,8 +1334,9 @@ impl TuiApp {
         if !self.editor.pending_pastes.is_empty() {
             if !self.paste_accumulator.is_empty() {
                 // Paste burst ended but pending_pastes exists: merge into pending paste.
+                // Keep last_paste_time so subsequent chars can still
+                // be recognised as paste continuation via timing check.
                 let text = std::mem::take(&mut self.paste_accumulator);
-                self.last_paste_time = None;
                 let (old_placeholder, old_len, current_text) = {
                     let last = self.editor.pending_pastes.last().unwrap();
                     (
@@ -1354,7 +1363,6 @@ impl TuiApp {
         let char_count = self.paste_accumulator.chars().count();
         if char_count > Self::LARGE_PASTE_CHAR_THRESHOLD {
             let text = std::mem::take(&mut self.paste_accumulator);
-            self.last_paste_time = None;
             self.editor.add_paste_placeholder(char_count, &text);
             return true;
         }
@@ -1362,7 +1370,6 @@ impl TuiApp {
             && now.duration_since(t).as_millis() > 50
         {
             let text = std::mem::take(&mut self.paste_accumulator);
-            self.last_paste_time = None;
             self.editor.insert_str(&text);
             let trimmed = self.editor.text().trim_start();
             if trimmed.starts_with('/') && !trimmed[1..].contains(' ') {
