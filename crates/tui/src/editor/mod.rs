@@ -184,8 +184,42 @@ impl Editor {
 
         let line_count = s.lines().count();
         if s.len() > 100 || line_count > 11 {
-            // Long paste: insert a placeholder string into the buffer
-            // and record the actual content for expansion on submit.
+            // Check if cursor is at the end of an existing paste element.
+            // If so, merge the new content into it (handles pastes that
+            // arrive in multiple batches due to timing / platform quirks).
+            if let Some(idx) = self
+                .paste_elements
+                .iter()
+                .position(|e| e.end == self.cursor)
+            {
+                let old_ph = self.buffer
+                    [self.paste_elements[idx].start..self.paste_elements[idx].end]
+                    .to_string();
+                if let Some(pp_idx) = self.pending_pastes.iter().position(|(ph, _)| *ph == old_ph) {
+                    let combined = self.pending_pastes[pp_idx].1.clone() + s;
+                    let new_line_count = combined.lines().count();
+                    let new_ph = format!("[Pasted Content {} Lines]", new_line_count);
+                    let new_ph_len = new_ph.len();
+                    let start = self.paste_elements[idx].start;
+                    let old_len = self.paste_elements[idx].end - start;
+
+                    self.push_undo();
+                    // Replace the old placeholder text with the new one
+                    self.buffer.drain(start..self.paste_elements[idx].end);
+                    self.buffer.insert_str(start, &new_ph);
+                    self.cursor = start + new_ph_len;
+                    // Update element range
+                    let delta = new_ph_len as isize - old_len as isize;
+                    self.paste_elements[idx].end = start + new_ph_len;
+                    // Update pending paste entry
+                    self.pending_pastes[pp_idx] = (new_ph, combined);
+                    // Shift subsequent elements by the delta
+                    self.shift_elements_after(start + old_len, delta);
+                    return;
+                }
+            }
+
+            // No existing element at cursor — create a new one.
             let placeholder = format!("[Pasted Content {} Lines]", line_count);
             let ph_len = placeholder.len();
             self.push_undo();

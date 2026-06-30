@@ -71,7 +71,7 @@ export function ThinkingSelector({
       <button
         onClick={() => { setOpen((v) => !v); setHighlightIdx(0); }}
         disabled={disabled}
-        className="selector-trigger max-w-[80px]"
+        className="selector-trigger"
       >
         <span className="selector-trigger-primary">{selectedLabel}</span>
         <span className="selector-trigger-icon">
