@@ -198,7 +198,9 @@ pub async fn run_tui_mode(
                         }
                         Some(crossterm::event::Event::Resize(_, _)) => {}
                         Some(crossterm::event::Event::Paste(text)) => {
+                            ctx.tui.force_flush_paste_accumulator();
                             ctx.tui.handle_paste(&text);
+                            ctx.tui.last_paste_time = Some(Instant::now());
                         }
                         Some(_) => {}
                         None => break 'input TuiAction::Quit,

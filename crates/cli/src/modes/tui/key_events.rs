@@ -144,6 +144,7 @@ pub(crate) fn process_key_event(
         if let Ok(mut clipboard) = arboard::Clipboard::new()
             && let Ok(text) = clipboard.get_text()
         {
+            tui.force_flush_paste_accumulator();
             tui.handle_paste(&text);
         }
         return None;
@@ -236,22 +237,27 @@ pub(crate) fn process_key_event(
     {
         match key.code {
             KeyCode::Char(c) if c as u32 <= 0x1F => {
-                if (c == '\n' || c == '\r') && check_newline_dedup(tui, now) {
+                if (c == '\n' || c == '\r' || c == '\t') && check_newline_dedup(tui, now) {
                     return None;
                 }
-                if c == '\n' || c == '\r' {
+                if c == '\n' || c == '\r' || c == '\t' {
                     // During a paste burst (accumulator non-empty),
-                    // push \n into the accumulator to keep the paste content
-                    // together, instead of submitting or inserting as newline.
+                    // push the character into the accumulator to keep the paste
+                    // content together instead of flushing partial content.
                     if !tui.paste_accumulator.is_empty() {
                         tui.paste_accumulator.push(c);
                         tui.last_paste_time = Some(now);
                         return None;
                     }
-                    // Use the same modifier resolution as Enter. This
-                    // handles Shift+Enter (newline), Ctrl+Enter (no-op),
-                    // and bare Enter (submit) when the terminal reports
-                    // a modified Enter as a bare control character.
+                    // No paste in progress — handle each differently:
+                    if c == '\t' {
+                        tui.force_flush_paste_accumulator();
+                        return tui.handle_key(KeyCode::Tab, key.modifiers);
+                    }
+                    // c == '\n' || c == '\r': use the same modifier resolution
+                    // as Enter.  This handles Shift+Enter (newline),
+                    // Ctrl+Enter (no-op), and bare Enter (submit) when the
+                    // terminal reports a modified Enter as a bare control char.
                     tui.force_flush_paste_accumulator();
                     let resolved = resolve_enter_modifiers(tui, &key, now);
                     if resolved.contains(KeyModifiers::SHIFT) {
@@ -305,6 +311,7 @@ pub(crate) fn process_key_event_during_agent(
         if let Ok(mut clipboard) = arboard::Clipboard::new()
             && let Ok(text) = clipboard.get_text()
         {
+            tui.force_flush_paste_accumulator();
             tui.handle_paste(&text);
         }
         return None;
@@ -363,22 +370,27 @@ pub(crate) fn process_key_event_during_agent(
     {
         match key.code {
             KeyCode::Char(c) if c as u32 <= 0x1F => {
-                if (c == '\n' || c == '\r') && check_newline_dedup(tui, now) {
+                if (c == '\n' || c == '\r' || c == '\t') && check_newline_dedup(tui, now) {
                     return None;
                 }
-                if c == '\n' || c == '\r' {
+                if c == '\n' || c == '\r' || c == '\t' {
                     // During a paste burst (accumulator non-empty),
-                    // push \n into the accumulator to keep the paste content
-                    // together, instead of submitting or inserting as newline.
+                    // push the character into the accumulator to keep the paste
+                    // content together instead of flushing partial content.
                     if !tui.paste_accumulator.is_empty() {
                         tui.paste_accumulator.push(c);
                         tui.last_paste_time = Some(now);
                         return None;
                     }
-                    // Use the same modifier resolution as Enter. This
-                    // handles Shift+Enter (newline), Ctrl+Enter (no-op),
-                    // and bare Enter (submit) when the terminal reports
-                    // a modified Enter as a bare control character.
+                    // No paste in progress — handle each differently:
+                    if c == '\t' {
+                        tui.force_flush_paste_accumulator();
+                        return tui.handle_key(KeyCode::Tab, key.modifiers);
+                    }
+                    // c == '\n' || c == '\r': use the same modifier resolution
+                    // as Enter.  This handles Shift+Enter (newline),
+                    // Ctrl+Enter (no-op), and bare Enter (submit) when the
+                    // terminal reports a modified Enter as a bare control char.
                     tui.force_flush_paste_accumulator();
                     let resolved = resolve_enter_modifiers(tui, &key, now);
                     if resolved.contains(KeyModifiers::SHIFT) {
@@ -452,18 +464,28 @@ pub(crate) fn drain_key_events(
                             // that would corrupt the buffer if inserted
                             // as text — and in drain this is a leftover
                             // from a modified Enter, not a submit action).
-                            if c == '\n' || c == '\r' {
-                                if check_newline_dedup(tui, Instant::now()) {
+                            if c == '\n' || c == '\r' || c == '\t' {
+                                if (c == '\n' || c == '\r')
+                                    && check_newline_dedup(tui, Instant::now())
+                                {
                                     continue;
                                 }
                                 // During a paste burst (accumulator non-empty),
-                                // push \n into the accumulator so the entire paste
-                                // content stays together.
+                                // push the character into the accumulator so the
+                                // entire paste content stays together.
                                 if !tui.paste_accumulator.is_empty() {
                                     tui.paste_accumulator.push(c);
                                     tui.last_paste_time = Some(Instant::now());
                                     had_paste_push = true;
+                                } else if c == '\t' {
+                                    tui.force_flush_paste_accumulator();
+                                    if let Some(a) = tui.handle_key(KeyCode::Tab, key.modifiers) {
+                                        action = Some(a);
+                                        had_action = true;
+                                    }
                                 } else {
+                                    // \n or \r without active paste — apply
+                                    // modifier-based action.
                                     if tui
                                         .last_detected_modifiers
                                         .intersects(KeyModifiers::SHIFT | KeyModifiers::CONTROL)
@@ -610,21 +632,35 @@ pub(crate) fn drain_key_events_during_agent(
                 {
                     match key.code {
                         KeyCode::Char(c) if (c as u32) <= 0x1F => {
-                            // Handle \n/\r as newline insertion if
-                            // dedup allows it.  In drain these are
-                            // leftovers from modified-Enter events.
-                            if c == '\n' || c == '\r' {
-                                if check_newline_dedup(tui, Instant::now()) {
+                            // Handle \n, \r, and \t appropriately during
+                            // paste bursts to keep the paste content together.
+                            if c == '\n' || c == '\r' || c == '\t' {
+                                if (c == '\n' || c == '\r')
+                                    && check_newline_dedup(tui, Instant::now())
+                                {
                                     continue;
                                 }
                                 // During a paste burst (accumulator non-empty),
-                                // push \n into the accumulator so the entire paste
-                                // content stays together.
+                                // push the character into the accumulator so the
+                                // entire paste content stays together.
                                 if !tui.paste_accumulator.is_empty() {
                                     tui.paste_accumulator.push(c);
                                     tui.last_paste_time = Some(Instant::now());
                                     had_paste_push = true;
+                                } else if c == '\t' {
+                                    tui.force_flush_paste_accumulator();
+                                    if let Some(a) = tui.handle_key(KeyCode::Tab, key.modifiers) {
+                                        if matches!(a, TuiAction::Quit) {
+                                            action = Some(a);
+                                            had_action = true;
+                                        } else if matches!(a, TuiAction::QueueMessage(_)) {
+                                            action = Some(a);
+                                            had_action = true;
+                                        }
+                                    }
                                 } else {
+                                    // \n or \r without active paste — apply
+                                    // modifier-based action.
                                     if tui
                                         .last_detected_modifiers
                                         .intersects(KeyModifiers::SHIFT | KeyModifiers::CONTROL)

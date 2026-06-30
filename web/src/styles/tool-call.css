@@ -28,6 +28,10 @@
   align-items: center;
 }
 
+.tool-call-status[data-status="pending"] {
+  color: var(--text-muted);
+}
+
 .tool-call-status[data-status="running"] {
   color: var(--status-warning);
 }

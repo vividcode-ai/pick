@@ -5,6 +5,7 @@
 @import "./styles/tool-call.css";
 @import "./styles/markdown.css";
 @import "./styles/diff.css";
+@import "./styles/selector.css";
 
 body {
   margin: 0;

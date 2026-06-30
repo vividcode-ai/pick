@@ -1172,8 +1172,12 @@ impl TuiApp {
             self.api_key_input.push_str(text);
             return;
         }
+        // Clear any residual paste accumulator so it doesn't get flushed
+        // after the paste, inserting stale content alongside the real paste.
+        self.paste_accumulator.clear();
         let pasted = text.replace("\r\n", "\n").replace('\r', "\n");
         self.editor.insert_str(&pasted);
+        self.last_paste_time = Some(Instant::now());
         if self.editor.is_autocomplete_active() || self.editor.text().trim_start().starts_with('/')
         {
             self.editor.trigger_autocomplete();
