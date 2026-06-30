@@ -136,9 +136,9 @@ impl Editor {
     }
 
     /// Insert a paste placeholder into the buffer for a large paste.
-    /// Uses `[Pasted Content N chars]` format, with dedup suffix (#2, #3…) for multiple pastes.
-    pub fn add_paste_placeholder(&mut self, text_len: usize, actual: &str) {
-        let base = format!("[Pasted Content {} chars]", text_len);
+    /// Uses `[Pasted Content N Lines]` format, with dedup suffix (#2, #3…) for multiple pastes.
+    pub fn add_paste_placeholder(&mut self, line_count: usize, actual: &str) {
+        let base = format!("[Pasted Content {} Lines]", line_count);
         let placeholder = self.unique_placeholder(&base);
         self.insert_str(&placeholder);
         self.pending_pastes.push(PendingPaste {

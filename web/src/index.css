@@ -28,7 +28,4 @@ aside {
   transition: transform 0.2s ease-in-out;
 }
 
-/* Textarea auto-resize */
-textarea {
-  field-sizing: content;
-}
+/* Textarea auto-resize handled via JS in ChatInput */

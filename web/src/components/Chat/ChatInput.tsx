@@ -86,9 +86,8 @@ export function ChatInput({
   };
 
   return (
-    <div className="border-t border-neutral-800 bg-neutral-900 px-4 py-3">
-      <div className="max-w-[90%] md:max-w-[70%] lg:max-w-[50%] mx-auto">
-        <div className="rounded-2xl bg-neutral-800 border border-neutral-700 overflow-hidden">
+    <div className="px-4 py-3">
+      <div className="max-w-[90%] md:max-w-[70%] lg:max-w-[50%] mx-auto rounded-2xl border border-neutral-700 bg-neutral-800">
           {/* Top: textarea */}
           <textarea
             ref={textareaRef}
@@ -101,11 +100,11 @@ export function ChatInput({
             }
             rows={1}
             disabled={!connected}
-            className="w-full bg-transparent text-neutral-100 px-4 pt-3 pb-2 text-sm resize-none outline-none placeholder-neutral-500 disabled:opacity-50"
+            className="w-full bg-transparent text-neutral-100 px-4 pt-3 pb-3 text-sm resize-none outline-none placeholder-neutral-500 disabled:opacity-50 min-h-[44px]"
           />
 
           {/* Bottom: controls */}
-          <div className="flex items-center justify-between px-3 pb-3">
+          <div className="flex items-center justify-between px-3 pb-3 pt-1.5 border-t border-neutral-700/50">
             {/* Left: command buttons */}
             <div className="flex items-center gap-1">
               <button
@@ -186,7 +185,6 @@ export function ChatInput({
             </div>
           </div>
         </div>
-      </div>
     </div>
   );
 }

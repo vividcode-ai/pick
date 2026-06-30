@@ -1179,16 +1179,15 @@ impl TuiApp {
         if !self.editor.pending_pastes.is_empty() {
             // Merge into last pending paste instead of expanding,
             // so existing paste placeholders stay visible.
-            let (old_placeholder, old_len, current_text) = {
+            let (old_placeholder, current_text) = {
                 let last = self.editor.pending_pastes.last().unwrap();
-                (
-                    last.placeholder.clone(),
-                    last.actual.chars().count(),
-                    self.editor.text().to_string(),
-                )
+                (last.placeholder.clone(), self.editor.text().to_string())
             };
-            let new_len = old_len + pasted.chars().count();
-            let base = format!("[Pasted Content {} chars]", new_len);
+            let new_line_count = {
+                let last = self.editor.pending_pastes.last().unwrap();
+                format!("{}{}", last.actual, pasted).lines().count()
+            };
+            let base = format!("[Pasted Content {} Lines]", new_line_count);
             let new_placeholder = self.editor.unique_placeholder(&base);
             if current_text.contains(&old_placeholder) {
                 self.editor
@@ -1208,7 +1207,8 @@ impl TuiApp {
 
         let char_count = pasted.chars().count();
         if char_count > Self::LARGE_PASTE_CHAR_THRESHOLD {
-            self.editor.add_paste_placeholder(char_count, &pasted);
+            let line_count = pasted.lines().count();
+            self.editor.add_paste_placeholder(line_count, &pasted);
         } else {
             self.editor.insert_str(&pasted);
         }
@@ -1250,7 +1250,8 @@ impl TuiApp {
             let char_count = self.paste_accumulator.chars().count();
             if char_count > Self::LARGE_PASTE_CHAR_THRESHOLD {
                 let text = std::mem::take(&mut self.paste_accumulator);
-                self.editor.add_paste_placeholder(char_count, &text);
+                let line_count = text.lines().count();
+                self.editor.add_paste_placeholder(line_count, &text);
             } else {
                 let text = std::mem::take(&mut self.paste_accumulator);
                 self.editor.insert_str(&text);
@@ -1281,7 +1282,8 @@ impl TuiApp {
         let char_count = self.paste_accumulator.chars().count();
         if char_count > Self::LARGE_PASTE_CHAR_THRESHOLD {
             let text = std::mem::take(&mut self.paste_accumulator);
-            self.editor.add_paste_placeholder(char_count, &text);
+            let line_count = text.lines().count();
+            self.editor.add_paste_placeholder(line_count, &text);
             return true;
         }
         if let Some(t) = self.last_paste_time
