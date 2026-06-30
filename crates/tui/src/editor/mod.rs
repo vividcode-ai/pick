@@ -62,6 +62,14 @@ pub struct Editor {
     // --- Pending messages browsing ---
     /// Index into pending_user_messages when browsing (None = not browsing)
     pub pending_index: Option<usize>,
+
+    // --- Paste placeholder ---
+    /// Byte offset where the paste region starts (None if no active paste placeholder)
+    paste_start: Option<usize>,
+    /// Byte length of the paste region
+    paste_len: usize,
+    /// Number of lines in the pasted content (for display in placeholder)
+    paste_line_count: usize,
 }
 
 impl Editor {
@@ -89,6 +97,9 @@ impl Editor {
             history_index: None,
             staging_buffer: String::new(),
             pending_index: None,
+            paste_start: None,
+            paste_len: 0,
+            paste_line_count: 0,
         }
     }
 
@@ -131,6 +142,14 @@ impl Editor {
         self.cursor += s.len();
         self.mark = None;
         self.kill_accumulating = false;
+        // Long paste: set placeholder so the display shows
+        // "[Pasted Content N Lines]" instead of the actual text.
+        // Short insertions (e.g. user typing) do NOT clear the placeholder.
+        if s.len() > 100 || s.lines().count() > 11 {
+            self.paste_start = Some(self.cursor - s.len());
+            self.paste_len = s.len();
+            self.paste_line_count = s.lines().count();
+        }
     }
 
     /// Insert a newline at cursor position
@@ -856,6 +875,9 @@ impl Editor {
         self.scroll_offset = 0;
         self.kill_accumulating = false;
         self.cancel_autocomplete();
+        self.paste_start = None;
+        self.paste_len = 0;
+        self.paste_line_count = 0;
     }
 
     /// Set the buffer content and reset cursor
@@ -866,6 +888,9 @@ impl Editor {
         self.mark = None;
         self.scroll_offset = 0;
         self.kill_accumulating = false;
+        self.paste_start = None;
+        self.paste_len = 0;
+        self.paste_line_count = 0;
     }
 
     /// Get the buffer content
@@ -1261,6 +1286,33 @@ impl Editor {
     /// where cursor position is within the rendered output.
     /// Produces ratatui Lines directly (no ANSI bridge needed).
     pub fn render(&self, width: usize, max_height: usize) -> (Vec<Line<'static>>, usize, usize) {
+        // Paste placeholder: substitute the paste region with a placeholder string
+        // for rendering, so the user sees "[Pasted Content N Lines]" instead of the
+        // actual pasted content. The cursor is mapped to the corresponding position
+        // in the display string.
+        let _paste_display: String;
+        let (buf, cursor) = if let Some(ps) = self.paste_start {
+            let pe = ps + self.paste_len;
+            if pe > self.buffer.len() {
+                // Paste region no longer valid (buffer was truncated via edits).
+                // Fall through to normal rendering.
+                (self.buffer.as_str(), self.cursor)
+            } else {
+                let ph = format!("[Pasted Content {} Lines]", self.paste_line_count);
+                _paste_display = format!("{}{}{}", &self.buffer[..ps], ph, &self.buffer[pe..]);
+                let c: usize = if self.cursor > pe {
+                    self.cursor - self.paste_len + ph.len()
+                } else if self.cursor > ps {
+                    ps + ph.len()
+                } else {
+                    self.cursor
+                };
+                (_paste_display.as_str(), c)
+            }
+        } else {
+            (self.buffer.as_str(), self.cursor)
+        };
+
         let mut lines: Vec<Line<'static>> = Vec::new();
         let mut cursor_row = 0;
         let mut cursor_col = 0;
@@ -1271,11 +1323,8 @@ impl Editor {
         // Build visual lines from buffer
         let mut line_index = 0;
         let mut found_cursor = false;
-        let cursor_line_start = self.buffer[..self.cursor]
-            .rfind('\n')
-            .map(|i| i + 1)
-            .unwrap_or(0);
-        let cursor_col_in_line = self.buffer[cursor_line_start..self.cursor].width();
+        let cursor_line_start = buf[..cursor].rfind('\n').map(|i| i + 1).unwrap_or(0);
+        let cursor_col_in_line = buf[cursor_line_start..cursor].width();
 
         // Helper to add a plain text line
         let add_line = |lines: &mut Vec<Line<'static>>, text: &str| {
@@ -1285,7 +1334,7 @@ impl Editor {
         // Iterate through buffer lines
         let mut buf_pos = 0;
         loop {
-            if buf_pos >= self.buffer.len() {
+            if buf_pos >= buf.len() {
                 // Add trailing empty line only if one doesn't already exist
                 if line_index >= visible_top && lines.len() < max_height {
                     let last_empty = lines.last().is_none_or(|l| {
@@ -1303,10 +1352,10 @@ impl Editor {
                 }
                 break;
             }
-            let remaining = &self.buffer[buf_pos..];
+            let remaining = &buf[buf_pos..];
             let nl_pos = remaining.find('\n');
-            let line_end = nl_pos.map(|i| buf_pos + i).unwrap_or(self.buffer.len());
-            let line_text = &self.buffer[buf_pos..line_end];
+            let line_end = nl_pos.map(|i| buf_pos + i).unwrap_or(buf.len());
+            let line_text = &buf[buf_pos..line_end];
 
             // Wrap long lines using display-width-aware splitting
             let wrapped: Vec<String> = if width > 0 && line_text.width() > width {
@@ -1317,7 +1366,7 @@ impl Editor {
 
             for (wi, wline) in wrapped.iter().enumerate() {
                 if line_index >= visible_top && lines.len() < max_height {
-                    let is_cursor_line = buf_pos <= self.cursor && self.cursor <= line_end;
+                    let is_cursor_line = buf_pos <= cursor && cursor <= line_end;
                     if is_cursor_line && wi == wrapped.len() - 1 {
                         cursor_row = lines.len();
                         cursor_col = std::cmp::min(cursor_col_in_line, wline.width());
@@ -1331,9 +1380,9 @@ impl Editor {
             buf_pos = line_end;
             if nl_pos.is_some() {
                 buf_pos += 1;
-                if buf_pos >= self.buffer.len() {
+                if buf_pos >= buf.len() {
                     if line_index >= visible_top && lines.len() < max_height {
-                        let is_cursor_line = !found_cursor && self.cursor == buf_pos;
+                        let is_cursor_line = !found_cursor && cursor == buf_pos;
                         if is_cursor_line {
                             cursor_row = lines.len();
                             cursor_col = 0;
@@ -1356,7 +1405,7 @@ impl Editor {
             if lines.is_empty() {
                 cursor_row = 0;
                 cursor_col = 0;
-            } else if self.cursor < cursor_line_start {
+            } else if cursor < cursor_line_start {
                 // Cursor is above the visible area
                 cursor_row = 0;
                 cursor_col = 0;
@@ -1368,7 +1417,7 @@ impl Editor {
         }
 
         // Trim trailing empty lines
-        if !self.buffer.ends_with('\n') {
+        if !buf.ends_with('\n') {
             while lines.len() > 1 {
                 let is_empty = lines.last().is_none_or(|l| {
                     l.spans.is_empty() || l.spans.iter().all(|s| s.content.as_ref().is_empty())

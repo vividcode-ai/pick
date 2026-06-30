@@ -20,6 +20,42 @@ const THINKING_LEVELS = [
   { value: "high", label: "High" },
 ];
 
+const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
+  "anthropic": "Anthropic",
+  "amazon-bedrock": "Amazon Bedrock",
+  "azure-openai-responses": "Azure OpenAI Responses",
+  "cerebras": "Cerebras",
+  "cloudflare-ai-gateway": "Cloudflare AI Gateway",
+  "cloudflare-workers-ai": "Cloudflare Workers AI",
+  "deepseek": "DeepSeek",
+  "fireworks": "Fireworks",
+  "google": "Google Gemini",
+  "google-vertex": "Google Vertex AI",
+  "groq": "Groq",
+  "huggingface": "Hugging Face",
+  "kimi-coding": "Kimi For Coding",
+  "mistral": "Mistral",
+  "minimax": "MiniMax",
+  "minimax-cn": "MiniMax (China)",
+  "moonshotai": "Moonshot AI",
+  "moonshotai-cn": "Moonshot AI (China)",
+  "opencode": "OpenCode Zen",
+  "opencode-go": "OpenCode Go",
+  "openai": "OpenAI",
+  "openrouter": "OpenRouter",
+  "together": "Together AI",
+  "vercel-ai-gateway": "Vercel AI Gateway",
+  "xai": "xAI",
+  "zai": "Z.AI",
+  "zai-coding-cn": "Z.AI Coding (China)",
+  "nvidia": "NVIDIA",
+  "openrouter-images": "OpenRouter Images",
+  "xiaomi": "Xiaomi MiMo",
+  "xiaomi-token-plan-cn": "Xiaomi MiMo Token Plan (China)",
+  "xiaomi-token-plan-ams": "Xiaomi MiMo Token Plan (Amsterdam)",
+  "xiaomi-token-plan-sgp": "Xiaomi MiMo Token Plan (Singapore)",
+};
+
 export function ChatInput({
   onSend,
   disabled,
@@ -77,6 +113,15 @@ export function ChatInput({
         m.provider.toLowerCase().includes(q)
     );
   }, [allModels, modelSearchQuery]);
+
+  const groupedModels = useMemo(() => {
+    const groups: Record<string, typeof filteredModels> = {};
+    for (const m of filteredModels) {
+      if (!groups[m.provider]) groups[m.provider] = [];
+      groups[m.provider].push(m);
+    }
+    return groups;
+  }, [filteredModels]);
 
   const handleSend = () => {
     const trimmed = input.trim();
@@ -216,21 +261,28 @@ export function ChatInput({
                     />
                   </div>
                   <div className="overflow-y-auto">
-                    {filteredModels.map((m) => (
-                      <button
-                        key={m.id}
-                        onClick={() => { onModelChange(m.id); setModelSearchOpen(false); }}
-                        className={`w-full px-3 py-1.5 text-xs text-left transition-colors ${
-                          m.id === selectedModel
-                            ? "bg-blue-600/30 text-blue-300"
-                            : "text-neutral-300 hover:bg-neutral-700"
-                        }`}
-                      >
-                        <span>{m.name}</span>
-                        {!m.hasKey && <span className="text-neutral-500 ml-1">(no api key)</span>}
-                      </button>
+                    {Object.entries(groupedModels).map(([provider, models]) => (
+                      <div key={provider}>
+                        <div className="px-3 py-1 text-xs text-neutral-400 font-medium sticky top-0 border-b border-neutral-700/50 bg-neutral-800">
+                          {PROVIDER_DISPLAY_NAMES[provider] || provider}
+                        </div>
+                        {models.map((m) => (
+                          <button
+                            key={m.id}
+                            onClick={() => { onModelChange(m.id); setModelSearchOpen(false); }}
+                            className={`w-full px-3 py-1.5 text-xs text-left transition-colors ${
+                              m.id === selectedModel
+                                ? "bg-blue-600/30 text-blue-300"
+                                : "text-neutral-300 hover:bg-neutral-700"
+                            }`}
+                          >
+                            <span>{m.name}</span>
+                            {!m.hasKey && <span className="text-neutral-500 ml-1">(no api key)</span>}
+                          </button>
+                        ))}
+                      </div>
                     ))}
-                    {filteredModels.length === 0 && (
+                    {Object.keys(groupedModels).length === 0 && (
                       <div className="px-3 py-2 text-xs text-neutral-500">No models found</div>
                     )}
                   </div>
