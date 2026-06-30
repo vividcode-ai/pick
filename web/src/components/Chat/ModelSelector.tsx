@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { ChevronDown, Search, Star, Check, Plus } from "lucide-react";
 import type { ProviderInfo } from "../../types/events";
 import { toggleFavorite, getFavoriteModelKeys, subscribeToFavorites } from "../../stores/models";
+import { openSettings } from "../../stores/settings";
 
 interface FlatModel {
   id: string;
@@ -77,15 +78,17 @@ export function ModelSelector({ providers, selectedModel, onModelChange, disable
   }, []);
 
   const allModels: FlatModel[] = useMemo(() => {
-    return providers.flatMap((p) =>
-      p.models.map((m) => ({
-        ...m,
-        provider: p.provider,
-        hasKey: p.has_key,
-        searchText: `${m.name} ${p.provider} ${m.id}`.toLowerCase(),
-      }))
-    );
-  }, [providers]);
+    return providers
+      .filter(p => p.has_key || p.models.some(m => m.id === selectedModel))
+      .flatMap((p) =>
+        p.models.map((m) => ({
+          ...m,
+          provider: p.provider,
+          hasKey: p.has_key,
+          searchText: `${m.name} ${p.provider} ${m.id}`.toLowerCase(),
+        }))
+      );
+  }, [providers, selectedModel]);
 
   const selectedDetail = useMemo(
     () => allModels.find((m) => m.id === selectedModel) || null,
@@ -148,7 +151,7 @@ export function ModelSelector({ providers, selectedModel, onModelChange, disable
     <div className="relative" ref={containerRef} onKeyDown={handleKeyDown}>
       <button
         onClick={() => { setOpen((v) => !v); setQuery(""); highlightRef.current = 0; }}
-        disabled={disabled || allModels.length === 0}
+        disabled={disabled}
         className="selector-trigger max-w-[110px]"
       >
         <span className="selector-trigger-primary">
@@ -241,8 +244,15 @@ export function ModelSelector({ providers, selectedModel, onModelChange, disable
               )}
             </div>
 
-            {!favoritesOnly && hasFavorites && (
-              <div className="selector-footer">
+            <div className="selector-footer">
+              <button
+                className="selector-option-action"
+                onClick={() => { setOpen(false); openSettings("providers"); }}
+              >
+                <Plus className="w-3 h-3 inline mr-1" />
+                Configure providers
+              </button>
+              {!favoritesOnly && hasFavorites && (
                 <button
                   className="selector-option-action"
                   onClick={() => setFavoritesOnly(true)}
@@ -250,8 +260,8 @@ export function ModelSelector({ providers, selectedModel, onModelChange, disable
                   <Star className="w-3 h-3 inline mr-1" fill="currentColor" />
                   Show favorites only
                 </button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </>
       )}

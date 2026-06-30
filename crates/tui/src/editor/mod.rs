@@ -12,6 +12,15 @@ use crate::undo_stack::UndoStack;
 mod types;
 pub use types::*;
 
+/// Byte range of a paste placeholder element in the editor buffer.
+/// The element is treated as an atomic unit: cursor skips over it,
+/// Backspace/Delete removes the entire element at once.
+#[derive(Debug, Clone)]
+pub struct PasteElement {
+    pub start: usize,
+    pub end: usize,
+}
+
 /// Multi-line text editor state
 pub struct Editor {
     /// Full text buffer
@@ -64,12 +73,15 @@ pub struct Editor {
     pub pending_index: Option<usize>,
 
     // --- Paste placeholder ---
-    /// Byte offset where the paste region starts (None if no active paste placeholder)
-    paste_start: Option<usize>,
-    /// Byte length of the paste region
-    paste_len: usize,
-    /// Number of lines in the pasted content (for display in placeholder)
-    paste_line_count: usize,
+    /// Maps a placeholder string (displayed in the buffer) to the actual
+    /// pasted content (used on submit to expand placeholders).
+    /// When `paste_elements` tracking detects deletion of a placeholder,
+    /// the corresponding entry is removed from this list.
+    pending_pastes: Vec<(String, String)>,
+    /// Byte ranges of paste placeholder elements in `buffer`.
+    /// These are kept aligned via `shift_elements_after` and
+    /// `validate_paste_elements`.
+    paste_elements: Vec<PasteElement>,
 }
 
 impl Editor {
@@ -97,15 +109,45 @@ impl Editor {
             history_index: None,
             staging_buffer: String::new(),
             pending_index: None,
-            paste_start: None,
-            paste_len: 0,
-            paste_line_count: 0,
+            pending_pastes: Vec::new(),
+            paste_elements: Vec::new(),
         }
     }
 
     /// Push current state onto undo stack
     fn push_undo(&mut self) {
         self.undo_stack.push(&self.buffer.clone());
+    }
+
+    /// Shift all paste-element byte ranges that start at or after `at`
+    /// by `delta` bytes (positive for insert, negative for delete).
+    fn shift_elements_after(&mut self, at: usize, delta: isize) {
+        for elem in &mut self.paste_elements {
+            if elem.start >= at {
+                elem.start = (elem.start as isize + delta) as usize;
+                elem.end = (elem.end as isize + delta) as usize;
+            }
+        }
+    }
+
+    /// Remove any paste elements whose byte range is invalid or whose
+    /// placeholder text no longer matches the buffer content.
+    fn validate_paste_elements(&mut self) {
+        let mut i = 0;
+        while i < self.paste_elements.len() {
+            let e = &self.paste_elements[i];
+            if e.end > self.buffer.len() || e.start >= e.end {
+                self.paste_elements.swap_remove(i);
+                continue;
+            }
+            let placeholder = &self.buffer[e.start..e.end];
+            let valid = self.pending_pastes.iter().any(|(ph, _)| ph == placeholder);
+            if !valid {
+                self.paste_elements.swap_remove(i);
+                continue;
+            }
+            i += 1;
+        }
     }
 
     // --- Insertion ---
@@ -119,6 +161,7 @@ impl Editor {
         self.cursor += c.len_utf8();
         self.mark = None;
         self.kill_accumulating = false;
+        self.shift_elements_after(self.cursor - c.len_utf8(), c.len_utf8() as isize);
         // Auto-trigger autocomplete when buffer starts with "/" (no space yet)
         if self.autocomplete_provider.is_some() {
             let trimmed = self.buffer.trim_start();
@@ -135,20 +178,31 @@ impl Editor {
         if s.is_empty() {
             return;
         }
-        // Any manual edit exits history browsing
         self.history_index = None;
-        self.push_undo();
-        self.buffer.insert_str(self.cursor, s);
-        self.cursor += s.len();
         self.mark = None;
         self.kill_accumulating = false;
-        // Long paste: set placeholder so the display shows
-        // "[Pasted Content N Lines]" instead of the actual text.
-        // Short insertions (e.g. user typing) do NOT clear the placeholder.
-        if s.len() > 100 || s.lines().count() > 11 {
-            self.paste_start = Some(self.cursor - s.len());
-            self.paste_len = s.len();
-            self.paste_line_count = s.lines().count();
+
+        let line_count = s.lines().count();
+        if s.len() > 100 || line_count > 11 {
+            // Long paste: insert a placeholder string into the buffer
+            // and record the actual content for expansion on submit.
+            let placeholder = format!("[Pasted Content {} Lines]", line_count);
+            let ph_len = placeholder.len();
+            self.push_undo();
+            let at = self.cursor;
+            self.buffer.insert_str(at, &placeholder);
+            self.cursor = at + ph_len;
+            self.paste_elements.push(PasteElement {
+                start: at,
+                end: at + ph_len,
+            });
+            self.pending_pastes.push((placeholder, s.to_string()));
+            self.shift_elements_after(at, ph_len as isize);
+        } else {
+            self.push_undo();
+            self.buffer.insert_str(self.cursor, s);
+            self.cursor += s.len();
+            self.shift_elements_after(self.cursor - s.len(), s.len() as isize);
         }
     }
 
@@ -173,10 +227,12 @@ impl Editor {
             .take_while(|c| *c == ' ' || *c == '\t')
             .collect();
 
+        let at = self.cursor;
         self.buffer.insert(self.cursor, '\n');
         self.cursor += 1;
         self.buffer.insert_str(self.cursor, &indent);
         self.cursor += indent.len();
+        self.shift_elements_after(at, (1 + indent.len()) as isize);
         self.mark = None;
         self.kill_accumulating = false;
     }
@@ -236,24 +292,51 @@ impl Editor {
         self.kill_accumulating = false;
     }
 
-    /// Move cursor left by one character
+    /// Move cursor left by one character (skipping paste elements)
     pub fn cursor_left(&mut self) {
         if self.cursor > 0 {
-            self.cursor = self.cursor.saturating_sub(1);
-            while !self.buffer.is_char_boundary(self.cursor) {
+            // If at end of an element, jump to its start
+            if let Some(elem) = self.paste_elements.iter().find(|e| e.end == self.cursor) {
+                self.cursor = elem.start;
+            } else {
                 self.cursor = self.cursor.saturating_sub(1);
+                while !self.buffer.is_char_boundary(self.cursor) {
+                    self.cursor = self.cursor.saturating_sub(1);
+                }
+                // If we landed inside an element, snap to its start
+                if let Some(elem) = self
+                    .paste_elements
+                    .iter()
+                    .find(|e| e.start < self.cursor && self.cursor < e.end)
+                {
+                    self.cursor = elem.start;
+                }
             }
         }
         self.mark = None;
         self.kill_accumulating = false;
     }
 
-    /// Move cursor right by one character
+    /// Move cursor right by one character (skipping paste elements)
     pub fn cursor_right(&mut self) {
         if self.cursor < self.buffer.len() {
-            self.cursor += 1;
-            while self.cursor < self.buffer.len() && !self.buffer.is_char_boundary(self.cursor) {
+            // If at start of an element, jump to its end
+            if let Some(elem) = self.paste_elements.iter().find(|e| e.start == self.cursor) {
+                self.cursor = elem.end;
+            } else {
                 self.cursor += 1;
+                while self.cursor < self.buffer.len() && !self.buffer.is_char_boundary(self.cursor)
+                {
+                    self.cursor += 1;
+                }
+                // If we landed inside an element, snap to its end
+                if let Some(elem) = self
+                    .paste_elements
+                    .iter()
+                    .find(|e| e.start < self.cursor && self.cursor < e.end)
+                {
+                    self.cursor = elem.end;
+                }
             }
         }
         self.mark = None;
@@ -464,8 +547,26 @@ impl Editor {
         if self.cursor == 0 {
             return;
         }
-        // Any manual edit exits history browsing
         self.history_index = None;
+        // If cursor is at the end of a paste element, delete the entire
+        // element atomically (remove placeholder from buffer + tracking).
+        if let Some(idx) = self
+            .paste_elements
+            .iter()
+            .position(|e| e.end == self.cursor)
+        {
+            self.push_undo();
+            let start = self.paste_elements[idx].start;
+            let end = self.paste_elements[idx].end;
+            let placeholder = self.buffer[start..end].to_string();
+            self.buffer.drain(start..end);
+            self.cursor = start;
+            self.pending_pastes.retain(|(ph, _)| *ph != placeholder);
+            self.paste_elements.swap_remove(idx);
+            self.shift_elements_after(start, -((end - start) as isize));
+            self.kill_accumulating = false;
+            return;
+        }
         // If there's a selection, delete it
         if self.mark.is_some() {
             self.delete_selection();
@@ -473,9 +574,11 @@ impl Editor {
         }
         self.push_undo();
         let prev = self.prev_char_boundary(self.cursor);
+        let removed_len = self.cursor - prev;
         let deleted = self.buffer[prev..self.cursor].to_string();
         self.buffer.drain(prev..self.cursor);
         self.cursor = prev;
+        self.shift_elements_after(prev, -(removed_len as isize));
         self.kill_accumulating = false;
         // Kill non-whitespace for accumulation
         if deleted.chars().any(|c| !c.is_whitespace()) {
@@ -507,8 +610,26 @@ impl Editor {
         if self.cursor >= self.buffer.len() {
             return;
         }
-        // Any manual edit exits history browsing
         self.history_index = None;
+        // If cursor is at the start of a paste element, delete the entire
+        // element atomically.
+        if let Some(idx) = self
+            .paste_elements
+            .iter()
+            .position(|e| e.start == self.cursor)
+        {
+            self.push_undo();
+            let start = self.paste_elements[idx].start;
+            let end = self.paste_elements[idx].end;
+            let placeholder = self.buffer[start..end].to_string();
+            self.buffer.drain(start..end);
+            self.cursor = start;
+            self.pending_pastes.retain(|(ph, _)| *ph != placeholder);
+            self.paste_elements.swap_remove(idx);
+            self.shift_elements_after(start, -((end - start) as isize));
+            self.kill_accumulating = false;
+            return;
+        }
         if self.mark.is_some() {
             self.delete_selection();
             return;
@@ -517,6 +638,7 @@ impl Editor {
         let next = self.next_char_boundary(self.cursor);
         let deleted = self.buffer[self.cursor..next].to_string();
         self.buffer.drain(self.cursor..next);
+        self.shift_elements_after(self.cursor, -((next - self.cursor) as isize));
         self.kill_ring.push(&deleted, false, self.kill_accumulating);
         self.kill_accumulating = true;
         self.kill_prepend = false;
@@ -532,6 +654,8 @@ impl Editor {
         let deleted = self.buffer[word_start..self.cursor].to_string();
         self.buffer.drain(word_start..self.cursor);
         self.cursor = word_start;
+        self.shift_elements_after(word_start, -(deleted.len() as isize));
+        self.validate_paste_elements();
         self.kill_ring.push(&deleted, true, true);
         self.kill_accumulating = true;
         self.kill_prepend = true;
@@ -546,6 +670,8 @@ impl Editor {
         let word_end = self.find_word_end_after(self.cursor);
         let deleted = self.buffer[self.cursor..word_end].to_string();
         self.buffer.drain(self.cursor..word_end);
+        self.shift_elements_after(self.cursor, -(deleted.len() as isize));
+        self.validate_paste_elements();
         self.kill_ring.push(&deleted, false, true);
         self.kill_accumulating = true;
         self.kill_prepend = false;
@@ -564,6 +690,8 @@ impl Editor {
         let deleted = self.buffer[line_start..self.cursor].to_string();
         self.buffer.drain(line_start..self.cursor);
         self.cursor = line_start;
+        self.shift_elements_after(line_start, -(deleted.len() as isize));
+        self.validate_paste_elements();
         self.kill_ring.push(&deleted, true, true);
         self.kill_accumulating = true;
         self.kill_prepend = true;
@@ -581,6 +709,8 @@ impl Editor {
         self.push_undo();
         let deleted = self.buffer[self.cursor..line_end].to_string();
         self.buffer.drain(self.cursor..line_end);
+        self.shift_elements_after(self.cursor, -(deleted.len() as isize));
+        self.validate_paste_elements();
         self.kill_ring.push(&deleted, false, true);
         self.kill_accumulating = true;
         self.kill_prepend = false;
@@ -603,6 +733,8 @@ impl Editor {
         let deleted = self.buffer[line_start..line_end].to_string();
         self.buffer.drain(line_start..line_end);
         self.cursor = std::cmp::min(line_start, self.buffer.len());
+        self.shift_elements_after(line_start, -(deleted.len() as isize));
+        self.validate_paste_elements();
         self.kill_ring.push(&deleted, false, false);
         self.kill_accumulating = false;
     }
@@ -638,8 +770,11 @@ impl Editor {
         self.push_undo();
         let start = std::cmp::min(mark, self.cursor);
         let end = std::cmp::max(mark, self.cursor);
+        let len = end - start;
         self.buffer.drain(start..end);
         self.cursor = start;
+        self.shift_elements_after(start, -(len as isize));
+        self.validate_paste_elements();
         self.mark = None;
         self.kill_accumulating = false;
     }
@@ -660,6 +795,7 @@ impl Editor {
             self.push_undo();
             self.kill_ring.push(&t, false, false);
             self.delete_selection();
+            self.validate_paste_elements();
             self.kill_accumulating = false;
         }
     }
@@ -673,10 +809,12 @@ impl Editor {
             None => return,
         };
         self.push_undo();
+        let at = self.cursor;
         self.buffer.insert_str(self.cursor, &text);
         // Position cursor after the yanked text, set mark at start
-        let mark_pos = self.cursor;
+        let mark_pos = at;
         self.cursor += text.len();
+        self.shift_elements_after(at, text.len() as isize);
         self.mark = Some(mark_pos);
         self.kill_accumulating = false;
         self.last_yank_size = Some(text.len());
@@ -700,20 +838,25 @@ impl Editor {
         }
         self.buffer.drain(start..end);
         self.cursor = start;
+        self.shift_elements_after(start, -(yank_size as isize));
         // Rotate kill ring and insert next entry
         self.kill_ring.rotate();
         match self.kill_ring.peek() {
             Some(t) => {
+                let at = self.cursor;
+                let t_len = t.len();
                 self.buffer.insert_str(self.cursor, t);
                 self.mark = Some(self.cursor);
-                self.cursor += t.len();
-                self.last_yank_size = Some(t.len());
+                self.cursor += t_len;
+                self.shift_elements_after(at, t_len as isize);
+                self.last_yank_size = Some(t_len);
             }
             None => {
                 self.mark = None;
                 self.last_yank_size = None;
             }
         }
+        self.validate_paste_elements();
     }
 
     // --- Undo ---
@@ -727,6 +870,7 @@ impl Editor {
             self.cursor = std::cmp::min(self.cursor, self.buffer.len());
             self.mark = None;
             self.kill_accumulating = false;
+            self.validate_paste_elements();
         }
     }
 
@@ -738,6 +882,7 @@ impl Editor {
             self.cursor = std::cmp::min(self.cursor, self.buffer.len());
             self.mark = None;
             self.kill_accumulating = false;
+            self.validate_paste_elements();
         }
     }
 
@@ -875,9 +1020,8 @@ impl Editor {
         self.scroll_offset = 0;
         self.kill_accumulating = false;
         self.cancel_autocomplete();
-        self.paste_start = None;
-        self.paste_len = 0;
-        self.paste_line_count = 0;
+        self.pending_pastes.clear();
+        self.paste_elements.clear();
     }
 
     /// Set the buffer content and reset cursor
@@ -888,14 +1032,23 @@ impl Editor {
         self.mark = None;
         self.scroll_offset = 0;
         self.kill_accumulating = false;
-        self.paste_start = None;
-        self.paste_len = 0;
-        self.paste_line_count = 0;
+        self.pending_pastes.clear();
+        self.paste_elements.clear();
     }
 
     /// Get the buffer content
     pub fn text(&self) -> &str {
         &self.buffer
+    }
+
+    /// Get the full text with all paste placeholders expanded to their
+    /// actual content.  This is what should be submitted to the agent.
+    pub fn full_text(&self) -> String {
+        let mut text = self.buffer.clone();
+        for (placeholder, actual) in &self.pending_pastes {
+            text = text.replace(placeholder.as_str(), actual.as_str());
+        }
+        text
     }
 
     // --- Input history ---
@@ -1286,33 +1439,6 @@ impl Editor {
     /// where cursor position is within the rendered output.
     /// Produces ratatui Lines directly (no ANSI bridge needed).
     pub fn render(&self, width: usize, max_height: usize) -> (Vec<Line<'static>>, usize, usize) {
-        // Paste placeholder: substitute the paste region with a placeholder string
-        // for rendering, so the user sees "[Pasted Content N Lines]" instead of the
-        // actual pasted content. The cursor is mapped to the corresponding position
-        // in the display string.
-        let _paste_display: String;
-        let (buf, cursor) = if let Some(ps) = self.paste_start {
-            let pe = ps + self.paste_len;
-            if pe > self.buffer.len() {
-                // Paste region no longer valid (buffer was truncated via edits).
-                // Fall through to normal rendering.
-                (self.buffer.as_str(), self.cursor)
-            } else {
-                let ph = format!("[Pasted Content {} Lines]", self.paste_line_count);
-                _paste_display = format!("{}{}{}", &self.buffer[..ps], ph, &self.buffer[pe..]);
-                let c: usize = if self.cursor > pe {
-                    self.cursor - self.paste_len + ph.len()
-                } else if self.cursor > ps {
-                    ps + ph.len()
-                } else {
-                    self.cursor
-                };
-                (_paste_display.as_str(), c)
-            }
-        } else {
-            (self.buffer.as_str(), self.cursor)
-        };
-
         let mut lines: Vec<Line<'static>> = Vec::new();
         let mut cursor_row = 0;
         let mut cursor_col = 0;
@@ -1323,8 +1449,11 @@ impl Editor {
         // Build visual lines from buffer
         let mut line_index = 0;
         let mut found_cursor = false;
-        let cursor_line_start = buf[..cursor].rfind('\n').map(|i| i + 1).unwrap_or(0);
-        let cursor_col_in_line = buf[cursor_line_start..cursor].width();
+        let cursor_line_start = self.buffer[..self.cursor]
+            .rfind('\n')
+            .map(|i| i + 1)
+            .unwrap_or(0);
+        let cursor_col_in_line = self.buffer[cursor_line_start..self.cursor].width();
 
         // Helper to add a plain text line
         let add_line = |lines: &mut Vec<Line<'static>>, text: &str| {
@@ -1334,7 +1463,7 @@ impl Editor {
         // Iterate through buffer lines
         let mut buf_pos = 0;
         loop {
-            if buf_pos >= buf.len() {
+            if buf_pos >= self.buffer.len() {
                 // Add trailing empty line only if one doesn't already exist
                 if line_index >= visible_top && lines.len() < max_height {
                     let last_empty = lines.last().is_none_or(|l| {
@@ -1352,10 +1481,10 @@ impl Editor {
                 }
                 break;
             }
-            let remaining = &buf[buf_pos..];
+            let remaining = &self.buffer[buf_pos..];
             let nl_pos = remaining.find('\n');
-            let line_end = nl_pos.map(|i| buf_pos + i).unwrap_or(buf.len());
-            let line_text = &buf[buf_pos..line_end];
+            let line_end = nl_pos.map(|i| buf_pos + i).unwrap_or(self.buffer.len());
+            let line_text = &self.buffer[buf_pos..line_end];
 
             // Wrap long lines using display-width-aware splitting
             let wrapped: Vec<String> = if width > 0 && line_text.width() > width {
@@ -1366,7 +1495,7 @@ impl Editor {
 
             for (wi, wline) in wrapped.iter().enumerate() {
                 if line_index >= visible_top && lines.len() < max_height {
-                    let is_cursor_line = buf_pos <= cursor && cursor <= line_end;
+                    let is_cursor_line = buf_pos <= self.cursor && self.cursor <= line_end;
                     if is_cursor_line && wi == wrapped.len() - 1 {
                         cursor_row = lines.len();
                         cursor_col = std::cmp::min(cursor_col_in_line, wline.width());
@@ -1380,9 +1509,9 @@ impl Editor {
             buf_pos = line_end;
             if nl_pos.is_some() {
                 buf_pos += 1;
-                if buf_pos >= buf.len() {
+                if buf_pos >= self.buffer.len() {
                     if line_index >= visible_top && lines.len() < max_height {
-                        let is_cursor_line = !found_cursor && cursor == buf_pos;
+                        let is_cursor_line = !found_cursor && self.cursor == buf_pos;
                         if is_cursor_line {
                             cursor_row = lines.len();
                             cursor_col = 0;
@@ -1405,7 +1534,7 @@ impl Editor {
             if lines.is_empty() {
                 cursor_row = 0;
                 cursor_col = 0;
-            } else if cursor < cursor_line_start {
+            } else if self.cursor < cursor_line_start {
                 // Cursor is above the visible area
                 cursor_row = 0;
                 cursor_col = 0;
@@ -1417,7 +1546,7 @@ impl Editor {
         }
 
         // Trim trailing empty lines
-        if !buf.ends_with('\n') {
+        if !self.buffer.ends_with('\n') {
             while lines.len() > 1 {
                 let is_empty = lines.last().is_none_or(|l| {
                     l.spans.is_empty() || l.spans.iter().all(|s| s.content.as_ref().is_empty())
@@ -1458,6 +1587,30 @@ impl Editor {
                 }
                 if cursor_row == 0 {
                     cursor_col += prompt_width;
+                }
+            }
+        }
+
+        // Highlight paste placeholder elements in cyan.
+        if !self.paste_elements.is_empty() {
+            let cyan = Style::default().fg(Color::Cyan);
+            for line in &mut lines {
+                let line_text: String = line.spans.iter().map(|s| s.content.as_ref()).collect();
+                for (ph, _) in &self.pending_pastes {
+                    if let Some(pos) = line_text.find(ph.as_str()) {
+                        let before = &line_text[..pos];
+                        let after = &line_text[pos + ph.len()..];
+                        let mut new_spans: Vec<Span<'static>> = Vec::new();
+                        if !before.is_empty() {
+                            new_spans.push(Span::raw(before.to_string()));
+                        }
+                        new_spans.push(Span::styled(ph.clone(), cyan));
+                        if !after.is_empty() {
+                            new_spans.push(Span::raw(after.to_string()));
+                        }
+                        line.spans = new_spans;
+                        break; // only one placeholder per line
+                    }
                 }
             }
         }

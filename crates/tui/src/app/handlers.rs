@@ -1231,7 +1231,7 @@ impl TuiApp {
 
     /// Submit the current editor content and return it
     pub(crate) fn submit_input(&mut self) -> Option<TuiAction> {
-        let text = self.editor.text().to_string();
+        let text = self.editor.full_text();
         if text.trim().is_empty() {
             return None;
         }
