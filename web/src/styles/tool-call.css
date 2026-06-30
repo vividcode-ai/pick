@@ -1,0 +1,54 @@
+.tool-call {
+  border: 1px solid var(--border-strong, var(--border-base));
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.tool-call-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background-color: var(--surface-secondary);
+  border-bottom: 1px solid var(--border-base);
+}
+
+.tool-call-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 13px;
+  font-family: var(--font-family-mono);
+  color: var(--text-primary);
+}
+
+.tool-call-status {
+  display: inline-flex;
+  align-items: center;
+}
+
+.tool-call-status[data-status="running"] {
+  color: var(--status-warning);
+}
+
+.tool-call-status[data-status="completed"] {
+  color: var(--status-success);
+}
+
+.tool-call-status[data-status="error"] {
+  color: var(--status-error);
+}
+
+.tool-call-body {
+  background-color: var(--surface-base);
+}
+
+.tool-call-body pre {
+  margin: 0;
+  padding: 0.75rem;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-x: auto;
+  color: var(--text-primary);
+}

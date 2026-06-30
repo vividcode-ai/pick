@@ -3,7 +3,23 @@ import { Layout } from "./components/Layout/Layout";
 import { LeftPanel } from "./components/Layout/LeftPanel";
 import { ChatView } from "./components/Chat/ChatView";
 import { ChatInput } from "./components/Chat/ChatInput";
+import { CommandPalette } from "./components/CommandPalette";
+import { SettingsScreen } from "./components/Settings/SettingsScreen";
+import { useTheme } from "./lib/ThemeProvider";
 import { useSSE, fetchProviders } from "./hooks/useSSE";
+import { useCommandPalette } from "./hooks/useCommandPalette";
+import {
+  registerDefaultCommands,
+  type Command,
+} from "./stores/commands";
+import {
+  openSettings,
+} from "./stores/settings";
+import {
+  addSessionEntry,
+  removeSessionEntry,
+  renameSessionEntry,
+} from "./stores/sessions";
 import type { ProviderInfo } from "./types/events";
 
 async function detectBaseUrl(): Promise<string> {
@@ -25,11 +41,12 @@ async function detectBaseUrl(): Promise<string> {
 export default function App() {
   const [baseUrl, setBaseUrl] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsUrl, setSettingsUrl] = useState("");
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [selectedModel, setSelectedModel] = useState("");
   const [thinkingLevel, setThinkingLevel] = useState("off");
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const { cycleThemeMode } = useTheme();
 
   useEffect(() => {
     detectBaseUrl().then((url) => {
@@ -51,6 +68,16 @@ export default function App() {
     });
   }, [baseUrl]);
 
+  const {
+    messages,
+    streaming,
+    connected,
+    sessionId,
+    createSession,
+    ask,
+    cancel,
+  } = useSSE(baseUrl ?? "");
+
   const selectedProvider = useMemo(() => {
     for (const p of providers) {
       if (p.models.some((m) => m.id === selectedModel)) {
@@ -60,112 +87,24 @@ export default function App() {
     return providers[0]?.provider || "anthropic";
   }, [providers, selectedModel]);
 
-  const handleSaveUrl = useCallback(() => {
-    localStorage.setItem("pick_server_url", settingsUrl);
-    window.location.reload();
-  }, [settingsUrl]);
-
-  if (!baseUrl) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-neutral-950 text-neutral-400">
-        Connecting...
-      </div>
-    );
-  }
-
-  return (
-    <>
-      <AppContent
-        baseUrl={baseUrl}
-        sidebarOpen={sidebarOpen}
-        onToggleSidebar={() => setSidebarOpen((v) => !v)}
-        onOpenSettings={() => setSettingsOpen(true)}
-        providers={providers}
-        selectedProvider={selectedProvider}
-        selectedModel={selectedModel}
-        onModelChange={setSelectedModel}
-        thinkingLevel={thinkingLevel}
-        onThinkingLevelChange={setThinkingLevel}
-      />
-
-      {settingsOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-          onClick={() => setSettingsOpen(false)}
-        >
-          <div
-            className="bg-neutral-900 border border-neutral-700 rounded-lg p-6 w-96"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-lg font-semibold text-neutral-100 mb-4">
-              Settings
-            </h2>
-            <label className="block text-sm text-neutral-400 mb-1">
-              Server URL
-            </label>
-            <input
-              className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded text-neutral-100 text-sm mb-4"
-              value={settingsUrl}
-              onChange={(e) => setSettingsUrl(e.target.value)}
-            />
-            <div className="flex justify-end gap-2">
-              <button
-                className="px-4 py-2 text-sm text-neutral-400 hover:text-neutral-200"
-                onClick={() => setSettingsOpen(false)}
-              >
-                Cancel
-              </button>
-              <button
-                className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
-                onClick={handleSaveUrl}
-              >
-                Save & Reload
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
-
-interface AppContentProps {
-  baseUrl: string;
-  sidebarOpen: boolean;
-  onToggleSidebar: () => void;
-  onOpenSettings: () => void;
-  providers: ProviderInfo[];
-  selectedProvider: string;
-  selectedModel: string;
-  onModelChange: (m: string) => void;
-  thinkingLevel: string;
-  onThinkingLevelChange: (l: string) => void;
-}
-
-function AppContent({
-  baseUrl,
-  sidebarOpen,
-  onToggleSidebar,
-  onOpenSettings,
-  providers,
-  selectedProvider,
-  selectedModel,
-  onModelChange,
-  thinkingLevel,
-  onThinkingLevelChange,
-}: AppContentProps) {
-  const {
-    messages,
-    streaming,
-    connected,
-    createSession,
-    ask,
-    cancel,
-  } = useSSE(baseUrl);
-
+  // Register commands
   useEffect(() => {
-    createSession(selectedModel, selectedProvider);
-  }, [baseUrl]);
+    registerDefaultCommands({
+      newSession: () => {
+        createSession(selectedModel, selectedProvider);
+      },
+      toggleSidebar: () => setSidebarOpen((v) => !v),
+      toggleTheme: cycleThemeMode,
+      openSettings: () => openSettings(),
+    });
+  }, [createSession, selectedModel, selectedProvider, cycleThemeMode]);
+
+  // Track active session
+  useEffect(() => {
+    if (sessionId) {
+      setActiveSessionId(sessionId);
+    }
+  }, [sessionId]);
 
   const handleSend = useCallback(
     (text: string) => {
@@ -175,8 +114,61 @@ function AppContent({
   );
 
   const handleNewSession = useCallback(() => {
-    createSession(selectedModel, selectedProvider);
+    createSession(selectedModel, selectedProvider).then((id) => {
+      if (id) {
+        addSessionEntry(id);
+      }
+    });
   }, [createSession, selectedModel, selectedProvider]);
+
+  const handleSelectSession = useCallback(
+    (id: string) => {
+      setActiveSessionId(id);
+    },
+    []
+  );
+
+  const handleRenameSession = useCallback(
+    (id: string, title: string) => {
+      renameSessionEntry(id, title);
+    },
+    []
+  );
+
+  const handleDeleteSession = useCallback(
+    (id: string) => {
+      removeSessionEntry(id);
+      if (id === activeSessionId) {
+        handleNewSession();
+      }
+    },
+    [activeSessionId, handleNewSession]
+  );
+
+  const handleSaveUrl = useCallback(
+    (url: string) => {
+      localStorage.setItem("pick_server_url", url);
+      window.location.reload();
+    },
+    []
+  );
+
+  const { open: commandPaletteOpen, close: closeCommandPalette, commands } = useCommandPalette();
+
+  const handleExecuteCommand = useCallback(
+    (cmd: Command) => {
+      cmd.action();
+    },
+    []
+  );
+
+  if (!baseUrl) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-neutral-950 text-neutral-400">
+        Connecting...
+      </div>
+    );
+  }
 
   const hasMessages = messages.length > 0;
 
@@ -188,36 +180,59 @@ function AppContent({
       connected={connected}
       providers={providers}
       selectedModel={selectedModel}
-      onModelChange={onModelChange}
+      onModelChange={setSelectedModel}
       thinkingLevel={thinkingLevel}
-      onThinkingLevelChange={onThinkingLevelChange}
+      onThinkingLevelChange={setThinkingLevel}
     />
   );
 
   return (
-    <Layout
-      sidebarOpen={sidebarOpen}
-      onToggleSidebar={onToggleSidebar}
-      leftPanel={
-        <LeftPanel
-          onNewSession={handleNewSession}
-          onSearch={() => {}}
-          onPlugins={() => {}}
-          onSettings={onOpenSettings}
-          connected={connected}
-        />
-      }
-    >
-      {hasMessages ? (
-        <>
-          <ChatView messages={messages} streaming={streaming} />
-          {chatInput}
-        </>
-      ) : (
-        <div className="flex-1 flex items-center justify-center">
-          {chatInput}
-        </div>
-      )}
-    </Layout>
+    <>
+      <Layout
+        sidebarOpen={sidebarOpen}
+        onToggleSidebar={() => setSidebarOpen((v) => !v)}
+        rightPanelDiffs={[]}
+        connected={connected}
+        leftPanel={
+          <LeftPanel
+            onNewSession={handleNewSession}
+            onSearch={() => {}}
+            onPlugins={() => {}}
+            onSettings={() => openSettings()}
+            connected={connected}
+            activeSessionId={activeSessionId}
+            onSelectSession={handleSelectSession}
+            onRenameSession={handleRenameSession}
+            onDeleteSession={handleDeleteSession}
+          />
+        }
+      >
+        {hasMessages ? (
+          <>
+            <ChatView messages={messages} streaming={streaming} />
+            {chatInput}
+          </>
+        ) : (
+          <div className="flex-1 flex items-center justify-center">
+            {chatInput}
+          </div>
+        )}
+      </Layout>
+
+      <CommandPalette
+        open={commandPaletteOpen}
+        onClose={closeCommandPalette}
+        commands={commands}
+        onExecute={handleExecuteCommand}
+      />
+
+      <SettingsScreen
+        providers={providers}
+        selectedModel={selectedModel}
+        onModelChange={setSelectedModel}
+        serverUrl={settingsUrl}
+        onSaveServerUrl={handleSaveUrl}
+      />
+    </>
   );
 }

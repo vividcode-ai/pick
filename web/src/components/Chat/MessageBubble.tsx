@@ -1,20 +1,33 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
+import { Copy, ChevronRight, ChevronDown, Undo, Trash2 } from "lucide-react";
 import type { ChatMessage } from "../../types/events";
+import { Markdown } from "./Markdown";
+import { ToolCall } from "./ToolCall";
+
 
 interface MessageBubbleProps {
   message: ChatMessage;
 }
 
+function formatTime(ts: number): string {
+  const d = new Date(ts);
+  return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+}
+
 export function MessageBubble({ message }: MessageBubbleProps) {
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(message.content);
+  }, [message.content]);
+
   switch (message.role) {
     case "user":
-      return <UserBubble message={message} />;
+      return <UserBubble message={message} onCopy={handleCopy} />;
     case "assistant":
-      return <AssistantBubble message={message} />;
+      return <AssistantBubble message={message} onCopy={handleCopy} />;
     case "thinking":
       return <ThinkingBubble message={message} />;
     case "tool":
-      return <ToolBubble message={message} />;
+      return <ToolCall message={message} onCopy={handleCopy} />;
     case "system":
       return <SystemBubble message={message} />;
     default:
@@ -22,21 +35,35 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   }
 }
 
-function UserBubble({ message }: { message: ChatMessage }) {
+function UserBubble({ message, onCopy }: { message: ChatMessage; onCopy: () => void }) {
   return (
-    <div className="flex justify-end">
-      <div className="max-w-[75%] rounded-2xl rounded-br-md bg-blue-600 text-white px-4 py-2.5 whitespace-pre-wrap text-sm leading-relaxed">
-        {message.content}
+    <div className="flex justify-end message-item">
+      <div className="user-message-bubble">
+        <div className="text-sm leading-relaxed whitespace-pre-wrap text-neutral-100">
+          {message.content}
+        </div>
+      </div>
+      <div className="message-actions justify-end pr-1">
+        <button className="message-action-button" onClick={onCopy} title="Copy">
+          <Copy className="w-3 h-3" />
+        </button>
       </div>
     </div>
   );
 }
 
-function AssistantBubble({ message }: { message: ChatMessage }) {
+function AssistantBubble({ message, onCopy }: { message: ChatMessage; onCopy: () => void }) {
   return (
-    <div className="flex justify-start">
-      <div className="max-w-[75%] rounded-2xl rounded-bl-md bg-neutral-800 text-neutral-100 px-4 py-2.5 whitespace-pre-wrap text-sm leading-relaxed">
-        {message.content}
+    <div className="flex justify-start message-item">
+      <div className="max-w-[85%]">
+        <div className="assistant-content-bubble">
+          <Markdown content={message.content} />
+        </div>
+        <div className="message-actions pl-1 pt-0.5">
+          <button className="message-action-button" onClick={onCopy} title="Copy">
+            <Copy className="w-3 h-3" />
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -46,60 +73,21 @@ function ThinkingBubble({ message }: { message: ChatMessage }) {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="flex justify-start">
-      <div className="max-w-[75%]">
+    <div className="flex justify-start message-item">
+      <div className="max-w-[85%]">
         <button
           onClick={() => setOpen(!open)}
-          className="flex items-center gap-2 w-full px-3 py-1.5 rounded-lg bg-neutral-900 border border-neutral-700 text-neutral-400 hover:text-neutral-300 text-xs transition-colors"
+          className="reasoning-toggle w-full"
         >
-          <svg
-            className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-90" : ""}`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9 5l7 7-7 7"
-            />
-          </svg>
+          {open ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
           <span className="font-medium">Thinking</span>
+          <span className="text-neutral-500">·</span>
+          <span className="text-neutral-500">{formatTime(message.timestamp)}</span>
         </button>
         {open && (
-          <div className="mt-1 px-3 py-2 rounded-lg bg-neutral-900 border border-neutral-700 text-neutral-400 text-xs whitespace-pre-wrap leading-relaxed">
-            {message.content}
+          <div className="reasoning-body">
+            <pre className="reasoning-text">{message.content}</pre>
           </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function ToolBubble({ message }: { message: ChatMessage }) {
-  const tc = message.toolCall;
-  if (!tc) return null;
-
-  return (
-    <div className="flex justify-start">
-      <div className="max-w-[75%] border border-neutral-700 rounded-lg overflow-hidden">
-        <div className="flex items-center gap-2 px-3 py-2 bg-neutral-800 text-sm text-neutral-300">
-          <span className="font-mono text-xs">{tc.name}</span>
-          {tc.isStreaming && (
-            <span className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse" />
-          )}
-          {tc.isError && <span className="text-red-400 text-xs">Error</span>}
-        </div>
-        {tc.isStreaming && message.content && (
-          <pre className="px-3 py-2 text-sm text-neutral-300 overflow-x-auto">
-            {message.content}
-          </pre>
-        )}
-        {tc.output && !tc.isStreaming && (
-          <pre className="px-3 py-2 text-sm text-neutral-300 overflow-x-auto max-h-60">
-            {tc.output}
-          </pre>
         )}
       </div>
     </div>
@@ -108,8 +96,8 @@ function ToolBubble({ message }: { message: ChatMessage }) {
 
 function SystemBubble({ message }: { message: ChatMessage }) {
   return (
-    <div className="flex justify-center">
-      <div className="text-xs text-neutral-500 bg-neutral-900 rounded-full px-3 py-1">
+    <div className="flex justify-center message-item">
+      <div className="text-xs text-neutral-500 bg-neutral-800 rounded-full px-3 py-1">
         {message.content}
       </div>
     </div>

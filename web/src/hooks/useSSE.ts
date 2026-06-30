@@ -12,11 +12,13 @@ export function useSSE(baseUrl: string) {
   const [streaming, setStreaming] = useState(false);
   const [connected, setConnected] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
     setConnected(true);
     return () => {
       abortRef.current?.abort();
+      eventSourceRef.current?.close();
     };
   }, []);
 
@@ -59,9 +61,8 @@ export function useSSE(baseUrl: string) {
       const controller = new AbortController();
       abortRef.current = controller;
 
-      const eventSource = new EventSource(
-        `${baseUrl}/events/${sessionId}`
-      );
+      const eventSource = new EventSource(`${baseUrl}/events/${sessionId}`);
+      eventSourceRef.current = eventSource;
 
       eventSource.onopen = () => {
         fetch(`${baseUrl}/ask`, {
@@ -76,6 +77,8 @@ export function useSSE(baseUrl: string) {
         }).catch(() => {});
       };
 
+      let assistantId: string | null = null;
+
       eventSource.addEventListener("message_update", (e) => {
         try {
           const payload = JSON.parse(e.data);
@@ -89,10 +92,11 @@ export function useSSE(baseUrl: string) {
               };
               return updated;
             }
+            assistantId = crypto.randomUUID();
             return [
               ...prev,
               {
-                id: crypto.randomUUID(),
+                id: assistantId,
                 role: "assistant",
                 content: payload.text,
                 timestamp: Date.now(),
@@ -177,12 +181,10 @@ export function useSSE(baseUrl: string) {
         eventSource.close();
       });
 
-      eventSource.addEventListener("error", (e) => {
+      eventSource.addEventListener("error", () => {
         setStreaming(false);
         eventSource.close();
       });
-
-      eventSource.addEventListener("turn_end", () => {});
 
       controller.signal.addEventListener("abort", () => {
         eventSource.close();
@@ -194,6 +196,7 @@ export function useSSE(baseUrl: string) {
   const cancel = useCallback(() => {
     if (!sessionId) return;
     abortRef.current?.abort();
+    eventSourceRef.current?.close();
     fetch(`${baseUrl}/cancel`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

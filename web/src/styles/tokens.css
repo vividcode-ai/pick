@@ -1,0 +1,102 @@
+:root {
+  color-scheme: light;
+  --surface-base: #ffffff;
+  --surface-primary: var(--surface-base);
+  --surface-secondary: #f5f5f5;
+  --surface-muted: #f8fafc;
+  --surface-code: #f1f5f9;
+  --surface-hover: #e0e0e0;
+  --border-base: #e0e0e0;
+  --border-secondary: #e0e0e0;
+  --border-muted: #e0e0e0;
+  --text-primary: #111827;
+  --text-secondary: #334155;
+  --text-muted: #475569;
+  --text-inverted: #ffffff;
+  --text-on-accent: #ffffff;
+  --accent-primary: #0066ff;
+  --accent-hover: #0052cc;
+  --status-success: #4caf50;
+  --status-error: #f44336;
+  --status-warning: #ff9800;
+  --message-user-bg: #eef2ff;
+  --message-user-border: #2196f3;
+  --message-assistant-bg: #f8fafc;
+  --message-assistant-border: #f59e0b;
+  --message-tool-bg: #eef2f7;
+  --message-tool-border: #64748b;
+  --focus-ring-color: var(--accent-primary);
+  --overlay-scrim: rgba(0, 0, 0, 0.5);
+  --panel-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+  --popover-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
+  --font-family-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-family-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --surface-base: #1a1a1a;
+    --surface-primary: var(--surface-base);
+    --surface-secondary: #2a2a2a;
+    --surface-muted: #212529;
+    --surface-code: #1a1a1a;
+    --surface-hover: #3a3a3a;
+    --border-base: #3a3a3a;
+    --border-secondary: #3a3a3a;
+    --border-muted: #3a3a3a;
+    --text-primary: #cfd4dc;
+    --text-secondary: #999999;
+    --text-muted: #999999;
+    --text-inverted: #1a1a1a;
+    --text-on-accent: #f5f6f8;
+    --accent-primary: #0080ff;
+    --accent-hover: #0066cc;
+    --status-success: #4caf50;
+    --status-error: #f44336;
+    --status-warning: #ff9800;
+    --message-user-bg: #202734;
+    --message-user-border: #42a5f5;
+    --message-assistant-bg: #212529;
+    --message-assistant-border: #d97706;
+    --message-tool-bg: #212529;
+    --message-tool-border: #adb5bd;
+    --focus-ring-color: var(--accent-primary);
+    --overlay-scrim: rgba(0, 0, 0, 0.6);
+    --panel-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+    --popover-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+  }
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-base: #1a1a1a;
+  --surface-primary: var(--surface-base);
+  --surface-secondary: #2a2a2a;
+  --surface-muted: #212529;
+  --surface-code: #1a1a1a;
+  --surface-hover: #3a3a3a;
+  --border-base: #3a3a3a;
+  --border-secondary: #3a3a3a;
+  --border-muted: #3a3a3a;
+  --text-primary: #cfd4dc;
+  --text-secondary: #999999;
+  --text-muted: #999999;
+  --text-inverted: #1a1a1a;
+  --text-on-accent: #f5f6f8;
+  --accent-primary: #0080ff;
+  --accent-hover: #0066cc;
+  --status-success: #4caf50;
+  --status-error: #f44336;
+  --status-warning: #ff9800;
+  --message-user-bg: #202734;
+  --message-user-border: #42a5f5;
+  --message-assistant-bg: #212529;
+  --message-assistant-border: #d97706;
+  --message-tool-bg: #212529;
+  --message-tool-border: #adb5bd;
+  --focus-ring-color: var(--accent-primary);
+  --overlay-scrim: rgba(0, 0, 0, 0.6);
+  --panel-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  --popover-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+}
