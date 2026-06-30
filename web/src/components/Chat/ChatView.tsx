@@ -16,7 +16,7 @@ export function ChatView({ messages, streaming }: ChatViewProps) {
 
   return (
     <div className="flex-1 overflow-y-auto min-h-0">
-      <div className="max-w-[90%] md:max-w-[70%] lg:max-w-[50%] mx-auto px-4 py-4 space-y-3">
+      <div className="max-w-[90%] md:max-w-[70%] lg:max-w-[40%] mx-auto px-4 py-4 space-y-3">
         {messages.map((msg) => (
           <MessageBubble key={msg.id + msg.timestamp} message={msg} />
         ))}

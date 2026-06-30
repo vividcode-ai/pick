@@ -195,17 +195,11 @@ pub(crate) fn process_key_event(
         }
 
         // During a paste burst (chars arriving <50ms apart), accumulate
-        // \n so the entire paste stays in the accumulator for the 100-char
-        // placeholder check instead of flushing partial content to the
-        // editor as raw text.  Windows may report pasted newlines as
-        // KeyCode::Enter (not Char('\n')), so this guard is essential.
-        // When pending_pastes exists, always accumulate (paste is active).
-        if !tui.paste_accumulator.is_empty() || !tui.editor.pending_pastes.is_empty() {
-            if !tui.editor.pending_pastes.is_empty() {
-                tui.paste_accumulator.push('\n');
-                tui.last_paste_time = Some(now);
-                return None;
-            }
+        // \n so the entire paste stays in the accumulator instead of
+        // flushing partial content to the editor as raw text.  Windows
+        // may report pasted newlines as KeyCode::Enter (not Char('\n')),
+        // so this guard is essential.
+        if !tui.paste_accumulator.is_empty() {
             if let Some(t) = tui.last_paste_time
                 && now.duration_since(t).as_millis() < 50
             {
@@ -246,12 +240,10 @@ pub(crate) fn process_key_event(
                     return None;
                 }
                 if c == '\n' || c == '\r' {
-                    // During a paste burst (accumulator non-empty), or when
-                    // paste placeholders exist (pending_pastes non-empty),
+                    // During a paste burst (accumulator non-empty),
                     // push \n into the accumulator to keep the paste content
-                    // together for the 100-char threshold check and merging,
-                    // instead of submitting or inserting as newline.
-                    if !tui.paste_accumulator.is_empty() || !tui.editor.pending_pastes.is_empty() {
+                    // together, instead of submitting or inserting as newline.
+                    if !tui.paste_accumulator.is_empty() {
                         tui.paste_accumulator.push(c);
                         tui.last_paste_time = Some(now);
                         return None;
@@ -339,17 +331,11 @@ pub(crate) fn process_key_event_during_agent(
             return None;
         }
         // During a paste burst (chars arriving <50ms apart), accumulate
-        // \n so the entire paste stays in the accumulator for the 100-char
-        // placeholder check instead of flushing partial content to the
-        // editor as raw text.  Windows may report pasted newlines as
-        // KeyCode::Enter (not Char('\n')), so this guard is essential.
-        // When pending_pastes exists, always accumulate (paste is active).
-        if !tui.paste_accumulator.is_empty() || !tui.editor.pending_pastes.is_empty() {
-            if !tui.editor.pending_pastes.is_empty() {
-                tui.paste_accumulator.push('\n');
-                tui.last_paste_time = Some(now);
-                return None;
-            }
+        // \n so the entire paste stays in the accumulator instead of
+        // flushing partial content to the editor as raw text.  Windows
+        // may report pasted newlines as KeyCode::Enter (not Char('\n')),
+        // so this guard is essential.
+        if !tui.paste_accumulator.is_empty() {
             if let Some(t) = tui.last_paste_time
                 && now.duration_since(t).as_millis() < 50
             {
@@ -381,12 +367,10 @@ pub(crate) fn process_key_event_during_agent(
                     return None;
                 }
                 if c == '\n' || c == '\r' {
-                    // During a paste burst (accumulator non-empty), or when
-                    // paste placeholders exist (pending_pastes non-empty),
+                    // During a paste burst (accumulator non-empty),
                     // push \n into the accumulator to keep the paste content
-                    // together for the 100-char threshold check and merging,
-                    // instead of submitting or inserting as newline.
-                    if !tui.paste_accumulator.is_empty() || !tui.editor.pending_pastes.is_empty() {
+                    // together, instead of submitting or inserting as newline.
+                    if !tui.paste_accumulator.is_empty() {
                         tui.paste_accumulator.push(c);
                         tui.last_paste_time = Some(now);
                         return None;
@@ -472,14 +456,10 @@ pub(crate) fn drain_key_events(
                                 if check_newline_dedup(tui, Instant::now()) {
                                     continue;
                                 }
-                                // During a paste burst (accumulator non-empty), or when
-                                // paste placeholders exist (pending_pastes non-empty),
+                                // During a paste burst (accumulator non-empty),
                                 // push \n into the accumulator so the entire paste
-                                // content stays together for the 100-char threshold
-                                // check, merging, and correct placeholder line count.
-                                if !tui.paste_accumulator.is_empty()
-                                    || !tui.editor.pending_pastes.is_empty()
-                                {
+                                // content stays together.
+                                if !tui.paste_accumulator.is_empty() {
                                     tui.paste_accumulator.push(c);
                                     tui.last_paste_time = Some(Instant::now());
                                     had_paste_push = true;
@@ -512,11 +492,8 @@ pub(crate) fn drain_key_events(
                             // Extra Enter event in drain — the main
                             // select!/process_key_event path handles the
                             // primary event.  Accumulate \n when
-                            // already in a paste batch or when placeholders
-                            // exist; otherwise skip.
-                            if !tui.paste_accumulator.is_empty()
-                                || !tui.editor.pending_pastes.is_empty()
-                            {
+                            // already in a paste batch; otherwise skip.
+                            if !tui.paste_accumulator.is_empty() {
                                 tui.paste_accumulator.push('\n');
                                 tui.last_paste_time = Some(Instant::now());
                                 had_paste_push = true;
@@ -640,14 +617,10 @@ pub(crate) fn drain_key_events_during_agent(
                                 if check_newline_dedup(tui, Instant::now()) {
                                     continue;
                                 }
-                                // During a paste burst (accumulator non-empty), or when
-                                // paste placeholders exist (pending_pastes non-empty),
+                                // During a paste burst (accumulator non-empty),
                                 // push \n into the accumulator so the entire paste
-                                // content stays together for the 100-char threshold
-                                // check, merging, and correct placeholder line count.
-                                if !tui.paste_accumulator.is_empty()
-                                    || !tui.editor.pending_pastes.is_empty()
-                                {
+                                // content stays together.
+                                if !tui.paste_accumulator.is_empty() {
                                     tui.paste_accumulator.push(c);
                                     tui.last_paste_time = Some(Instant::now());
                                     had_paste_push = true;
@@ -683,11 +656,8 @@ pub(crate) fn drain_key_events_during_agent(
                         }
                         KeyCode::Enter => {
                             // Extra Enter event in drain. Accumulate \n when
-                            // already in a paste batch or when placeholders
-                            // exist; skip otherwise.
-                            if !tui.paste_accumulator.is_empty()
-                                || !tui.editor.pending_pastes.is_empty()
-                            {
+                            // already in a paste batch; skip otherwise.
+                            if !tui.paste_accumulator.is_empty() {
                                 tui.paste_accumulator.push('\n');
                                 tui.last_paste_time = Some(Instant::now());
                                 had_paste_push = true;

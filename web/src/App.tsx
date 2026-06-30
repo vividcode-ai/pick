@@ -4,7 +4,7 @@ import { LeftPanel } from "./components/Layout/LeftPanel";
 import { ChatView } from "./components/Chat/ChatView";
 import { ChatInput } from "./components/Chat/ChatInput";
 import { useSSE, fetchProviders } from "./hooks/useSSE";
-import type { ProviderInfo} from "./types/events";
+import type { ProviderInfo } from "./types/events";
 
 async function detectBaseUrl(): Promise<string> {
   const params = new URLSearchParams(window.location.search);
@@ -28,7 +28,6 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsUrl, setSettingsUrl] = useState("");
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
-  const [selectedProvider, setSelectedProvider] = useState("anthropic");
   const [selectedModel, setSelectedModel] = useState("");
   const [thinkingLevel, setThinkingLevel] = useState("off");
 
@@ -44,26 +43,22 @@ export default function App() {
     fetchProviders(baseUrl).then((list) => {
       setProviders(list);
       if (list.length > 0) {
-        setSelectedProvider(list[0].provider);
-        if (list[0].models.length > 0) {
-          setSelectedModel(list[0].models[0].id);
+        const firstWithKey = list.find((p) => p.has_key) || list[0];
+        if (firstWithKey.models.length > 0) {
+          setSelectedModel(firstWithKey.models[0].id);
         }
       }
     });
   }, [baseUrl]);
 
-  const selectedModelDetail = useMemo(() => {
+  const selectedProvider = useMemo(() => {
     for (const p of providers) {
-      if (p.provider === selectedProvider) {
-        return p.models.find((m) => m.id === selectedModel) || null;
+      if (p.models.some((m) => m.id === selectedModel)) {
+        return p.provider;
       }
     }
-    return null;
-  }, [providers, selectedProvider, selectedModel]);
-
-  const modelsForProvider = useMemo(() => {
-    return providers.find((p) => p.provider === selectedProvider)?.models || [];
-  }, [providers, selectedProvider]);
+    return providers[0]?.provider || "anthropic";
+  }, [providers, selectedModel]);
 
   const handleSaveUrl = useCallback(() => {
     localStorage.setItem("pick_server_url", settingsUrl);
@@ -87,11 +82,8 @@ export default function App() {
         onOpenSettings={() => setSettingsOpen(true)}
         providers={providers}
         selectedProvider={selectedProvider}
-        onProviderChange={setSelectedProvider}
         selectedModel={selectedModel}
         onModelChange={setSelectedModel}
-        modelsForProvider={modelsForProvider}
-        selectedModelDetail={selectedModelDetail}
         thinkingLevel={thinkingLevel}
         onThinkingLevelChange={setThinkingLevel}
       />
@@ -144,11 +136,8 @@ interface AppContentProps {
   onOpenSettings: () => void;
   providers: ProviderInfo[];
   selectedProvider: string;
-  onProviderChange: (p: string) => void;
   selectedModel: string;
   onModelChange: (m: string) => void;
-  modelsForProvider: { id: string; name: string; reasoning: boolean }[];
-  selectedModelDetail: { id: string; name: string; reasoning: boolean } | null;
   thinkingLevel: string;
   onThinkingLevelChange: (l: string) => void;
 }
@@ -160,11 +149,8 @@ function AppContent({
   onOpenSettings,
   providers,
   selectedProvider,
-  onProviderChange,
   selectedModel,
   onModelChange,
-  modelsForProvider,
-  selectedModelDetail,
   thinkingLevel,
   onThinkingLevelChange,
 }: AppContentProps) {
@@ -194,6 +180,20 @@ function AppContent({
 
   const hasMessages = messages.length > 0;
 
+  const chatInput = (
+    <ChatInput
+      onSend={handleSend}
+      disabled={streaming}
+      onCancel={cancel}
+      connected={connected}
+      providers={providers}
+      selectedModel={selectedModel}
+      onModelChange={onModelChange}
+      thinkingLevel={thinkingLevel}
+      onThinkingLevelChange={onThinkingLevelChange}
+    />
+  );
+
   return (
     <Layout
       sidebarOpen={sidebarOpen}
@@ -211,39 +211,11 @@ function AppContent({
       {hasMessages ? (
         <>
           <ChatView messages={messages} streaming={streaming} />
-          <ChatInput
-            onSend={handleSend}
-            disabled={streaming}
-            onCancel={cancel}
-            connected={connected}
-            providers={providers}
-            selectedProvider={selectedProvider}
-            onProviderChange={onProviderChange}
-            selectedModel={selectedModel}
-            onModelChange={onModelChange}
-            modelsForProvider={modelsForProvider}
-            selectedModelDetail={selectedModelDetail}
-            thinkingLevel={thinkingLevel}
-            onThinkingLevelChange={onThinkingLevelChange}
-          />
+          {chatInput}
         </>
       ) : (
         <div className="flex-1 flex items-center justify-center">
-          <ChatInput
-            onSend={handleSend}
-            disabled={streaming}
-            onCancel={cancel}
-            connected={connected}
-            providers={providers}
-            selectedProvider={selectedProvider}
-            onProviderChange={onProviderChange}
-            selectedModel={selectedModel}
-            onModelChange={onModelChange}
-            modelsForProvider={modelsForProvider}
-            selectedModelDetail={selectedModelDetail}
-            thinkingLevel={thinkingLevel}
-            onThinkingLevelChange={onThinkingLevelChange}
-          />
+          {chatInput}
         </div>
       )}
     </Layout>

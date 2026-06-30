@@ -75,5 +75,6 @@ export interface ModelInfo {
 
 export interface ProviderInfo {
   provider: string;
+  has_key: boolean;
   models: ModelInfo[];
 }

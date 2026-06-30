@@ -1160,8 +1160,6 @@ impl TuiApp {
     }
 
     /// Handle a paste event: insert pasted text into the editor buffer.
-    const LARGE_PASTE_CHAR_THRESHOLD: usize = 100;
-
     pub fn handle_paste(&mut self, text: &str) {
         if matches!(
             self.state,
@@ -1175,75 +1173,15 @@ impl TuiApp {
             return;
         }
         let pasted = text.replace("\r\n", "\n").replace('\r', "\n");
-
-        if !self.editor.pending_pastes.is_empty() {
-            // Merge into last pending paste instead of expanding,
-            // so existing paste placeholders stay visible.
-            self.merge_into_last_paste(&pasted);
-            if self.editor.is_autocomplete_active()
-                || self.editor.text().trim_start().starts_with('/')
-            {
-                self.editor.trigger_autocomplete();
-            }
-            return;
-        }
-
-        let char_count = pasted.chars().count();
-        if char_count > Self::LARGE_PASTE_CHAR_THRESHOLD {
-            let line_count = pasted.lines().count();
-            self.editor.add_paste_placeholder(line_count, &pasted);
-        } else {
-            self.editor.insert_str(&pasted);
-        }
+        self.editor.insert_str(&pasted);
         if self.editor.is_autocomplete_active() || self.editor.text().trim_start().starts_with('/')
         {
             self.editor.trigger_autocomplete();
         }
     }
 
-    /// Merge accumulated text into the last pending paste instead of inserting
-    /// it directly. Updates the placeholder text to reflect the new total line count.
-    fn merge_into_last_paste(&mut self, text: &str) {
-        let (old_placeholder, current_text) = {
-            let last = self.editor.pending_pastes.last().unwrap();
-            (last.placeholder.clone(), self.editor.text().to_string())
-        };
-        let new_line_count = {
-            let last = self.editor.pending_pastes.last().unwrap();
-            format!("{}{}", last.actual, text).lines().count()
-        };
-        let base = format!("[Pasted Content {} Lines]", new_line_count);
-        let new_placeholder = self.editor.unique_placeholder(&base);
-        if current_text.contains(&old_placeholder) {
-            self.editor
-                .set_text(&current_text.replace(&old_placeholder, &new_placeholder));
-        }
-        if let Some(last) = self.editor.pending_pastes.last_mut() {
-            last.actual.push_str(text);
-            last.placeholder = new_placeholder;
-        }
-    }
-
-    /// Handle a regular printable character.
-    /// When paste placeholders exist, chars arriving fast (within 50ms of the
-    /// previous char) are treated as paste continuation and accumulated for
-    /// merging into the pending paste. Slow chars are treated as user typing
-    /// and inserted directly. Otherwise, accumulate for paste burst detection.
+    /// Handle a regular printable character. Accumulate for paste burst detection.
     pub fn handle_char_for_paste(&mut self, c: char, now: Instant) {
-        if !self.editor.pending_pastes.is_empty() {
-            let is_fast = self
-                .last_paste_time
-                .is_some_and(|t| now.duration_since(t).as_millis() < 50);
-            if is_fast {
-                // Fast char → likely paste continuation → accumulate for merging
-                self.paste_accumulator.push(c);
-                self.last_paste_time = Some(now);
-                return;
-            }
-            // Slow char → user typing after paste → insert directly
-            self.editor.insert_char(c);
-            return;
-        }
         self.paste_accumulator.push(c);
         self.last_paste_time = Some(now);
     }
@@ -1253,27 +1191,11 @@ impl TuiApp {
     /// a CONTROL/ALT key or Enter is processed, preventing the key handler from
     /// operating on an empty buffer with pending text.
     pub fn force_flush_paste_accumulator(&mut self) {
-        if self.paste_accumulator.is_empty() && self.editor.pending_pastes.is_empty() {
+        if self.paste_accumulator.is_empty() {
             return;
         }
-        if !self.editor.pending_pastes.is_empty() {
-            if !self.paste_accumulator.is_empty() {
-                let typed = std::mem::take(&mut self.paste_accumulator);
-                self.merge_into_last_paste(&typed);
-            }
-            return;
-        }
-        if !self.paste_accumulator.is_empty() {
-            let char_count = self.paste_accumulator.chars().count();
-            if char_count > Self::LARGE_PASTE_CHAR_THRESHOLD {
-                let text = std::mem::take(&mut self.paste_accumulator);
-                let line_count = text.lines().count();
-                self.editor.add_paste_placeholder(line_count, &text);
-            } else {
-                let text = std::mem::take(&mut self.paste_accumulator);
-                self.editor.insert_str(&text);
-            }
-        }
+        let text = std::mem::take(&mut self.paste_accumulator);
+        self.editor.insert_str(&text);
         let trimmed = self.editor.text().trim_start();
         if trimmed.starts_with('/') && !trimmed[1..].contains(' ') {
             self.editor.trigger_autocomplete();
@@ -1285,22 +1207,6 @@ impl TuiApp {
     /// Finalize paste accumulator
     pub fn finalize_paste_accumulator(&mut self, now: Instant) -> bool {
         if self.paste_accumulator.is_empty() {
-            return true;
-        }
-
-        if !self.editor.pending_pastes.is_empty() {
-            if !self.paste_accumulator.is_empty() {
-                let text = std::mem::take(&mut self.paste_accumulator);
-                self.merge_into_last_paste(&text);
-            }
-            return true;
-        }
-
-        let char_count = self.paste_accumulator.chars().count();
-        if char_count > Self::LARGE_PASTE_CHAR_THRESHOLD {
-            let text = std::mem::take(&mut self.paste_accumulator);
-            let line_count = text.lines().count();
-            self.editor.add_paste_placeholder(line_count, &text);
             return true;
         }
         if let Some(t) = self.last_paste_time
@@ -1321,17 +1227,10 @@ impl TuiApp {
 
     /// Submit the current editor content and return it
     pub(crate) fn submit_input(&mut self) -> Option<TuiAction> {
-        let raw = self.editor.text().to_string();
-        if raw.trim().is_empty() {
+        let text = self.editor.text().to_string();
+        if text.trim().is_empty() {
             return None;
         }
-        let text = if !self.editor.pending_pastes.is_empty() {
-            let expanded = self.editor.expand_pending_pastes(&raw);
-            self.editor.pending_pastes.clear();
-            expanded
-        } else {
-            raw
-        };
         let is_slash = text.trim().starts_with('/');
         self.editor.push_history(text.clone());
         self.editor.clear();

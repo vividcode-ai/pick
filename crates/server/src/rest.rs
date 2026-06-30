@@ -103,15 +103,15 @@ pub struct ModelInfo {
 #[derive(Serialize)]
 pub struct ProviderInfo {
     pub provider: String,
+    pub has_key: bool,
     pub models: Vec<ModelInfo>,
 }
 
-pub async fn list_providers() -> impl IntoResponse {
-    let registry = pick_ai::registry::global_registry();
-    let apis = registry.list_apis();
-    let providers: Vec<ProviderInfo> = apis
+pub async fn list_providers(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let providers: Vec<ProviderInfo> = pick_ai::models::get_providers()
         .iter()
         .map(|p| {
+            let has_key = state.api_keys.contains_key(p);
             let models = pick_ai::models::get_models(p)
                 .iter()
                 .map(|m| ModelInfo {
@@ -122,6 +122,7 @@ pub async fn list_providers() -> impl IntoResponse {
                 .collect();
             ProviderInfo {
                 provider: p.clone(),
+                has_key,
                 models,
             }
         })

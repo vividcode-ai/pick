@@ -40,8 +40,6 @@ pub struct Editor {
     last_yank_size: Option<usize>,
     /// Redo stack (undo pushes here before restoring)
     redo_stack: UndoStack<String>,
-    /// Large paste placeholders (placeholder_text ↔ actual_content mappings)
-    pub pending_pastes: Vec<PendingPaste>,
 
     // --- Autocomplete ---
     /// Optional autocomplete provider for slash commands and file paths
@@ -82,7 +80,7 @@ impl Editor {
             placeholder: String::new(),
             last_yank_size: None,
             redo_stack: UndoStack::new(),
-            pending_pastes: Vec::new(),
+
             autocomplete_provider: None,
             autocomplete_suggestions: None,
             autocomplete_selection: 0,
@@ -133,47 +131,6 @@ impl Editor {
         self.cursor += s.len();
         self.mark = None;
         self.kill_accumulating = false;
-    }
-
-    /// Insert a paste placeholder into the buffer for a large paste.
-    /// Uses `[Pasted Content N Lines]` format, with dedup suffix (#2, #3…) for multiple pastes.
-    pub fn add_paste_placeholder(&mut self, line_count: usize, actual: &str) {
-        let base = format!("[Pasted Content {} Lines]", line_count);
-        let placeholder = self.unique_placeholder(&base);
-        self.insert_str(&placeholder);
-        self.pending_pastes.push(PendingPaste {
-            placeholder,
-            actual: actual.to_string(),
-        });
-    }
-
-    /// Generate a unique placeholder string, adding `#2`, `#3` … if duplicates exist.
-    pub(crate) fn unique_placeholder(&self, base: &str) -> String {
-        let mut max_suffix = 0usize;
-        for pp in &self.pending_pastes {
-            if pp.placeholder == base {
-                max_suffix = max_suffix.max(1);
-            }
-            if let Some(suffix) = pp.placeholder.strip_prefix(&format!("{} #", base))
-                && let Ok(v) = suffix.parse::<usize>()
-            {
-                max_suffix = max_suffix.max(v);
-            }
-        }
-        if max_suffix == 0 {
-            base.to_string()
-        } else {
-            format!("{} #{}", base, max_suffix + 1)
-        }
-    }
-
-    /// Expand all paste placeholders in `text` to their actual content.
-    pub fn expand_pending_pastes(&self, text: &str) -> String {
-        let mut result = text.to_string();
-        for pp in &self.pending_pastes {
-            result = result.replace(&pp.placeholder, &pp.actual);
-        }
-        result
     }
 
     /// Insert a newline at cursor position
@@ -1453,50 +1410,6 @@ impl Editor {
                 if cursor_row == 0 {
                     cursor_col += prompt_width;
                 }
-            }
-        }
-
-        // Apply dim + italic styling to paste placeholders
-        if !self.pending_pastes.is_empty() {
-            let placeholder_style = Style::default().fg(Color::Cyan).add_modifier(Modifier::DIM);
-            for line in &mut lines {
-                let mut new_spans = Vec::new();
-                for span in std::mem::take(&mut line.spans) {
-                    let content = span.content.as_ref().to_string();
-                    // Check if this span's content contains any placeholder text
-                    let mut remaining = content.as_str();
-                    loop {
-                        let mut earliest_pos = None;
-                        let mut earliest_pp = None;
-                        for pp in &self.pending_pastes {
-                            if let Some(pos) = remaining.find(&pp.placeholder)
-                                && earliest_pos.is_none_or(|p| pos < p)
-                            {
-                                earliest_pos = Some(pos);
-                                earliest_pp = Some(pp);
-                            }
-                        }
-                        match (earliest_pos, earliest_pp) {
-                            (Some(pos), Some(pp)) => {
-                                if pos > 0 {
-                                    new_spans.push(Span::raw(remaining[..pos].to_string()));
-                                }
-                                new_spans.push(Span::styled(
-                                    remaining[pos..pos + pp.placeholder.len()].to_string(),
-                                    placeholder_style,
-                                ));
-                                remaining = &remaining[pos + pp.placeholder.len()..];
-                            }
-                            _ => {
-                                if !remaining.is_empty() {
-                                    new_spans.push(Span::raw(remaining.to_string()));
-                                }
-                                break;
-                            }
-                        }
-                    }
-                }
-                line.spans = new_spans;
             }
         }
 
