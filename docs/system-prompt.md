@@ -1,10 +1,10 @@
 # System Prompt
 
-Pick supports customizing and appending to the system prompt via files, allowing you to adjust the AI's behavior.
+Pick supports customizing and appending to the system prompt via files.
 
 ## SYSTEM.md
 
-`SYSTEM.md` **completely replaces** the default system prompt.
+Completely **replaces** the default system prompt.
 
 ### Load locations
 
@@ -35,7 +35,7 @@ You are an AI coding assistant running inside Pick.
 
 ## APPEND_SYSTEM.md
 
-`APPEND_SYSTEM.md` appends content to the **end** of the default system prompt.
+Appends content to the **end** of the default system prompt.
 
 ### Load locations
 
@@ -48,8 +48,6 @@ You are an AI coding assistant running inside Pick.
 
 ```markdown
 # Project-Specific Rules
-
-This project follows these conventions:
 
 1. Use Rust edition 2024
 2. Prefer anyhow for error handling
@@ -67,18 +65,18 @@ This project follows these conventions:
     + APPEND_SYSTEM.md (still appended)
 ```
 
-1. **No SYSTEM.md** → Default system prompt is used
-2. **SYSTEM.md exists** → Replaces default system prompt
-3. **APPEND_SYSTEM.md** → Always appended to the final system prompt
+1. **No SYSTEM.md** → Default system prompt used
+2. **SYSTEM.md exists** → Replaces default
+3. **APPEND_SYSTEM.md** → Always appended
 
 ## Dynamic appending
 
-Extensions can use `systemPromptAppend` to append content to the system prompt at runtime.
+Extensions can use `systemPromptAppend` to append content at runtime.
 
 ## Best practices
 
-1. **Prefer APPEND_SYSTEM.md** — Append rules rather than fully replacing
-2. **Use SYSTEM.md for full customization** — Only replace the default prompt when you need full control
-3. **Place project config in .pick/** — Keep projects self-contained
-4. **Place global config in ~/.pick/** — For cross-project rules
+1. **Prefer APPEND_SYSTEM.md** — Append rules rather than replacing
+2. **Use SYSTEM.md for full control** — Replace when complete customization is needed
+3. **Place project config in `.pick/`** — Self-contained projects
+4. **Place global config in `~/.pick/`** — Cross-project rules
 5. **Avoid over-constraining** — Too many rules reduce AI flexibility

@@ -10,8 +10,8 @@
 
 ## 特性
 
-- **多提供商 LLM** — Anthropic、OpenAI、Google、Mistral、Bedrock、Azure OpenAI、Cloudflare、GitHub Copilot、Google Vertex
-- **4 种运行模式** — TUI（默认）、交互式 REPL、Print/JSON 批处理、RPC（基于 stdio 的 JSON-RPC）
+- **多提供商 LLM** — Anthropic、OpenAI、Google、Mistral、Bedrock、Azure OpenAI、DeepSeek、Kimi、MiniMax、ZAI、Cloudflare、GitHub Copilot、Google Vertex
+- **5 种运行模式** — TUI（默认）、交互式 REPL、Print/JSON 批处理、RPC（基于 stdio 的 JSON-RPC）、Server（Web UI）
 - **智能体工具系统** — read、write、edit、bash、grep、find、ls、webfetch
 - **扩展机制** — 通过动态库加载的生命周期钩子
 - **MCP 支持** — 模型上下文协议服务器，扩展工具能力
@@ -25,20 +25,24 @@
 - **双层配置** — 全局 `~/.pick/settings.json` 与项目 `.pick/settings.json` 自动合并
 - **自动更新** — 内置 `pick update` 更新机制
 - **会话导出** — 将对话导出为 HTML
-- **跨平台** — Windows、macOS、Linux
+- **跨平台** — 终端 CLI/TUI（Windows、Linux、macOS）、桌面 GUI（Windows、Linux、macOS）、Web、移动端（Android、iOS）
+- **Web 与桌面 GUI** — 基于 React 的 Web 界面，由内置 HTTP 服务器提供服务；Tauri 桌面封装提供原生体验
+- **移动端支持** — 通过 Tauri 支持 Android 和 iOS 应用
 
 ## 架构
 
 ```text
-pick-tui（不依赖其他 pick crate）
-    ↑
-pick-ai（不依赖其他 pick crate）
+pick-tui（终端 UI，不依赖其他 pick crate）
+pick-ai（LLM 抽象层，不依赖其他 pick crate）
     ↑
 pick-agent（依赖 pick-ai 和 pick-tui）
     ↑
-pick-cli（二进制入口，依赖所有 crate）— 生成 `pick` 可执行文件
-pick-mcp（MCP 协议实现）
-pick-sandbox（进程隔离实现）
+├── pick-cli — 二进制入口，生成 `pick` 可执行文件
+├── pick-mcp — MCP 协议客户端
+├── pick-sandbox — 进程隔离
+├── pick-server — HTTP/WS 服务器，为 Web UI 提供服务
+    ↑
+└── pick-desktop — Tauri 应用（桌面 GUI + 移动端）
 ```
 
 - **pick-ai** — 统一的多提供商 LLM 抽象层，基于提供者注册模式
@@ -47,6 +51,21 @@ pick-sandbox（进程隔离实现）
 - **pick-cli** — CLI 二进制入口、参数解析、设置、认证、所有运行模式
 - **pick-mcp** — 模型上下文协议客户端（stdio、SSE、streamable HTTP）
 - **pick-sandbox** — 平台特定的进程隔离（Windows Job Objects、Linux bwrap、macOS Seatbelt）
+- **pick-server** — 基于 Axum 的 HTTP/WS 服务器，提供 Web 前端和 WebSocket API
+- **pick-desktop** — Tauri 2.0 封装，支持桌面端（Windows、Linux、macOS）和移动端（Android、iOS）
+
+## 平台
+
+Pick 支持多种平台和界面：
+
+| 界面 | 技术 | 支持目标 |
+|------|------|----------|
+| **终端** | CLI / TUI（crossterm + ratatui） | Windows、Linux、macOS |
+| **桌面** | Tauri GUI（React 前端） | Windows、Linux、macOS |
+| **Web** | 浏览器（Vite + React + pick-server） | 任何现代浏览器 |
+| **移动端** | Tauri 应用（React 前端） | Android、iOS |
+
+终端 CLI/TUI 是主要界面。桌面端、Web 和移动端通过内置 HTTP/WS 服务器（`pick-server`）复用同一核心 `pick-agent` 引擎，并使用 React 前端。
 
 ## 安装
 
@@ -101,6 +120,9 @@ pick --list-models
 
 # 计划模式（只读调研，确认后再实施变更）
 pick --agent-mode plan -P "这个模块应该如何重构？"
+
+# 启动 Web 服务器，打开浏览器界面
+pick server --open
 ```
 
 ## 文档
@@ -155,6 +177,10 @@ pick --agent-mode plan -P "这个模块应该如何重构？"
 | `--agent-mode` | build 或 plan |
 | `--list-models` | 列出可用模型 |
 | `--export <FILE>` | 将会话导出为 HTML |
+| `server` | 启动 Web 服务器，打开浏览器界面（子命令） |
+| `--port <PORT>` | 服务器端口（默认：随机可用端口） |
+| `--host <HOST>` | 服务器地址（默认：127.0.0.1） |
+| `--open` | 启动服务器后自动打开浏览器 |
 | `--audit` | 查看权限审计日志 |
 
 ## 优缺点
@@ -162,6 +188,7 @@ pick --agent-mode plan -P "这个模块应该如何重构？"
 **优点：**
 - 原生 Rust 实现，性能优异
 - 广泛支持各类 LLM 提供商
+- 多种界面：终端、桌面 GUI、Web、移动端
 - 功能丰富的 TUI，支持 Markdown、图片、语法高亮
 - 会话持久化存储与压缩
 - 计划模式防止意外变更
@@ -173,6 +200,7 @@ pick --agent-mode plan -P "这个模块应该如何重构？"
 - 项目尚年轻，社区规模较小
 - 文档仍在完善中
 - 部分功能（如 macOS 沙箱）需要特定平台配置
+- 移动端和 Web 平台仍在完善中
 
 ## 许可证
 

@@ -5,6 +5,7 @@ pub mod auth_storage;
 pub mod bash_executor;
 pub mod defaults;
 pub mod diagnostics;
+pub mod embedded_docs;
 pub mod event_bus;
 pub mod exec;
 pub mod export_html;

@@ -32,7 +32,7 @@ cargo build --release
 ## Quick start
 
 ```bash
-# Start TUI (default mode)
+# Start TUI (default)
 pick
 
 # Specify model and provider
@@ -41,10 +41,10 @@ pick -m claude-sonnet-4-20250514 -p anthropic
 # One-shot question (print mode)
 pick -P "What is the directory structure of this project?"
 
-# Interactive REPL mode
+# Interactive REPL
 pick --mode interactive
 
-# List available models
+# List models
 pick --list-models
 
 # Plan mode (read-only research)
@@ -64,7 +64,7 @@ pick --api-key sk-ant-xxx...
 
 ### 2. Project configuration
 
-`.pick/settings.json` overrides global settings `~/.pick/settings.json`:
+`.pick/settings.json` overrides global `~/.pick/settings.json`:
 
 ```json
 {
@@ -77,7 +77,7 @@ pick --api-key sk-ant-xxx...
 }
 ```
 
-### 3. Verify installation
+### 3. Verify
 
 ```bash
 pick -P "Hello, what model are you using?"

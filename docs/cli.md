@@ -10,9 +10,9 @@ pick [OPTIONS] [@files...] [MESSAGE...]
 
 | Mode | Flag | Description |
 |------|------|-------------|
-| **TUI** (default) | `--mode tui` | Full terminal UI: diff rendering, syntax highlighting, images |
+| **TUI** (default) | `--mode tui` | Full terminal UI with diff rendering, syntax highlighting, images |
 | **Interactive** | `--mode interactive` | REPL-style interaction |
-| **Print** | `--mode print` / `-P` | Batch, non-interactive, output to stdout |
+| **Print** | `--mode print` / `-P` | Batch non-interactive, output to stdout |
 | **JSON** | `--mode json` | JSON-formatted output |
 
 ## Options
@@ -21,9 +21,9 @@ pick [OPTIONS] [@files...] [MESSAGE...]
 
 | Flag | Description |
 |------|-------------|
-| `-m, --model <MODEL>` | Model ID to use |
+| `-m, --model <MODEL>` | Model ID |
 | `-p, --provider <PROV>` | Provider (anthropic, openai, google, etc.) |
-| `--thinking <LEVEL>` | Thinking/reasoning level: off / minimal / low / medium / high / xhigh |
+| `--thinking <LEVEL>` | Reasoning level: off / minimal / low / medium / high / xhigh |
 | `--list-models [FILTER]` | List available models |
 | `--api-key <KEY>` | Set API key |
 
@@ -33,7 +33,7 @@ pick [OPTIONS] [@files...] [MESSAGE...]
 |------|-------------|
 | `-s, --session <ID>` | Resume session by ID |
 | `-r, --resume` | Interactive session selector |
-| `--fork <ID>` | Fork a session (snapshot + continue) |
+| `--fork <ID>` | Fork a session (snapshot then continue) |
 | `-c, --continue [ID]` | Continue most recent or specified session |
 | `--no-session` | Run without persistence |
 | `--export <FILE>` | Export session to HTML |
@@ -46,7 +46,7 @@ pick [OPTIONS] [@files...] [MESSAGE...]
 | `--system-prompt <TEXT>` | Custom system prompt |
 | `-t, --tools <TOOLS>` | Tool allowlist (comma-separated) |
 | `-nt, --no-tools` | Disable all tools |
-| `-nbt, --no-builtin-tools` | Disable only built-in tools |
+| `-nbt, --no-builtin-tools` | Disable built-in tools only |
 
 ### Extensions & customization
 
@@ -67,7 +67,7 @@ pick [OPTIONS] [@files...] [MESSAGE...]
 | `--json` | JSON-format audit output |
 | `--recent <N>` | N most recent audit entries |
 | `--tool <NAME>` | Filter by tool name |
-| `--decision <TYPE>` | Filter by decision type (allow / deny / ask) |
+| `--decision <TYPE>` | Filter by decision (allow / deny / ask) |
 | `--layer <LAYER>` | Filter by audit layer |
 
 ### Other
@@ -84,7 +84,7 @@ pick [OPTIONS] [@files...] [MESSAGE...]
 
 | Argument | Description |
 |----------|-------------|
-| `@files...` | Include as context files (e.g. `@src/main.rs`) |
+| `@files...` | Context files (e.g. `@src/main.rs`) |
 | `MESSAGE...` | Input prompt (use with `-P` in print mode) |
 
 ## Exit codes

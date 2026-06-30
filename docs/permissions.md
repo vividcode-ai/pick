@@ -1,22 +1,6 @@
 # Permission System
 
-Pick has a three-tier permission system ensuring AI operations stay within controlled bounds.
-
-## Architecture
-
-```
-┌──────────────┐     ┌───────────────┐     ┌──────────────┐
-│  Tool Call   │────▶│  Permission   │────▶│  Execution   │
-│  Request     │     │  Evaluation   │     │  Decision    │
-└──────────────┘     └───────────────┘     └──────────────┘
-                           │
-                    ┌──────┴──────┐
-                    │              │
-               ┌─────────┐  ┌──────────┐
-               │ Ruleset │  │  Audit   │
-               │         │  │  Log     │
-               └─────────┘  └──────────┘
-```
+Three-tier permission system ensuring AI operations stay within controlled bounds.
 
 ## Permission keys
 
@@ -41,20 +25,18 @@ Each tool maps to a permission key:
 Rule config file (`.pick/rules/default.rules`):
 
 ```text
-# This is a comment
-
 # Safe commands
 ls -> allow
 cat -> allow
 head -> allow
 git diff -> allow
 
-# Dangerous commands - prompt for confirmation
+# Dangerous — prompt for confirmation
 rm -rf -> prompt
 sudo -> prompt
 git push -> prompt
 
-# Forbidden commands
+# Forbidden
 rm -rf / -> forbid
 dd -> forbid
 ```
@@ -73,24 +55,22 @@ One rule per line: `<pattern> -> <decision>`
 
 ### Pattern matching
 
-- Token-aware pattern matching (`git push` matches `git push origin main`)
-- Wildcard support (`git *` matches any git subcommand)
+- Token-aware matching (`git push` matches `git push origin main`)
+- Wildcard (`git *` matches any git subcommand)
 - **Last matching rule wins**
-- Commands containing shell meta characters (`;`, `&&`, `||`, `|`, `$()`) are auto-upgraded to `prompt`
+- Commands with shell meta chars (`;`, `&&`, `||`, `|`, `$()`) auto-upgrade to `prompt`
 
-### Built-in security heuristics
+### Built-in heuristics (when no rule matches)
 
-When no rule matches, built-in heuristics apply:
-
-| Category | Example commands | Default decision |
-|----------|-----------------|------------------|
+| Category | Examples | Default |
+|----------|----------|---------|
 | Safe | ls, cat, head, tail, grep, find, echo, pwd | `allow` |
 | Dangerous | rm, mv, sudo, chmod, kill, dd, mkfs | `prompt` |
 | Unknown | Other commands | `prompt` |
 
-## Permission rules
+## Permission rules (JSON)
 
-Permission rule files (JSON format) define more granular access control:
+Granular access control via rule files:
 
 ```json
 [
@@ -112,17 +92,13 @@ Permission rule files (JSON format) define more granular access control:
 ]
 ```
 
-Wildcard matching is supported for both permission keys and patterns.
-
-### Save and load
-
-- Rule files are stored at `~/.pick/permissions.json` (global) and `.pick/permissions.json` (project)
+- Stored at `~/.pick/permissions.json` (global) and `.pick/permissions.json` (project)
 - Project rules override global rules
-- Can be modified at runtime via the `/permission` command
+- Modify at runtime via `/permission` command
 
 ## Audit log
 
-Every permission decision is recorded in the audit log:
+Every decision is recorded:
 
 ```jsonl
 {"type":"allow","tool":"bash","command":"ls -la","timestamp":"...","layer":"base"}
@@ -130,37 +106,28 @@ Every permission decision is recorded in the audit log:
 {"type":"deny","tool":"bash","command":"sudo rm -rf /","timestamp":"...","layer":"base"}
 ```
 
-### Viewing audit
+### Viewing
 
 ```bash
-# View all audit entries
-pick --audit
-
-# Filter by tool
-pick --audit --tool bash
-
-# Filter by decision
-pick --audit --decision deny
-
-# JSON output
-pick --audit --json
-
-# Last 20 entries
-pick --audit --recent 20
+pick --audit                          # All entries
+pick --audit --tool bash              # Filter by tool
+pick --audit --decision deny          # Filter by decision
+pick --audit --json                   # JSON output
+pick --audit --recent 20             # Last 20 entries
 ```
 
 ## Security profiles
 
 | Profile | Description |
 |---------|-------------|
-| `:workspace` | Restrict tools to workspace directory only |
+| `:workspace` | Restrict to workspace directory |
 | `:global` | Allow global operations (requires confirmation) |
-| Custom path | Restrict to a specific directory range |
+| Custom path | Restrict to a specific directory |
 
 ## Best practices
 
-1. **Principle of least privilege** — Only allow the tools and operations necessary for the task
-2. **Regular auditing** — Use `--audit` to review the AI's behavior records
-3. **Project isolation** — Set different permission configs for different projects
-4. **Periodic cleanup** — Review and update rule files regularly
-5. **Sensitive path protection** — Explicitly deny write access to `.env`, `.git/`, `node_modules/`, etc.
+1. **Least privilege** — Allow only necessary tools and operations
+2. **Regular auditing** — Use `--audit` to review AI behavior
+3. **Project isolation** — Different permission configs per project
+4. **Periodic cleanup** — Review and update rule files
+5. **Sensitive paths** — Deny write access to `.env`, `.git/`, `node_modules/`, etc.

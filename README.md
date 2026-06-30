@@ -10,8 +10,8 @@ A Rust port of the pi AI coding agent, combining high performance with reliabili
 
 ## Features
 
-- **Multi-provider LLM** — Anthropic, OpenAI, Google, Mistral, Bedrock, Azure OpenAI, Cloudflare, GitHub Copilot, Google Vertex
-- **4 run modes** — TUI (default), Interactive (REPL), Print/JSON (batch), RPC (JSON-RPC over stdio)
+- **Multi-provider LLM** — Anthropic, OpenAI, Google, Mistral, Bedrock, Azure OpenAI, DeepSeek, Kimi, MiniMax, ZAI, Cloudflare, GitHub Copilot, Google Vertex
+- **5 run modes** — TUI (default), Interactive (REPL), Print/JSON (batch), RPC (JSON-RPC over stdio), Server (web UI)
 - **Agent tool system** — read, write, edit, bash, grep, find, ls, webfetch
 - **Extensions** — dynamic library loading via lifecycle hooks
 - **MCP support** — Model Context Protocol servers for extending tool capabilities
@@ -25,20 +25,24 @@ A Rust port of the pi AI coding agent, combining high performance with reliabili
 - **Two-tier settings** — Global `~/.pick/settings.json` merged with project `.pick/settings.json`
 - **Auto-update** — Built-in update mechanism via `pick update`
 - **Session export** — Export conversations to HTML
-- **Cross-platform** — Windows, macOS, Linux
+- **Cross-platform** — Terminal CLI/TUI (Windows, Linux, macOS), Desktop GUI (Windows, Linux, macOS), Web, Mobile (Android, iOS)
+- **Web & Desktop GUI** — React-based web interface served by built-in HTTP server; Tauri desktop wrapper for native experience
+- **Mobile support** — Android and iOS apps via Tauri
 
 ## Architecture
 
 ```text
-pick-tui (no deps on other pick crates)
-    ↑
-pick-ai  (no deps on other pick crates)
+pick-tui (terminal UI, no pick deps)
+pick-ai  (LLM abstraction, no pick deps)
     ↑
 pick-agent (depends on pick-ai, pick-tui)
     ↑
-pick-cli (binary, depends on all) — produces `pick` executable
-pick-mcp (MCP protocol)
-pick-sandbox (process isolation)
+├── pick-cli — Binary entrypoint, produces `pick`
+├── pick-mcp — MCP protocol client
+├── pick-sandbox — Process isolation
+├── pick-server — HTTP/WS server for web UI
+    ↑
+└── pick-desktop — Tauri app (desktop GUI + mobile)
 ```
 
 - **pick-ai** — Unified multi-provider LLM abstraction with provider registry pattern
@@ -47,6 +51,21 @@ pick-sandbox (process isolation)
 - **pick-cli** — CLI binary, argument parsing, settings, auth, all run modes
 - **pick-mcp** — Model Context Protocol client (stdio, SSE, streamable HTTP)
 - **pick-sandbox** — Platform-specific process isolation (Windows Job Objects, Linux bwrap, macOS Seatbelt)
+- **pick-server** — Axum-based HTTP/WS server, serves web frontend and provides WebSocket API
+- **pick-desktop** — Tauri 2.0 wrapper for desktop (Windows, Linux, macOS) and mobile (Android, iOS)
+
+## Platforms
+
+Pick is available on multiple platforms with different interfaces:
+
+| Interface | Technology | Supported Targets |
+|-----------|-----------|-------------------|
+| **Terminal** | CLI / TUI (crossterm + ratatui) | Windows, Linux, macOS |
+| **Desktop** | Tauri GUI (React frontend) | Windows, Linux, macOS |
+| **Web** | Browser (Vite + React + pick-server) | Any modern browser |
+| **Mobile** | Tauri app (React frontend) | Android, iOS |
+
+The terminal CLI/TUI is the primary interface. Desktop, web, and mobile use the same core `pick-agent` engine through a built-in HTTP/WS server (`pick-server`), with a React frontend.
 
 ## Installation
 
@@ -102,6 +121,9 @@ pick --list-models
 
 # Plan mode (read-only research before making changes)
 pick --agent-mode plan -P "How should I refactor this?"
+
+# Start web server with browser UI
+pick server --open
 ```
 
 ## Documentation
@@ -156,6 +178,10 @@ Example `.pick/settings.json`:
 | `--agent-mode` | build or plan |
 | `--list-models` | List available models |
 | `--export <FILE>` | Export session to HTML |
+| `server` | Start web server with browser UI (subcommand) |
+| `--port <PORT>` | Server port (default: random available) |
+| `--host <HOST>` | Server host address (default: 127.0.0.1) |
+| `--open` | Open browser automatically on server start |
 | `--audit` | View permission audit trail |
 
 ## Pros & Cons
@@ -163,6 +189,7 @@ Example `.pick/settings.json`:
 **Pros:**
 - Fast, native performance (Rust)
 - Wide LLM provider support
+- Multiple interfaces: terminal, desktop GUI, web, mobile
 - Rich TUI with markdown, images, syntax highlighting
 - Session persistence with compaction
 - Plan mode prevents accidental changes
@@ -174,6 +201,7 @@ Example `.pick/settings.json`:
 - Younger project, smaller community
 - Documentation still growing
 - Some features (e.g., sandbox on macOS) require platform-specific setup
+- Mobile and web platforms are still maturing
 
 ## License
 

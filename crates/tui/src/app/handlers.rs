@@ -1218,35 +1218,13 @@ impl TuiApp {
         }
     }
 
-    /// Handle a regular printable character, respecting pending paste placeholders.
-    /// If there are existing paste placeholders and the paste burst has ended
-    /// (>50ms since last paste char), expand the placeholder and insert the
-    /// character directly into the editor buffer so the user sees their typed
-    /// text. Otherwise, accumulate for paste detection.
+    /// Handle a regular printable character.
+    /// When paste placeholders exist, insert the character directly after the
+    /// placeholder — no paste burst detection, since the paste is already captured.
+    /// Otherwise, accumulate for paste burst detection.
     pub fn handle_char_for_paste(&mut self, c: char, now: Instant) {
         if !self.editor.pending_pastes.is_empty() {
-            if let Some(t) = self.last_paste_time
-                && now.duration_since(t).as_millis() < 50
-            {
-                self.paste_accumulator.push(c);
-                self.last_paste_time = Some(now);
-                return;
-            }
-            // last_paste_time being None means the paste burst was just
-            // finalized (accumulator flushed to a placeholder).  A char
-            // arriving immediately after is likely a late paste character,
-            // not user typing — accumulate it.
-            if self.last_paste_time.is_none() {
-                self.paste_accumulator.push(c);
-                self.last_paste_time = Some(now);
-                return;
-            }
-            let raw = self.editor.text().to_string();
-            let expanded = self.editor.expand_pending_pastes(&raw);
-            self.editor.pending_pastes.clear();
-            self.editor.set_text(&expanded);
             self.editor.insert_char(c);
-            self.last_paste_time = None;
             return;
         }
         self.paste_accumulator.push(c);
@@ -1263,47 +1241,8 @@ impl TuiApp {
         }
         if !self.editor.pending_pastes.is_empty() {
             if !self.paste_accumulator.is_empty() {
-                // Timing check: if chars are still arriving (<50ms since last),
-                // this is a paste continuation → merge into pending_paste.
-                // If >=50ms have passed, this is user typing after paste → expand.
-                if let Some(t) = self.last_paste_time
-                    && Instant::now().duration_since(t).as_millis() < 50
-                {
-                    // Still within paste burst: merge into pending paste.
-                    // Keep last_paste_time so subsequent chars can still
-                    // be recognised as paste continuation via timing check.
-                    let text = std::mem::take(&mut self.paste_accumulator);
-                    let (old_placeholder, old_len, current_text) = {
-                        let last = self.editor.pending_pastes.last().unwrap();
-                        (
-                            last.placeholder.clone(),
-                            last.actual.chars().count(),
-                            self.editor.text().to_string(),
-                        )
-                    };
-                    let new_len = old_len + text.chars().count();
-                    let base = format!("[Pasted Content {} chars]", new_len);
-                    let new_placeholder = self.editor.unique_placeholder(&base);
-                    if current_text.contains(&old_placeholder) {
-                        self.editor
-                            .set_text(&current_text.replace(&old_placeholder, &new_placeholder));
-                    }
-                    if let Some(last) = self.editor.pending_pastes.last_mut() {
-                        last.actual.push_str(&text);
-                        last.placeholder = new_placeholder;
-                    }
-                } else {
-                    // Paste burst ended, user typed after paste: expand placeholder
-                    let typed = std::mem::take(&mut self.paste_accumulator);
-                    self.last_paste_time = None;
-                    let raw = self.editor.text().to_string();
-                    let expanded = self.editor.expand_pending_pastes(&raw);
-                    self.editor.pending_pastes.clear();
-                    self.editor.set_text(&expanded);
-                    if !typed.is_empty() {
-                        self.editor.insert_str(&typed);
-                    }
-                }
+                let typed = std::mem::take(&mut self.paste_accumulator);
+                self.editor.insert_str(&typed);
             }
             return;
         }
@@ -1333,29 +1272,8 @@ impl TuiApp {
 
         if !self.editor.pending_pastes.is_empty() {
             if !self.paste_accumulator.is_empty() {
-                // Paste burst ended but pending_pastes exists: merge into pending paste.
-                // Keep last_paste_time so subsequent chars can still
-                // be recognised as paste continuation via timing check.
                 let text = std::mem::take(&mut self.paste_accumulator);
-                let (old_placeholder, old_len, current_text) = {
-                    let last = self.editor.pending_pastes.last().unwrap();
-                    (
-                        last.placeholder.clone(),
-                        last.actual.chars().count(),
-                        self.editor.text().to_string(),
-                    )
-                };
-                let new_len = old_len + text.chars().count();
-                let base = format!("[Pasted Content {} chars]", new_len);
-                let new_placeholder = self.editor.unique_placeholder(&base);
-                if current_text.contains(&old_placeholder) {
-                    self.editor
-                        .set_text(&current_text.replace(&old_placeholder, &new_placeholder));
-                }
-                if let Some(last) = self.editor.pending_pastes.last_mut() {
-                    last.actual.push_str(&text);
-                    last.placeholder = new_placeholder;
-                }
+                self.editor.insert_str(&text);
             }
             return true;
         }

@@ -1,30 +1,14 @@
 # Extension System
 
-Pick provides an extension mechanism via dynamic library loading (libloading). Extensions inject custom behavior at various stages of the agent lifecycle.
-
-> **Note:** Pick's extension system is based on Rust dynamic libraries, unlike pi (TypeScript). Extensions must be compiled as `.dll` / `.so` / `.dylib` shared libraries.
+Pick extensions are Rust dynamic libraries (`.dll` / `.so` / `.dylib`) that inject custom behavior via `libloading`.
 
 ## Architecture
 
 ```
-┌──────────────┐     ┌──────────────────┐
-│  Agent Loop  │────▶│  ExtensionRunner │
-└──────────────┘     └──────────────────┘
-     │                      │
-     │  Event               │  Dispatch to
-     │  Emission            │  registered handlers
-     ▼                      ▼
-┌────────────────────────────────────────────┐
-│              Extension Pool                │
-│  ┌─────────┐ ┌─────────┐ ┌─────────┐      │
-│  │ Ext #1  │ │ Ext #2  │ │ Ext #3  │ ...  │
-│  └─────────┘ └─────────┘ └─────────┘      │
-└────────────────────────────────────────────┘
+Agent Loop ──▶ ExtensionRunner ──▶ Extension Pool
 ```
 
 ## ExtensionFactory trait
-
-Extensions implement the `ExtensionFactory` trait:
 
 ```rust
 #[async_trait]
@@ -35,8 +19,6 @@ pub trait ExtensionFactory: Send + Sync {
 ```
 
 ## ExtensionAPI
-
-The `ExtensionAPI` trait provides these registration methods:
 
 | Method | Description |
 |--------|-------------|
@@ -75,10 +57,9 @@ The `ExtensionAPI` trait provides these registration methods:
 | `session_before_tree` | Before session tree operation | — |
 | `session_tree` | After session tree operation | — |
 
-**Blockable events** control flow by returning a result:
+Blockable events control flow by returning `EventResult`:
 
 ```rust
-// tool_call event example: blocking dangerous commands
 fn my_handler(event: &ExtensionEvent) -> EventResult {
     if let ExtensionEvent::ToolCall(ev) = event {
         if ev.tool_name == "bash" && ev.input["command"].to_string().contains("rm -rf") {
@@ -91,57 +72,36 @@ fn my_handler(event: &ExtensionEvent) -> EventResult {
 
 ## Extension loading
 
-Extensions are loaded from these locations:
-
-1. **User directory** — `~/.pick/extensions/*.so` (auto-discovered)
-2. **Project directory** — `.pick/extensions/*.so` (auto-discovered)
-3. **CLI argument** — `pick -e /path/to/extension.so`
+Extensions load from (in order):
+1. `~/.pick/extensions/*.so` (auto-discovered)
+2. `.pick/extensions/*.so` (auto-discovered)
+3. `pick -e /path/to/extension.so` (CLI argument)
 
 ## Writing an extension
 
-An extension is a Rust crate that implements the `ExtensionFactory` trait:
-
 ```rust
 // my-extension/src/lib.rs
-use pick_agent::extensions::{
-    ExtensionAPI, ExtensionFactory, ExtensionEvent, EventResult,
-};
+use pick_agent::extensions::{ExtensionAPI, ExtensionFactory, ExtensionEvent, EventResult};
 
 struct MyExtension;
 
 #[async_trait::async_trait]
 impl ExtensionFactory for MyExtension {
-    fn name(&self) -> &str {
-        "my-extension"
-    }
+    fn name(&self) -> &str { "my-extension" }
 
     async fn init(&self, api: &dyn ExtensionAPI) -> Result<(), String> {
-        // Register event handler
-        api.on_raw("tool_call", std::sync::Arc::new(|event| {
-            // Handle event
-            Ok(None)
-        }));
-
-        // Register custom tool
+        api.on_raw("tool_call", std::sync::Arc::new(|event| Ok(None)))?;
         api.register_tool(ToolDefinition {
             name: "my_tool".into(),
             label: "My Custom Tool".into(),
             description: "Does something useful".into(),
-            parameters: vec![],
-            prompt_snippet: None,
-            prompt_guidelines: None,
-            render_shell: None,
-            execution_mode: None,
-        });
-
-        // Register slash command
-        api.register_command("my-command", Some("Description"));
-
+            ..Default::default()
+        })?;
+        api.register_command("my-command", Some("Description"))?;
         Ok(())
     }
 }
 
-// Register globally
 #[no_mangle]
 pub extern "C" fn _pick_extension_register() {
     pick_agent::extensions::loader::register_extension_factory(
@@ -150,7 +110,7 @@ pub extern "C" fn _pick_extension_register() {
 }
 ```
 
-## Differences from pi extensions
+## Differences from pi
 
 | Feature | pi | Pick |
 |---------|----|------|

@@ -111,7 +111,7 @@ export function useAgentSession(wsUrl: string) {
             const updated = [...prev];
             updated[updated.length - 1] = {
               ...last,
-              content: last.content + payload.text,
+              content: payload.text,
             };
             return updated;
           }

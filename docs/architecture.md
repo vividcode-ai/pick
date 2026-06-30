@@ -1,6 +1,6 @@
 # Architecture
 
-Pick is a Rust workspace project composed of 6 independent crates arranged in a dependency hierarchy.
+Pick is a Rust workspace with 6 crates arranged in a dependency hierarchy.
 
 ## Workspace structure
 
@@ -18,7 +18,7 @@ pick/
 
 ## Dependency hierarchy
 
-```text
+```
 pick-tui (crossterm/ratatui, pure UI)
     ↑
 pick-ai (multi-provider LLM abstraction)
@@ -38,43 +38,22 @@ Both depend on pick-agent interfaces
 ## Crate overview
 
 ### pick-tui
-- Terminal UI built on crossterm + ratatui
-- Custom differential rendering engine
-- Markdown rendering, syntax highlighting, image display
-- Undo/redo, key bindings, theme system
+Terminal UI built on crossterm + ratatui. Features custom differential rendering, Markdown rendering, syntax highlighting, image display, undo/redo, key bindings, and theme system.
 
 ### pick-ai
-- Unified multi-provider LLM abstraction layer
-- Provider registry pattern: Anthropic, OpenAI, Google, Mistral, Bedrock, and more
-- Streaming responses, thinking/reasoning, auto-retry
-- Token counting and context management
+Unified multi-provider LLM abstraction with provider registry (Anthropic, OpenAI, Google, Mistral, Bedrock, etc.), streaming, thinking/reasoning, auto-retry, token counting, and context management.
 
 ### pick-agent
-- Agent main loop: user input → LLM call → tool execution → result output
-- Tool system: read, write, edit, bash, grep, find, ls, webfetch
-- Session management: JSONL persistence, fork/resume, compaction, branch summarization
-- Extension system: dynamic library loading (libloading), lifecycle events
-- Permission system: allow/deny/ask rules, audit log, execution policy
-- Skill system: reusable Markdown instructions
-- Sub-agents: task delegation to specialized agent processes
+Core agent: input → LLM call → tool execution → output. Includes tool system (read, write, edit, bash, grep, find, ls, webfetch), session management (JSONL persistence, fork/resume, compaction, branch summarization), extension system (dynamic library loading), permission system (allow/deny/ask rules, audit), skill system (Markdown instructions), and sub-agents.
 
 ### pick-cli
-- Binary entrypoint
-- CLI argument parsing (clap)
-- Run mode dispatch (TUI, interactive, print, json, rpc)
-- Settings loading (global + project two-tier merge), auth management
+Binary entrypoint with CLI argument parsing, run mode dispatch (TUI, interactive, print, json, rpc), settings loading (global + project merge), and auth management.
 
 ### pick-mcp
-- Model Context Protocol client implementation
-- Supports stdio, SSE, streamable HTTP transports
-- Tool registration and auto-discovery
+Model Context Protocol client supporting stdio, SSE, and streamable HTTP transports, with tool registration and auto-discovery.
 
 ### pick-sandbox
-- Platform-specific process isolation
-- Windows: restricted tokens + Job Objects
-- Linux: bubblewrap
-- macOS: Seatbelt
-- Falls back to null (no sandbox) on failure
+Platform-specific process isolation: Windows (restricted tokens + Job Objects), Linux (bubblewrap), macOS (Seatbelt). Falls back to null sandbox on failure.
 
 ## Data flow
 

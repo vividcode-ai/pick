@@ -89,7 +89,7 @@ pub fn serialize_event(event: &AgentEvent) -> Option<WsEvent> {
                 }
                 Some(WsEvent {
                     event_type: "message_update".to_string(),
-                    payload: serde_json::to_value(MessageUpdatePayload { text, delta: true })
+                    payload: serde_json::to_value(MessageUpdatePayload { text, delta: false })
                         .unwrap_or_default(),
                 })
             } else {

@@ -1,10 +1,10 @@
 # Skills System
 
-Skills are reusable Markdown files containing instructions for specific tasks. When a task matches a skill's description, Pick loads the skill content as a supplement to the system prompt.
+Skills are reusable Markdown files with instructions for specific tasks. When a task matches a skill's description, Pick loads it as a supplement to the system prompt.
 
 ## Skill format
 
-Skills use Markdown with optional YAML frontmatter:
+Markdown with optional YAML frontmatter:
 
 ```markdown
 ---
@@ -26,27 +26,25 @@ When the user needs to configure CI/CD:
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `name` | ✓ | Skill name (lowercase alphanumeric + hyphens, max 64 chars) |
-| `description` | ✓ | Skill description (max 1024 chars) |
-| `disable-model-invocation` | No | If `true`, the model won't auto-invoke this skill (default `false`) |
+| `name` | ✓ | Lowercase alphanumeric + hyphens, max 64 chars |
+| `description` | ✓ | Description, max 1024 chars |
+| `disable-model-invocation` | No | If `true`, model won't auto-invoke (default `false`) |
 
 ### Name rules
 
-- Only lowercase letters (`a-z`), digits (`0-9`), and hyphens (`-`)
-- Cannot start or end with a hyphen
-- Cannot contain consecutive double hyphens
+- Only `a-z`, `0-9`, and hyphens (`-`)
+- Cannot start or end with hyphen
+- No consecutive double hyphens
 
 ## Load locations
-
-Skills are loaded from these locations (lowest to highest priority):
 
 | Location | Scope | Description |
 |----------|-------|-------------|
 | `~/.pick/agent/skills/` | User/global | Cross-project skills |
 | `.pick/skills/` | Project | Project-specific skills |
-| `--skill <PATH>` | CLI | File or directory path specified via CLI |
+| `--skill <PATH>` | CLI | File or directory path |
 
-## Discovery mechanism
+## Discovery
 
 ```
 ~/.pick/agent/skills/             # User skills
@@ -58,15 +56,15 @@ Skills are loaded from these locations (lowest to highest priority):
   └── project-conventions.md
 ```
 
-**Discovery rules:**
-- If a directory contains `SKILL.md`, only that file is loaded as a skill
-- Otherwise, all `.md` files in the directory are scanned
-- Subdirectories are recursed to find `SKILL.md` files
-- Duplicate names: project config overrides user config
+**Rules:**
+- Directory with `SKILL.md` → only that file loads
+- Otherwise, all `.md` files in directory scan
+- Subdirectories recursed for `SKILL.md` files
+- Duplicate names: project overrides user
 
 ## Format in system prompt
 
-Loaded skills are formatted as XML blocks injected into the system prompt:
+Loaded skills inject as XML blocks:
 
 ```xml
 <available_skills>
@@ -99,11 +97,11 @@ When debugging Rust code:
 5. Check `Cargo.toml` for dependency version conflicts
 ```
 
-The skill is automatically loaded when the user asks about Rust compilation errors.
+The skill auto-loads when the user asks about Rust compilation errors.
 
 ## Disabling model invocation
 
-For skills intended for human reading or manual invocation via `/skill`, rather than automatic model triggering:
+For skills intended for manual invocation via `/skill`, not automatic triggering:
 
 ```markdown
 ---

@@ -194,6 +194,11 @@ async fn main() {
         }
     }
 
+    // Extract embedded documentation
+    if let Err(e) = core::embedded_docs::extract_embedded_docs(&crate::config::get_agent_dir()) {
+        tracing::warn!("Failed to extract embedded docs: {}", e);
+    }
+
     // Workspace trust check: verify the current directory is trusted before
     // proceeding. Skip for non-interactive modes (print/json/rpc).
     let is_interactive =
@@ -345,9 +350,9 @@ async fn main() {
 
         // 2. All providers with stored credentials
         for provider in auth.list_providers() {
-            if !api_keys.contains_key(&provider) {
-                if let Some(key) = auth.get_api_key(&provider, true).await {
-                    api_keys.insert(provider, key);
+            if let std::collections::hash_map::Entry::Vacant(e) = api_keys.entry(provider) {
+                if let Some(key) = auth.get_api_key(e.key(), true).await {
+                    e.insert(key);
                 }
             }
         }

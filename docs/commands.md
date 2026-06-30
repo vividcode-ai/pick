@@ -1,18 +1,18 @@
 # Custom Commands
 
-Pick supports defining custom slash commands through Markdown files. These command files are placed in the `commands/` directory and triggered via `/command_name`.
+Pick supports custom slash commands via Markdown files in the `commands/` directory, triggered as `/command_name`.
 
 ## Command format
 
 ```markdown
 ---
-description: Command description - short description of what the command does
+description: Short description of what the command does
 argument-hint: "<argument hint>"
 ---
 
 # Command Title
 
-The specific instruction content for the command, supports Markdown.
+Instructions for the command, supports Markdown.
 
 ## Requirements
 
@@ -30,12 +30,10 @@ The specific instruction content for the command, supports Markdown.
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `description` | ✓ | Short description of the command (shown in help) |
+| `description` | ✓ | Short description (shown in help) |
 | `argument-hint` | No | Argument hint text |
 
 ### Argument placeholders
-
-Use these placeholders in command content to reference user input:
 
 | Placeholder | Description |
 |-------------|-------------|
@@ -59,33 +57,23 @@ Create `.pick/commands/hello.md`:
 
 ```markdown
 ---
-description: Greet the user — a friendly salutation
+description: Greet the user
 argument-hint: "[name]"
 ---
 
-# Hello Command
-
-When the user types /hello, respond with a friendly greeting.
-
-## Requirements
-
-1. Use a warm and friendly tone
-2. If the user provides a name ($1), address them by name
-3. Respond in English
+Greet the user warmly. If a name ($1) is provided, address them by name. Respond in English.
 
 User said: $@
 ```
 
-In Pick:
-
 ```
 You: /hello Alice
-AI: Hello, Alice! Great to meet you! 😊
+AI: Hello, Alice! Great to meet you!
 ```
 
 ## Best practices
 
-1. **Clear descriptions** — Keep `description` concise so the user knows the command's purpose
-2. **Argument hints** — Provide `argument-hint` to help users understand argument format
+1. **Clear descriptions** — Keep `description` concise so the user understands the command's purpose
+2. **Argument hints** — Provide `argument-hint` to guide argument format
 3. **Explicit requirements** — List specific behaviors the AI should follow
 4. **Use arguments** — Reference user input with `$1`, `$@`, etc.

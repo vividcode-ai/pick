@@ -1,10 +1,10 @@
 # Session Management
 
-Pick persists sessions as JSONL files, supporting resume, fork, compaction, and navigation.
+Sessions persist as JSONL files, supporting resume, fork, compaction, and navigation.
 
 ## Storage format
 
-Sessions are stored as JSONL (one JSON object per line) at:
+One JSON object per line at:
 
 ```
 ~/.pick/agent/sessions/
@@ -12,7 +12,7 @@ Sessions are stored as JSONL (one JSON object per line) at:
   └── ...
 ```
 
-Each record is a session entry (`SessionEntry`) containing messages, tool calls, system events, etc.
+Each record is a `SessionEntry` containing messages, tool calls, and system events.
 
 ## Lifecycle
 
@@ -27,36 +27,27 @@ Create ─▶ Session Start ─▶ Agent Loop ─▶ Save ─▶ Close
 ### Create
 
 ```bash
-# Auto-create new session
-pick
-
-# Run without persistence
-pick --no-session
+pick                   # Auto-create new session
+pick --no-session      # Run without persistence
 ```
 
 ### Resume
 
 ```bash
-# Resume by ID
-pick -s <session-id>
-
-# Interactive session selector
-pick -r
-
-# Continue most recent session
-pick -c
+pick -s <session-id>   # Resume by ID
+pick -r                # Interactive session selector
+pick -c                # Continue most recent session
 ```
 
 ### Fork
 
 ```bash
-# Fork from a specific session (snapshot then continue)
-pick --fork <session-id>
+pick --fork <session-id>   # Snapshot then continue
 ```
 
 ## Session compaction
 
-Long sessions trigger compaction to reduce context length. Compaction behavior is configurable:
+Long sessions trigger compaction to reduce context length:
 
 ```json
 {
@@ -70,30 +61,29 @@ Long sessions trigger compaction to reduce context length. Compaction behavior i
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `max_messages` | 150 | Max messages before compaction triggers |
-| `max_tokens` | 32000 | Max tokens before compaction triggers |
+| `max_messages` | 150 | Max messages before compaction |
+| `max_tokens` | 32000 | Max tokens before compaction |
 | `enabled` | true | Enable automatic compaction |
 
-Extensions can customize compaction behavior via the `session_before_compact` event.
+Extensions can customize via `session_before_compact` event.
 
 ## Storage modes
 
 | Mode | Description |
 |------|-------------|
-| **Persistent** (default) | Stored to JSONL file, supports resume and fork |
-| **In-memory** | Memory-only storage, lost when process ends |
+| **Persistent** (default) | JSONL file, supports resume and fork |
+| **In-memory** | Memory-only, lost on process end |
 
 ## State persistence
 
-Extension tool state is persisted to sessions via the `details` field in tool results. On session resume, extensions reconstruct state by iterating through branch entries.
+Extension tool state persists via the `details` field in tool results. On resume, extensions reconstruct state by iterating branch entries.
 
 ## Export
 
 ```bash
-# Export most recent session to HTML
-pick --export session.html
+pick --export session.html   # Export most recent session
 ```
 
 ## Session titles
 
-Default title format is `New session - <timestamp>`.
+Default format: `New session - <timestamp>`.
