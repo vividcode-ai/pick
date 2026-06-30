@@ -24,6 +24,7 @@ pub async fn run_serve_mode(
 
     let state = Arc::new(pick_server::AppState {
         session_manager: pick_server::session::SessionManager::new(),
+        sse_sessions: tokio::sync::RwLock::new(std::collections::HashMap::new()),
         config: pick_server::ServerConfig {
             host: host.clone(),
             port: actual_port,
@@ -43,7 +44,7 @@ pub async fn run_serve_mode(
         println!("Opening {} in browser...", url);
     }
 
-    println!("Pick server listening on ws://{}:{}", host, actual_port);
+    println!("Pick server listening on http://{}:{}", host, actual_port);
     println!("  Web UI:  http://{}:{}", host, actual_port);
 
     pick_server::serve_with_state(listener, state)

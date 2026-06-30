@@ -1,9 +1,9 @@
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use pick_agent::core::state::AgentTool;
 use pick_ai::types::Message;
-use tokio::sync::{RwLock, oneshot};
+use tokio::sync::{RwLock, oneshot, watch};
 
 #[derive(Clone)]
 pub struct PendingApproval {
@@ -95,4 +95,15 @@ impl SessionManager {
     pub async fn list(&self) -> Vec<String> {
         self.sessions.read().await.keys().cloned().collect()
     }
+}
+
+#[derive(Clone)]
+pub struct SseSessionState {
+    pub event_tx: tokio::sync::mpsc::UnboundedSender<
+        Result<axum::response::sse::Event, std::convert::Infallible>,
+    >,
+    pub cancel_tx: Option<watch::Sender<bool>>,
+    pub pending_approvals: Arc<Mutex<HashMap<String, oneshot::Sender<bool>>>>,
+    pub pending_questions:
+        Arc<Mutex<HashMap<String, oneshot::Sender<Result<Vec<Vec<String>>, String>>>>>,
 }

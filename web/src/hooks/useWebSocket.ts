@@ -1,117 +1,37 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
-  WsMessage,
   ChatMessage,
   ToolStartPayload,
   ToolEndPayload,
   MessageUpdatePayload,
 } from "../types/events";
 
-interface UseWebSocketOptions {
-  url: string;
-  onMessage?: (msg: WsMessage) => void;
-  onError?: (error: string) => void;
-  autoReconnect?: boolean;
-}
-
-export function useWebSocket({
-  url,
-  onMessage,
-  onError,
-  autoReconnect = true,
-}: UseWebSocketOptions) {
-  const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [connected, setConnected] = useState(false);
-  const reconnectAttemptRef = useRef(0);
-
-  const connect = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) return;
-
-    try {
-      const ws = new WebSocket(url);
-
-      ws.onopen = () => {
-        setConnected(true);
-        reconnectAttemptRef.current = 0;
-      };
-
-      ws.onclose = () => {
-        setConnected(false);
-        wsRef.current = null;
-        if (autoReconnect && reconnectAttemptRef.current < 5) {
-          const delay = Math.min(1000 * 2 ** reconnectAttemptRef.current, 10000);
-          reconnectAttemptRef.current++;
-          reconnectTimerRef.current = setTimeout(connect, delay);
-        }
-      };
-
-      ws.onerror = () => {
-        onError?.("WebSocket connection error");
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const msg: WsMessage = JSON.parse(event.data);
-          onMessage?.(msg);
-        } catch (e) {
-          console.error("Failed to parse WS message:", e);
-        }
-      };
-
-      wsRef.current = ws;
-    } catch (e) {
-      onError?.(`Failed to connect: ${e}`);
-    }
-  }, [url, onMessage, onError, autoReconnect]);
-
-  const disconnect = useCallback(() => {
-    if (reconnectTimerRef.current) {
-      clearTimeout(reconnectTimerRef.current);
-      reconnectTimerRef.current = null;
-    }
-    wsRef.current?.close();
-    wsRef.current = null;
-    setConnected(false);
-  }, []);
-
-  const send = useCallback((msg: WsMessage) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify(msg));
-    }
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      disconnect();
-    };
-  }, [disconnect]);
-
-  return { connected, connect, disconnect, send };
-}
-
-export function useAgentSession(wsUrl: string) {
+export function useAgentSession(baseUrl: string) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [connected, setConnected] = useState(false);
+  const esRef = useRef<EventSource | null>(null);
+  const sessionIdRef = useRef<string | null>(null);
 
-  const handleMessage = useCallback((msg: WsMessage) => {
-    switch (msg.type) {
-      case "session_created": {
-        setSessionId(msg.payload.session_id);
-        setMessages([]);
-        break;
-      }
+  const handleEvent = useCallback((type: string, rawData: string) => {
+    let payload: any;
+    try {
+      payload = JSON.parse(rawData);
+    } catch {
+      return;
+    }
+
+    switch (type) {
       case "message_update": {
-        const payload = msg.payload as MessageUpdatePayload;
+        const p = payload as MessageUpdatePayload;
         setMessages((prev) => {
           const last = prev[prev.length - 1];
           if (last?.role === "assistant" && last.content) {
             const updated = [...prev];
             updated[updated.length - 1] = {
               ...last,
-              content: payload.text,
+              content: p.text,
             };
             return updated;
           }
@@ -120,7 +40,7 @@ export function useAgentSession(wsUrl: string) {
             {
               id: crypto.randomUUID(),
               role: "assistant",
-              content: payload.text,
+              content: p.text,
               timestamp: Date.now(),
             },
           ];
@@ -128,16 +48,16 @@ export function useAgentSession(wsUrl: string) {
         break;
       }
       case "tool_start": {
-        const payload = msg.payload as ToolStartPayload;
+        const p = payload as ToolStartPayload;
         setMessages((prev) => [
           ...prev,
           {
-            id: payload.tool_call_id,
+            id: p.tool_call_id,
             role: "tool",
             content: "",
             toolCall: {
-              name: payload.tool_name,
-              args: payload.args,
+              name: p.tool_name,
+              args: p.args,
               isStreaming: true,
             },
             timestamp: Date.now(),
@@ -146,7 +66,7 @@ export function useAgentSession(wsUrl: string) {
         break;
       }
       case "tool_update": {
-        const { tool_call_id, partial_output } = msg.payload;
+        const { tool_call_id, partial_output } = payload;
         setMessages((prev) =>
           prev.map((m) =>
             m.id === tool_call_id && m.toolCall
@@ -160,17 +80,17 @@ export function useAgentSession(wsUrl: string) {
         break;
       }
       case "tool_end": {
-        const payload = msg.payload as ToolEndPayload;
+        const p = payload as ToolEndPayload;
         setMessages((prev) =>
           prev.map((m) =>
-            m.id === payload.tool_call_id && m.toolCall
+            m.id === p.tool_call_id && m.toolCall
               ? {
                   ...m,
-                  content: payload.output,
+                  content: p.output,
                   toolCall: {
                     ...m.toolCall,
-                    output: payload.output,
-                    isError: payload.is_error,
+                    output: p.output,
+                    isError: p.is_error,
                     isStreaming: false,
                   },
                 }
@@ -192,7 +112,7 @@ export function useAgentSession(wsUrl: string) {
           {
             id: crypto.randomUUID(),
             role: "system",
-            content: "Error: " + (msg.payload?.message || "Unknown error"),
+            content: "Error: " + (payload?.message || "Unknown error"),
             timestamp: Date.now(),
           },
         ]);
@@ -200,27 +120,62 @@ export function useAgentSession(wsUrl: string) {
     }
   }, []);
 
-  const ws = useWebSocket({
-    url: wsUrl,
-    onMessage: handleMessage,
-  });
+  const connectSse = useCallback(
+    (sid: string) => {
+      if (esRef.current) {
+        esRef.current.close();
+      }
 
-  useEffect(() => {
-    setConnected(ws.connected);
-  }, [ws.connected]);
+      const es = new EventSource(`${baseUrl}/events/${sid}`);
+
+      es.onopen = () => {
+        setConnected(true);
+      };
+
+      es.onerror = () => {
+        setConnected(false);
+      };
+
+      const onEvent = (type: string) => (e: MessageEvent) =>
+        handleEvent(type, e.data);
+
+      es.addEventListener("message_update", onEvent("message_update"));
+      es.addEventListener("tool_start", onEvent("tool_start"));
+      es.addEventListener("tool_update", onEvent("tool_update"));
+      es.addEventListener("tool_end", onEvent("tool_end"));
+      es.addEventListener("agent_end", onEvent("agent_end"));
+      es.addEventListener("turn_end", onEvent("turn_end"));
+      es.addEventListener("error", onEvent("error"));
+      es.addEventListener("approval_required", onEvent("approval_required"));
+      es.addEventListener("question", onEvent("question"));
+
+      esRef.current = es;
+    },
+    [baseUrl, handleEvent]
+  );
 
   const createSession = useCallback(
-    (modelId?: string, provider?: string) => {
-      ws.send({
-        type: "create_session",
-        payload: { model_id: modelId, provider },
+    async (modelId?: string, provider?: string) => {
+      const resp = await fetch(`${baseUrl}/sessions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model_id: modelId, provider }),
       });
+      const data = await resp.json();
+      const sid: string = data.session_id;
+      sessionIdRef.current = sid;
+      setSessionId(sid);
+      setMessages([]);
+      connectSse(sid);
     },
-    [ws.send]
+    [baseUrl, connectSse]
   );
 
   const ask = useCallback(
-    (prompt: string) => {
+    async (prompt: string) => {
+      const sid = sessionIdRef.current;
+      if (!sid) return;
+
       setStreaming(true);
       setMessages((prev) => [
         ...prev,
@@ -231,17 +186,31 @@ export function useAgentSession(wsUrl: string) {
           timestamp: Date.now(),
         },
       ]);
-      ws.send({
-        type: "ask",
-        payload: { prompt, session_id: sessionId },
+
+      await fetch(`${baseUrl}/ask`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sid, prompt }),
       });
     },
-    [ws.send, sessionId]
+    [baseUrl]
   );
 
-  const cancel = useCallback(() => {
-    ws.send({ type: "cancel" });
-  }, [ws.send]);
+  const cancel = useCallback(async () => {
+    const sid = sessionIdRef.current;
+    if (!sid) return;
+    await fetch(`${baseUrl}/cancel`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: sid }),
+    });
+  }, [baseUrl]);
+
+  useEffect(() => {
+    return () => {
+      esRef.current?.close();
+    };
+  }, []);
 
   return {
     sessionId,
@@ -251,7 +220,9 @@ export function useAgentSession(wsUrl: string) {
     createSession,
     ask,
     cancel,
-    connect: ws.connect,
-    disconnect: ws.disconnect,
+    connect: () => {}, // No-op: sessions created explicitly
+    disconnect: () => {
+      esRef.current?.close();
+    },
   };
 }

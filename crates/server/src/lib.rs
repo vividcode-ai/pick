@@ -1,21 +1,25 @@
 pub mod events;
 pub mod rest;
+pub mod routes;
 pub mod session;
 pub mod spa;
-pub mod ws;
+pub mod sse;
 
 use std::collections::HashMap;
 use std::sync::Arc;
 
 use axum::Router;
-use axum::routing::get;
+use axum::routing::{get, post};
 use pick_agent::session::GoalManager;
+use session::SseSessionState;
 use tokio::net::TcpListener;
+use tokio::sync::RwLock;
 use tower_http::cors::CorsLayer;
 use tracing::info;
 
 pub struct AppState {
     pub session_manager: session::SessionManager,
+    pub sse_sessions: RwLock<HashMap<String, SseSessionState>>,
     pub config: ServerConfig,
     pub default_provider: Option<String>,
     pub default_model: Option<String>,
@@ -26,6 +30,7 @@ impl AppState {
     pub fn new(config: ServerConfig) -> Self {
         Self {
             session_manager: session::SessionManager::new(),
+            sse_sessions: RwLock::new(HashMap::new()),
             config,
             default_provider: None,
             default_model: None,
@@ -78,7 +83,11 @@ pub fn create_app(state: Arc<AppState>) -> Router {
             get(rest::get_session).delete(rest::delete_session),
         )
         .route("/providers", get(rest::list_providers))
-        .route("/ws", get(ws::handle_ws))
+        .route("/events/{session_id}", get(sse::handle_sse))
+        .route("/ask", post(routes::ask))
+        .route("/cancel", post(routes::cancel))
+        .route("/approve", post(routes::approve))
+        .route("/answer_question", post(routes::answer_question))
         .fallback(spa::spa_handler)
         .layer(CorsLayer::permissive())
         .with_state(state)

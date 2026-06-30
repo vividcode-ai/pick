@@ -4,7 +4,7 @@ import { ChatView } from "./components/Chat/ChatView";
 import { ChatInput } from "./components/Chat/ChatInput";
 import { useAgentSession } from "./hooks/useWebSocket";
 
-const DEFAULT_WS_URL = "ws://localhost:8080/ws";
+const DEFAULT_HTTP_URL = "http://localhost:8080";
 
 async function detectServerUrl(): Promise<string> {
   const params = new URLSearchParams(window.location.search);
@@ -18,20 +18,20 @@ async function detectServerUrl(): Promise<string> {
   }
 
   // Derive from current page URL (covers pick server random port)
-  const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  const derivedUrl = `${wsProtocol}//${window.location.host}/ws`;
+  const proto = window.location.protocol === "https:" ? "https:" : "http:";
+  const derivedUrl = `${proto}//${window.location.host}`;
 
   return localStorage.getItem("pick_server_url") || derivedUrl;
 }
 
 export default function App() {
-  const [wsUrl, setWsUrl] = useState<string | null>(null);
+  const [httpUrl, setHttpUrl] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsUrl, setSettingsUrl] = useState("");
 
   useEffect(() => {
     detectServerUrl().then((url) => {
-      setWsUrl(url);
+      setHttpUrl(url);
       setSettingsUrl(url);
     });
   }, []);
@@ -41,7 +41,7 @@ export default function App() {
     window.location.reload();
   }, [settingsUrl]);
 
-  if (!wsUrl) {
+  if (!httpUrl) {
     return (
       <div className="flex h-screen items-center justify-center bg-neutral-950 text-neutral-400">
         Connecting...
@@ -51,7 +51,7 @@ export default function App() {
 
   return (
     <>
-      <AppContent wsUrl={wsUrl} onOpenSettings={() => setSettingsOpen(true)} />
+      <AppContent httpUrl={httpUrl} onOpenSettings={() => setSettingsOpen(true)} />
 
       {settingsOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setSettingsOpen(false)}>
@@ -85,23 +85,17 @@ export default function App() {
 }
 
 interface AppContentProps {
-  wsUrl: string;
+  httpUrl: string;
   onOpenSettings: () => void;
 }
 
-function AppContent({ wsUrl, onOpenSettings }: AppContentProps) {
-  const { messages, streaming, connected, createSession, ask, cancel, connect } =
-    useAgentSession(wsUrl);
+function AppContent({ httpUrl, onOpenSettings }: AppContentProps) {
+  const { messages, streaming, connected, createSession, ask, cancel } =
+    useAgentSession(httpUrl);
 
   useEffect(() => {
-    connect();
-  }, [connect]);
-
-  useEffect(() => {
-    if (connected) {
-      createSession();
-    }
-  }, [connected, createSession]);
+    createSession();
+  }, [createSession]);
 
   return (
     <Layout
@@ -118,7 +112,7 @@ function AppContent({ wsUrl, onOpenSettings }: AppContentProps) {
                 />
                 <span>{connected ? "Connected" : "Disconnected"}</span>
               </div>
-              <p className="text-xs text-neutral-500 break-all">{wsUrl}</p>
+              <p className="text-xs text-neutral-500 break-all">{httpUrl}</p>
               <button
                 className="w-full mt-4 px-3 py-1.5 text-xs bg-neutral-800 border border-neutral-700 rounded hover:bg-neutral-700"
                 onClick={onOpenSettings}
