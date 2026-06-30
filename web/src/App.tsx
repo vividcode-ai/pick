@@ -1,47 +1,76 @@
-import { useCallback, useEffect, useState } from "react";
-import { Layout, SidebarContent, SidebarHeader } from "./components/Layout/Layout";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Layout } from "./components/Layout/Layout";
+import { LeftPanel } from "./components/Layout/LeftPanel";
 import { ChatView } from "./components/Chat/ChatView";
 import { ChatInput } from "./components/Chat/ChatInput";
-import { useAgentSession } from "./hooks/useWebSocket";
+import { useSSE, fetchProviders } from "./hooks/useSSE";
+import type { ProviderInfo} from "./types/events";
 
-const DEFAULT_HTTP_URL = "http://localhost:8080";
-
-async function detectServerUrl(): Promise<string> {
+async function detectBaseUrl(): Promise<string> {
   const params = new URLSearchParams(window.location.search);
   if (params.get("server")) return params.get("server")!;
 
   if (typeof window !== "undefined" && (window as any).__TAURI__) {
     try {
       const url = await (window as any).__TAURI__.invoke("get_server_url");
-      if (url) return url;
+      if (url) return url.replace(/\/+$/, "");
     } catch {}
   }
 
-  // Derive from current page URL (covers pick server random port)
-  const proto = window.location.protocol === "https:" ? "https:" : "http:";
-  const derivedUrl = `${proto}//${window.location.host}`;
-
-  return localStorage.getItem("pick_server_url") || derivedUrl;
+  const origin = window.location.origin;
+  const stored = localStorage.getItem("pick_server_url");
+  return stored || origin;
 }
 
 export default function App() {
-  const [httpUrl, setHttpUrl] = useState<string | null>(null);
+  const [baseUrl, setBaseUrl] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsUrl, setSettingsUrl] = useState("");
+  const [providers, setProviders] = useState<ProviderInfo[]>([]);
+  const [selectedProvider, setSelectedProvider] = useState("anthropic");
+  const [selectedModel, setSelectedModel] = useState("");
+  const [thinkingLevel, setThinkingLevel] = useState("off");
 
   useEffect(() => {
-    detectServerUrl().then((url) => {
-      setHttpUrl(url);
+    detectBaseUrl().then((url) => {
+      setBaseUrl(url);
       setSettingsUrl(url);
     });
   }, []);
+
+  useEffect(() => {
+    if (!baseUrl) return;
+    fetchProviders(baseUrl).then((list) => {
+      setProviders(list);
+      if (list.length > 0) {
+        setSelectedProvider(list[0].provider);
+        if (list[0].models.length > 0) {
+          setSelectedModel(list[0].models[0].id);
+        }
+      }
+    });
+  }, [baseUrl]);
+
+  const selectedModelDetail = useMemo(() => {
+    for (const p of providers) {
+      if (p.provider === selectedProvider) {
+        return p.models.find((m) => m.id === selectedModel) || null;
+      }
+    }
+    return null;
+  }, [providers, selectedProvider, selectedModel]);
+
+  const modelsForProvider = useMemo(() => {
+    return providers.find((p) => p.provider === selectedProvider)?.models || [];
+  }, [providers, selectedProvider]);
 
   const handleSaveUrl = useCallback(() => {
     localStorage.setItem("pick_server_url", settingsUrl);
     window.location.reload();
   }, [settingsUrl]);
 
-  if (!httpUrl) {
+  if (!baseUrl) {
     return (
       <div className="flex h-screen items-center justify-center bg-neutral-950 text-neutral-400">
         Connecting...
@@ -51,13 +80,37 @@ export default function App() {
 
   return (
     <>
-      <AppContent httpUrl={httpUrl} onOpenSettings={() => setSettingsOpen(true)} />
+      <AppContent
+        baseUrl={baseUrl}
+        sidebarOpen={sidebarOpen}
+        onToggleSidebar={() => setSidebarOpen((v) => !v)}
+        onOpenSettings={() => setSettingsOpen(true)}
+        providers={providers}
+        selectedProvider={selectedProvider}
+        onProviderChange={setSelectedProvider}
+        selectedModel={selectedModel}
+        onModelChange={setSelectedModel}
+        modelsForProvider={modelsForProvider}
+        selectedModelDetail={selectedModelDetail}
+        thinkingLevel={thinkingLevel}
+        onThinkingLevelChange={setThinkingLevel}
+      />
 
       {settingsOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setSettingsOpen(false)}>
-          <div className="bg-neutral-900 border border-neutral-700 rounded-lg p-6 w-96" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-lg font-semibold text-neutral-100 mb-4">Settings</h2>
-            <label className="block text-sm text-neutral-400 mb-1">Server URL</label>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+          onClick={() => setSettingsOpen(false)}
+        >
+          <div
+            className="bg-neutral-900 border border-neutral-700 rounded-lg p-6 w-96"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-semibold text-neutral-100 mb-4">
+              Settings
+            </h2>
+            <label className="block text-sm text-neutral-400 mb-1">
+              Server URL
+            </label>
             <input
               className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded text-neutral-100 text-sm mb-4"
               value={settingsUrl}
@@ -74,7 +127,7 @@ export default function App() {
                 className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
                 onClick={handleSaveUrl}
               >
-                Save &amp; Reload
+                Save & Reload
               </button>
             </div>
           </div>
@@ -85,52 +138,114 @@ export default function App() {
 }
 
 interface AppContentProps {
-  httpUrl: string;
+  baseUrl: string;
+  sidebarOpen: boolean;
+  onToggleSidebar: () => void;
   onOpenSettings: () => void;
+  providers: ProviderInfo[];
+  selectedProvider: string;
+  onProviderChange: (p: string) => void;
+  selectedModel: string;
+  onModelChange: (m: string) => void;
+  modelsForProvider: { id: string; name: string; reasoning: boolean }[];
+  selectedModelDetail: { id: string; name: string; reasoning: boolean } | null;
+  thinkingLevel: string;
+  onThinkingLevelChange: (l: string) => void;
 }
 
-function AppContent({ httpUrl, onOpenSettings }: AppContentProps) {
-  const { messages, streaming, connected, createSession, ask, cancel } =
-    useAgentSession(httpUrl);
+function AppContent({
+  baseUrl,
+  sidebarOpen,
+  onToggleSidebar,
+  onOpenSettings,
+  providers,
+  selectedProvider,
+  onProviderChange,
+  selectedModel,
+  onModelChange,
+  modelsForProvider,
+  selectedModelDetail,
+  thinkingLevel,
+  onThinkingLevelChange,
+}: AppContentProps) {
+  const {
+    messages,
+    streaming,
+    connected,
+    createSession,
+    ask,
+    cancel,
+  } = useSSE(baseUrl);
 
   useEffect(() => {
-    createSession();
-  }, [createSession]);
+    createSession(selectedModel, selectedProvider);
+  }, [baseUrl]);
+
+  const handleSend = useCallback(
+    (text: string) => {
+      ask(text, thinkingLevel === "off" ? undefined : thinkingLevel);
+    },
+    [ask, thinkingLevel]
+  );
+
+  const handleNewSession = useCallback(() => {
+    createSession(selectedModel, selectedProvider);
+  }, [createSession, selectedModel, selectedProvider]);
+
+  const hasMessages = messages.length > 0;
 
   return (
     <Layout
-      sidebar={
-        <>
-          <SidebarHeader>Pick</SidebarHeader>
-          <SidebarContent>
-            <div className="text-sm text-neutral-400 space-y-2">
-              <div className="flex items-center gap-2">
-                <span
-                  className={`w-2 h-2 rounded-full ${
-                    connected ? "bg-green-500" : "bg-red-500"
-                  }`}
-                />
-                <span>{connected ? "Connected" : "Disconnected"}</span>
-              </div>
-              <p className="text-xs text-neutral-500 break-all">{httpUrl}</p>
-              <button
-                className="w-full mt-4 px-3 py-1.5 text-xs bg-neutral-800 border border-neutral-700 rounded hover:bg-neutral-700"
-                onClick={onOpenSettings}
-              >
-                Settings
-              </button>
-            </div>
-          </SidebarContent>
-        </>
+      sidebarOpen={sidebarOpen}
+      onToggleSidebar={onToggleSidebar}
+      leftPanel={
+        <LeftPanel
+          onNewSession={handleNewSession}
+          onSearch={() => {}}
+          onPlugins={() => {}}
+          onSettings={onOpenSettings}
+          connected={connected}
+        />
       }
     >
-      <ChatView messages={messages} streaming={streaming} />
-      <ChatInput
-        onSend={ask}
-        disabled={streaming}
-        onCancel={cancel}
-        connected={connected}
-      />
+      {hasMessages ? (
+        <>
+          <ChatView messages={messages} streaming={streaming} />
+          <ChatInput
+            onSend={handleSend}
+            disabled={streaming}
+            onCancel={cancel}
+            connected={connected}
+            providers={providers}
+            selectedProvider={selectedProvider}
+            onProviderChange={onProviderChange}
+            selectedModel={selectedModel}
+            onModelChange={onModelChange}
+            modelsForProvider={modelsForProvider}
+            selectedModelDetail={selectedModelDetail}
+            thinkingLevel={thinkingLevel}
+            onThinkingLevelChange={onThinkingLevelChange}
+          />
+        </>
+      ) : (
+        <div className="flex-1 flex items-center justify-center px-4">
+          <ChatInput
+            onSend={handleSend}
+            disabled={streaming}
+            onCancel={cancel}
+            connected={connected}
+            providers={providers}
+            selectedProvider={selectedProvider}
+            onProviderChange={onProviderChange}
+            selectedModel={selectedModel}
+            onModelChange={onModelChange}
+            modelsForProvider={modelsForProvider}
+            selectedModelDetail={selectedModelDetail}
+            thinkingLevel={thinkingLevel}
+            onThinkingLevelChange={onThinkingLevelChange}
+          />
+        </div>
+      )}
     </Layout>
   );
 }

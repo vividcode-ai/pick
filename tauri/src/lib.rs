@@ -10,7 +10,7 @@ struct ServerRuntime(Runtime);
 
 #[tauri::command]
 fn get_server_url(state: tauri::State<ServerState>) -> Option<String> {
-    Some(format!("ws://127.0.0.1:{}/ws", state.port))
+    Some(format!("http://127.0.0.1:{}", state.port))
 }
 
 #[tauri::command]

@@ -48,7 +48,7 @@ export interface ApprovalRequiredPayload {
 
 export interface ChatMessage {
   id: string;
-  role: "user" | "assistant" | "system" | "tool";
+  role: "user" | "assistant" | "system" | "tool" | "thinking";
   content: string;
   toolCall?: {
     name: string;
@@ -65,4 +65,15 @@ export interface SessionInfo {
   messages: ChatMessage[];
   connected: boolean;
   streaming: boolean;
+}
+
+export interface ModelInfo {
+  id: string;
+  name: string;
+  reasoning: boolean;
+}
+
+export interface ProviderInfo {
+  provider: string;
+  models: ModelInfo[];
 }

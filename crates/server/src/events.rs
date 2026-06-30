@@ -74,26 +74,44 @@ pub struct QuestionPromptPayload {
     pub r#type: String,
 }
 
-pub fn serialize_event(event: &AgentEvent) -> Option<WsEvent> {
+pub fn serialize_event(event: &AgentEvent) -> Vec<WsEvent> {
     match event {
         AgentEvent::MessageUpdate { message, .. } => {
             if let Message::Assistant(msg) = message {
+                let mut events = Vec::new();
                 let mut text = String::new();
+
                 for block in &msg.content {
-                    if let ContentBlock::Text(t) = block {
-                        text.push_str(&t.text);
+                    match block {
+                        ContentBlock::Text(t) => {
+                            text.push_str(&t.text);
+                        }
+                        ContentBlock::Thinking(t) => {
+                            if !t.thinking.is_empty() {
+                                events.push(WsEvent {
+                                    event_type: "thinking".to_string(),
+                                    payload: serde_json::to_value(ThinkingPayload {
+                                        text: t.thinking.clone(),
+                                    })
+                                    .unwrap_or_default(),
+                                });
+                            }
+                        }
+                        _ => {}
                     }
                 }
-                if text.is_empty() {
-                    return None;
+
+                if !text.is_empty() {
+                    events.push(WsEvent {
+                        event_type: "message_update".to_string(),
+                        payload: serde_json::to_value(MessageUpdatePayload { text, delta: false })
+                            .unwrap_or_default(),
+                    });
                 }
-                Some(WsEvent {
-                    event_type: "message_update".to_string(),
-                    payload: serde_json::to_value(MessageUpdatePayload { text, delta: false })
-                        .unwrap_or_default(),
-                })
+
+                events
             } else {
-                None
+                Vec::new()
             }
         }
         AgentEvent::ToolExecutionStart {
@@ -101,7 +119,7 @@ pub fn serialize_event(event: &AgentEvent) -> Option<WsEvent> {
             tool_call_id,
             args,
             ..
-        } => Some(WsEvent {
+        } => vec![WsEvent {
             event_type: "tool_start".to_string(),
             payload: serde_json::to_value(ToolStartPayload {
                 tool_call_id: tool_call_id.clone(),
@@ -109,7 +127,7 @@ pub fn serialize_event(event: &AgentEvent) -> Option<WsEvent> {
                 args: args.clone(),
             })
             .unwrap_or_default(),
-        }),
+        }],
         AgentEvent::ToolExecutionUpdate {
             tool_call_id,
             partial_result,
@@ -121,14 +139,14 @@ pub fn serialize_event(event: &AgentEvent) -> Option<WsEvent> {
                 .and_then(|arr| arr.first())
                 .and_then(|v| v.as_str())
                 .unwrap_or("");
-            Some(WsEvent {
+            vec![WsEvent {
                 event_type: "tool_update".to_string(),
                 payload: serde_json::to_value(ToolUpdatePayload {
                     tool_call_id: tool_call_id.clone(),
                     partial_output: partial_output.to_string(),
                 })
                 .unwrap_or_default(),
-            })
+            }]
         }
         AgentEvent::ToolExecutionEnd {
             tool_call_id,
@@ -152,7 +170,7 @@ pub fn serialize_event(event: &AgentEvent) -> Option<WsEvent> {
             } else {
                 String::new()
             };
-            Some(WsEvent {
+            vec![WsEvent {
                 event_type: "tool_end".to_string(),
                 payload: serde_json::to_value(ToolEndPayload {
                     tool_call_id: tool_call_id.clone(),
@@ -161,13 +179,13 @@ pub fn serialize_event(event: &AgentEvent) -> Option<WsEvent> {
                     is_error: *is_error,
                 })
                 .unwrap_or_default(),
-            })
+            }]
         }
-        AgentEvent::TurnEnd { .. } => Some(WsEvent {
+        AgentEvent::TurnEnd { .. } => vec![WsEvent {
             event_type: "turn_end".to_string(),
             payload: Value::Null,
-        }),
-        _ => None,
+        }],
+        _ => Vec::new(),
     }
 }
 

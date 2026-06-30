@@ -20,6 +20,7 @@ use crate::events;
 pub struct AskRequest {
     pub session_id: String,
     pub prompt: String,
+    pub thinking_level: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -170,7 +171,14 @@ pub async fn ask(
         model: model.clone(),
         system_prompt: session.system_prompt.clone(),
         tools: session.tools.clone(),
-        thinking_level: ThinkingLevel::Off,
+        thinking_level: match req.thinking_level.as_deref() {
+            Some("minimal") => ThinkingLevel::Minimal,
+            Some("low") => ThinkingLevel::Low,
+            Some("medium") => ThinkingLevel::Medium,
+            Some("high") => ThinkingLevel::High,
+            Some("xhigh") => ThinkingLevel::XHigh,
+            _ => ThinkingLevel::Off,
+        },
         max_tokens: None,
         temperature: None,
         extension_runner: None,
@@ -187,7 +195,7 @@ pub async fn ask(
         agent_id: None,
         agent_registry: None,
         on_event: Some(Arc::new(move |event| {
-            if let Some(server_event) = events::serialize_event(&event) {
+            for server_event in events::serialize_event(&event) {
                 let sse_event = Event::default()
                     .event(&server_event.event_type)
                     .data(serde_json::to_string(&server_event.payload).unwrap_or_default());

@@ -94,9 +94,16 @@ pub async fn delete_session(
 }
 
 #[derive(Serialize)]
+pub struct ModelInfo {
+    pub id: String,
+    pub name: String,
+    pub reasoning: bool,
+}
+
+#[derive(Serialize)]
 pub struct ProviderInfo {
     pub provider: String,
-    pub models: Vec<String>,
+    pub models: Vec<ModelInfo>,
 }
 
 pub async fn list_providers() -> impl IntoResponse {
@@ -107,7 +114,11 @@ pub async fn list_providers() -> impl IntoResponse {
         .map(|p| {
             let models = pick_ai::models::get_models(p)
                 .iter()
-                .map(|m| m.id.clone())
+                .map(|m| ModelInfo {
+                    id: m.id.clone(),
+                    name: m.name.clone(),
+                    reasoning: m.reasoning,
+                })
                 .collect();
             ProviderInfo {
                 provider: p.clone(),
