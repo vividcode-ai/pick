@@ -86,7 +86,7 @@ export function ChatInput({
   };
 
   return (
-    <div className="px-4 py-3">
+    <div className="w-full px-4 py-3">
       <div className="max-w-[90%] md:max-w-[70%] lg:max-w-[50%] mx-auto rounded-2xl border border-neutral-700 bg-neutral-800">
           {/* Top: textarea */}
           <textarea

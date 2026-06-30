@@ -228,7 +228,7 @@ function AppContent({
           />
         </>
       ) : (
-        <div className="flex-1 flex items-center justify-center px-4">
+        <div className="flex-1 flex items-center justify-center">
           <ChatInput
             onSend={handleSend}
             disabled={streaming}

@@ -1179,24 +1179,7 @@ impl TuiApp {
         if !self.editor.pending_pastes.is_empty() {
             // Merge into last pending paste instead of expanding,
             // so existing paste placeholders stay visible.
-            let (old_placeholder, current_text) = {
-                let last = self.editor.pending_pastes.last().unwrap();
-                (last.placeholder.clone(), self.editor.text().to_string())
-            };
-            let new_line_count = {
-                let last = self.editor.pending_pastes.last().unwrap();
-                format!("{}{}", last.actual, pasted).lines().count()
-            };
-            let base = format!("[Pasted Content {} Lines]", new_line_count);
-            let new_placeholder = self.editor.unique_placeholder(&base);
-            if current_text.contains(&old_placeholder) {
-                self.editor
-                    .set_text(&current_text.replace(&old_placeholder, &new_placeholder));
-            }
-            if let Some(last) = self.editor.pending_pastes.last_mut() {
-                last.actual.push_str(&pasted);
-                last.placeholder = new_placeholder;
-            }
+            self.merge_into_last_paste(&pasted);
             if self.editor.is_autocomplete_active()
                 || self.editor.text().trim_start().starts_with('/')
             {
@@ -1218,12 +1201,46 @@ impl TuiApp {
         }
     }
 
+    /// Merge accumulated text into the last pending paste instead of inserting
+    /// it directly. Updates the placeholder text to reflect the new total line count.
+    fn merge_into_last_paste(&mut self, text: &str) {
+        let (old_placeholder, current_text) = {
+            let last = self.editor.pending_pastes.last().unwrap();
+            (last.placeholder.clone(), self.editor.text().to_string())
+        };
+        let new_line_count = {
+            let last = self.editor.pending_pastes.last().unwrap();
+            format!("{}{}", last.actual, text).lines().count()
+        };
+        let base = format!("[Pasted Content {} Lines]", new_line_count);
+        let new_placeholder = self.editor.unique_placeholder(&base);
+        if current_text.contains(&old_placeholder) {
+            self.editor
+                .set_text(&current_text.replace(&old_placeholder, &new_placeholder));
+        }
+        if let Some(last) = self.editor.pending_pastes.last_mut() {
+            last.actual.push_str(text);
+            last.placeholder = new_placeholder;
+        }
+    }
+
     /// Handle a regular printable character.
-    /// When paste placeholders exist, insert the character directly after the
-    /// placeholder — no paste burst detection, since the paste is already captured.
-    /// Otherwise, accumulate for paste burst detection.
+    /// When paste placeholders exist, chars arriving fast (within 50ms of the
+    /// previous char) are treated as paste continuation and accumulated for
+    /// merging into the pending paste. Slow chars are treated as user typing
+    /// and inserted directly. Otherwise, accumulate for paste burst detection.
     pub fn handle_char_for_paste(&mut self, c: char, now: Instant) {
         if !self.editor.pending_pastes.is_empty() {
+            let is_fast = self
+                .last_paste_time
+                .is_some_and(|t| now.duration_since(t).as_millis() < 50);
+            if is_fast {
+                // Fast char → likely paste continuation → accumulate for merging
+                self.paste_accumulator.push(c);
+                self.last_paste_time = Some(now);
+                return;
+            }
+            // Slow char → user typing after paste → insert directly
             self.editor.insert_char(c);
             return;
         }
@@ -1242,7 +1259,7 @@ impl TuiApp {
         if !self.editor.pending_pastes.is_empty() {
             if !self.paste_accumulator.is_empty() {
                 let typed = std::mem::take(&mut self.paste_accumulator);
-                self.editor.insert_str(&typed);
+                self.merge_into_last_paste(&typed);
             }
             return;
         }
@@ -1274,7 +1291,7 @@ impl TuiApp {
         if !self.editor.pending_pastes.is_empty() {
             if !self.paste_accumulator.is_empty() {
                 let text = std::mem::take(&mut self.paste_accumulator);
-                self.editor.insert_str(&text);
+                self.merge_into_last_paste(&text);
             }
             return true;
         }
