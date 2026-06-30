@@ -149,18 +149,11 @@ export function ModelSelector({ providers, selectedModel, onModelChange, disable
       <button
         onClick={() => { setOpen((v) => !v); setQuery(""); highlightRef.current = 0; }}
         disabled={disabled || allModels.length === 0}
-        className="selector-trigger max-w-[140px]"
+        className="selector-trigger max-w-[110px]"
       >
-        <div className="selector-trigger-label min-w-0">
-          <span className="selector-trigger-primary selector-trigger-primary--align-left">
-            {selectedDetail?.name || "Model"}
-          </span>
-          {selectedDetail && (
-            <span className="selector-trigger-secondary">
-              {PROVIDER_DISPLAY_NAMES[selectedDetail.provider] || selectedDetail.provider}
-            </span>
-          )}
-        </div>
+        <span className="selector-trigger-primary">
+          {selectedDetail?.name || "Model"}
+        </span>
         <span className="selector-trigger-icon">
           <ChevronDown className="w-3 h-3" />
         </span>
