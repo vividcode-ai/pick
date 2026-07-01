@@ -178,6 +178,23 @@ impl Editor {
         self.insert_str_impl(s, false);
     }
 
+    /// Insert a string without merging into any adjacent paste element.
+    /// Used for non-paste text accumulated during normal typing, ensuring
+    /// typed characters appear visibly in the buffer instead of being
+    /// swallowed into a paste element's pending_pastes.
+    pub fn insert_str_no_merge(&mut self, s: &str) {
+        if s.is_empty() {
+            return;
+        }
+        self.push_undo();
+        self.history_index = None;
+        self.mark = None;
+        self.kill_accumulating = false;
+        self.buffer.insert_str(self.cursor, s);
+        self.cursor += s.len();
+        self.shift_elements_after(self.cursor - s.len(), s.len() as isize);
+    }
+
     /// Insert a string during a confirmed paste burst.
     /// Always creates/merges a PasteElement regardless of content size,
     /// so the first batch of a multi-batch paste creates a placeholder

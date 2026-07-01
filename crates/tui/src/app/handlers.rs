@@ -1221,7 +1221,7 @@ impl TuiApp {
         if self.paste_burst_active {
             self.editor.insert_str_paste_burst(&text);
         } else {
-            self.editor.insert_str(&text);
+            self.editor.insert_str_no_merge(&text);
         }
         self.paste_burst_active = false;
         self.paste_burst_consecutive = 0;
@@ -1246,7 +1246,7 @@ impl TuiApp {
             if self.paste_burst_active {
                 self.editor.insert_str_paste_burst(&text);
             } else {
-                self.editor.insert_str(&text);
+                self.editor.insert_str_no_merge(&text);
             }
             self.paste_burst_active = false;
             self.paste_burst_consecutive = 0;

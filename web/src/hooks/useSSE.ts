@@ -94,11 +94,11 @@ export function useSSE(baseUrl: string) {
           const payload = JSON.parse(e.data);
           setMessages((prev) => {
             const last = prev[prev.length - 1];
-            if (last?.role === "assistant" && last.content) {
+            if (last?.role === "assistant") {
               const updated = [...prev];
               updated[updated.length - 1] = {
                 ...last,
-                content: last.content + payload.text,
+                content: payload.text,
               };
               return updated;
             }
@@ -119,15 +119,26 @@ export function useSSE(baseUrl: string) {
       eventSource.addEventListener("thinking", (e) => {
         try {
           const payload = JSON.parse(e.data);
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: crypto.randomUUID(),
-              role: "thinking",
-              content: payload.text,
-              timestamp: Date.now(),
-            },
-          ]);
+          setMessages((prev) => {
+            const last = prev[prev.length - 1];
+            if (last?.role === "thinking") {
+              const updated = [...prev];
+              updated[updated.length - 1] = {
+                ...last,
+                content: payload.text,
+              };
+              return updated;
+            }
+            return [
+              ...prev,
+              {
+                id: crypto.randomUUID(),
+                role: "thinking",
+                content: payload.text,
+                timestamp: Date.now(),
+              },
+            ];
+          });
         } catch {}
       });
 
