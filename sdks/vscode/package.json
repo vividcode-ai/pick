@@ -1,0 +1,44 @@
+{
+  "name": "pick-ai",
+  "displayName": "Pick AI",
+  "description": "AI-powered coding assistant for VS Code",
+  "version": "0.1.0",
+  "publisher": "pick-ai",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./src/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "pick.startSession",
+        "title": "Pick: Start new AI session"
+      },
+      {
+        "command": "pick.askPrompt",
+        "title": "Pick: Ask AI about selected code"
+      }
+    ],
+    "configuration": {
+      "title": "Pick AI",
+      "properties": {
+        "pick.serverUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:8080",
+          "description": "Pick server URL"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "package": "npx vsce package"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.90.0"
+  }
+}

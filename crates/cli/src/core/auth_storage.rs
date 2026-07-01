@@ -433,7 +433,7 @@ impl AuthStorage {
 
         // Environment variable
         if let Some(env_key) = find_env_key(provider_id) {
-            return std::env::var(&env_key).ok();
+            return std::env::var(&env_key).ok().filter(|k| !k.is_empty());
         }
 
         // Fallback resolver

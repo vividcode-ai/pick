@@ -1,5 +1,4 @@
 //! Question tool - asks the user for input
-//! Maps to opencode packages/opencode/src/tool/question.ts
 
 use pick_ai::types::ContentBlock;
 

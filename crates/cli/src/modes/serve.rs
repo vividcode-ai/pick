@@ -22,17 +22,15 @@ pub async fn run_serve_mode(
         .expect("Failed to bind address");
     let actual_port = listener.local_addr().unwrap().port();
 
-    let state = Arc::new(pick_server::AppState {
-        session_manager: pick_server::session::SessionManager::new(),
-        sse_sessions: tokio::sync::RwLock::new(std::collections::HashMap::new()),
-        config: pick_server::ServerConfig {
-            host: host.clone(),
-            port: actual_port,
-        },
-        default_provider,
-        default_model,
-        api_keys,
+    let mut state = pick_server::AppState::new(pick_server::ServerConfig {
+        host: host.clone(),
+        port: actual_port,
+        pty_ws_port: 9000,
     });
+    state.default_provider = default_provider;
+    state.default_model = default_model;
+    state.api_keys = api_keys;
+    let state = Arc::new(state);
 
     if args.open_browser {
         let url = format!("http://{}:{}", host, actual_port);

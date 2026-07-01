@@ -343,7 +343,9 @@ async fn main() {
 
         // 1. Default provider
         if let Some(ref prov) = default_provider {
-            if let Some(key) = auth.get_api_key(prov, true).await {
+            if let Some(key) = auth.get_api_key(prov, true).await
+                && !key.is_empty()
+            {
                 api_keys.insert(prov.clone(), key);
             }
         }
@@ -351,7 +353,9 @@ async fn main() {
         // 2. All providers with stored credentials
         for provider in auth.list_providers() {
             if let std::collections::hash_map::Entry::Vacant(e) = api_keys.entry(provider) {
-                if let Some(key) = auth.get_api_key(e.key(), true).await {
+                if let Some(key) = auth.get_api_key(e.key(), true).await
+                    && !key.is_empty()
+                {
                     e.insert(key);
                 }
             }

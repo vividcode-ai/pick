@@ -1,5 +1,4 @@
 //! WebFetch tool - fetches content from URLs
-//! Maps to opencode packages/opencode/src/tool/webfetch.ts
 
 use std::time::Duration;
 

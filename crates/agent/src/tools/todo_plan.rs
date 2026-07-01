@@ -1,5 +1,4 @@
 ﻿//! TodoPlan tool - manages task list
-//! Maps to opencode packages/opencode/src/tool/todo.ts
 
 use pick_ai::types::ContentBlock;
 

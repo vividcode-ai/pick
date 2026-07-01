@@ -1,5 +1,4 @@
 //! Question dialog component for user input
-//! Maps to opencode's question tool design
 
 /// Represents a question being asked to the user
 pub struct QuestionDialog {

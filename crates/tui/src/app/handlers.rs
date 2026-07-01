@@ -1225,6 +1225,7 @@ impl TuiApp {
         }
         self.paste_burst_active = false;
         self.paste_burst_consecutive = 0;
+        self.last_paste_time = Some(Instant::now());
         let trimmed = self.editor.text().trim_start();
         if trimmed.starts_with('/') && !trimmed[1..].contains(' ') {
             self.editor.trigger_autocomplete();
@@ -1249,6 +1250,7 @@ impl TuiApp {
             }
             self.paste_burst_active = false;
             self.paste_burst_consecutive = 0;
+            self.last_paste_time = Some(now);
             let trimmed = self.editor.text().trim_start();
             if trimmed.starts_with('/') && !trimmed[1..].contains(' ') {
                 self.editor.trigger_autocomplete();

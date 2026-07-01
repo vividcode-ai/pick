@@ -150,7 +150,6 @@ impl FromStr for AgentMode {
 }
 
 /// Plan mode reminder text injected as a synthetic user message
-/// Matches opencode's plan.txt
 pub const PLAN_MODE_REMINDER: &str = "\
 <system-reminder>
 # Plan Mode - System Reminder

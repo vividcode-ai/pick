@@ -12,36 +12,48 @@ use pick_ai::types::UserMessage;
 use serde::Deserialize;
 use tokio::sync::watch;
 use tracing::{error, info};
+use utoipa::ToSchema;
 
 use crate::AppState;
 use crate::events;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct AskRequest {
     pub session_id: String,
     pub prompt: String,
     pub thinking_level: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct CancelRequest {
     pub session_id: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct ApproveRequest {
     pub session_id: String,
     pub approval_id: String,
     pub approved: bool,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct AnswerQuestionRequest {
     pub session_id: String,
     pub question_id: String,
     pub answers: Vec<Vec<String>>,
 }
 
+/// Submit a prompt to an agent session
+#[utoipa::path(
+    post,
+    path = "/ask",
+    tag = "agent",
+    request_body = AskRequest,
+    responses(
+        (status = 202, description = "Agent started"),
+        (status = 404, description = "Session not found"),
+    )
+)]
 pub async fn ask(
     State(state): State<Arc<AppState>>,
     Json(req): Json<AskRequest>,
@@ -272,6 +284,17 @@ pub async fn ask(
     (StatusCode::ACCEPTED, "Agent started").into_response()
 }
 
+/// Cancel an active agent
+#[utoipa::path(
+    post,
+    path = "/cancel",
+    tag = "agent",
+    request_body = CancelRequest,
+    responses(
+        (status = 200, description = "Agent cancelled"),
+        (status = 404, description = "No active agent for this session"),
+    )
+)]
 pub async fn cancel(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CancelRequest>,
@@ -286,6 +309,17 @@ pub async fn cancel(
     (StatusCode::NOT_FOUND, "No active agent for this session").into_response()
 }
 
+/// Approve or deny a pending tool approval
+#[utoipa::path(
+    post,
+    path = "/approve",
+    tag = "agent",
+    request_body = ApproveRequest,
+    responses(
+        (status = 200, description = "Approval responded"),
+        (status = 404, description = "Approval request not found"),
+    )
+)]
 pub async fn approve(
     State(state): State<Arc<AppState>>,
     Json(req): Json<ApproveRequest>,
@@ -301,6 +335,17 @@ pub async fn approve(
     (StatusCode::NOT_FOUND, "Approval request not found").into_response()
 }
 
+/// Answer a pending agent question
+#[utoipa::path(
+    post,
+    path = "/answer_question",
+    tag = "agent",
+    request_body = AnswerQuestionRequest,
+    responses(
+        (status = 200, description = "Question answered"),
+        (status = 404, description = "Question not found"),
+    )
+)]
 pub async fn answer_question(
     State(state): State<Arc<AppState>>,
     Json(req): Json<AnswerQuestionRequest>,
