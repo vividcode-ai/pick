@@ -85,18 +85,18 @@ fn collect_text_files(dir: &PathBuf, project_root: &PathBuf, files: &mut Vec<(St
         let path = entry.path();
         if path.is_dir() {
             collect_text_files(&path, project_root, files);
-        } else if is_text_file(&path) {
-            if let Ok(relative) = path.strip_prefix(project_root) {
-                let rel_str = relative.to_string_lossy().to_string().replace('\\', "/");
-                files.push((rel_str, path));
-            }
+        } else if is_text_file(&path)
+            && let Ok(relative) = path.strip_prefix(project_root)
+        {
+            let rel_str = relative.to_string_lossy().to_string().replace('\\', "/");
+            files.push((rel_str, path));
         }
     }
 }
 
 fn is_text_file(path: &std::path::Path) -> bool {
-    match path.extension().and_then(|e| e.to_str()) {
-        Some("md") | Some("json") | Some("rules") => true,
-        _ => false,
-    }
+    matches!(
+        path.extension().and_then(|e| e.to_str()),
+        Some("md") | Some("json") | Some("rules")
+    )
 }

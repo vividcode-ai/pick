@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Copy, ChevronRight, ChevronDown, Undo, Trash2 } from "lucide-react";
+import { Copy, GitFork, ChevronRight, ChevronDown, Undo, Trash2 } from "lucide-react";
 import type { ChatMessage } from "../../types/events";
 import { Markdown } from "./Markdown";
 import { ToolCall } from "./ToolCall";
@@ -7,6 +7,7 @@ import { ToolCall } from "./ToolCall";
 
 interface MessageBubbleProps {
   message: ChatMessage;
+  onFork?: () => void;
 }
 
 function formatTime(ts: number): string {
@@ -14,7 +15,7 @@ function formatTime(ts: number): string {
   return d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 }
 
-export function MessageBubble({ message }: MessageBubbleProps) {
+export function MessageBubble({ message, onFork }: MessageBubbleProps) {
   const handleCopy = useCallback(() => {
     navigator.clipboard.writeText(message.content);
   }, [message.content]);
@@ -23,7 +24,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
     case "user":
       return <UserBubble message={message} onCopy={handleCopy} />;
     case "assistant":
-      return <AssistantBubble message={message} onCopy={handleCopy} />;
+      return <AssistantBubble message={message} onCopy={handleCopy} onFork={onFork} />;
     case "thinking":
       return <ThinkingBubble message={message} />;
     case "tool":
@@ -52,14 +53,17 @@ function UserBubble({ message, onCopy }: { message: ChatMessage; onCopy: () => v
   );
 }
 
-function AssistantBubble({ message, onCopy }: { message: ChatMessage; onCopy: () => void }) {
+function AssistantBubble({ message, onCopy, onFork }: { message: ChatMessage; onCopy: () => void; onFork?: () => void }) {
   return (
     <div className="flex justify-start message-item">
-      <div className="max-w-[85%]">
+      <div className="w-full">
         <div className="assistant-content-bubble">
           <Markdown content={message.content} />
         </div>
         <div className="message-actions pl-1 pt-0.5">
+          <button className="message-action-button" onClick={onFork} title="Fork">
+            <GitFork className="w-3 h-3" />
+          </button>
           <button className="message-action-button" onClick={onCopy} title="Copy">
             <Copy className="w-3 h-3" />
           </button>
@@ -74,7 +78,7 @@ function ThinkingBubble({ message }: { message: ChatMessage }) {
 
   return (
     <div className="flex justify-start message-item">
-      <div className="max-w-[85%]">
+      <div className="w-full">
         <button
           onClick={() => setOpen(!open)}
           className="reasoning-toggle w-full"

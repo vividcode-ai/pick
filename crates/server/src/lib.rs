@@ -11,11 +11,14 @@ pub mod spa;
 pub mod sse;
 
 use std::collections::HashMap;
+use std::path::Path;
 use std::sync::Arc;
 
 use axum::Router;
 use axum::routing::{delete, get, post};
 use pick_agent::session::GoalManager;
+use pick_agent::session::entries::SessionEntryKind;
+use pick_ai::types::Message;
 use pick_mcp::McpManager;
 use pick_mcp::config::McpServerConfig;
 use pty::PtyManager;
@@ -68,6 +71,177 @@ impl AppState {
         let agent_mode: Option<String> = None;
         registry::create_coding_tools_with_goal_manager(agent_mode, gm)
     }
+
+    fn home_dir() -> Option<std::path::PathBuf> {
+        #[cfg(target_os = "windows")]
+        {
+            std::env::var("USERPROFILE")
+                .ok()
+                .map(std::path::PathBuf::from)
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            std::env::var("HOME").ok().map(std::path::PathBuf::from)
+        }
+    }
+
+    pub async fn load_persisted_sessions(&self, cwd: &Path) {
+        let project_dir = cwd.join(".pick").join("sessions");
+        if project_dir.exists() {
+            info!("Loading session metadata from {}", project_dir.display());
+            self.load_from_dir(&project_dir).await;
+        }
+        if let Some(home) = Self::home_dir() {
+            let global_dir = home.join(".pick").join("agent").join("sessions");
+            if global_dir.exists() {
+                info!("Loading session metadata from {}", global_dir.display());
+                self.load_from_dir(&global_dir).await;
+            }
+        }
+    }
+
+    /// Ensure a session's messages are loaded from disk (lazy load).
+    /// No-op if messages already loaded or session is new (no path).
+    pub async fn ensure_session_messages(&self, id: &str) {
+        let has_path = {
+            let session = self.session_manager.get(id).await;
+            match session {
+                Some(s) => !s.messages.is_empty() || s.session_path.is_none(),
+                None => true,
+            }
+        };
+        if has_path {
+            return;
+        }
+        let session = self.session_manager.get(id).await;
+        let path = session.and_then(|s| s.session_path.clone());
+        let path = match path {
+            Some(p) => p,
+            None => return,
+        };
+        let path = std::path::PathBuf::from(&path);
+        if let Some(loaded) = self.load_messages_from_file(&path).await {
+            self.session_manager
+                .update_messages(id, loaded.messages)
+                .await;
+        }
+    }
+
+    /// Scan dir and load only session metadata (header + session_info entry).
+    async fn load_from_dir(&self, dir: &Path) {
+        use tokio::fs;
+        let mut rd = match fs::read_dir(dir).await {
+            Ok(r) => r,
+            Err(_) => return,
+        };
+        let mut files = Vec::new();
+        loop {
+            match rd.next_entry().await {
+                Ok(Some(entry)) => {
+                    if entry.path().extension() == Some(std::ffi::OsStr::new("jsonl")) {
+                        files.push(entry.path());
+                    }
+                }
+                Ok(None) => break,
+                Err(_) => break,
+            }
+        }
+        for path in files {
+            if let Some(session) = self.load_meta_only(&path).await {
+                self.session_manager.insert_session(session).await;
+                info!("Loaded session meta: {}", path.display());
+            }
+        }
+    }
+
+    /// Read only the header and title from a JSONL file (line 1 + first session_info entry).
+    async fn load_meta_only(&self, path: &Path) -> Option<session::AgentSession> {
+        use pick_agent::session::entries::{SessionEntry, SessionHeader};
+
+        let content = tokio::fs::read_to_string(path).await.ok()?;
+        let mut lines = content.lines();
+
+        let header_line = lines.next()?;
+        let header: SessionHeader = serde_json::from_str(header_line).ok()?;
+
+        let mut title = format!("Session - {}", chrono::Utc::now().format("%Y-%m-%d %H:%M"));
+
+        for line in lines {
+            if line.trim().is_empty() {
+                continue;
+            }
+            let entry: SessionEntry = serde_json::from_str(line).ok()?;
+            if let SessionEntryKind::SessionInfo(info) = &entry.kind {
+                title = info.name.clone();
+                break;
+            }
+        }
+
+        let model_id = header
+            .model
+            .unwrap_or_else(|| "claude-sonnet-4-20250514".to_string());
+        let provider = header.provider.unwrap_or_else(|| "anthropic".to_string());
+
+        Some(session::AgentSession {
+            id: header.id,
+            title,
+            model_id,
+            provider,
+            system_prompt: String::new(),
+            tools: Vec::new(),
+            messages: Vec::new(),
+            created_at: header.created_at,
+            updated_at: header.updated_at,
+            status: "idle".to_string(),
+            fork_parent_id: None,
+            session_path: Some(path.to_string_lossy().to_string()),
+        })
+    }
+
+    /// Load all messages from a JSONL file (for lazy loading).
+    async fn load_messages_from_file(&self, path: &Path) -> Option<session::AgentSession> {
+        use pick_agent::session::entries::{SessionEntry, SessionHeader};
+
+        let content = tokio::fs::read_to_string(path).await.ok()?;
+        let mut lines = content.lines();
+
+        let header_line = lines.next()?;
+        let header: SessionHeader = serde_json::from_str(header_line).ok()?;
+
+        let mut messages = Vec::new();
+
+        for line in lines {
+            if line.trim().is_empty() {
+                continue;
+            }
+            let entry: SessionEntry = serde_json::from_str(line).ok()?;
+            if let SessionEntryKind::Message(_) = &entry.kind {
+                if let Ok(msg) = Message::try_from(&entry) {
+                    messages.push(msg);
+                }
+            }
+        }
+
+        let model_id = header
+            .model
+            .unwrap_or_else(|| "claude-sonnet-4-20250514".to_string());
+        let provider = header.provider.unwrap_or_else(|| "anthropic".to_string());
+
+        Some(session::AgentSession {
+            id: header.id,
+            title: String::new(),
+            model_id,
+            provider,
+            system_prompt: String::new(),
+            tools: Vec::new(),
+            messages,
+            created_at: header.created_at,
+            updated_at: header.updated_at,
+            status: "idle".to_string(),
+            fork_parent_id: None,
+            session_path: Some(path.to_string_lossy().to_string()),
+        })
+    }
 }
 
 #[derive(Clone)]
@@ -75,6 +249,7 @@ pub struct ServerConfig {
     pub host: String,
     pub port: u16,
     pub pty_ws_port: u16,
+    pub cwd: Option<String>,
 }
 
 impl Default for ServerConfig {
@@ -83,6 +258,7 @@ impl Default for ServerConfig {
             host: "127.0.0.1".to_string(),
             port: 8080,
             pty_ws_port: 9000,
+            cwd: None,
         }
     }
 }
@@ -138,6 +314,15 @@ pub fn create_app(state: Arc<AppState>) -> Router {
 
 pub async fn run_server(config: ServerConfig) -> Result<(), Box<dyn std::error::Error>> {
     let state = Arc::new(AppState::new(config.clone()));
+
+    // Load persisted sessions from disk
+    let cwd = config
+        .cwd
+        .as_deref()
+        .map(Path::new)
+        .unwrap_or_else(|| Path::new("."));
+    state.load_persisted_sessions(cwd).await;
+
     let app = create_app(state.clone());
 
     // Start PTY WebSocket server in background

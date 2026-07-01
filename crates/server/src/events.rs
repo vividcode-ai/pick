@@ -13,6 +13,8 @@ pub struct WsEvent {
 #[derive(Debug, Clone, Serialize)]
 pub struct MessageUpdatePayload {
     pub text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub thinking: Option<String>,
     pub delta: bool,
 }
 
@@ -78,38 +80,34 @@ pub fn serialize_event(event: &AgentEvent) -> Vec<WsEvent> {
     match event {
         AgentEvent::MessageUpdate { message, .. } => {
             if let Message::Assistant(msg) = message {
-                let mut events = Vec::new();
                 let mut text = String::new();
+                let mut thinking: Option<String> = None;
 
                 for block in &msg.content {
                     match block {
                         ContentBlock::Text(t) => {
                             text.push_str(&t.text);
                         }
-                        ContentBlock::Thinking(t) => {
-                            if !t.thinking.is_empty() {
-                                events.push(WsEvent {
-                                    event_type: "thinking".to_string(),
-                                    payload: serde_json::to_value(ThinkingPayload {
-                                        text: t.thinking.clone(),
-                                    })
-                                    .unwrap_or_default(),
-                                });
-                            }
+                        ContentBlock::Thinking(t) if !t.thinking.is_empty() => {
+                            thinking = Some(t.thinking.clone());
                         }
                         _ => {}
                     }
                 }
 
-                if !text.is_empty() {
-                    events.push(WsEvent {
+                if !text.is_empty() || thinking.is_some() {
+                    vec![WsEvent {
                         event_type: "message_update".to_string(),
-                        payload: serde_json::to_value(MessageUpdatePayload { text, delta: false })
-                            .unwrap_or_default(),
-                    });
+                        payload: serde_json::to_value(MessageUpdatePayload {
+                            text,
+                            thinking,
+                            delta: false,
+                        })
+                        .unwrap_or_default(),
+                    }]
+                } else {
+                    Vec::new()
                 }
-
-                events
             } else {
                 Vec::new()
             }

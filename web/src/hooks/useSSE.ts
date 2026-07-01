@@ -6,6 +6,84 @@ import type {
   ProviderInfo,
 } from "../types/events";
 
+interface ServerContentBlock {
+  type: string;
+  text?: string;
+  thinking?: string;
+  name?: string;
+  arguments?: Record<string, any>;
+  is_error?: boolean;
+  tool_name?: string;
+  tool_call_id?: string;
+}
+
+interface ServerMessage {
+  role: string;
+  content?: ServerContentBlock[];
+  timestamp?: number;
+  tool_call_id?: string;
+  tool_name?: string;
+  is_error?: boolean;
+}
+
+function transformServerMessages(msgs: ServerMessage[]): ChatMessage[] {
+  const result: ChatMessage[] = [];
+  for (const msg of msgs) {
+    const ts = msg.timestamp || Date.now();
+    switch (msg.role) {
+      case "user": {
+        const text = (msg.content || [])
+          .filter((b) => b.type === "text")
+          .map((b) => b.text || "")
+          .join("");
+        result.push({ id: crypto.randomUUID(), role: "user", content: text, timestamp: ts });
+        break;
+      }
+      case "assistant": {
+        for (const block of msg.content || []) {
+          if (block.type === "thinking" && block.thinking) {
+            result.push({ id: crypto.randomUUID(), role: "thinking", content: block.thinking, timestamp: ts });
+          }
+        }
+        const text = (msg.content || [])
+          .filter((b) => b.type === "text")
+          .map((b) => b.text || "")
+          .join("");
+        if (text) {
+          result.push({ id: crypto.randomUUID(), role: "assistant", content: text, timestamp: ts });
+        }
+        for (const block of msg.content || []) {
+          if (block.type === "toolCall" && block.name) {
+            result.push({
+              id: crypto.randomUUID(),
+              role: "tool",
+              content: "",
+              toolCall: { name: block.name, args: block.arguments || {}, isStreaming: false },
+              timestamp: ts,
+            });
+          }
+        }
+        break;
+      }
+      case "toolResult": {
+        const text = (msg.content || [])
+          .filter((b) => b.type === "text")
+          .map((b) => b.text || "")
+          .join("");
+        result.push({
+          id: crypto.randomUUID(),
+          role: "tool",
+          content: text,
+          toolCall: { name: msg.tool_name || "", args: {}, output: text, isError: msg.is_error || false, isStreaming: false },
+          timestamp: ts,
+        });
+        break;
+      }
+    }
+  }
+  return result;
+}
+
 export function useSSE(baseUrl: string) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -22,14 +100,41 @@ export function useSSE(baseUrl: string) {
     };
   }, []);
 
+  const switchSession = useCallback(
+    async (id: string) => {
+      eventSourceRef.current?.close();
+      abortRef.current?.abort();
+      setSessionId(id);
+      setMessages([]);
+      setStreaming(false);
+      setConnected(true);
+      try {
+        const res = await fetch(`${baseUrl}/sessions/${id}/messages?limit=1000`);
+        if (res.ok) {
+          const data = await res.json();
+          setMessages(transformServerMessages(data.messages || []));
+        }
+      } catch (e) {
+        console.error("Failed to load session messages:", e);
+      }
+    },
+    [baseUrl]
+  );
+
   const createSession = useCallback(
     async (modelId?: string, provider?: string) => {
       try {
+        eventSourceRef.current?.close();
+        abortRef.current?.abort();
         const res = await fetch(`${baseUrl}/sessions`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ model_id: modelId, provider }),
         });
+        if (!res.ok) {
+          console.error("Failed to create session:", res.status);
+          return null;
+        }
         const data = await res.json();
         setSessionId(data.session_id);
         setMessages([]);
@@ -93,50 +198,80 @@ export function useSSE(baseUrl: string) {
         try {
           const payload = JSON.parse(e.data);
           setMessages((prev) => {
-            const last = prev[prev.length - 1];
-            if (last?.role === "assistant") {
-              const updated = [...prev];
-              updated[updated.length - 1] = {
-                ...last,
-                content: payload.text,
-              };
-              return updated;
-            }
-            if (last?.role === "thinking") {
+            let updated = [...prev];
+
+            // -- Process thinking content first (so it's always before text in the array) --
+            if (payload.thinking) {
+              const last = updated[updated.length - 1];
               if (turnEndMessageCount >= 0) {
-                for (let i = prev.length - 1; i > turnEndMessageCount; i--) {
-                  if (prev[i].role === "assistant") {
-                    const updated = [...prev];
-                    updated[i] = { ...updated[i], content: payload.text };
-                    return updated;
+                let found = false;
+                for (let i = updated.length - 1; i > turnEndMessageCount; i--) {
+                  if (updated[i].role === "thinking") {
+                    updated[i] = { ...updated[i], content: payload.thinking };
+                    found = true;
+                    break;
+                  }
+                }
+                if (!found) {
+                  updated = [...updated, {
+                    id: crypto.randomUUID(),
+                    role: "thinking",
+                    content: payload.thinking,
+                    timestamp: Date.now(),
+                  }];
+                }
+              } else if (last?.role === "thinking") {
+                updated[updated.length - 1] = { ...last, content: payload.thinking };
+              } else if (last?.role === "assistant") {
+                for (let i = updated.length - 1; i >= 0; i--) {
+                  if (updated[i].role === "thinking") {
+                    updated[i] = { ...updated[i], content: payload.thinking };
+                    break;
                   }
                 }
               } else {
-                let lastUserIdx = -1;
-                for (let i = prev.length - 1; i >= 0; i--) {
-                  if (prev[i].role === "user") { lastUserIdx = i; break; }
-                }
-                for (let i = prev.length - 1; i > lastUserIdx; i--) {
-                  if (prev[i].role === "assistant") {
-                    const updated = [...prev];
-                    updated[i] = {
-                      ...updated[i],
-                      content: payload.text,
-                    };
-                    return updated;
-                  }
-                }
+                updated = [...updated, {
+                  id: crypto.randomUUID(),
+                  role: "thinking",
+                  content: payload.thinking,
+                  timestamp: Date.now(),
+                }];
               }
             }
-            return [
-              ...prev,
-              {
-                id: crypto.randomUUID(),
-                role: "assistant",
-                content: payload.text,
-                timestamp: Date.now(),
-              },
-            ];
+
+            // -- Process text content after thinking --
+            if (payload.text) {
+              const last = updated[updated.length - 1];
+              if (turnEndMessageCount >= 0) {
+                let found = false;
+                for (let i = updated.length - 1; i > turnEndMessageCount; i--) {
+                  if (updated[i].role === "assistant") {
+                    updated[i] = { ...updated[i], content: payload.text };
+                    found = true;
+                    break;
+                  }
+                }
+                if (!found) {
+                  updated = [...updated, {
+                    id: crypto.randomUUID(),
+                    role: "assistant",
+                    content: payload.text,
+                    timestamp: Date.now(),
+                  }];
+                }
+              } else if (last?.role === "assistant") {
+                updated[updated.length - 1] = { ...last, content: payload.text };
+              } else {
+                updated = [...updated, {
+                  id: crypto.randomUUID(),
+                  role: "assistant",
+                  content: payload.text,
+                  timestamp: Date.now(),
+                }];
+              }
+            }
+
+            return updated;
           });
         } catch {}
       });
@@ -292,6 +427,7 @@ export function useSSE(baseUrl: string) {
     streaming,
     connected,
     createSession,
+    switchSession,
     ask,
     cancel,
   };

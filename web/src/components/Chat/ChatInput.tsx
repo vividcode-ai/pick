@@ -8,6 +8,7 @@ interface ChatInputProps {
   disabled: boolean;
   onCancel?: () => void;
   connected: boolean;
+  streaming: boolean;
   providers: ProviderInfo[];
   selectedModel: string;
   selectedProvider?: string;
@@ -21,6 +22,7 @@ export function ChatInput({
   disabled,
   onCancel,
   connected,
+  streaming,
   providers,
   selectedModel,
   selectedProvider,
@@ -33,6 +35,10 @@ export function ChatInput({
   const [commandOpen, setCommandOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const commandRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    textareaRef.current?.focus();
+  }, [connected]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -100,11 +106,19 @@ export function ChatInput({
   };
 
   return (
-    <div className="w-full px-4 py-3">
-      <div className="max-w-[90%] md:max-w-[70%] lg:max-w-[40%] mx-auto rounded-2xl border border-neutral-700 bg-neutral-800">
+      <div className="w-full px-4 py-3">
+      <div className="max-w-[90%] md:max-w-[70%] lg:max-w-[40%] mx-auto">
+        {streaming && (
+          <div className="flex items-center gap-2 text-neutral-400 px-1 pb-1">
+            <span className="w-2 h-2 bg-neutral-400 rounded-full animate-pulse" />
+            <span className="text-sm">Working...</span>
+          </div>
+        )}
+        <div className="rounded-2xl border border-neutral-700 bg-neutral-800">
         {/* Top: textarea */}
         <textarea
           ref={textareaRef}
+          autoFocus
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -193,6 +207,7 @@ export function ChatInput({
           </div>
         </div>
       </div>
+    </div>
     </div>
   );
 }

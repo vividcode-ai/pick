@@ -25,7 +25,7 @@ export function ToolCall({ message, onCopy }: ToolCallProps) {
 
   return (
     <div className="flex justify-start message-item">
-      <div className="max-w-[85%]">
+      <div className="w-full">
         <div className="tool-call">
           <button
             className="tool-call-header w-full"

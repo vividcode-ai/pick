@@ -159,7 +159,7 @@ pub async fn read_file_handler(Query(params): Query<FileReadParams>) -> impl Int
                     .into_response();
             }
         };
-        let is_bin = data[..data.len().min(1024)].iter().any(|&b| b == 0x00);
+        let is_bin = data[..data.len().min(1024)].contains(&0x00);
         if is_bin {
             return (
                 StatusCode::OK,

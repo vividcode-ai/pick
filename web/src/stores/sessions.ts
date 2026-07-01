@@ -23,6 +23,11 @@ function emitChange() {
   listeners.forEach((l) => l());
 }
 
+export function initSessions(list: SessionEntry[]) {
+  sessions = list;
+  emitChange();
+}
+
 export function addSessionEntry(id: string, title?: string) {
   const now = Date.now();
   sessions = [

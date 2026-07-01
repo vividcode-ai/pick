@@ -199,6 +199,7 @@ pub async fn fork_session(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
+    state.ensure_session_messages(&id).await;
     match state.session_manager.fork(&id).await {
         Some(new_id) => (
             StatusCode::CREATED,
@@ -229,6 +230,9 @@ pub async fn get_session_messages(
     Path(id): Path<String>,
     Query(query): Query<MessagesQuery>,
 ) -> impl IntoResponse {
+    // Lazy-load messages from disk if needed
+    state.ensure_session_messages(&id).await;
+
     match state
         .session_manager
         .get_messages(&id, query.offset, query.limit)

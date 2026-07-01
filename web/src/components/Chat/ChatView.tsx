@@ -4,10 +4,10 @@ import { MessageBubble } from "./MessageBubble";
 
 interface ChatViewProps {
   messages: ChatMessage[];
-  streaming: boolean;
+  onFork?: (message: ChatMessage) => void;
 }
 
-export function ChatView({ messages, streaming }: ChatViewProps) {
+export function ChatView({ messages, onFork }: ChatViewProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -18,14 +18,8 @@ export function ChatView({ messages, streaming }: ChatViewProps) {
     <div className="flex-1 overflow-y-auto min-h-0">
       <div className="max-w-[90%] md:max-w-[70%] lg:max-w-[40%] mx-auto px-4 py-4 space-y-3">
         {messages.map((msg) => (
-          <MessageBubble key={msg.id + msg.timestamp} message={msg} />
+          <MessageBubble key={msg.id + msg.timestamp} message={msg} onFork={msg.role === "assistant" ? () => onFork?.(msg) : undefined} />
         ))}
-        {streaming && (
-          <div className="flex items-center gap-2 text-neutral-400 px-4 py-2">
-            <span className="w-2 h-2 bg-neutral-400 rounded-full animate-pulse" />
-            <span className="text-sm">Thinking...</span>
-          </div>
-        )}
         <div ref={bottomRef} />
       </div>
     </div>

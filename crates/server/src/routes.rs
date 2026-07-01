@@ -58,6 +58,9 @@ pub async fn ask(
     State(state): State<Arc<AppState>>,
     Json(req): Json<AskRequest>,
 ) -> impl IntoResponse {
+    // Lazy-load messages from disk if needed
+    state.ensure_session_messages(&req.session_id).await;
+
     let session = match state.session_manager.get(&req.session_id).await {
         Some(s) => s,
         None => {
@@ -300,11 +303,11 @@ pub async fn cancel(
     Json(req): Json<CancelRequest>,
 ) -> impl IntoResponse {
     let sessions = state.sse_sessions.read().await;
-    if let Some(s) = sessions.get(&req.session_id) {
-        if let Some(ref tx) = s.cancel_tx {
-            let _ = tx.send(true);
-            return (StatusCode::OK, "Cancelled").into_response();
-        }
+    if let Some(s) = sessions.get(&req.session_id)
+        && let Some(ref tx) = s.cancel_tx
+    {
+        let _ = tx.send(true);
+        return (StatusCode::OK, "Cancelled").into_response();
     }
     (StatusCode::NOT_FOUND, "No active agent for this session").into_response()
 }

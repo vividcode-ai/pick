@@ -26,10 +26,16 @@ pub async fn run_serve_mode(
         host: host.clone(),
         port: actual_port,
         pty_ws_port: 9000,
+        cwd: None,
     });
     state.default_provider = default_provider;
     state.default_model = default_model;
     state.api_keys = api_keys;
+
+    // Load persisted sessions from disk
+    let cwd = std::env::current_dir().unwrap_or_default();
+    state.load_persisted_sessions(&cwd).await;
+
     let state = Arc::new(state);
 
     if args.open_browser {

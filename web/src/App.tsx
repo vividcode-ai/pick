@@ -19,8 +19,9 @@ import {
   addSessionEntry,
   removeSessionEntry,
   renameSessionEntry,
+  initSessions,
 } from "./stores/sessions";
-import type { ProviderInfo } from "./types/events";
+import type { ChatMessage, ProviderInfo } from "./types/events";
 
 async function detectBaseUrl(): Promise<string> {
   const params = new URLSearchParams(window.location.search);
@@ -70,12 +71,29 @@ export default function App() {
     });
   }, [baseUrl]);
 
+  useEffect(() => {
+    if (!baseUrl) return;
+    fetch(`${baseUrl}/sessions`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then((list: any[]) => {
+        const entries = list.map((s) => ({
+          id: s.id,
+          title: s.title,
+          createdAt: s.created_at,
+          updatedAt: s.updated_at,
+        }));
+        if (entries.length > 0) initSessions(entries);
+      })
+      .catch(() => {});
+  }, [baseUrl]);
+
   const {
     messages,
     streaming,
     connected,
     sessionId,
     createSession,
+    switchSession,
     ask,
     cancel,
   } = useSSE(baseUrl ?? "");
@@ -152,8 +170,9 @@ export default function App() {
   const handleSelectSession = useCallback(
     (id: string) => {
       setActiveSessionId(id);
+      switchSession(id);
     },
-    []
+    [switchSession]
   );
 
   const handleRenameSession = useCallback(
@@ -172,6 +191,19 @@ export default function App() {
     },
     [activeSessionId, handleNewSession]
   );
+
+  const handleFork = useCallback(async (_message: ChatMessage) => {
+    if (!sessionId || !baseUrl) return;
+    try {
+      const res = await fetch(`${baseUrl}/sessions/${sessionId}/fork`, { method: "POST" });
+      if (!res.ok) return;
+      const { session_id } = await res.json();
+      addSessionEntry(session_id);
+      switchSession(session_id);
+    } catch (e) {
+      console.error("Fork failed:", e);
+    }
+  }, [baseUrl, sessionId, switchSession]);
 
   const handleSaveUrl = useCallback(
     (url: string) => {
@@ -206,6 +238,7 @@ export default function App() {
       disabled={streaming}
       onCancel={cancel}
       connected={connected}
+      streaming={streaming}
       providers={providers}
       selectedModel={selectedModel}
       selectedProvider={selectedProvider}
@@ -238,7 +271,7 @@ export default function App() {
       >
         {hasMessages ? (
           <>
-            <ChatView messages={messages} streaming={streaming} />
+            <ChatView messages={messages} onFork={handleFork} />
             {chatInput}
           </>
         ) : (

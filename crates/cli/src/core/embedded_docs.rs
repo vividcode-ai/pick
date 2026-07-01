@@ -67,7 +67,7 @@ fn remove_stale_entries(
         let path = entry.path();
         if path.is_dir() {
             remove_stale_entries(base, &path, keep, prefix)?;
-            if path.read_dir().map_or(false, |mut i| i.next().is_none()) {
+            if path.read_dir().is_ok_and(|mut i| i.next().is_none()) {
                 let _ = std::fs::remove_dir(&path);
             }
         } else if path.is_file() {

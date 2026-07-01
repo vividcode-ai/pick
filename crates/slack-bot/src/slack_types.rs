@@ -22,7 +22,9 @@ pub struct SlackEnvelope {
     #[serde(rename = "type")]
     pub msg_type: String,
     pub payload: Option<serde_json::Value>,
+    #[expect(dead_code)]
     pub accepts_response_payload: Option<bool>,
+    #[expect(dead_code)]
     pub retry_attempt: Option<u32>,
     pub error: Option<String>,
 }
@@ -38,7 +40,9 @@ pub struct SlackAck {
 #[derive(Debug, Deserialize)]
 pub struct EventPayload {
     pub event: SlackEvent,
+    #[expect(dead_code)]
     pub event_id: Option<String>,
+    #[expect(dead_code)]
     pub event_time: Option<u64>,
 }
 
@@ -49,6 +53,7 @@ pub struct SlackEvent {
     pub event_type: String,
     pub text: Option<String>,
     pub channel: Option<String>,
+    #[expect(dead_code)]
     pub user: Option<String>,
     pub thread_ts: Option<String>,
     pub ts: Option<String>,

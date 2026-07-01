@@ -102,12 +102,11 @@ async fn run_bot(http: &Client, pick_url: &str, bot_token: &str) -> Result<()> {
                 let _ = write.send(ack.into()).await;
 
                 // Process event
-                if let Some(payload) = &envelope.payload {
-                    if let Ok(ep) = serde_json::from_value::<EventPayload>(payload.clone()) {
-                        if let Err(e) = handle_event(http, pick_url, bot_token, &ep).await {
-                            error!("Failed to handle event: {e}");
-                        }
-                    }
+                if let Some(payload) = &envelope.payload
+                    && let Ok(ep) = serde_json::from_value::<EventPayload>(payload.clone())
+                    && let Err(e) = handle_event(http, pick_url, bot_token, &ep).await
+                {
+                    error!("Failed to handle event: {e}");
                 }
             }
             other => {
@@ -145,11 +144,10 @@ async fn handle_event(
     let event = &payload.event;
 
     // Only handle app_mention or message in DMs (channel_type = "im")
-    let is_relevant = match (event.event_type.as_str(), event.channel_type.as_deref()) {
-        ("app_mention", _) => true,
-        ("message", Some("im")) => true,
-        _ => false,
-    };
+    let is_relevant = matches!(
+        (event.event_type.as_str(), event.channel_type.as_deref()),
+        ("app_mention", _) | ("message", Some("im"))
+    );
     if !is_relevant {
         return Ok(());
     }

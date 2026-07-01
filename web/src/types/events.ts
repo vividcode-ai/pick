@@ -5,6 +5,7 @@ export interface WsMessage {
 
 export interface MessageUpdatePayload {
   text: string;
+  thinking?: string;
   delta: boolean;
 }
 

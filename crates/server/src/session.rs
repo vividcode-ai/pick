@@ -1,3 +1,4 @@
+use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -45,6 +46,7 @@ pub struct AgentSession {
     pub updated_at: i64,
     pub status: String,
     pub fork_parent_id: Option<String>,
+    pub session_path: Option<String>,
 }
 
 impl AgentSession {
@@ -68,6 +70,7 @@ impl AgentSession {
             updated_at: now,
             status: "idle".to_string(),
             fork_parent_id: None,
+            session_path: None,
         }
     }
 
@@ -101,6 +104,13 @@ impl SessionManager {
         Self {
             sessions: RwLock::new(HashMap::new()),
         }
+    }
+
+    pub async fn insert_session(&self, session: AgentSession) {
+        self.sessions
+            .write()
+            .await
+            .insert(session.id.clone(), session);
     }
 
     pub async fn create(
@@ -140,7 +150,7 @@ impl SessionManager {
     pub async fn list_info(&self) -> Vec<SessionInfo> {
         let sessions = self.sessions.read().await;
         let mut infos: Vec<SessionInfo> = sessions.values().map(|s| s.to_info()).collect();
-        infos.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+        infos.sort_by_key(|b| Reverse(b.updated_at));
         infos
     }
 
@@ -186,6 +196,7 @@ impl SessionManager {
             updated_at: now,
             status: "idle".to_string(),
             fork_parent_id: Some(source.id.clone()),
+            session_path: None,
         };
         drop(sessions);
         self.sessions.write().await.insert(new_id.clone(), forked);
@@ -225,6 +236,9 @@ impl SessionManager {
     }
 }
 
+type PendingQuestionSenders =
+    Arc<Mutex<HashMap<String, oneshot::Sender<Result<Vec<Vec<String>>, String>>>>>;
+
 #[derive(Clone)]
 pub struct SseSessionState {
     pub event_tx: tokio::sync::mpsc::UnboundedSender<
@@ -232,6 +246,5 @@ pub struct SseSessionState {
     >,
     pub cancel_tx: Option<watch::Sender<bool>>,
     pub pending_approvals: Arc<Mutex<HashMap<String, oneshot::Sender<bool>>>>,
-    pub pending_questions:
-        Arc<Mutex<HashMap<String, oneshot::Sender<Result<Vec<Vec<String>>, String>>>>>,
+    pub pending_questions: PendingQuestionSenders,
 }
