@@ -10,7 +10,8 @@ interface ChatInputProps {
   connected: boolean;
   providers: ProviderInfo[];
   selectedModel: string;
-  onModelChange: (m: string) => void;
+  selectedProvider?: string;
+  onModelChange: (modelId: string, provider: string) => void;
   thinkingLevel: string;
   onThinkingLevelChange: (l: string) => void;
 }
@@ -22,6 +23,7 @@ export function ChatInput({
   connected,
   providers,
   selectedModel,
+  selectedProvider,
   onModelChange,
   thinkingLevel,
   onThinkingLevelChange,
@@ -159,6 +161,7 @@ export function ChatInput({
             <ModelSelector
               providers={providers}
               selectedModel={selectedModel}
+              selectedProvider={selectedProvider}
               onModelChange={onModelChange}
               disabled={disabled || !connected}
             />

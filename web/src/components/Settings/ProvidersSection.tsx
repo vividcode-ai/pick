@@ -3,7 +3,7 @@ import type { ProviderInfo } from "../../types/events";
 interface ProvidersSectionProps {
   providers: ProviderInfo[];
   selectedModel: string;
-  onModelChange: (m: string) => void;
+  onModelChange: (modelId: string, provider: string) => void;
 }
 
 export function ProvidersSection({ providers, selectedModel, onModelChange }: ProvidersSectionProps) {
@@ -41,7 +41,7 @@ export function ProvidersSection({ providers, selectedModel, onModelChange }: Pr
                       name="model"
                       value={model.id}
                       checked={selectedModel === model.id}
-                      onChange={() => onModelChange(model.id)}
+                      onChange={() => onModelChange(model.id, provider.provider)}
                       className="accent-blue-500"
                     />
                     <span>{model.name}</span>

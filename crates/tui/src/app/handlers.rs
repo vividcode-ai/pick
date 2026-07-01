@@ -1220,6 +1220,12 @@ impl TuiApp {
         let text = std::mem::take(&mut self.paste_accumulator);
         if self.paste_burst_active {
             self.editor.insert_str_paste_burst(&text);
+        } else if text.contains('\n') || text.contains('\r') {
+            // Contains line breaks: likely multi-line paste content that
+            // arrived after a timing gap reset the burst detector.
+            // Use insert_str which merges into an existing paste element
+            // at cursor, keeping the placeholder line count accurate.
+            self.editor.insert_str(&text);
         } else {
             self.editor.insert_str_no_merge(&text);
         }
@@ -1245,6 +1251,8 @@ impl TuiApp {
             let text = std::mem::take(&mut self.paste_accumulator);
             if self.paste_burst_active {
                 self.editor.insert_str_paste_burst(&text);
+            } else if text.contains('\n') || text.contains('\r') {
+                self.editor.insert_str(&text);
             } else {
                 self.editor.insert_str_no_merge(&text);
             }

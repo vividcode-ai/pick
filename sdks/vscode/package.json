@@ -2,7 +2,7 @@
   "name": "pick-ai",
   "displayName": "Pick AI",
   "description": "AI-powered coding assistant for VS Code",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "pick-ai",
   "license": "MIT",
   "engines": {
@@ -16,24 +16,48 @@
   "contributes": {
     "commands": [
       {
-        "command": "pick.startSession",
-        "title": "Pick: Start new AI session"
+        "command": "pick.openTerminal",
+        "title": "Pick: Open terminal",
+        "icon": {
+          "light": "images/button-dark.svg",
+          "dark": "images/button-light.svg"
+        }
       },
       {
-        "command": "pick.askPrompt",
-        "title": "Pick: Ask AI about selected code"
-      }
-    ],
-    "configuration": {
-      "title": "Pick AI",
-      "properties": {
-        "pick.serverUrl": {
-          "type": "string",
-          "default": "http://127.0.0.1:8080",
-          "description": "Pick server URL"
+        "command": "pick.openNewTerminal",
+        "title": "Pick: Open new terminal",
+        "icon": {
+          "light": "images/button-dark.svg",
+          "dark": "images/button-light.svg"
         }
       }
-    }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "pick.openNewTerminal",
+          "group": "navigation"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "pick.openTerminal",
+        "title": "Open Pick",
+        "key": "ctrl+escape",
+        "mac": "cmd+escape",
+        "win": "ctrl+escape",
+        "linux": "ctrl+escape"
+      },
+      {
+        "command": "pick.openNewTerminal",
+        "title": "Open Pick in new tab",
+        "key": "ctrl+shift+escape",
+        "mac": "cmd+shift+escape",
+        "win": "ctrl+shift+escape",
+        "linux": "ctrl+shift+escape"
+      }
+    ]
   },
   "scripts": {
     "package": "npx vsce package"

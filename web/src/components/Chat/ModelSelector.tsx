@@ -16,7 +16,8 @@ interface FlatModel {
 interface ModelSelectorProps {
   providers: ProviderInfo[];
   selectedModel: string;
-  onModelChange: (m: string) => void;
+  selectedProvider?: string;
+  onModelChange: (modelId: string, provider: string) => void;
   disabled?: boolean;
 }
 
@@ -49,7 +50,7 @@ const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
   "xiaomi": "Xiaomi MiMo",
 };
 
-export function ModelSelector({ providers, selectedModel, onModelChange, disabled }: ModelSelectorProps) {
+export function ModelSelector({ providers, selectedModel, selectedProvider, onModelChange, disabled }: ModelSelectorProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [favoritesOnly, setFavoritesOnly] = useState(false);
@@ -91,8 +92,8 @@ export function ModelSelector({ providers, selectedModel, onModelChange, disable
   }, [providers, selectedModel]);
 
   const selectedDetail = useMemo(
-    () => allModels.find((m) => m.id === selectedModel) || null,
-    [allModels, selectedModel]
+    () => allModels.find((m) => m.id === selectedModel && m.provider === selectedProvider) || null,
+    [allModels, selectedModel, selectedProvider]
   );
 
   const favoriteKeys = useMemo(() => {
@@ -136,7 +137,7 @@ export function ModelSelector({ providers, selectedModel, onModelChange, disable
         highlightRef.current = Math.max(highlightRef.current - 1, 0);
       } else if (e.key === "Enter" && flatList[highlightRef.current]) {
         e.preventDefault();
-        onModelChange(flatList[highlightRef.current].id);
+        onModelChange(flatList[highlightRef.current].id, flatList[highlightRef.current].provider);
         setOpen(false);
       } else if (e.key === "Escape") {
         setOpen(false);
@@ -202,7 +203,7 @@ export function ModelSelector({ providers, selectedModel, onModelChange, disable
                     <div className="selector-group-header">{providerName}</div>
                     {models.map((m) => {
                       const globalIdx = flatList.indexOf(m);
-                      const selected = m.id === selectedModel;
+                      const selected = m.id === selectedModel && m.provider === selectedProvider;
                       const fav = favoriteKeys.has(`${m.provider}/${m.id}`);
                       return (
                         <div
@@ -210,7 +211,7 @@ export function ModelSelector({ providers, selectedModel, onModelChange, disable
                           className="selector-option"
                           data-highlighted={globalIdx === highlightRef.current}
                           data-selected={selected}
-                          onClick={() => { onModelChange(m.id); setOpen(false); }}
+                          onClick={() => { onModelChange(m.id, m.provider); setOpen(false); }}
                           onMouseEnter={() => { highlightRef.current = globalIdx; }}
                         >
                           <div className="selector-option-content">

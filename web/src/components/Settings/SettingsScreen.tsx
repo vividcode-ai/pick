@@ -16,7 +16,7 @@ import type { ProviderInfo } from "../../types/events";
 interface SettingsScreenProps {
   providers: ProviderInfo[];
   selectedModel: string;
-  onModelChange: (m: string) => void;
+  onModelChange: (modelId: string, provider: string) => void;
   serverUrl: string;
   onSaveServerUrl: (url: string) => void;
 }

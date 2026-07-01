@@ -70,8 +70,8 @@ export function useSSE(baseUrl: string) {
       const eventSource = new EventSource(`${baseUrl}/events/${sessionId}`);
       eventSourceRef.current = eventSource;
 
-      let assistantId: string | null = null;
       let asked = false;
+      let turnEndMessageCount = -1;
 
       eventSource.addEventListener("open", () => {
         setConnected(true);
@@ -102,11 +102,36 @@ export function useSSE(baseUrl: string) {
               };
               return updated;
             }
-            assistantId = crypto.randomUUID();
+            if (last?.role === "thinking") {
+              if (turnEndMessageCount >= 0) {
+                for (let i = prev.length - 1; i > turnEndMessageCount; i--) {
+                  if (prev[i].role === "assistant") {
+                    const updated = [...prev];
+                    updated[i] = { ...updated[i], content: payload.text };
+                    return updated;
+                  }
+                }
+              } else {
+                let lastUserIdx = -1;
+                for (let i = prev.length - 1; i >= 0; i--) {
+                  if (prev[i].role === "user") { lastUserIdx = i; break; }
+                }
+                for (let i = prev.length - 1; i > lastUserIdx; i--) {
+                  if (prev[i].role === "assistant") {
+                    const updated = [...prev];
+                    updated[i] = {
+                      ...updated[i],
+                      content: payload.text,
+                    };
+                    return updated;
+                  }
+                }
+              }
+            }
             return [
               ...prev,
               {
-                id: assistantId,
+                id: crypto.randomUUID(),
                 role: "assistant",
                 content: payload.text,
                 timestamp: Date.now(),
@@ -128,6 +153,32 @@ export function useSSE(baseUrl: string) {
                 content: payload.text,
               };
               return updated;
+            }
+            if (last?.role === "assistant") {
+              if (turnEndMessageCount >= 0) {
+                for (let i = prev.length - 1; i > turnEndMessageCount; i--) {
+                  if (prev[i].role === "thinking") {
+                    const updated = [...prev];
+                    updated[i] = { ...updated[i], content: payload.text };
+                    return updated;
+                  }
+                }
+              } else {
+                let lastUserIdx = -1;
+                for (let i = prev.length - 1; i >= 0; i--) {
+                  if (prev[i].role === "user") { lastUserIdx = i; break; }
+                }
+                for (let i = prev.length - 1; i > lastUserIdx; i--) {
+                  if (prev[i].role === "thinking") {
+                    const updated = [...prev];
+                    updated[i] = {
+                      ...updated[i],
+                      content: payload.text,
+                    };
+                    return updated;
+                  }
+                }
+              }
             }
             return [
               ...prev,
@@ -198,10 +249,14 @@ export function useSSE(baseUrl: string) {
       });
 
       eventSource.addEventListener("turn_end", () => {
-        assistantId = null;
+        setMessages((prev) => {
+          turnEndMessageCount = prev.length;
+          return prev;
+        });
       });
 
       eventSource.addEventListener("agent_end", () => {
+        turnEndMessageCount = -1;
         setStreaming(false);
         eventSource.close();
       });

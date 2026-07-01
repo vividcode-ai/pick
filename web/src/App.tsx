@@ -44,6 +44,7 @@ export default function App() {
   const [settingsUrl, setSettingsUrl] = useState("");
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [selectedModel, setSelectedModel] = useState("");
+  const [selectedProvider, setSelectedProvider] = useState("");
   const [thinkingLevel, setThinkingLevel] = useState("off");
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const { cycleThemeMode } = useTheme();
@@ -63,6 +64,7 @@ export default function App() {
         const firstWithKey = list.find((p) => p.has_key) || list[0];
         if (firstWithKey.models.length > 0) {
           setSelectedModel(firstWithKey.models[0].id);
+          setSelectedProvider(firstWithKey.provider);
         }
       }
     });
@@ -77,15 +79,6 @@ export default function App() {
     ask,
     cancel,
   } = useSSE(baseUrl ?? "");
-
-  const selectedProvider = useMemo(() => {
-    for (const p of providers) {
-      if (p.models.some((m) => m.id === selectedModel)) {
-        return p.provider;
-      }
-    }
-    return providers[0]?.provider || "anthropic";
-  }, [providers, selectedModel]);
 
   const pendingSendRef = useRef<string | null>(null);
 
@@ -135,18 +128,18 @@ export default function App() {
     [sessionId, createSession, selectedModel, selectedProvider, ask, thinkingLevel]
   );
 
-  const handleModelChange = useCallback((model: string) => {
-    setSelectedModel(model);
+  const handleModelChange = useCallback((modelId: string, provider: string) => {
+    setSelectedModel(modelId);
+    setSelectedProvider(provider);
     cancel();
     if (sessionId && baseUrl) {
-      const provider = providers.find(p => p.models.some(m => m.id === model))?.provider || "anthropic";
       fetch(`${baseUrl}/sessions/${sessionId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model_id: model, provider }),
+        body: JSON.stringify({ model_id: modelId, provider }),
       }).catch(() => {});
     }
-  }, [sessionId, baseUrl, providers, cancel]);
+  }, [sessionId, baseUrl, cancel]);
 
   const handleNewSession = useCallback(() => {
     createSession(selectedModel, selectedProvider).then((id) => {
@@ -215,6 +208,7 @@ export default function App() {
       connected={connected}
       providers={providers}
       selectedModel={selectedModel}
+      selectedProvider={selectedProvider}
       onModelChange={handleModelChange}
       thinkingLevel={thinkingLevel}
       onThinkingLevelChange={setThinkingLevel}
