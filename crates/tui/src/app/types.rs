@@ -155,6 +155,14 @@ pub struct TuiApp {
     pub paste_burst: PasteBurst,
     pub paste_accumulator: String,
     pub last_paste_time: Option<std::time::Instant>,
+    /// Number of consecutive characters received within <50ms of each other.
+    /// Resets to 0 after a flush or when gap exceeds 50ms.
+    pub paste_burst_consecutive: usize,
+    /// Set to true when 3+ consecutive fast chars are detected (<50ms apart).
+    /// When active, the next flush forces PasteElement creation regardless of
+    /// content size, so the first below-threshold batch still creates a
+    /// placeholder that subsequent batches can merge into.
+    pub paste_burst_active: bool,
     pub(crate) last_render_state: AppState,
     pub question_dialog: Option<crate::components::QuestionDialog>,
     pub question_response_tx:

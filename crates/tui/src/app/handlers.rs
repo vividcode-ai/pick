@@ -85,6 +85,8 @@ impl TuiApp {
             paste_burst: crate::paste_burst::PasteBurst::new(),
             paste_accumulator: String::new(),
             last_paste_time: None,
+            paste_burst_consecutive: 0,
+            paste_burst_active: false,
             last_render_state: AppState::Input,
             question_dialog: None,
             question_response_tx: None,
@@ -170,6 +172,8 @@ impl TuiApp {
             paste_burst: crate::paste_burst::PasteBurst::new(),
             paste_accumulator: String::new(),
             last_paste_time: None,
+            paste_burst_consecutive: 0,
+            paste_burst_active: false,
             last_render_state: AppState::Input,
             question_dialog: None,
             question_response_tx: None,
@@ -1185,7 +1189,22 @@ impl TuiApp {
     }
 
     /// Handle a regular printable character. Accumulate for paste burst detection.
+    /// Tracks consecutive fast chars (<50ms apart). When 3+ consecutive fast
+    /// chars are seen, sets `paste_burst_active` so the next flush forces
+    /// PasteElement creation (even for below-threshold content), ensuring the
+    /// first batch of a multi-batch paste creates a placeholder.
     pub fn handle_char_for_paste(&mut self, c: char, now: Instant) {
+        if let Some(last) = self.last_paste_time
+            && now.duration_since(last).as_millis() < 50
+        {
+            self.paste_burst_consecutive += 1;
+            if self.paste_burst_consecutive >= 3 {
+                self.paste_burst_active = true;
+            }
+        } else {
+            self.paste_burst_consecutive = 1;
+            self.paste_burst_active = false;
+        }
         self.paste_accumulator.push(c);
         self.last_paste_time = Some(now);
     }
@@ -1199,7 +1218,13 @@ impl TuiApp {
             return;
         }
         let text = std::mem::take(&mut self.paste_accumulator);
-        self.editor.insert_str(&text);
+        if self.paste_burst_active {
+            self.editor.insert_str_paste_burst(&text);
+        } else {
+            self.editor.insert_str(&text);
+        }
+        self.paste_burst_active = false;
+        self.paste_burst_consecutive = 0;
         let trimmed = self.editor.text().trim_start();
         if trimmed.starts_with('/') && !trimmed[1..].contains(' ') {
             self.editor.trigger_autocomplete();
@@ -1217,7 +1242,13 @@ impl TuiApp {
             && now.duration_since(t).as_millis() > 50
         {
             let text = std::mem::take(&mut self.paste_accumulator);
-            self.editor.insert_str(&text);
+            if self.paste_burst_active {
+                self.editor.insert_str_paste_burst(&text);
+            } else {
+                self.editor.insert_str(&text);
+            }
+            self.paste_burst_active = false;
+            self.paste_burst_consecutive = 0;
             let trimmed = self.editor.text().trim_start();
             if trimmed.starts_with('/') && !trimmed[1..].contains(' ') {
                 self.editor.trigger_autocomplete();

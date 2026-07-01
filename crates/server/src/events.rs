@@ -181,6 +181,20 @@ pub fn serialize_event(event: &AgentEvent) -> Vec<WsEvent> {
                 .unwrap_or_default(),
             }]
         }
+        AgentEvent::MessageStart { message } => {
+            if let Message::Assistant(_) = message {
+                vec![WsEvent {
+                    event_type: "message_update".to_string(),
+                    payload: serde_json::to_value(MessageUpdatePayload {
+                        text: String::new(),
+                        delta: false,
+                    })
+                    .unwrap_or_default(),
+                }]
+            } else {
+                Vec::new()
+            }
+        }
         AgentEvent::TurnEnd { .. } => vec![WsEvent {
             event_type: "turn_end".to_string(),
             payload: Value::Null,

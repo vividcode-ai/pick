@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Layout } from "./components/Layout/Layout";
 import { LeftPanel } from "./components/Layout/LeftPanel";
 import { ChatView } from "./components/Chat/ChatView";
@@ -86,6 +86,21 @@ export default function App() {
     }
     return providers[0]?.provider || "anthropic";
   }, [providers, selectedModel]);
+
+  const autoSessionRef = useRef(false);
+
+  useEffect(() => {
+    if (baseUrl && !sessionId && !autoSessionRef.current && providers.length > 0 && selectedModel) {
+      autoSessionRef.current = true;
+      createSession(selectedModel, selectedProvider).then((id) => {
+        if (id) {
+          addSessionEntry(id);
+        } else {
+          autoSessionRef.current = false;
+        }
+      });
+    }
+  }, [baseUrl, sessionId, providers, selectedModel, selectedProvider, createSession]);
 
   // Register commands
   useEffect(() => {

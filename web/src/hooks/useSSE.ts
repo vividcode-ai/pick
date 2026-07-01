@@ -44,7 +44,10 @@ export function useSSE(baseUrl: string) {
 
   const ask = useCallback(
     (prompt: string, thinkingLevel?: string) => {
-      if (!sessionId) return;
+      if (!sessionId) {
+        console.warn("Cannot send: no active session. Create a new session first.");
+        return;
+      }
 
       setStreaming(true);
       setMessages((prev) => [
@@ -57,14 +60,23 @@ export function useSSE(baseUrl: string) {
         },
       ]);
 
+      // Close previous SSE connection to prevent duplicate event sources
+      eventSourceRef.current?.close();
       abortRef.current?.abort();
+
       const controller = new AbortController();
       abortRef.current = controller;
 
       const eventSource = new EventSource(`${baseUrl}/events/${sessionId}`);
       eventSourceRef.current = eventSource;
 
-      eventSource.onopen = () => {
+      let assistantId: string | null = null;
+      let asked = false;
+
+      eventSource.addEventListener("open", () => {
+        setConnected(true);
+        if (asked) return;
+        asked = true;
         fetch(`${baseUrl}/ask`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -75,9 +87,7 @@ export function useSSE(baseUrl: string) {
             thinking_level: thinkingLevel,
           }),
         }).catch(() => {});
-      };
-
-      let assistantId: string | null = null;
+      });
 
       eventSource.addEventListener("message_update", (e) => {
         try {
@@ -176,12 +186,17 @@ export function useSSE(baseUrl: string) {
         } catch {}
       });
 
+      eventSource.addEventListener("turn_end", () => {
+        assistantId = null;
+      });
+
       eventSource.addEventListener("agent_end", () => {
         setStreaming(false);
         eventSource.close();
       });
 
       eventSource.addEventListener("error", () => {
+        setConnected(false);
         setStreaming(false);
         eventSource.close();
       });

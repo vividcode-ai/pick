@@ -67,11 +67,11 @@ export function ThinkingSelector({
   const selectedLabel = THINKING_LEVELS.find((l) => l.value === thinkingLevel)?.label || "Off";
 
   return (
-    <div className="relative" ref={containerRef} onKeyDown={handleKeyDown}>
+    <div className="relative w-fit" ref={containerRef} onKeyDown={handleKeyDown}>
       <button
         onClick={() => { setOpen((v) => !v); setHighlightIdx(0); }}
         disabled={disabled}
-        className="selector-trigger"
+        className="selector-trigger w-fit"
       >
         <span className="selector-trigger-primary">{selectedLabel}</span>
         <span className="selector-trigger-icon">
@@ -82,7 +82,7 @@ export function ThinkingSelector({
       {open && (
         <>
           <div className="fixed inset-0 z-[2199]" onClick={() => setOpen(false)} />
-          <div className="absolute bottom-full left-0 mb-2 selector-popover z-[2200] min-w-[120px]">
+          <div className="absolute bottom-full left-0 mb-2 selector-popover z-[2200]">
             <div className="selector-listbox">
               {THINKING_LEVELS.map((level, idx) => {
                 const selected = level.value === thinkingLevel;

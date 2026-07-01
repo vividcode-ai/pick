@@ -11,7 +11,6 @@
   outline: none;
   transition: background-color 140ms ease, border-color 140ms ease;
   font-size: 12px;
-  min-width: 120px;
   background-color: var(--surface-base);
   color: var(--text-primary);
   cursor: pointer;

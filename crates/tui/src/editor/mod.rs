@@ -175,6 +175,21 @@ impl Editor {
 
     /// Insert a string at cursor position
     pub fn insert_str(&mut self, s: &str) {
+        self.insert_str_impl(s, false);
+    }
+
+    /// Insert a string during a confirmed paste burst.
+    /// Always creates/merges a PasteElement regardless of content size,
+    /// so the first batch of a multi-batch paste creates a placeholder
+    /// even when the individual batch is below the 100-char / 11-line threshold.
+    pub fn insert_str_paste_burst(&mut self, s: &str) {
+        self.insert_str_impl(s, true);
+    }
+
+    /// Internal implementation shared by `insert_str` and `insert_str_paste_burst`.
+    /// When `force_element` is true, the size threshold is bypassed and a
+    /// PasteElement is always created (or merged with an existing one at cursor).
+    fn insert_str_impl(&mut self, s: &str, force_element: bool) {
         if s.is_empty() {
             return;
         }
@@ -183,7 +198,7 @@ impl Editor {
         self.kill_accumulating = false;
 
         let line_count = s.lines().count();
-        if s.len() > 100 || line_count > 11 {
+        if s.len() > 100 || line_count > 11 || force_element {
             // Check if cursor is at the end of an existing paste element.
             // If so, merge the new content into it (handles pastes that
             // arrive in multiple batches due to timing / platform quirks).
@@ -226,13 +241,45 @@ impl Editor {
             let at = self.cursor;
             self.buffer.insert_str(at, &placeholder);
             self.cursor = at + ph_len;
+            self.shift_elements_after(at, ph_len as isize);
             self.paste_elements.push(PasteElement {
                 start: at,
                 end: at + ph_len,
             });
             self.pending_pastes.push((placeholder, s.to_string()));
-            self.shift_elements_after(at, ph_len as isize);
         } else {
+            // Small insertion (<100 chars, <=11 lines).
+            // If cursor is at the end of a paste element, merge this text
+            // into the existing placeholder to handle paste batches that
+            // arrive below the threshold.
+            if let Some(idx) = self
+                .paste_elements
+                .iter()
+                .position(|e| e.end == self.cursor)
+            {
+                let old_ph = self.buffer
+                    [self.paste_elements[idx].start..self.paste_elements[idx].end]
+                    .to_string();
+                if let Some(pp_idx) = self.pending_pastes.iter().position(|(ph, _)| *ph == old_ph) {
+                    let combined = self.pending_pastes[pp_idx].1.clone() + s;
+                    let new_line_count = combined.lines().count();
+                    let new_ph = format!("[Pasted Content {} Lines]", new_line_count);
+                    let new_ph_len = new_ph.len();
+                    let start = self.paste_elements[idx].start;
+                    let old_len = self.paste_elements[idx].end - start;
+
+                    self.push_undo();
+                    self.buffer.drain(start..self.paste_elements[idx].end);
+                    self.buffer.insert_str(start, &new_ph);
+                    self.cursor = start + new_ph_len;
+                    let delta = new_ph_len as isize - old_len as isize;
+                    self.paste_elements[idx].end = start + new_ph_len;
+                    self.pending_pastes[pp_idx] = (new_ph, combined);
+                    self.shift_elements_after(start + old_len, delta);
+                    return;
+                }
+            }
+
             self.push_undo();
             self.buffer.insert_str(self.cursor, s);
             self.cursor += s.len();
@@ -1073,6 +1120,12 @@ impl Editor {
     /// Get the buffer content
     pub fn text(&self) -> &str {
         &self.buffer
+    }
+
+    /// Whether the editor has any active paste elements (placeholders
+    /// inserted for long pastes that haven't been submitted yet).
+    pub fn has_paste_elements(&self) -> bool {
+        !self.paste_elements.is_empty()
     }
 
     /// Get the full text with all paste placeholders expanded to their
