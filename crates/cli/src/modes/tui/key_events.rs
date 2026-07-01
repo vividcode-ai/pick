@@ -195,26 +195,24 @@ pub(crate) fn process_key_event(
             return None;
         }
 
-        // During a paste burst (chars arriving <50ms apart), accumulate
-        // \n so the entire paste stays in the accumulator instead of
-        // flushing partial content to the editor as raw text.  Windows
-        // may report pasted newlines as KeyCode::Enter (not Char('\n')),
-        // so this guard is essential.  Also check last_paste_time when
-        // accumulator is empty — the previous batch may have just been
-        // flushed and the next \n must continue the same paste burst.
+        // During a paste burst, accumulate \n so the entire paste stays
+        // in the accumulator instead of flushing partial content to the
+        // editor as raw text.  Windows may report pasted newlines as
+        // KeyCode::Enter (not Char('\n')), so this guard is essential.
+        // When the accumulator is non-empty, always treat Enter as part
+        // of the paste (the timing-based flush in finalize/force_flush
+        // already ensures the accumulator is cleared during idle gaps).
+        // When the accumulator is empty but paste elements exist, use a
+        // generous 200ms window to absorb pauses between OS-level paste
+        // batches delivered by ReadConsoleInputW.
         if !tui.paste_accumulator.is_empty() {
-            if let Some(t) = tui.last_paste_time
-                && now.duration_since(t).as_millis() < 50
-            {
-                tui.paste_accumulator.push('\n');
-                tui.last_paste_time = Some(now);
-                return None;
-            }
-            tui.force_flush_paste_accumulator();
+            tui.paste_accumulator.push('\n');
+            tui.last_paste_time = Some(now);
+            return None;
         } else if tui.editor.has_paste_elements()
             && tui
                 .last_paste_time
-                .is_some_and(|t| now.duration_since(t).as_millis() < 50)
+                .is_some_and(|t| now.duration_since(t).as_millis() < 200)
         {
             // Accumulator is empty but a paste element exists and was
             // recently written — the next \n belongs to the same paste
@@ -265,7 +263,7 @@ pub(crate) fn process_key_event(
                         || (tui.editor.has_paste_elements()
                             && tui
                                 .last_paste_time
-                                .is_some_and(|t| now.duration_since(t).as_millis() < 50))
+                                .is_some_and(|t| now.duration_since(t).as_millis() < 200))
                     {
                         tui.paste_accumulator.push(c);
                         tui.last_paste_time = Some(now);
@@ -359,26 +357,22 @@ pub(crate) fn process_key_event_during_agent(
             tui.force_flush_paste_accumulator();
             return None;
         }
-        // During a paste burst (chars arriving <50ms apart), accumulate
-        // \n so the entire paste stays in the accumulator instead of
-        // flushing partial content to the editor as raw text.  Windows
-        // may report pasted newlines as KeyCode::Enter (not Char('\n')),
-        // so this guard is essential.  Also check last_paste_time when
-        // accumulator is empty — the previous batch may have just been
-        // flushed and the next \n must continue the same paste burst.
+        // During a paste burst, accumulate \n so the entire paste stays
+        // in the accumulator instead of flushing partial content to the
+        // editor as raw text.  Windows may report pasted newlines as
+        // KeyCode::Enter (not Char('\n')), so this guard is essential.
+        // When the accumulator is non-empty, always treat Enter as part
+        // of the paste.  When the accumulator is empty but paste elements
+        // exist, use a generous 200ms window to absorb pauses between
+        // OS-level paste batches.
         if !tui.paste_accumulator.is_empty() {
-            if let Some(t) = tui.last_paste_time
-                && now.duration_since(t).as_millis() < 50
-            {
-                tui.paste_accumulator.push('\n');
-                tui.last_paste_time = Some(now);
-                return None;
-            }
-            tui.force_flush_paste_accumulator();
+            tui.paste_accumulator.push('\n');
+            tui.last_paste_time = Some(now);
+            return None;
         } else if tui.editor.has_paste_elements()
             && tui
                 .last_paste_time
-                .is_some_and(|t| now.duration_since(t).as_millis() < 50)
+                .is_some_and(|t| now.duration_since(t).as_millis() < 200)
         {
             tui.paste_accumulator.push('\n');
             tui.last_paste_time = Some(now);
@@ -416,7 +410,7 @@ pub(crate) fn process_key_event_during_agent(
                         || (tui.editor.has_paste_elements()
                             && tui
                                 .last_paste_time
-                                .is_some_and(|t| now.duration_since(t).as_millis() < 50))
+                                .is_some_and(|t| now.duration_since(t).as_millis() < 200))
                     {
                         tui.paste_accumulator.push(c);
                         tui.last_paste_time = Some(now);
@@ -519,7 +513,7 @@ pub(crate) fn drain_key_events(
                                 if !tui.paste_accumulator.is_empty()
                                     || (tui.editor.has_paste_elements()
                                         && tui.last_paste_time.is_some_and(|t| {
-                                            Instant::now().duration_since(t).as_millis() < 50
+                                            Instant::now().duration_since(t).as_millis() < 200
                                         }))
                                 {
                                     tui.paste_accumulator.push(c);
@@ -562,11 +556,12 @@ pub(crate) fn drain_key_events(
                             // Extra Enter event in drain — the main
                             // select!/process_key_event path handles the
                             // primary event.  Accumulate \n when
-                            // already in a paste batch; otherwise skip.
+                            // already in a paste batch (non-empty accumulator
+                            // or recent paste elements within 200ms).
                             if !tui.paste_accumulator.is_empty()
                                 || (tui.editor.has_paste_elements()
                                     && tui.last_paste_time.is_some_and(|t| {
-                                        Instant::now().duration_since(t).as_millis() < 50
+                                        Instant::now().duration_since(t).as_millis() < 200
                                     }))
                             {
                                 tui.paste_accumulator.push('\n');
@@ -702,7 +697,7 @@ pub(crate) fn drain_key_events_during_agent(
                                 if !tui.paste_accumulator.is_empty()
                                     || (tui.editor.has_paste_elements()
                                         && tui.last_paste_time.is_some_and(|t| {
-                                            Instant::now().duration_since(t).as_millis() < 50
+                                            Instant::now().duration_since(t).as_millis() < 200
                                         }))
                                 {
                                     tui.paste_accumulator.push(c);
@@ -753,11 +748,12 @@ pub(crate) fn drain_key_events_during_agent(
                         }
                         KeyCode::Enter => {
                             // Extra Enter event in drain. Accumulate \n when
-                            // already in a paste batch; skip otherwise.
+                            // already in a paste batch (non-empty accumulator
+                            // or recent paste elements within 200ms).
                             if !tui.paste_accumulator.is_empty()
                                 || (tui.editor.has_paste_elements()
                                     && tui.last_paste_time.is_some_and(|t| {
-                                        Instant::now().duration_since(t).as_millis() < 50
+                                        Instant::now().duration_since(t).as_millis() < 200
                                     }))
                             {
                                 tui.paste_accumulator.push('\n');

@@ -87,20 +87,16 @@ export default function App() {
     return providers[0]?.provider || "anthropic";
   }, [providers, selectedModel]);
 
-  const autoSessionRef = useRef(false);
+  const pendingSendRef = useRef<string | null>(null);
 
+  // Flush pending send when sessionId becomes available
   useEffect(() => {
-    if (baseUrl && !sessionId && !autoSessionRef.current && providers.length > 0 && selectedModel) {
-      autoSessionRef.current = true;
-      createSession(selectedModel, selectedProvider).then((id) => {
-        if (id) {
-          addSessionEntry(id);
-        } else {
-          autoSessionRef.current = false;
-        }
-      });
+    if (sessionId && pendingSendRef.current !== null) {
+      const text = pendingSendRef.current;
+      pendingSendRef.current = null;
+      ask(text, thinkingLevel === "off" ? undefined : thinkingLevel);
     }
-  }, [baseUrl, sessionId, providers, selectedModel, selectedProvider, createSession]);
+  }, [sessionId, ask, thinkingLevel]);
 
   // Register commands
   useEffect(() => {
@@ -123,10 +119,34 @@ export default function App() {
 
   const handleSend = useCallback(
     (text: string) => {
-      ask(text, thinkingLevel === "off" ? undefined : thinkingLevel);
+      if (!sessionId) {
+        pendingSendRef.current = text;
+        createSession(selectedModel, selectedProvider).then((id) => {
+          if (id) {
+            addSessionEntry(id);
+          } else {
+            pendingSendRef.current = null;
+          }
+        });
+      } else {
+        ask(text, thinkingLevel === "off" ? undefined : thinkingLevel);
+      }
     },
-    [ask, thinkingLevel]
+    [sessionId, createSession, selectedModel, selectedProvider, ask, thinkingLevel]
   );
+
+  const handleModelChange = useCallback((model: string) => {
+    setSelectedModel(model);
+    cancel();
+    if (sessionId && baseUrl) {
+      const provider = providers.find(p => p.models.some(m => m.id === model))?.provider || "anthropic";
+      fetch(`${baseUrl}/sessions/${sessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model_id: model, provider }),
+      }).catch(() => {});
+    }
+  }, [sessionId, baseUrl, providers, cancel]);
 
   const handleNewSession = useCallback(() => {
     createSession(selectedModel, selectedProvider).then((id) => {
@@ -195,7 +215,7 @@ export default function App() {
       connected={connected}
       providers={providers}
       selectedModel={selectedModel}
-      onModelChange={setSelectedModel}
+      onModelChange={handleModelChange}
       thinkingLevel={thinkingLevel}
       onThinkingLevelChange={setThinkingLevel}
     />
@@ -244,7 +264,7 @@ export default function App() {
       <SettingsScreen
         providers={providers}
         selectedModel={selectedModel}
-        onModelChange={setSelectedModel}
+        onModelChange={handleModelChange}
         serverUrl={settingsUrl}
         onSaveServerUrl={handleSaveUrl}
       />
