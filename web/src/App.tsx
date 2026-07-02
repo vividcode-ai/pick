@@ -16,6 +16,7 @@ import {
 import {
   openSettings,
 } from "./stores/settings";
+import { initAppSettings } from "./stores/appSettings";
 import {
   addSessionEntry,
   removeSessionEntry,
@@ -60,6 +61,7 @@ export default function App() {
 
   useEffect(() => {
     if (!baseUrl) return;
+    initAppSettings(baseUrl);
     fetchProviders(baseUrl).then((list) => {
       setProviders(list);
       if (list.length > 0) {

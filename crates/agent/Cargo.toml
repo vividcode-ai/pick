@@ -27,3 +27,4 @@ url.workspace = true
 dirs = "6"
 libloading = "0.8"
 scraper = "0.22"
+fs2 = "0.4"

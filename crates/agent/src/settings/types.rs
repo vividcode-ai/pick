@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use pick_agent::permission::approval::PermissionConfig;
+use crate::permission::approval::PermissionConfig;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

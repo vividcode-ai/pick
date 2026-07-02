@@ -20,6 +20,7 @@ pub mod extensions;
 pub mod inter_agent;
 pub mod permission;
 pub mod session;
+pub mod settings;
 pub mod skills;
 pub mod tools;
 pub mod utils;

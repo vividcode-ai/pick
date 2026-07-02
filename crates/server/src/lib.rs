@@ -7,6 +7,7 @@ pub mod pty;
 pub mod rest;
 pub mod routes;
 pub mod session;
+pub mod settings_routes;
 pub mod spa;
 pub mod sse;
 
@@ -241,6 +242,10 @@ pub fn create_app(state: Arc<AppState>) -> Router {
         .route(
             "/mcp/{name}/reconnect",
             post(mcp_routes::reconnect_mcp_server),
+        )
+        .route(
+            "/settings",
+            get(settings_routes::get_settings).patch(settings_routes::update_settings),
         )
         .route("/openapi.json", get(docs::openapi_json))
         .route("/docs", get(docs::docs_ui))
