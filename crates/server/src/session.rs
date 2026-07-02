@@ -4,9 +4,8 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use pick_agent::core::state::AgentTool;
-use pick_agent::session::entries::{
-    SessionEntry, SessionEntryKind, SessionHeader, SessionInfoEntry,
-};
+use pick_agent::session::entries::{SessionEntry, SessionEntryKind, SessionInfoEntry};
+use pick_agent::session::manager::SessionManager as AgentSessionManager;
 use pick_ai::types::Message;
 use serde::Serialize;
 use tokio::sync::{RwLock, oneshot, watch};
@@ -58,6 +57,7 @@ pub struct AgentSession {
 impl AgentSession {
     pub fn new(
         id: String,
+        title: String,
         model_id: String,
         provider: String,
         system_prompt: String,
@@ -66,7 +66,7 @@ impl AgentSession {
         let now = chrono::Utc::now().timestamp_millis();
         Self {
             id,
-            title: format!("Session - {}", chrono::Utc::now().format("%Y-%m-%d %H:%M")),
+            title,
             model_id,
             provider,
             system_prompt,
@@ -99,76 +99,29 @@ impl AgentSession {
 pub struct SessionManager {
     sessions: RwLock<HashMap<String, AgentSession>>,
     session_dir: PathBuf,
+    cwd: PathBuf,
 }
 
 impl SessionManager {
     pub fn new(session_dir: PathBuf) -> Self {
+        let cwd = session_dir
+            .parent()
+            .and_then(|p| p.parent())
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
         Self {
             sessions: RwLock::new(HashMap::new()),
             session_dir,
+            cwd,
         }
     }
 
-    async fn write_header_and_info(&self, session: &AgentSession) -> Result<String, String> {
-        let path = self.session_dir.join(format!("{}.jsonl", session.id));
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| format!("Failed to create dir: {}", e))?;
+    pub fn new_with_cwd(session_dir: PathBuf, cwd: PathBuf) -> Self {
+        Self {
+            sessions: RwLock::new(HashMap::new()),
+            session_dir,
+            cwd,
         }
-        let header = SessionHeader {
-            id: session.id.clone(),
-            version: 1,
-            created_at: session.created_at,
-            updated_at: session.updated_at,
-            cwd: None,
-            model: Some(session.model_id.clone()),
-            provider: Some(session.provider.clone()),
-        };
-        let header_line =
-            serde_json::to_string(&header).map_err(|e| format!("Serialize header: {}", e))?;
-        let info_entry = SessionEntry {
-            id: uuid::Uuid::now_v7().to_string(),
-            parent_id: None,
-            timestamp: chrono::Utc::now().timestamp_millis(),
-            kind: SessionEntryKind::SessionInfo(SessionInfoEntry {
-                name: session.title.clone(),
-            }),
-        };
-        let info_line =
-            serde_json::to_string(&info_entry).map_err(|e| format!("Serialize info: {}", e))?;
-        let content = format!("{}\n{}\n", header_line, info_line);
-        tokio::fs::write(&path, content)
-            .await
-            .map_err(|e| format!("Write session file: {}", e))?;
-        Ok(path.to_string_lossy().to_string())
-    }
-
-    async fn append_messages_to_disk(
-        &self,
-        session: &AgentSession,
-        start_index: usize,
-    ) -> Result<(), String> {
-        let path = match &session.session_path {
-            Some(p) => std::path::PathBuf::from(p),
-            None => return Err("No session path".to_string()),
-        };
-        let new_messages: Vec<&Message> = session.messages.iter().skip(start_index).collect();
-        if new_messages.is_empty() {
-            return Ok(());
-        }
-        let mut content = String::new();
-        for msg in new_messages {
-            let entry: SessionEntry = msg.into();
-            let line =
-                serde_json::to_string(&entry).map_err(|e| format!("Serialize message: {}", e))?;
-            content.push_str(&line);
-            content.push('\n');
-        }
-        let mut file_content = tokio::fs::read_to_string(&path).await.unwrap_or_default();
-        file_content.push_str(&content);
-        tokio::fs::write(&path, &file_content)
-            .await
-            .map_err(|e| format!("Write messages: {}", e))?;
-        Ok(())
     }
 
     pub async fn insert_session(&self, session: AgentSession) {
@@ -185,19 +138,57 @@ impl SessionManager {
         system_prompt: String,
         tools: Vec<AgentTool>,
     ) -> (String, String) {
-        let id = uuid::Uuid::now_v7().to_string();
-        let mut session = AgentSession::new(id.clone(), model_id, provider, system_prompt, tools);
-        let title = session.title.clone();
-        match self.write_header_and_info(&session).await {
-            Ok(path) => {
-                session.session_path = Some(path);
+        match AgentSessionManager::create(
+            self.cwd.clone(),
+            Some(self.session_dir.clone()),
+            Some(model_id.clone()),
+            Some(provider.clone()),
+        )
+        .await
+        {
+            Ok(agent) => {
+                let id = agent
+                    .header()
+                    .map(|h| h.id.clone())
+                    .unwrap_or_else(|| uuid::Uuid::now_v7().to_string());
+                let title = agent.get_session_name().unwrap_or("Session").to_string();
+                let path = agent
+                    .session_path()
+                    .map(|p| p.to_string_lossy().to_string());
+                let session = AgentSession {
+                    id: id.clone(),
+                    title: title.clone(),
+                    model_id,
+                    provider,
+                    system_prompt,
+                    tools,
+                    messages: Vec::new(),
+                    created_at: agent.header().map(|h| h.created_at).unwrap_or_default(),
+                    updated_at: agent.header().map(|h| h.updated_at).unwrap_or_default(),
+                    status: "idle".to_string(),
+                    fork_parent_id: None,
+                    session_path: path,
+                    persisted_messages_count: 0,
+                };
+                self.sessions.write().await.insert(id.clone(), session);
+                (id, title)
             }
             Err(e) => {
-                error!("Failed to persist session {}: {}", id, e);
+                error!("Failed to create session: {}", e);
+                let id = uuid::Uuid::now_v7().to_string();
+                let title = format!("Session - {}", chrono::Utc::now().format("%Y-%m-%d %H:%M"));
+                let session = AgentSession::new(
+                    id.clone(),
+                    title.clone(),
+                    model_id,
+                    provider,
+                    system_prompt,
+                    tools,
+                );
+                self.sessions.write().await.insert(id.clone(), session);
+                (id, title)
             }
         }
-        self.sessions.write().await.insert(id.clone(), session);
-        (id, title)
     }
 
     pub async fn get(&self, id: &str) -> Option<AgentSession> {
@@ -211,38 +202,53 @@ impl SessionManager {
             let prev_count = s.persisted_messages_count;
             s.messages = messages;
             s.updated_at = chrono::Utc::now().timestamp_millis();
-            if s.session_path.is_some() {
-                let session_copy = s.clone();
-                drop(sessions);
-                if let Err(e) = self
-                    .append_messages_to_disk(&session_copy, prev_count)
-                    .await
-                {
-                    error!("Failed to persist messages for session {}: {}", id, e);
-                }
-                let mut sessions = self.sessions.write().await;
-                if let Some(s) = sessions.get_mut(id) {
-                    s.persisted_messages_count = s.messages.len();
+
+            // Persist new messages via agent if we have a path
+            if let Some(path) = s.session_path.clone() {
+                let new_msgs: Vec<Message> = s.messages[prev_count..].to_vec();
+                if !new_msgs.is_empty() {
+                    drop(sessions);
+                    self.append_messages_to_jsonl(&path, &new_msgs).await;
+                    let mut sessions = self.sessions.write().await;
+                    if let Some(s) = sessions.get_mut(id) {
+                        s.persisted_messages_count = s.messages.len();
+                    }
+                    return;
                 }
             }
+            // No path or no new messages, just update count
+            s.persisted_messages_count = s.messages.len();
         }
     }
 
+    async fn append_messages_to_jsonl(&self, path: &str, messages: &[Message]) {
+        let path = PathBuf::from(path);
+
+        // Load existing content then append new entries
+        let mut content = tokio::fs::read_to_string(&path).await.unwrap_or_default();
+        for msg in messages {
+            let entry: SessionEntry = msg.into();
+            if let Ok(line) = serde_json::to_string(&entry) {
+                content.push_str(&line);
+                content.push('\n');
+            }
+        }
+        let _ = tokio::fs::write(&path, &content).await;
+    }
+
     pub async fn delete(&self, id: &str) -> bool {
-        let path = {
-            let sessions = self.sessions.read().await;
-            sessions.get(id).and_then(|s| s.session_path.clone())
-        };
-        // Remove from memory
-        let removed = self.sessions.write().await.remove(id).is_some();
         // Remove file from disk
-        if let Some(p) = path {
-            let p = std::path::PathBuf::from(&p);
-            if p.exists() {
+        {
+            let sessions = self.sessions.read().await;
+            if let Some(s) = sessions.get(id)
+                && let Some(path) = &s.session_path
+            {
+                let p = PathBuf::from(path);
                 let _ = tokio::fs::remove_file(&p).await;
             }
         }
-        removed
+        // Remove from memory
+        self.sessions.write().await.remove(id).is_some()
     }
 
     pub async fn list(&self) -> Vec<String> {
@@ -263,10 +269,24 @@ impl SessionManager {
         model_id: Option<String>,
         provider: Option<String>,
     ) -> bool {
+        // For title persistence, we need the path before locking
+        let needs_persist = if title.is_some() {
+            let sessions = self.sessions.read().await;
+            sessions.get(id).and_then(|s| s.session_path.clone())
+        } else {
+            None
+        };
+
         let mut sessions = self.sessions.write().await;
         if let Some(s) = sessions.get_mut(id) {
             if let Some(t) = title {
-                s.title = t;
+                s.title = t.clone();
+                s.updated_at = chrono::Utc::now().timestamp_millis();
+                if let Some(path) = needs_persist {
+                    drop(sessions);
+                    self.append_session_info_to_jsonl(&path, &t).await;
+                    return true;
+                }
             }
             if let Some(m) = model_id {
                 s.model_id = m;
@@ -281,38 +301,89 @@ impl SessionManager {
         }
     }
 
-    pub async fn fork(&self, id: &str) -> Option<(String, String)> {
-        let sessions = self.sessions.read().await;
-        let source = sessions.get(id)?;
-        let new_id = uuid::Uuid::now_v7().to_string();
-        let now = chrono::Utc::now().timestamp_millis();
-        let title = format!("{} (fork)", source.title);
-        let mut forked = AgentSession {
-            id: new_id.clone(),
-            title: title.clone(),
-            model_id: source.model_id.clone(),
-            provider: source.provider.clone(),
-            system_prompt: source.system_prompt.clone(),
-            tools: source.tools.clone(),
-            messages: source.messages.clone(),
-            created_at: now,
-            updated_at: now,
-            status: "idle".to_string(),
-            fork_parent_id: Some(source.id.clone()),
-            session_path: None,
-            persisted_messages_count: 0,
+    async fn append_session_info_to_jsonl(&self, path: &str, name: &str) {
+        let entry = SessionEntry {
+            id: uuid::Uuid::now_v7().to_string(),
+            parent_id: None,
+            timestamp: chrono::Utc::now().timestamp_millis(),
+            kind: SessionEntryKind::SessionInfo(SessionInfoEntry {
+                name: name.to_string(),
+            }),
         };
-        drop(sessions);
-        match self.write_header_and_info(&forked).await {
-            Ok(path) => {
-                forked.session_path = Some(path);
+        let mut content = tokio::fs::read_to_string(path).await.unwrap_or_default();
+        if let Ok(line) = serde_json::to_string(&entry) {
+            content.push_str(&line);
+            content.push('\n');
+        }
+        let _ = tokio::fs::write(path, &content).await;
+    }
+
+    pub async fn fork(&self, id: &str) -> Option<(String, String)> {
+        let (
+            source_path,
+            title,
+            model_id,
+            provider,
+            system_prompt,
+            tools,
+            source_messages,
+            source_id,
+        ) = {
+            let sessions = self.sessions.read().await;
+            let source = sessions.get(id)?;
+            (
+                source.session_path.clone()?,
+                format!("{} (fork)", source.title),
+                source.model_id.clone(),
+                source.provider.clone(),
+                source.system_prompt.clone(),
+                source.tools.clone(),
+                source.messages.clone(),
+                source.id.clone(),
+            )
+        };
+
+        let msg_count = source_messages.len();
+        match AgentSessionManager::fork_from(
+            PathBuf::from(&source_path),
+            self.cwd.clone(),
+            Some(model_id.clone()),
+            Some(provider.clone()),
+        )
+        .await
+        {
+            Ok(agent) => {
+                let new_id = agent
+                    .header()
+                    .map(|h| h.id.clone())
+                    .unwrap_or_else(|| uuid::Uuid::now_v7().to_string());
+                let path = agent
+                    .session_path()
+                    .map(|p| p.to_string_lossy().to_string());
+                let now = chrono::Utc::now().timestamp_millis();
+                let session = AgentSession {
+                    id: new_id.clone(),
+                    title: title.clone(),
+                    model_id,
+                    provider,
+                    system_prompt,
+                    tools,
+                    messages: source_messages.clone(),
+                    created_at: now,
+                    updated_at: now,
+                    status: "idle".to_string(),
+                    fork_parent_id: Some(source_id),
+                    session_path: path,
+                    persisted_messages_count: msg_count,
+                };
+                self.sessions.write().await.insert(new_id.clone(), session);
+                Some((new_id, title))
             }
             Err(e) => {
-                error!("Failed to persist forked session {}: {}", new_id, e);
+                error!("Failed to fork session {}: {}", id, e);
+                None
             }
         }
-        self.sessions.write().await.insert(new_id.clone(), forked);
-        Some((new_id, title))
     }
 
     pub async fn set_status(&self, id: &str, status: &str) -> bool {
@@ -321,6 +392,25 @@ impl SessionManager {
             s.status = status.to_string();
             s.updated_at = chrono::Utc::now().timestamp_millis();
             true
+        } else {
+            false
+        }
+    }
+
+    /// Compact the session JSONL file on disk by removing non-essential entries
+    /// (compaction summaries, labels, etc.) while preserving message history.
+    pub async fn compact_session(&self, id: &str) -> bool {
+        let path = {
+            let sessions = self.sessions.read().await;
+            sessions.get(id).and_then(|s| s.session_path.clone())
+        };
+        if let Some(path) = path {
+            let agent_mgr = AgentSessionManager::open(PathBuf::from(path), PathBuf::new()).await;
+            if let Ok(mgr) = agent_mgr {
+                mgr.compact().await.is_ok()
+            } else {
+                false
+            }
         } else {
             false
         }

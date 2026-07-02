@@ -1,13 +1,13 @@
-import { Search, Puzzle, Settings, MessageSquarePlus, Pin } from "lucide-react";
+import { Puzzle, Settings, MessageSquarePlus, Pin, PinOff } from "lucide-react";
 import { ThemeModeToggle } from "../ThemeModeToggle";
 import { SessionList } from "./SessionList";
 
 interface LeftPanelProps {
   onNewSession: () => void;
-  onSearch: () => void;
   onPlugins: () => void;
   onSettings: () => void;
-  onToggleSidebar?: () => void;
+  pinned?: boolean;
+  onTogglePinned?: () => void;
   connected: boolean;
   activeSessionId: string | null;
   onSelectSession: (id: string) => void;
@@ -18,10 +18,10 @@ interface LeftPanelProps {
 
 export function LeftPanel({
   onNewSession,
-  onSearch,
   onPlugins,
   onSettings,
-  onToggleSidebar,
+  pinned,
+  onTogglePinned,
   connected,
   activeSessionId,
   onSelectSession,
@@ -40,13 +40,6 @@ export function LeftPanel({
           <MessageSquarePlus className="w-5 h-5" />
         </button>
         <button
-          onClick={onSearch}
-          title="Search Sessions"
-          className="p-2 rounded-md hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 transition-colors"
-        >
-          <Search className="w-5 h-5" />
-        </button>
-        <button
           onClick={onPlugins}
           title="Plugins"
           className="p-2 rounded-md hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 transition-colors"
@@ -54,13 +47,13 @@ export function LeftPanel({
           <Puzzle className="w-5 h-5" />
         </button>
         <ThemeModeToggle />
-        {onToggleSidebar && (
+        {onTogglePinned && (
           <button
-            onClick={onToggleSidebar}
-            title="Close sidebar"
+            onClick={onTogglePinned}
+            title={pinned ? "Auto-close" : "Keep open"}
             className="p-2 rounded-md hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 transition-colors"
           >
-            <Pin className="w-5 h-5" />
+            {pinned ? <Pin className="w-5 h-5" /> : <PinOff className="w-5 h-5" />}
           </button>
         )}
       </div>

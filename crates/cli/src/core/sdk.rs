@@ -84,7 +84,7 @@ pub async fn create_agent_session(
         None => {
             let session_dir = get_default_session_dir(&cwd, &agent_dir);
             let cwd_path = std::path::PathBuf::from(&cwd);
-            SessionManager::create(cwd_path, Some(session_dir))
+            SessionManager::create(cwd_path, Some(session_dir), None, None)
                 .await
                 .unwrap_or_else(|e| panic!("Failed to create session: {}", e))
         }

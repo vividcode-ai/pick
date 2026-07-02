@@ -114,7 +114,7 @@ pub async fn create_session_manager(
     }
 
     // Create new session
-    SessionManager::create(cwd.clone(), session_dir)
+    SessionManager::create(cwd.clone(), session_dir, None, None)
         .await
         .map_err(|e| format!("Failed to create session: {}", e))
 }
@@ -147,7 +147,7 @@ async fn fork_session(
         }
     };
 
-    SessionManager::fork_from(source_path, cwd.clone())
+    SessionManager::fork_from(source_path, cwd.clone(), None, None)
         .await
         .map_err(|e| format!("Failed to fork session: {}", e))
 }

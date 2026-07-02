@@ -406,7 +406,7 @@ pub(crate) async fn handle_import(ctx: &mut TuiContext, args: &[String]) {
                             path
                         ));
                     } else {
-                        match SessionManager::create(cwd, Some(session_dir)).await {
+                        match SessionManager::create(cwd, Some(session_dir), None, None).await {
                             Ok(mut sess) => {
                                 for msg in &msgs {
                                     let _ = sess.append(SessionEntry::from(msg)).await;

@@ -500,7 +500,7 @@ pub async fn run_interactive_mode(
                             let idx = n - 1;
                             let cwd = std::env::current_dir().unwrap_or_default();
                             let session_dir = cwd.join(".pick").join("sessions");
-                            match SessionManager::create(cwd, Some(session_dir)).await {
+                            match SessionManager::create(cwd, Some(session_dir), None, None).await {
                                 Ok(mut new_mgr) => {
                                     let fork_msgs: Vec<Message> = all_messages[..=idx].to_vec();
                                     for msg in &fork_msgs {

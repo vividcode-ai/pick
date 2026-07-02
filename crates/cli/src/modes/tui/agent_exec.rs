@@ -7,7 +7,6 @@ use pick_agent::extensions::types::{
     ExtensionEvent, SessionBeforeCompactEvent, SessionCompactEvent,
 };
 use pick_agent::session::{CompactionEntry, SessionEntry, SessionEntryKind};
-use pick_ai::Context;
 use pick_ai::types::{ContentBlock, Message, UserMessage};
 use tokio::sync::mpsc;
 
@@ -384,140 +383,17 @@ pub(crate) fn spawn_title_generation(
     cmd_tx: mpsc::UnboundedSender<TuiCommand>,
     model: pick_ai::types::Model,
     api_key: Option<String>,
-    title_prompt: String,
 ) {
     tokio::spawn(async move {
         let send_title = |t: String| {
             let _ = cmd_tx.send(TuiCommand::SetSessionTitle(t));
         };
 
-        async fn call_provider(
-            mdl: &pick_ai::types::Model,
-            api_key: Option<String>,
-            ctx: Context,
-        ) -> (String, Option<String>) {
-            let registry = pick_ai::registry::global_registry();
-            let provider = match registry.get(mdl.api.as_str()) {
-                Some(p) => p,
-                None => {
-                    return (
-                        String::new(),
-                        Some(format!("no provider for {}", mdl.api.as_str())),
-                    );
-                }
-            };
-            let stream_options = pick_ai::StreamOptions {
-                temperature: None,
-                max_tokens: Some(100),
-                api_key,
-                transport: None,
-                cache_retention: None,
-                session_id: None,
-                headers: None,
-                timeout_ms: None,
-                max_retries: Some(3),
-                max_retry_delay_ms: None,
-                thinking_budget: None,
-                reasoning: None,
-                metadata: None,
-                signal: None,
-            };
-            let mut rx = (provider.stream)(mdl.clone(), ctx, Some(stream_options));
-            let mut text = String::new();
-            let mut error = None;
-            while let Some(event) = rx.recv().await {
-                match event {
-                    pick_ai::StreamEvent::Done { message, .. } => {
-                        for block in message.content {
-                            if let ContentBlock::Text(t) = block {
-                                text.push_str(&t.text);
-                            }
-                        }
-                        break;
-                    }
-                    pick_ai::StreamEvent::Error { error: e, .. } => {
-                        error = Some(
-                            e.error_message
-                                .unwrap_or_else(|| "unknown error".to_string()),
-                        );
-                        break;
-                    }
-                    _ => {}
-                }
-            }
-            (text, error)
+        let title = pick_agent::session::title::generate_title(&title_text, &model, api_key).await;
+
+        if let Some(t) = title {
+            send_title(t);
         }
-
-        fn clean_title(text: &str) -> Option<String> {
-            text.lines()
-                .filter_map(|l| {
-                    let trimmed = l.trim();
-                    if trimmed.is_empty() || trimmed.starts_with('<') {
-                        None
-                    } else {
-                        Some(
-                            trimmed
-                                .trim_matches('"')
-                                .trim_matches('\'')
-                                .trim()
-                                .to_string(),
-                        )
-                    }
-                })
-                .next()
-                .filter(|l| !l.is_empty())
-                .map(|l| {
-                    if l.len() > 100 {
-                        crate::utils::truncate_utf8(&l, 97)
-                    } else {
-                        l
-                    }
-                })
-        }
-
-        // Attempt 1: system_prompt + same-language instruction
-        let ctx1 = Context {
-            system_prompt: Some(title_prompt.clone()),
-            messages: vec![
-                UserMessage::text(format!(
-                    "Generate a title in the SAME LANGUAGE as the user message below. \
-                 Only output the title, nothing else.\n\n{}",
-                    title_text
-                ))
-                .into(),
-            ],
-            tools: None,
-        };
-        let (resp1, _err1) = call_provider(&model, api_key.clone(), ctx1).await;
-        let mut title = clean_title(&resp1);
-
-        // Attempt 2: if still no title, try user-message-only
-        if title.is_none() {
-            let ctx2 = Context {
-                system_prompt: None,
-                messages: vec![
-                    UserMessage::text(format!(
-                        "Generate a very short title in the SAME LANGUAGE as the user message. \
-                     Max 40 characters, no quotes, no explanation.\n\n{}",
-                        title_text
-                    ))
-                    .into(),
-                ],
-                tools: None,
-            };
-            let (resp2, _err2) = call_provider(&model, api_key, ctx2).await;
-            title = clean_title(&resp2);
-        }
-
-        let final_title = title.unwrap_or_else(|| {
-            if title_text.len() > 50 {
-                crate::utils::truncate_utf8(&title_text, 47)
-            } else {
-                title_text
-            }
-        });
-
-        send_title(final_title);
     });
 }
 

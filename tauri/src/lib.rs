@@ -34,6 +34,7 @@ fn run_desktop() {
                     host: "127.0.0.1".to_string(),
                     port,
                     pty_ws_port: 9000,
+                    cwd: None,
                 };
 
                 tokio::spawn(async move {

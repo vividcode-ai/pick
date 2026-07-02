@@ -156,7 +156,7 @@ pub(crate) async fn handle_fork(ctx: &mut TuiContext, idx: usize) {
         }));
     }
 
-    match SessionManager::create(cwd.clone(), Some(session_dir)).await {
+    match SessionManager::create(cwd.clone(), Some(session_dir), None, None).await {
         Ok(mut new_mgr) => {
             let fork_msgs: Vec<Message> =
                 ctx.all_messages[..=idx.min(ctx.all_messages.len().saturating_sub(1))].to_vec();
@@ -263,7 +263,7 @@ pub(crate) async fn handle_clone(ctx: &mut TuiContext) {
 
     let cwd = std::env::current_dir().unwrap_or_default();
     let session_dir = cwd.join(".pick").join("sessions");
-    match SessionManager::create(cwd.clone(), Some(session_dir)).await {
+    match SessionManager::create(cwd.clone(), Some(session_dir), None, None).await {
         Ok(mut new_mgr) => {
             let msg_count = ctx.all_messages.len();
             for msg in &ctx.all_messages {
@@ -291,7 +291,7 @@ pub(crate) async fn handle_new_session(ctx: &mut TuiContext) {
         .map(|(w, _)| w as usize)
         .unwrap_or(80);
 
-    match SessionManager::create(cwd, Some(session_dir)).await {
+    match SessionManager::create(cwd, Some(session_dir), None, None).await {
         Ok(new_mgr) => {
             ctx.all_messages.clear();
             ctx.tui.chat.clear();

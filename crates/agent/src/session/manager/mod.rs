@@ -30,7 +30,12 @@ pub struct SessionManager {
 
 impl SessionManager {
     /// Create a new session in the given directory
-    pub async fn create(cwd: PathBuf, session_dir: Option<PathBuf>) -> Result<Self, StorageError> {
+    pub async fn create(
+        cwd: PathBuf,
+        session_dir: Option<PathBuf>,
+        model: Option<String>,
+        provider: Option<String>,
+    ) -> Result<Self, StorageError> {
         let dir = session_dir
             .clone()
             .unwrap_or_else(|| cwd.join(".pick").join("sessions"));
@@ -45,8 +50,8 @@ impl SessionManager {
             created_at: chrono::Utc::now().timestamp_millis(),
             updated_at: chrono::Utc::now().timestamp_millis(),
             cwd: Some(cwd.to_string_lossy().to_string()),
-            model: None,
-            provider: None,
+            model,
+            provider,
         };
         storage.save_header(header.clone()).await?;
 
@@ -72,6 +77,16 @@ impl SessionManager {
             label_timestamps_by_id: HashMap::new(),
             goal_manager: Arc::new(GoalManager::new()),
         })
+    }
+
+    /// Delete the session file from disk
+    pub fn delete_file(&self) -> Result<(), StorageError> {
+        if let Some(path) = &self.session_path
+            && path.exists()
+        {
+            std::fs::remove_file(path)?;
+        }
+        Ok(())
     }
 
     /// Rebuild label index from all Label entries
@@ -131,7 +146,12 @@ impl SessionManager {
     }
 
     /// Fork a session from an existing one
-    pub async fn fork_from(source_path: PathBuf, cwd: PathBuf) -> Result<Self, StorageError> {
+    pub async fn fork_from(
+        source_path: PathBuf,
+        cwd: PathBuf,
+        model: Option<String>,
+        provider: Option<String>,
+    ) -> Result<Self, StorageError> {
         let source_storage = JsonlStorage::new(source_path);
         let header = source_storage.load_header().await?;
         let entries = source_storage.load().await?;
@@ -142,8 +162,8 @@ impl SessionManager {
             created_at: chrono::Utc::now().timestamp_millis(),
             updated_at: chrono::Utc::now().timestamp_millis(),
             cwd: Some(cwd.to_string_lossy().to_string()),
-            model: None,
-            provider: None,
+            model,
+            provider,
         });
         new_header.id = uuid::Uuid::now_v7().to_string();
         new_header.cwd = Some(cwd.to_string_lossy().to_string());
@@ -603,6 +623,17 @@ impl SessionManager {
         }
 
         result
+    }
+
+    /// Compact the session JSONL by removing non-essential entries.
+    /// Delegates to `JsonlStorage::compact()`.
+    pub async fn compact(&self) -> Result<(), StorageError> {
+        if let Some(path) = &self.session_path {
+            let storage = JsonlStorage::new(path.clone());
+            storage.compact().await
+        } else {
+            Ok(())
+        }
     }
 
     /// Generate a forked title by appending `(fork #N)` suffix

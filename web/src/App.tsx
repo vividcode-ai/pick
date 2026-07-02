@@ -42,6 +42,7 @@ async function detectBaseUrl(): Promise<string> {
 export default function App() {
   const [baseUrl, setBaseUrl] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarPinned, setSidebarPinned] = useState(true);
   const [settingsUrl, setSettingsUrl] = useState("");
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [selectedModel, setSelectedModel] = useState("");
@@ -238,12 +239,13 @@ export default function App() {
       <Layout
         sidebarOpen={sidebarOpen}
         onToggleSidebar={() => setSidebarOpen((v) => !v)}
+        sidebarPinned={sidebarPinned}
+        onToggleSidebarPinned={() => setSidebarPinned((v) => !v)}
         rightPanelDiffs={[]}
         connected={activeConnected}
         leftPanel={
           <LeftPanel
             onNewSession={handleNewSession}
-            onSearch={() => {}}
             onPlugins={() => {}}
             onSettings={() => openSettings()}
             connected={activeConnected}
@@ -252,7 +254,8 @@ export default function App() {
             onRenameSession={handleRenameSession}
             onDeleteSession={handleDeleteSession}
             streamingSessions={streamingSessions}
-            onToggleSidebar={() => setSidebarOpen((v) => !v)}
+            pinned={sidebarPinned}
+            onTogglePinned={() => setSidebarPinned((v) => !v)}
           />
         }
       >

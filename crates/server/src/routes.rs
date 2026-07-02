@@ -58,9 +58,6 @@ pub async fn ask(
     State(state): State<Arc<AppState>>,
     Json(req): Json<AskRequest>,
 ) -> impl IntoResponse {
-    // Lazy-load messages from disk if needed
-    state.ensure_session_messages(&req.session_id).await;
-
     let session = match state.session_manager.get(&req.session_id).await {
         Some(s) => s,
         None => {
@@ -272,6 +269,33 @@ pub async fn ask(
                     .session_manager
                     .update_messages(&sid_agent, agent_result.messages)
                     .await;
+
+                // Auto-generate session title from first user message
+                let session = state_agent.session_manager.get(&sid_agent).await;
+                if let Some(session) = session {
+                    let is_default = session.title.starts_with("New session -")
+                        || session.title.starts_with("Session -");
+                    if is_default
+                        && let Some(first_text) =
+                            pick_agent::session::title::first_user_text(&session.messages)
+                        && let Some(model) =
+                            pick_ai::models::get_model(&session.provider, &session.model_id)
+                    {
+                        let api_key = state_agent.api_keys.get(&session.provider).cloned();
+                        let title = pick_agent::session::title::generate_title(
+                            &first_text,
+                            &model,
+                            api_key,
+                        )
+                        .await;
+                        if let Some(t) = title {
+                            state_agent
+                                .session_manager
+                                .update_session(&sid_agent, Some(t), None, None)
+                                .await;
+                        }
+                    }
+                }
             }
             Err(e) => {
                 error!("Agent loop error for session {}: {}", sid_agent, e);

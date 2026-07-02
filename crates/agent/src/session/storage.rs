@@ -108,6 +108,84 @@ impl SessionStorage for JsonlStorage {
     }
 }
 
+impl JsonlStorage {
+    /// Compact the JSONL file by removing non-essential entries
+    /// while preserving the conversation tree structure.
+    ///
+    /// Keeps: Message, SessionInfo, LeafChange, Goal entries.
+    /// Removes: Compaction, BranchSummary, Label, ModelChange, etc.
+    ///
+    /// For entries whose parent_id points to a removed entry, the parent_id
+    /// is re-wired to the nearest kept ancestor (or None if none exists).
+    pub async fn compact(&self) -> Result<(), StorageError> {
+        let entries = self.load().await?;
+        let header = self.load_header().await?;
+
+        use super::entries::SessionEntryKind;
+        fn is_essential(kind: &SessionEntryKind) -> bool {
+            matches!(
+                kind,
+                SessionEntryKind::Message(_)
+                    | SessionEntryKind::SessionInfo(_)
+                    | SessionEntryKind::LeafChange(_)
+                    | SessionEntryKind::Goal(_)
+            )
+        }
+
+        let mut kept: Vec<super::entries::SessionEntry> = entries
+            .iter()
+            .filter(|e| is_essential(&e.kind))
+            .cloned()
+            .collect();
+
+        let kept_ids: std::collections::HashSet<String> =
+            kept.iter().map(|e| e.id.clone()).collect();
+
+        let parent_map: std::collections::HashMap<String, Option<String>> = entries
+            .iter()
+            .map(|e| (e.id.clone(), e.parent_id.clone()))
+            .collect();
+
+        fn find_kept_ancestor(
+            id: &str,
+            kept_ids: &std::collections::HashSet<String>,
+            parent_map: &std::collections::HashMap<String, Option<String>>,
+        ) -> Option<String> {
+            let mut current = parent_map.get(id)?.as_ref()?.clone();
+            loop {
+                if kept_ids.contains(&current) {
+                    return Some(current);
+                }
+                current = parent_map.get(&current)?.as_ref()?.clone();
+            }
+        }
+
+        for entry in &mut kept {
+            if let Some(ref pid) = entry.parent_id
+                && !kept_ids.contains(pid)
+            {
+                entry.parent_id = find_kept_ancestor(pid, &kept_ids, &parent_map);
+            }
+        }
+
+        let mut content = String::new();
+        if let Some(ref h) = header
+            && let Ok(line) = serde_json::to_string(h)
+        {
+            content.push_str(&line);
+            content.push('\n');
+        }
+        for entry in &kept {
+            if let Ok(line) = serde_json::to_string(entry) {
+                content.push_str(&line);
+                content.push('\n');
+            }
+        }
+        tokio::fs::write(&self.path, content).await?;
+        Ok(())
+    }
+}
+
 /// In-memory session storage (for testing)
 pub struct MemoryStorage {
     entries: Arc<Mutex<Vec<SessionEntry>>>,

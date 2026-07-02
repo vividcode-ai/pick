@@ -577,7 +577,6 @@ async fn handle_submit(ctx: &mut TuiContext, user_text: String) {
             ctx.cmd_tx.clone(),
             ctx.model.clone(),
             api_key,
-            include_str!("../../title_prompt.txt").to_string(),
         );
     }
 
