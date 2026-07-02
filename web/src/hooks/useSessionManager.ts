@@ -5,6 +5,7 @@ import type {
   ToolStartPayload,
   ToolEndPayload,
 } from "../types/events";
+import { renameSessionEntry } from "../stores/sessions";
 
 interface ServerContentBlock {
   type: string;
@@ -160,7 +161,8 @@ export function useSessionManager(baseUrl: string) {
     cancelEvictionTimer(id);
     setActiveSessionId(id);
 
-    if (evictedSessionsRef.current.has(id)) {
+    const needsMessages = evictedSessionsRef.current.has(id) || !sessionDataRef.current[id];
+    if (needsMessages) {
       try {
         const res = await fetch(`${baseUrl}/sessions/${id}/messages?limit=1000`);
         if (res.ok) {
@@ -427,13 +429,20 @@ export function useSessionManager(baseUrl: string) {
       });
     });
 
-    eventSource.addEventListener("agent_end", () => {
+    eventSource.addEventListener("agent_end", (e) => {
       turnEndMessageCount = -1;
       updateSession(sessionId, (prev) => ({ ...prev, streaming: false }));
       if (sessionId !== activeSessionIdRef.current) {
         startEvictionTimer(sessionId);
       }
       eventSource.close();
+
+      try {
+        const data = JSON.parse(e.data);
+        if (data.title) {
+          renameSessionEntry(sessionId, data.title);
+        }
+      } catch {}
     });
 
     eventSource.addEventListener("error", () => {

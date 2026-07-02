@@ -259,43 +259,53 @@ pub async fn ask(
                     })
                     .sum();
 
-                let agent_end_event = events::serialize_agent_end(total_input, total_output);
-                let sse_event = Event::default()
-                    .event(&agent_end_event.event_type)
-                    .data(serde_json::to_string(&agent_end_event.payload).unwrap_or_default());
-                let _ = et_agent.send(Ok(sse_event));
-
                 state_agent
                     .session_manager
                     .update_messages(&sid_agent, agent_result.messages)
                     .await;
 
                 // Auto-generate session title from first user message
-                let session = state_agent.session_manager.get(&sid_agent).await;
-                if let Some(session) = session {
-                    let is_default = session.title.starts_with("New session -")
-                        || session.title.starts_with("Session -");
-                    if is_default
-                        && let Some(first_text) =
-                            pick_agent::session::title::first_user_text(&session.messages)
-                        && let Some(model) =
-                            pick_ai::models::get_model(&session.provider, &session.model_id)
-                    {
-                        let api_key = state_agent.api_keys.get(&session.provider).cloned();
-                        let title = pick_agent::session::title::generate_title(
-                            &first_text,
-                            &model,
-                            api_key,
-                        )
-                        .await;
-                        if let Some(t) = title {
-                            state_agent
-                                .session_manager
-                                .update_session(&sid_agent, Some(t), None, None)
-                                .await;
+                let generated_title = {
+                    let session = state_agent.session_manager.get(&sid_agent).await;
+                    if let Some(session) = session {
+                        let is_default = session.title.starts_with("New session -")
+                            || session.title.starts_with("Session -");
+                        if is_default
+                            && let Some(first_text) =
+                                pick_agent::session::title::first_user_text(&session.messages)
+                            && let Some(model) =
+                                pick_ai::models::get_model(&session.provider, &session.model_id)
+                        {
+                            let api_key = state_agent.api_keys.get(&session.provider).cloned();
+                            let title = pick_agent::session::title::generate_title(
+                                &first_text,
+                                &model,
+                                api_key,
+                            )
+                            .await;
+                            if let Some(t) = title {
+                                state_agent
+                                    .session_manager
+                                    .update_session(&sid_agent, Some(t.clone()), None, None)
+                                    .await;
+                                Some(t)
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
                         }
+                    } else {
+                        None
                     }
-                }
+                };
+
+                let agent_end_event =
+                    events::serialize_agent_end(total_input, total_output, generated_title);
+                let sse_event = Event::default()
+                    .event(&agent_end_event.event_type)
+                    .data(serde_json::to_string(&agent_end_event.payload).unwrap_or_default());
+                let _ = et_agent.send(Ok(sse_event));
             }
             Err(e) => {
                 error!("Agent loop error for session {}: {}", sid_agent, e);

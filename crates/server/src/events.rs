@@ -53,6 +53,8 @@ pub struct UsagePayload {
 #[derive(Debug, Clone, Serialize)]
 pub struct AgentEndPayload {
     pub usage: UsagePayload,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -187,7 +189,7 @@ pub fn serialize_event(event: &AgentEvent) -> Vec<WsEvent> {
     }
 }
 
-pub fn serialize_agent_end(usage_input: u64, usage_output: u64) -> WsEvent {
+pub fn serialize_agent_end(usage_input: u64, usage_output: u64, title: Option<String>) -> WsEvent {
     WsEvent {
         event_type: "agent_end".to_string(),
         payload: serde_json::to_value(AgentEndPayload {
@@ -195,6 +197,7 @@ pub fn serialize_agent_end(usage_input: u64, usage_output: u64) -> WsEvent {
                 input: usage_input,
                 output: usage_output,
             },
+            title,
         })
         .unwrap_or_default(),
     }
