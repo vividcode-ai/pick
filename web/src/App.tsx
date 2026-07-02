@@ -6,7 +6,7 @@ import { ChatInput } from "./components/Chat/ChatInput";
 import { CommandPalette } from "./components/CommandPalette";
 import { SettingsScreen } from "./components/Settings/SettingsScreen";
 import { useTheme } from "./lib/ThemeProvider";
-import { useSSE, fetchProviders } from "./hooks/useSSE";
+import { useSessionManager, fetchProviders } from "./hooks/useSessionManager";
 import { useCommandPalette } from "./hooks/useCommandPalette";
 import {
   registerDefaultCommands,
@@ -47,7 +47,6 @@ export default function App() {
   const [selectedModel, setSelectedModel] = useState("");
   const [selectedProvider, setSelectedProvider] = useState("");
   const [thinkingLevel, setThinkingLevel] = useState("off");
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const { cycleThemeMode } = useTheme();
 
   useEffect(() => {
@@ -88,28 +87,29 @@ export default function App() {
   }, [baseUrl]);
 
   const {
-    messages,
-    streaming,
-    connected,
-    sessionId,
+    activeSessionId,
+    activeMessages,
+    activeStreaming,
+    activeConnected,
+    streamingSessions,
     createSession,
     switchSession,
     ask,
     cancel,
-  } = useSSE(baseUrl ?? "");
+    deleteSession,
+    forkSession,
+  } = useSessionManager(baseUrl ?? "");
 
   const pendingSendRef = useRef<string | null>(null);
 
-  // Flush pending send when sessionId becomes available
   useEffect(() => {
-    if (sessionId && pendingSendRef.current !== null) {
+    if (activeSessionId && pendingSendRef.current !== null) {
       const text = pendingSendRef.current;
       pendingSendRef.current = null;
       ask(text, thinkingLevel === "off" ? undefined : thinkingLevel);
     }
-  }, [sessionId, ask, thinkingLevel]);
+  }, [activeSessionId, ask, thinkingLevel]);
 
-  // Register commands
   useEffect(() => {
     registerDefaultCommands({
       newSession: () => {
@@ -121,20 +121,13 @@ export default function App() {
     });
   }, [createSession, selectedModel, selectedProvider, cycleThemeMode]);
 
-  // Track active session
-  useEffect(() => {
-    if (sessionId) {
-      setActiveSessionId(sessionId);
-    }
-  }, [sessionId]);
-
   const handleSend = useCallback(
     (text: string) => {
-      if (!sessionId) {
+      if (!activeSessionId) {
         pendingSendRef.current = text;
-        createSession(selectedModel, selectedProvider).then((id) => {
-          if (id) {
-            addSessionEntry(id);
+        createSession(selectedModel, selectedProvider).then((result) => {
+          if (result) {
+            addSessionEntry(result.id, result.title);
           } else {
             pendingSendRef.current = null;
           }
@@ -143,33 +136,32 @@ export default function App() {
         ask(text, thinkingLevel === "off" ? undefined : thinkingLevel);
       }
     },
-    [sessionId, createSession, selectedModel, selectedProvider, ask, thinkingLevel]
+    [activeSessionId, createSession, selectedModel, selectedProvider, ask, thinkingLevel]
   );
 
   const handleModelChange = useCallback((modelId: string, provider: string) => {
     setSelectedModel(modelId);
     setSelectedProvider(provider);
     cancel();
-    if (sessionId && baseUrl) {
-      fetch(`${baseUrl}/sessions/${sessionId}`, {
+    if (activeSessionId && baseUrl) {
+      fetch(`${baseUrl}/sessions/${activeSessionId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ model_id: modelId, provider }),
       }).catch(() => {});
     }
-  }, [sessionId, baseUrl, cancel]);
+  }, [activeSessionId, baseUrl, cancel]);
 
   const handleNewSession = useCallback(() => {
-    createSession(selectedModel, selectedProvider).then((id) => {
-      if (id) {
-        addSessionEntry(id);
+    createSession(selectedModel, selectedProvider).then((result) => {
+      if (result) {
+        addSessionEntry(result.id, result.title);
       }
     });
   }, [createSession, selectedModel, selectedProvider]);
 
   const handleSelectSession = useCallback(
     (id: string) => {
-      setActiveSessionId(id);
       switchSession(id);
     },
     [switchSession]
@@ -183,27 +175,20 @@ export default function App() {
   );
 
   const handleDeleteSession = useCallback(
-    (id: string) => {
+    async (id: string) => {
+      await deleteSession(id);
       removeSessionEntry(id);
-      if (id === activeSessionId) {
-        handleNewSession();
-      }
     },
-    [activeSessionId, handleNewSession]
+    [deleteSession]
   );
 
   const handleFork = useCallback(async (_message: ChatMessage) => {
-    if (!sessionId || !baseUrl) return;
-    try {
-      const res = await fetch(`${baseUrl}/sessions/${sessionId}/fork`, { method: "POST" });
-      if (!res.ok) return;
-      const { session_id } = await res.json();
-      addSessionEntry(session_id);
-      switchSession(session_id);
-    } catch (e) {
-      console.error("Fork failed:", e);
+    if (!activeSessionId || !baseUrl) return;
+    const result = await forkSession(activeSessionId);
+    if (result) {
+      addSessionEntry(result.id as string, result.title as string);
     }
-  }, [baseUrl, sessionId, switchSession]);
+  }, [baseUrl, activeSessionId, forkSession]);
 
   const handleSaveUrl = useCallback(
     (url: string) => {
@@ -230,15 +215,15 @@ export default function App() {
     );
   }
 
-  const hasMessages = messages.length > 0;
+  const hasMessages = activeMessages.length > 0;
 
   const chatInput = (
     <ChatInput
       onSend={handleSend}
-      disabled={streaming}
+      disabled={activeStreaming}
       onCancel={cancel}
-      connected={connected}
-      streaming={streaming}
+      connected={activeConnected}
+      streaming={activeStreaming}
       providers={providers}
       selectedModel={selectedModel}
       selectedProvider={selectedProvider}
@@ -254,24 +239,26 @@ export default function App() {
         sidebarOpen={sidebarOpen}
         onToggleSidebar={() => setSidebarOpen((v) => !v)}
         rightPanelDiffs={[]}
-        connected={connected}
+        connected={activeConnected}
         leftPanel={
           <LeftPanel
             onNewSession={handleNewSession}
             onSearch={() => {}}
             onPlugins={() => {}}
             onSettings={() => openSettings()}
-            connected={connected}
+            connected={activeConnected}
             activeSessionId={activeSessionId}
             onSelectSession={handleSelectSession}
             onRenameSession={handleRenameSession}
             onDeleteSession={handleDeleteSession}
+            streamingSessions={streamingSessions}
+            onToggleSidebar={() => setSidebarOpen((v) => !v)}
           />
         }
       >
         {hasMessages ? (
           <>
-            <ChatView messages={messages} onFork={handleFork} />
+            <ChatView messages={activeMessages} onFork={handleFork} />
             {chatInput}
           </>
         ) : (

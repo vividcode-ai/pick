@@ -27,6 +27,7 @@ pub struct CreateSessionRequest {
 #[derive(Serialize, ToSchema)]
 pub struct CreateSessionResponse {
     pub session_id: String,
+    pub title: String,
 }
 
 #[derive(Deserialize, ToSchema)]
@@ -93,14 +94,14 @@ pub async fn create_session(
     let system_prompt = state.build_system_prompt(&provider, &model_id);
     let tools = state.get_tools();
 
-    let session_id = state
+    let (session_id, title) = state
         .session_manager
         .create(model_id, provider, system_prompt, tools)
         .await;
 
     (
         StatusCode::CREATED,
-        Json(CreateSessionResponse { session_id }),
+        Json(CreateSessionResponse { session_id, title }),
     )
 }
 
@@ -201,9 +202,12 @@ pub async fn fork_session(
 ) -> impl IntoResponse {
     state.ensure_session_messages(&id).await;
     match state.session_manager.fork(&id).await {
-        Some(new_id) => (
+        Some((new_id, title)) => (
             StatusCode::CREATED,
-            Json(CreateSessionResponse { session_id: new_id }),
+            Json(CreateSessionResponse {
+                session_id: new_id,
+                title,
+            }),
         )
             .into_response(),
         None => (StatusCode::NOT_FOUND).into_response(),

@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { Pin } from "lucide-react";
 import { RightPanel } from "./RightPanel";
 
 interface LayoutProps {
@@ -51,44 +52,48 @@ export function Layout({
         {leftPanel}
       </aside>
 
-      {/* Toggle left button */}
-      <button
-        onClick={onToggleSidebar}
-        className="fixed top-3 z-50 p-1.5 rounded-md bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-neutral-200 transition-colors md:top-3"
-        style={{
-          left: sidebarOpen ? "calc(max(10%, 180px) + 8px)" : "8px",
-        }}
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          {sidebarOpen ? (
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          ) : (
+      {/* Toggle left button (visible when sidebar closed) */}
+      {!sidebarOpen && (
+        <button
+          onClick={onToggleSidebar}
+          className="fixed top-3 z-50 p-1.5 rounded-md bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-neutral-200 transition-colors md:top-3"
+          style={{ left: "8px" }}
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-          )}
-        </svg>
-      </button>
+          </svg>
+        </button>
+      )}
 
       {/* Center content */}
       <main className="flex-1 flex flex-col min-w-0">
         {children}
       </main>
 
-      {/* Toggle right button */}
-      <button
-        onClick={toggleRightPanel}
-        className="fixed top-3 z-50 p-1.5 rounded-md bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-neutral-200 transition-colors"
-        style={{ right: rightPanelOpen ? "calc(30vw + 8px)" : "8px" }}
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
-      </button>
+      {/* Toggle right button (visible when panel closed) */}
+      {!rightPanelOpen && (
+        <button
+          onClick={toggleRightPanel}
+          className="fixed top-3 z-50 p-1.5 rounded-md bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-neutral-200 transition-colors"
+          style={{ right: "8px" }}
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+      )}
 
       {/* Right Panel (desktop pinned) */}
       {rightPanelOpen && (
-        <aside
-          className="hidden md:flex w-[30vw] min-w-[280px] max-w-[400px] flex-col border-l border-[var(--border-base)] bg-[var(--surface-secondary)]"
-        >
+        <aside className="hidden md:flex w-[30vw] min-w-[280px] max-w-[400px] flex-col border-l border-[var(--border-base)] bg-[var(--surface-secondary)]">
+          <div className="flex items-center justify-end px-3 py-2 border-b border-[var(--border-base)]">
+            <button
+              onClick={toggleRightPanel}
+              className="p-1.5 rounded-md hover:bg-neutral-700 text-neutral-400 hover:text-neutral-200 transition-colors"
+            >
+              <Pin className="w-4 h-4" />
+            </button>
+          </div>
           {rightPanelContent}
         </aside>
       )}
@@ -98,6 +103,14 @@ export function Layout({
         <div className="md:hidden fixed inset-0 z-40 flex justify-end">
           <div className="fixed inset-0 bg-black/50" onClick={toggleRightPanel} />
           <aside className="relative w-[85vw] max-w-[320px] h-full flex flex-col bg-[var(--surface-secondary)] shadow-lg">
+            <div className="flex items-center justify-end px-3 py-2 border-b border-[var(--border-base)]">
+              <button
+                onClick={toggleRightPanel}
+                className="p-1.5 rounded-md hover:bg-neutral-700 text-neutral-400 hover:text-neutral-200 transition-colors"
+              >
+                <Pin className="w-4 h-4" />
+              </button>
+            </div>
             {rightPanelContent}
           </aside>
         </div>

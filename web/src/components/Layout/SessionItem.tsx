@@ -5,6 +5,7 @@ import type { SessionEntry } from "../../stores/sessions";
 interface SessionItemProps {
   session: SessionEntry;
   isActive: boolean;
+  streaming: boolean;
   onSelect: (id: string) => void;
   onRename: (id: string, title: string) => void;
   onDelete: (id: string) => void;
@@ -24,7 +25,7 @@ function formatRelativeTime(ts: number): string {
   return `${months}mo ago`;
 }
 
-export function SessionItem({ session, isActive, onSelect, onRename, onDelete }: SessionItemProps) {
+export function SessionItem({ session, isActive, streaming, onSelect, onRename, onDelete }: SessionItemProps) {
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(session.title);
 
@@ -45,7 +46,13 @@ export function SessionItem({ session, isActive, onSelect, onRename, onDelete }:
       onClick={() => onSelect(session.id)}
     >
       <div className="flex items-center gap-2">
-        <MessageSquare className="w-3.5 h-3.5 flex-shrink-0" />
+        {streaming ? (
+          <span className="w-3.5 h-3.5 flex items-center justify-center flex-shrink-0">
+            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+          </span>
+        ) : (
+          <MessageSquare className="w-3.5 h-3.5 flex-shrink-0" />
+        )}
         {editing ? (
           <input
             type="text"

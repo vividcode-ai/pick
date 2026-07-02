@@ -1,4 +1,4 @@
-import { Search, Puzzle, Settings, MessageSquarePlus } from "lucide-react";
+import { Search, Puzzle, Settings, MessageSquarePlus, Pin } from "lucide-react";
 import { ThemeModeToggle } from "../ThemeModeToggle";
 import { SessionList } from "./SessionList";
 
@@ -7,11 +7,13 @@ interface LeftPanelProps {
   onSearch: () => void;
   onPlugins: () => void;
   onSettings: () => void;
+  onToggleSidebar?: () => void;
   connected: boolean;
   activeSessionId: string | null;
   onSelectSession: (id: string) => void;
   onRenameSession: (id: string, title: string) => void;
   onDeleteSession: (id: string) => void;
+  streamingSessions?: Record<string, boolean>;
 }
 
 export function LeftPanel({
@@ -19,11 +21,13 @@ export function LeftPanel({
   onSearch,
   onPlugins,
   onSettings,
+  onToggleSidebar,
   connected,
   activeSessionId,
   onSelectSession,
   onRenameSession,
   onDeleteSession,
+  streamingSessions,
 }: LeftPanelProps) {
   return (
     <>
@@ -50,6 +54,15 @@ export function LeftPanel({
           <Puzzle className="w-5 h-5" />
         </button>
         <ThemeModeToggle />
+        {onToggleSidebar && (
+          <button
+            onClick={onToggleSidebar}
+            title="Close sidebar"
+            className="p-2 rounded-md hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 transition-colors"
+          >
+            <Pin className="w-5 h-5" />
+          </button>
+        )}
       </div>
 
       <SessionList
@@ -58,6 +71,7 @@ export function LeftPanel({
         onNewSession={onNewSession}
         onRenameSession={onRenameSession}
         onDeleteSession={onDeleteSession}
+        streamingSessions={streamingSessions}
       />
 
       <div className="border-t border-neutral-800 px-3 py-3 space-y-2">

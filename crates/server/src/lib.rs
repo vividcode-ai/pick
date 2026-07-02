@@ -26,7 +26,7 @@ use session::SseSessionState;
 use tokio::net::TcpListener;
 use tokio::sync::RwLock;
 use tower_http::cors::CorsLayer;
-use tracing::info;
+use tracing::{debug, info};
 
 pub struct AppState {
     pub session_manager: session::SessionManager,
@@ -42,8 +42,15 @@ pub struct AppState {
 
 impl AppState {
     pub fn new(config: ServerConfig) -> Self {
+        let cwd = config
+            .cwd
+            .as_deref()
+            .map(Path::new)
+            .map(|p| p.to_path_buf())
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+        let session_dir = cwd.join(".pick").join("sessions");
         Self {
-            session_manager: session::SessionManager::new(),
+            session_manager: session::SessionManager::new(session_dir),
             sse_sessions: RwLock::new(HashMap::new()),
             config,
             default_provider: None,
@@ -149,7 +156,7 @@ impl AppState {
         for path in files {
             if let Some(session) = self.load_meta_only(&path).await {
                 self.session_manager.insert_session(session).await;
-                info!("Loaded session meta: {}", path.display());
+                debug!("Loaded session meta: {}", path.display());
             }
         }
     }
@@ -195,6 +202,7 @@ impl AppState {
             status: "idle".to_string(),
             fork_parent_id: None,
             session_path: Some(path.to_string_lossy().to_string()),
+            persisted_messages_count: 0,
         })
     }
 
@@ -222,6 +230,7 @@ impl AppState {
             }
         }
 
+        let msg_count = messages.len();
         let model_id = header
             .model
             .unwrap_or_else(|| "claude-sonnet-4-20250514".to_string());
@@ -240,6 +249,7 @@ impl AppState {
             status: "idle".to_string(),
             fork_parent_id: None,
             session_path: Some(path.to_string_lossy().to_string()),
+            persisted_messages_count: msg_count,
         })
     }
 }
@@ -348,7 +358,16 @@ pub async fn run_server_on_listener(
     listener: TcpListener,
     config: ServerConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let state = Arc::new(AppState::new(config));
+    let state = Arc::new(AppState::new(config.clone()));
+
+    // Load persisted sessions from disk
+    let cwd = config
+        .cwd
+        .as_deref()
+        .map(Path::new)
+        .unwrap_or_else(|| Path::new("."));
+    state.load_persisted_sessions(cwd).await;
+
     let app = create_app(state);
 
     axum::serve(listener, app).await?;
