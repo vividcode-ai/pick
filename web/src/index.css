@@ -6,6 +6,7 @@
 @import "./styles/markdown.css";
 @import "./styles/diff.css";
 @import "./styles/selector.css";
+@import "./styles/settings.css";
 
 body {
   margin: 0;

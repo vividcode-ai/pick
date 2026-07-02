@@ -35,11 +35,7 @@ impl Drop for SseStream {
         let session_id = self.session_id.clone();
         tokio::spawn(async move {
             let mut sessions = state.sse_sessions.write().await;
-            if let Some(s) = sessions.remove(&session_id)
-                && let Some(cancel_tx) = s.cancel_tx
-            {
-                let _ = cancel_tx.send(true);
-            }
+            sessions.remove(&session_id);
         });
     }
 }
