@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { GitBranch, FolderOpen, FileCode, RotateCw } from "lucide-react";
 import type { GitInfo } from "../../../types/events";
 import { CommitModal } from "./CommitModal";
@@ -6,7 +6,6 @@ import { CommitModal } from "./CommitModal";
 interface StatusCardProps {
   gitInfo: GitInfo | null;
   sessionId: string | null;
-  baseUrl: string;
   onCommitRequest: (message: string) => void;
 }
 
@@ -27,8 +26,9 @@ const statusColor: Record<string, string> = {
   "??": "text-neutral-400 bg-neutral-500/10",
 };
 
-export function StatusCard({ gitInfo, sessionId, baseUrl, onCommitRequest }: StatusCardProps) {
+export function StatusCard({ gitInfo, sessionId, onCommitRequest }: StatusCardProps) {
   const [commitOpen, setCommitOpen] = useState(false);
+  const [showAll, setShowAll] = useState(false);
 
   const handleCommit = useCallback((message: string) => {
     onCommitRequest(message);
@@ -36,7 +36,9 @@ export function StatusCard({ gitInfo, sessionId, baseUrl, onCommitRequest }: Sta
 
   if (!sessionId) return null;
 
-  const changeCount = gitInfo?.changes?.length ?? 0;
+  const changes = gitInfo?.changes ?? [];
+  const changeCount = changes.length;
+  const displayChanges = showAll ? changes : changes.slice(0, 5);
 
   return (
     <div className="rounded-xl border border-[var(--border-base)] bg-[var(--surface-secondary)] shadow-sm overflow-hidden">
@@ -82,14 +84,14 @@ export function StatusCard({ gitInfo, sessionId, baseUrl, onCommitRequest }: Sta
             </div>
             {changeCount > 0 ? (
               <div className="mt-1.5 space-y-1">
-                {gitInfo!.changes.map((change, i) => {
+                {displayChanges.map((change, i) => {
                   const st = change.status.trim();
                   const label = statusLabel[st] ?? st;
                   const color = statusColor[st] ?? "text-neutral-400 bg-neutral-500/10";
                   return (
                     <div key={i} className="flex items-center gap-1.5 text-xs">
                       <span className={`text-[10px] px-1 py-0.5 rounded font-mono font-medium ${color}`}>
-                        {st}
+                        {label}
                       </span>
                       <span className="text-[var(--text-secondary)] truncate flex-1" title={change.path}>
                         {change.path}
@@ -97,6 +99,22 @@ export function StatusCard({ gitInfo, sessionId, baseUrl, onCommitRequest }: Sta
                     </div>
                   );
                 })}
+                {changeCount > 5 && !showAll && (
+                  <button
+                    onClick={() => setShowAll(true)}
+                    className="text-xs text-[var(--accent-primary)] hover:underline mt-1"
+                  >
+                    显示全部 {changeCount} 个
+                  </button>
+                )}
+                {showAll && changeCount > 5 && (
+                  <button
+                    onClick={() => setShowAll(false)}
+                    className="text-xs text-[var(--text-muted)] hover:underline mt-1"
+                  >
+                    收起
+                  </button>
+                )}
               </div>
             ) : (
               <div className="text-xs text-[var(--text-muted)] mt-0.5">

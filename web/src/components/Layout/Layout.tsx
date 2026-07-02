@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Pin, PinOff } from "lucide-react";
+import { X } from "lucide-react";
 import { RightPanel } from "./RightPanel";
 import type { GitInfo, TodoItem } from "../../types/events";
 
@@ -17,7 +17,6 @@ interface LayoutProps {
   sessionId?: string | null;
   todos?: TodoItem[];
   gitInfo?: GitInfo | null;
-  baseUrl?: string;
   onCommitRequest?: (message: string) => void;
   children: ReactNode;
 }
@@ -36,16 +35,12 @@ export function Layout({
   sessionId,
   todos,
   gitInfo,
-  baseUrl,
   onCommitRequest,
   children,
 }: LayoutProps) {
   const [rightPanelOpenLocal, setRightPanelOpenLocal] = useState(false);
   const rightPanelOpen = rightPanelOpenProp ?? rightPanelOpenLocal;
   const toggleRightPanel = onToggleRightPanel ?? (() => setRightPanelOpenLocal((v) => !v));
-
-  const [rightPanelPinned, setRightPanelPinned] = useState(true);
-  const toggleRightPanelPinned = () => setRightPanelPinned((v) => !v);
 
   const rightPanelContent = rightPanel ?? (
     <RightPanel
@@ -54,7 +49,6 @@ export function Layout({
       sessionId={sessionId ?? null}
       todos={todos ?? []}
       gitInfo={gitInfo ?? null}
-      baseUrl={baseUrl ?? ""}
       onCommitRequest={onCommitRequest ?? (() => {})}
     />
   );
@@ -95,10 +89,7 @@ export function Layout({
 
       {/* Center content */}
       <main
-        className="flex-1 flex flex-col min-w-0 relative"
-        onClick={() => {
-          if (sidebarOpen && !sidebarPinned) onToggleSidebar();
-        }}
+        className="flex-1 flex flex-col min-w-0"
       >
         {children}
 
@@ -106,34 +97,29 @@ export function Layout({
         {rightPanelOpen && (
           <div className="hidden md:block absolute top-3 right-3 z-10 w-[320px] max-h-[calc(100vh-6rem)]">
             <div className="flex flex-col h-full rounded-xl border border-[var(--border-base)] bg-[var(--surface-secondary)] shadow-lg overflow-hidden">
-              <div className="flex items-center justify-end px-3 py-2 border-b border-[var(--border-base)] flex-shrink-0">
-                <button
-                  onClick={toggleRightPanelPinned}
-                  className="p-1.5 rounded-md hover:bg-neutral-700 text-neutral-400 hover:text-neutral-200 transition-colors"
-                  title={rightPanelPinned ? "Auto-close" : "Keep open"}
-                >
-                  {rightPanelPinned ? <Pin className="w-4 h-4" /> : <PinOff className="w-4 h-4" />}
-                </button>
-              </div>
               <div className="flex-1 overflow-y-auto min-h-0">
                 {rightPanelContent}
               </div>
             </div>
           </div>
         )}
-
-        {/* Toggle right button (visible when panel closed) */}
-        {!rightPanelOpen && (
-          <button
-            onClick={toggleRightPanel}
-            className="absolute top-3 right-3 z-10 p-1.5 rounded-md bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-neutral-200 transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-        )}
       </main>
+
+      {/* Toggle right button (always visible, fixed position) */}
+      <button
+        onClick={toggleRightPanel}
+        className="fixed top-3 z-50 p-1.5 rounded-md bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-neutral-200 transition-colors"
+        style={{ right: "8px" }}
+        title={rightPanelOpen ? "隐藏右侧面板" : "显示右侧面板"}
+      >
+        {rightPanelOpen ? (
+          <X className="w-4 h-4" />
+        ) : (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        )}
+      </button>
 
       {/* Right Panel (mobile drawer) */}
       {rightPanelOpen && (
@@ -142,11 +128,10 @@ export function Layout({
           <aside className="relative w-[85vw] max-w-[320px] h-full flex flex-col bg-[var(--surface-secondary)] shadow-lg">
             <div className="flex items-center justify-end px-3 py-2 border-b border-[var(--border-base)]">
               <button
-                onClick={toggleRightPanelPinned}
+                onClick={toggleRightPanel}
                 className="p-1.5 rounded-md hover:bg-neutral-700 text-neutral-400 hover:text-neutral-200 transition-colors"
-                title={rightPanelPinned ? "Auto-close" : "Keep open"}
               >
-                {rightPanelPinned ? <Pin className="w-4 h-4" /> : <PinOff className="w-4 h-4" />}
+                <X className="w-4 h-4" />
               </button>
             </div>
             {rightPanelContent}

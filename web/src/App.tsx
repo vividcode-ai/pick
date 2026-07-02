@@ -277,7 +277,6 @@ export default function App() {
         sessionId={activeSessionId}
         todos={activeTodos}
         gitInfo={activeGitInfo}
-        baseUrl={baseUrl}
         onCommitRequest={handleCommitRequest}
         leftPanel={
           <LeftPanel

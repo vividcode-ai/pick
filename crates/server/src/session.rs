@@ -1,8 +1,10 @@
 use std::cmp::Reverse;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 
+use pick_agent::core::message_queue::PendingMessageQueue;
 use pick_agent::core::state::AgentTool;
 use pick_agent::session::entries::{SessionEntry, SessionEntryKind, SessionInfoEntry};
 use pick_agent::session::manager::SessionManager as AgentSessionManager;
@@ -519,4 +521,8 @@ pub struct SseSessionState {
     pub cancel_tx: Option<watch::Sender<bool>>,
     pub pending_approvals: Arc<Mutex<HashMap<String, oneshot::Sender<bool>>>>,
     pub pending_questions: PendingQuestionSenders,
+    /// Queue of pending user messages to be processed sequentially
+    pub message_queue: Arc<Mutex<PendingMessageQueue>>,
+    /// Whether an agent loop is currently running for this session
+    pub in_flight: Arc<AtomicBool>,
 }

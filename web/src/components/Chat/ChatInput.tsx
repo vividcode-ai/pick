@@ -54,7 +54,7 @@ export function ChatInput({
 
   const handleSend = () => {
     const trimmed = input.trim();
-    if (!trimmed || disabled) return;
+    if (!trimmed) return;
     onSend(trimmed);
     setInput("");
     if (textareaRef.current) {
@@ -190,22 +190,21 @@ export function ChatInput({
               disabled={disabled}
             />
 
-            {disabled ? (
+            {streaming && (
               <button
                 onClick={onCancel}
                 className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs hover:bg-red-700 transition-colors"
               >
                 Stop
               </button>
-            ) : (
-              <button
-                onClick={handleSend}
-                disabled={!input.trim() || !connected}
-                className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                Send
-              </button>
             )}
+            <button
+              onClick={handleSend}
+              disabled={!input.trim() || !connected}
+              className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Send
+            </button>
           </div>
         </div>
       </div>

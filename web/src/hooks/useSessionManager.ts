@@ -226,22 +226,53 @@ export function useSessionManager(baseUrl: string) {
     await switchActiveSession(id);
   }, [switchActiveSession]);
 
+  /** Send a prompt via POST to the server (used when EventSource is already open). */
+  const sendPrompt = useCallback((sessionId: string, prompt: string, thinkingLevel?: string) => {
+    fetch(`${baseUrl}/ask`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        session_id: sessionId,
+        prompt,
+        thinking_level: thinkingLevel,
+      }),
+    }).catch(() => {});
+  }, [baseUrl]);
+
   const ask = useCallback((prompt: string, thinkingLevel?: string) => {
     const sessionId = activeSessionIdRef.current;
     if (!sessionId) return;
 
     cancelEvictionTimer(sessionId);
 
+    // Add user message to local display immediately
     updateSession(sessionId, (prev) => ({
       ...prev,
       messages: [
         ...prev.messages,
         { id: crypto.randomUUID(), role: "user", content: prompt, timestamp: Date.now() },
       ],
-      streaming: true,
     }));
 
+    const currentData = sessionDataRef.current[sessionId];
+
+    if (currentData?.streaming) {
+      // Already streaming — server will queue this message
+      sendPrompt(sessionId, prompt, thinkingLevel);
+      return;
+    }
+
+    // Not streaming — need an EventSource connection to receive events
+    updateSession(sessionId, (prev) => ({ ...prev, streaming: true }));
+
     const existing = sessionResourcesRef.current[sessionId];
+    if (existing?.eventSource && existing.eventSource.readyState === EventSource.OPEN) {
+      // EventSource already open and ready — POST immediately
+      sendPrompt(sessionId, prompt, thinkingLevel);
+      return;
+    }
+
+    // Need to create a fresh EventSource connection
     existing?.eventSource?.close();
     existing?.abortController?.abort();
 
@@ -249,8 +280,8 @@ export function useSessionManager(baseUrl: string) {
     const eventSource = new EventSource(`${baseUrl}/events/${sessionId}`);
     sessionResourcesRef.current[sessionId] = { eventSource, abortController: controller };
 
-    let asked = false;
     let turnEndMessageCount = -1;
+    let asked = false;
 
     eventSource.addEventListener("open", () => {
       updateSession(sessionId, (prev) => ({ ...prev, connected: true }));
@@ -465,7 +496,7 @@ export function useSessionManager(baseUrl: string) {
       if (sessionId !== activeSessionIdRef.current) {
         startEvictionTimer(sessionId);
       }
-      eventSource.close();
+      // Keep EventSource open — reuse for subsequent asks
 
       try {
         const data = JSON.parse(e.data);
@@ -483,16 +514,14 @@ export function useSessionManager(baseUrl: string) {
     controller.signal.addEventListener("abort", () => {
       eventSource.close();
     });
-  }, [baseUrl, updateSession, startEvictionTimer, cancelEvictionTimer]);
+  }, [baseUrl, cancelEvictionTimer, updateSession, startEvictionTimer, sendPrompt]);
 
   const cancel = useCallback(() => {
     const sessionId = activeSessionIdRef.current;
     if (!sessionId) return;
 
-    const resources = sessionResourcesRef.current[sessionId];
-    resources?.abortController?.abort();
-    resources?.eventSource?.close();
-
+    // Keep EventSource alive — the server clears the queue and cancels the
+    // current agent loop, but the SSE connection remains for subsequent asks.
     fetch(`${baseUrl}/cancel`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

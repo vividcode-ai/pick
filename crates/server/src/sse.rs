@@ -2,6 +2,8 @@ use std::collections::HashMap;
 use std::convert::Infallible;
 use std::pin::Pin;
 use std::sync::Arc;
+use std::sync::Mutex;
+use std::sync::atomic::AtomicBool;
 use std::task::{Context, Poll};
 use std::time::Duration;
 
@@ -9,6 +11,7 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::response::sse::{Event, KeepAlive, Sse};
+use pick_agent::core::message_queue::{PendingMessageQueue, QueueMode};
 use tokio::sync::mpsc;
 use tracing::info;
 
@@ -59,8 +62,12 @@ pub async fn handle_sse(
             SseSessionState {
                 event_tx: tx.clone(),
                 cancel_tx: None,
-                pending_approvals: Arc::new(std::sync::Mutex::new(HashMap::new())),
-                pending_questions: Arc::new(std::sync::Mutex::new(HashMap::new())),
+                pending_approvals: Arc::new(Mutex::new(HashMap::new())),
+                pending_questions: Arc::new(Mutex::new(HashMap::new())),
+                message_queue: Arc::new(Mutex::new(PendingMessageQueue::new(
+                    QueueMode::OneAtATime,
+                ))),
+                in_flight: Arc::new(AtomicBool::new(false)),
             },
         );
     }
