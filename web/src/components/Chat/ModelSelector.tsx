@@ -1,14 +1,12 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { ChevronDown, Search, Star, Check, Plus } from "lucide-react";
+import { ChevronDown, Search, Check, Plus } from "lucide-react";
 import type { ProviderInfo } from "../../types/events";
-import { toggleFavorite, getFavoriteModelKeys, subscribeToFavorites } from "../../stores/models";
 import { openSettings } from "../../stores/settings";
 
 interface FlatModel {
   id: string;
   name: string;
   provider: string;
-  hasKey: boolean;
   reasoning: boolean;
   searchText: string;
 }
@@ -53,8 +51,6 @@ const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
 export function ModelSelector({ providers, selectedModel, selectedProvider, onModelChange, disabled }: ModelSelectorProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [favoritesOnly, setFavoritesOnly] = useState(false);
-  const [favoritesRev, setFavoritesRev] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const highlightRef = useRef<number>(0);
@@ -63,10 +59,6 @@ export function ModelSelector({ providers, selectedModel, selectedProvider, onMo
     if (!open) return;
     setTimeout(() => searchRef.current?.focus(), 80);
   }, [open]);
-
-  useEffect(() => {
-    return subscribeToFavorites(() => setFavoritesRev((v) => v + 1));
-  }, []);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -80,38 +72,26 @@ export function ModelSelector({ providers, selectedModel, selectedProvider, onMo
 
   const allModels: FlatModel[] = useMemo(() => {
     return providers
-      .filter(p => p.has_key || p.models.some(m => m.id === selectedModel))
+      .filter(p => p.has_key)
       .flatMap((p) =>
         p.models.map((m) => ({
           ...m,
           provider: p.provider,
-          hasKey: p.has_key,
           searchText: `${m.name} ${p.provider} ${m.id}`.toLowerCase(),
         }))
       );
-  }, [providers, selectedModel]);
+  }, [providers]);
 
   const selectedDetail = useMemo(
     () => allModels.find((m) => m.id === selectedModel && m.provider === selectedProvider) || null,
     [allModels, selectedModel, selectedProvider]
   );
 
-  const favoriteKeys = useMemo(() => {
-    void favoritesRev;
-    return getFavoriteModelKeys();
-  }, [favoritesRev]);
-
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    let list = allModels;
-    if (q) {
-      list = list.filter((m) => m.searchText.includes(q));
-    }
-    if (favoritesOnly) {
-      list = list.filter((m) => favoriteKeys.has(`${m.provider}/${m.id}`));
-    }
-    return list;
-  }, [allModels, query, favoritesOnly, favoriteKeys]);
+    if (!q) return allModels;
+    return allModels.filter((m) => m.searchText.includes(q));
+  }, [allModels, query]);
 
   const grouped = useMemo(() => {
     const groups = new Map<string, FlatModel[]>();
@@ -146,8 +126,6 @@ export function ModelSelector({ providers, selectedModel, selectedProvider, onMo
     [open, flatList, onModelChange]
   );
 
-  const hasFavorites = favoriteKeys.size > 0;
-
   return (
     <div className="relative" ref={containerRef} onKeyDown={handleKeyDown}>
       <button
@@ -156,7 +134,7 @@ export function ModelSelector({ providers, selectedModel, selectedProvider, onMo
         className="selector-trigger max-w-[110px]"
       >
         <span className="selector-trigger-primary">
-          {selectedDetail?.name || "Model"}
+          {selectedDetail?.name || ""}
         </span>
         <span className="selector-trigger-icon">
           <ChevronDown className="w-3 h-3" />
@@ -180,15 +158,6 @@ export function ModelSelector({ providers, selectedModel, selectedProvider, onMo
                     className="selector-search-input pl-7"
                   />
                 </div>
-                <button
-                  className="selector-favorites-toggle"
-                  data-active={favoritesOnly}
-                  disabled={!hasFavorites}
-                  onClick={() => setFavoritesOnly((v) => !v)}
-                  title={favoritesOnly ? "Show all" : "Favorites only"}
-                >
-                  <Star className="w-3.5 h-3.5" fill={favoritesOnly ? "currentColor" : "none"} />
-                </button>
               </div>
             </div>
 
@@ -204,7 +173,6 @@ export function ModelSelector({ providers, selectedModel, selectedProvider, onMo
                     {models.map((m) => {
                       const globalIdx = flatList.indexOf(m);
                       const selected = m.id === selectedModel && m.provider === selectedProvider;
-                      const fav = favoriteKeys.has(`${m.provider}/${m.id}`);
                       return (
                         <div
                           key={m.id}
@@ -218,20 +186,8 @@ export function ModelSelector({ providers, selectedModel, selectedProvider, onMo
                             <span className="selector-option-label">{m.name}</span>
                             <span className="selector-option-description">
                               {PROVIDER_DISPLAY_NAMES[m.provider] || m.provider} • {m.provider}/{m.id}
-                              {!m.hasKey ? " (no api key)" : ""}
                             </span>
                           </div>
-                          <button
-                            className="selector-option-star"
-                            data-active={fav}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleFavorite(m.provider, m.id);
-                            }}
-                            title={fav ? "Remove from favorites" : "Add to favorites"}
-                          >
-                            <Star className="w-3.5 h-3.5" fill={fav ? "currentColor" : "none"} />
-                          </button>
                           {selected && (
                             <span className="selector-option-indicator">
                               <Check className="w-3.5 h-3.5" />
@@ -253,15 +209,6 @@ export function ModelSelector({ providers, selectedModel, selectedProvider, onMo
                 <Plus className="w-3 h-3 inline mr-1" />
                 Configure providers
               </button>
-              {!favoritesOnly && hasFavorites && (
-                <button
-                  className="selector-option-action"
-                  onClick={() => setFavoritesOnly(true)}
-                >
-                  <Star className="w-3 h-3 inline mr-1" fill="currentColor" />
-                  Show favorites only
-                </button>
-              )}
             </div>
           </div>
         </>
