@@ -357,7 +357,7 @@ impl SessionManager {
         let _ = tokio::fs::write(path, &content).await;
     }
 
-    pub async fn fork(&self, id: &str) -> Option<(String, String)> {
+    pub async fn fork(&self, id: &str, message_count: Option<usize>) -> Option<(String, String)> {
         let (
             source_path,
             title,
@@ -370,6 +370,23 @@ impl SessionManager {
         ) = {
             let sessions = self.sessions.read().await;
             let source = sessions.get(id)?;
+            let msgs = source.messages.clone();
+            let msgs = if let Some(count) = message_count {
+                let mut truncated = Vec::new();
+                let mut user_cnt = 0;
+                for msg in msgs {
+                    if matches!(msg, Message::User(_)) {
+                        user_cnt += 1;
+                        if user_cnt > count {
+                            break;
+                        }
+                    }
+                    truncated.push(msg);
+                }
+                truncated
+            } else {
+                msgs
+            };
             (
                 source.session_path.clone()?,
                 format!("{} (fork)", source.title),
@@ -377,7 +394,7 @@ impl SessionManager {
                 source.provider.clone(),
                 source.system_prompt.clone(),
                 source.tools.clone(),
-                source.messages.clone(),
+                msgs,
                 source.id.clone(),
             )
         };

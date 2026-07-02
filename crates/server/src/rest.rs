@@ -43,6 +43,11 @@ pub struct MessagesQuery {
     pub limit: Option<usize>,
 }
 
+#[derive(Deserialize)]
+pub struct ForkQuery {
+    pub message_count: Option<usize>,
+}
+
 /// Health check endpoint
 #[utoipa::path(
     get,
@@ -199,8 +204,9 @@ pub async fn update_session(
 pub async fn fork_session(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
+    Query(query): Query<ForkQuery>,
 ) -> impl IntoResponse {
-    match state.session_manager.fork(&id).await {
+    match state.session_manager.fork(&id, query.message_count).await {
         Some((new_id, title)) => (
             StatusCode::CREATED,
             Json(CreateSessionResponse {

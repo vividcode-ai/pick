@@ -3,6 +3,7 @@ import { Layout } from "./components/Layout/Layout";
 import { LeftPanel } from "./components/Layout/LeftPanel";
 import { ChatView } from "./components/Chat/ChatView";
 import { ChatInput } from "./components/Chat/ChatInput";
+import { PickLogo } from "./components/PickLogo";
 import { CommandPalette } from "./components/CommandPalette";
 import { SettingsScreen } from "./components/Settings/SettingsScreen";
 import { useTheme } from "./lib/ThemeProvider";
@@ -183,13 +184,19 @@ export default function App() {
     [deleteSession]
   );
 
-  const handleFork = useCallback(async (_message: ChatMessage) => {
+  const handleFork = useCallback(async (message: ChatMessage) => {
     if (!activeSessionId || !baseUrl) return;
-    const result = await forkSession(activeSessionId);
+    const msgIdx = activeMessages.indexOf(message);
+    if (msgIdx === -1) return;
+    let userCount = 0;
+    for (let i = 0; i <= msgIdx; i++) {
+      if (activeMessages[i].role === "user") userCount++;
+    }
+    const result = await forkSession(activeSessionId, userCount);
     if (result) {
       addSessionEntry(result.id as string, result.title as string);
     }
-  }, [baseUrl, activeSessionId, forkSession]);
+  }, [baseUrl, activeSessionId, forkSession, activeMessages]);
 
   const handleSaveUrl = useCallback(
     (url: string) => {
@@ -231,6 +238,7 @@ export default function App() {
       onModelChange={handleModelChange}
       thinkingLevel={thinkingLevel}
       onThinkingLevelChange={setThinkingLevel}
+      sessionId={activeSessionId}
     />
   );
 
@@ -265,7 +273,12 @@ export default function App() {
             {chatInput}
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center">
+          <div className="flex-1 flex flex-col items-center justify-center gap-6">
+            <div className="w-full px-4">
+              <div className="max-w-[90%] md:max-w-[70%] lg:max-w-[40%] mx-auto flex justify-center">
+                <PickLogo />
+              </div>
+            </div>
             {chatInput}
           </div>
         )}

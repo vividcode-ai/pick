@@ -498,10 +498,11 @@ export function useSessionManager(baseUrl: string) {
     }
   }, [baseUrl, cancelEvictionTimer]);
 
-  const forkSession = useCallback(async (originSessionId: string) => {
+  const forkSession = useCallback(async (originSessionId: string, messageCount?: number) => {
     if (!baseUrl) return;
     try {
-      const res = await fetch(`${baseUrl}/sessions/${originSessionId}/fork`, { method: "POST" });
+      const params = messageCount !== undefined ? `?message_count=${messageCount}` : '';
+      const res = await fetch(`${baseUrl}/sessions/${originSessionId}/fork${params}`, { method: "POST" });
       if (!res.ok) return;
       const { session_id, title } = await res.json();
 

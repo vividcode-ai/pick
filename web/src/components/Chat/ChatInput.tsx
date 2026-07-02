@@ -15,6 +15,7 @@ interface ChatInputProps {
   onModelChange: (modelId: string, provider: string) => void;
   thinkingLevel: string;
   onThinkingLevelChange: (l: string) => void;
+  sessionId?: string | null;
 }
 
 export function ChatInput({
@@ -29,6 +30,7 @@ export function ChatInput({
   onModelChange,
   thinkingLevel,
   onThinkingLevelChange,
+  sessionId,
 }: ChatInputProps) {
   const [input, setInput] = useState("");
   const [currentCommand, setCurrentCommand] = useState<"build" | "plan">("build");
@@ -38,7 +40,7 @@ export function ChatInput({
 
   useEffect(() => {
     textareaRef.current?.focus();
-  }, [connected]);
+  }, [connected, sessionId]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
