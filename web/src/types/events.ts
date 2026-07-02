@@ -79,3 +79,20 @@ export interface ProviderInfo {
   has_key: boolean;
   models: ModelInfo[];
 }
+
+export interface TodoItem {
+  content: string;
+  status: "pending" | "in_progress" | "completed" | "cancelled";
+  priority: "high" | "medium" | "low";
+}
+
+export interface GitChange {
+  path: string;
+  status: string;
+}
+
+export interface GitInfo {
+  branch: string;
+  changes: GitChange[];
+  cwd: string;
+}

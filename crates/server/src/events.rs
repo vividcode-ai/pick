@@ -185,6 +185,10 @@ pub fn serialize_event(event: &AgentEvent) -> Vec<WsEvent> {
             event_type: "turn_end".to_string(),
             payload: Value::Null,
         }],
+        AgentEvent::TodoUpdated { todos } => vec![WsEvent {
+            event_type: "todo_updated".to_string(),
+            payload: todos.clone(),
+        }],
         _ => Vec::new(),
     }
 }

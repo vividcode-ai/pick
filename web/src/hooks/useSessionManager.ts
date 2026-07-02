@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   ChatMessage,
+  GitInfo,
   ProviderInfo,
+  TodoItem,
   ToolStartPayload,
   ToolEndPayload,
 } from "../types/events";
@@ -91,6 +93,8 @@ interface SessionData {
   messages: ChatMessage[];
   streaming: boolean;
   connected: boolean;
+  todos: TodoItem[];
+  gitInfo: GitInfo | null;
 }
 
 export function useSessionManager(baseUrl: string) {
@@ -101,6 +105,8 @@ export function useSessionManager(baseUrl: string) {
   const activeMessages = activeData?.messages ?? [];
   const activeStreaming = activeData?.streaming ?? false;
   const activeConnected = activeData ? activeData.connected : true;
+  const activeTodos = activeData?.todos ?? [];
+  const activeGitInfo = activeData?.gitInfo ?? null;
 
   const streamingSessions = useMemo(() => {
     const result: Record<string, boolean> = {};
@@ -121,7 +127,7 @@ export function useSessionManager(baseUrl: string) {
 
   const updateSession = useCallback((id: string, updater: (prev: SessionData) => SessionData) => {
     setSessionData(prev => {
-      const prevState = prev[id] || { messages: [], streaming: false, connected: true };
+      const prevState = prev[id] || { messages: [], streaming: false, connected: true, todos: [], gitInfo: null };
       return { ...prev, [id]: updater(prevState) };
     });
   }, []);
@@ -200,7 +206,7 @@ export function useSessionManager(baseUrl: string) {
 
       setSessionData(prev => ({
         ...prev,
-        [newId]: { messages: [], streaming: false, connected: true },
+        [newId]: { messages: [], streaming: false, connected: true, todos: [], gitInfo: null },
       }));
       sessionResourcesRef.current[newId] = { eventSource: null, abortController: null };
       evictedSessionsRef.current.delete(newId);
@@ -429,6 +435,21 @@ export function useSessionManager(baseUrl: string) {
       });
     });
 
+    eventSource.addEventListener("todo_updated", (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        const todos: TodoItem[] = data.todos || [];
+        updateSession(sessionId, (prev) => ({ ...prev, todos }));
+      } catch {}
+    });
+
+    eventSource.addEventListener("git_info_updated", (e) => {
+      try {
+        const gitInfo: GitInfo = JSON.parse(e.data);
+        updateSession(sessionId, (prev) => ({ ...prev, gitInfo }));
+      } catch {}
+    });
+
     eventSource.addEventListener("agent_end", (e) => {
       turnEndMessageCount = -1;
       updateSession(sessionId, (prev) => ({ ...prev, streaming: false }));
@@ -508,7 +529,7 @@ export function useSessionManager(baseUrl: string) {
 
       setSessionData(prev => ({
         ...prev,
-        [session_id]: { messages: [], streaming: false, connected: true },
+        [session_id]: { messages: [], streaming: false, connected: true, todos: [], gitInfo: null },
       }));
       sessionResourcesRef.current[session_id] = { eventSource: null, abortController: null };
       evictedSessionsRef.current.delete(session_id);
@@ -537,6 +558,8 @@ export function useSessionManager(baseUrl: string) {
     activeMessages,
     activeStreaming,
     activeConnected,
+    activeTodos,
+    activeGitInfo,
     streamingSessions,
     createSession,
     switchSession,

@@ -1,6 +1,7 @@
 pub mod docs;
 pub mod events;
 pub mod files;
+pub mod git;
 pub mod mcp_routes;
 pub mod plugins;
 pub mod pty;
@@ -169,6 +170,7 @@ impl AppState {
                             fork_parent_id: None,
                             session_path: path,
                             persisted_messages_count: msg_count,
+                            cwd: Some(cwd.to_string_lossy().to_string()),
                         };
                         self.session_manager.insert_session(session).await;
                         debug!("Loaded session meta: {}", entry.path().display());
@@ -218,6 +220,7 @@ pub fn create_app(state: Arc<AppState>) -> Router {
         .route("/sessions/{id}/messages", get(rest::get_session_messages))
         .route("/sessions/{id}/summarize", post(rest::summarize_session))
         .route("/sessions/{id}/status", get(rest::get_session_status))
+        .route("/sessions/{id}/git-info", get(rest::get_session_git_info))
         .route("/providers", get(rest::list_providers))
         .route("/events/{session_id}", get(sse::handle_sse))
         .route("/ask", post(routes::ask))

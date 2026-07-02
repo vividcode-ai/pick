@@ -13,6 +13,7 @@ use tokio::sync::mpsc;
 use tracing::info;
 
 use crate::AppState;
+use crate::git::get_git_info;
 use crate::session::SseSessionState;
 
 struct SseStream {
@@ -56,12 +57,26 @@ pub async fn handle_sse(
         sessions.insert(
             session_id.clone(),
             SseSessionState {
-                event_tx: tx,
+                event_tx: tx.clone(),
                 cancel_tx: None,
                 pending_approvals: Arc::new(std::sync::Mutex::new(HashMap::new())),
                 pending_questions: Arc::new(std::sync::Mutex::new(HashMap::new())),
             },
         );
+    }
+
+    // Send initial git info
+    if let Some(s) = state.session_manager.get(&session_id).await {
+        let cwd = s.cwd.and_then(|c| {
+            let p = std::path::PathBuf::from(&c);
+            if p.exists() { Some(p) } else { None }
+        });
+        if let Some(cwd) = cwd {
+            let git_info = get_git_info(&cwd);
+            if let Ok(payload) = serde_json::to_string(&git_info) {
+                let _ = tx.send(Ok(Event::default().event("git_info_updated").data(payload)));
+            }
+        }
     }
 
     let stream = SseStream {

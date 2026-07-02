@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::AppState;
+use crate::git::get_git_info;
 use crate::session::SessionInfo;
 
 #[derive(Serialize, ToSchema)]
@@ -417,4 +418,33 @@ pub async fn list_providers(State(state): State<Arc<AppState>>) -> impl IntoResp
         })
         .collect();
     Json(providers)
+}
+
+/// Get git info for a session's workspace
+#[utoipa::path(
+    get,
+    path = "/sessions/{id}/git-info",
+    tag = "sessions",
+    params(
+        ("id" = String, Path, description = "Session ID"),
+    ),
+    responses(
+        (status = 200, description = "Git info"),
+        (status = 404, description = "Session not found"),
+    )
+)]
+pub async fn get_session_git_info(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    let session = match state.session_manager.get(&id).await {
+        Some(s) => s,
+        None => return (StatusCode::NOT_FOUND, "Session not found").into_response(),
+    };
+    let cwd = match session.cwd {
+        Some(ref c) => std::path::PathBuf::from(c),
+        None => return (StatusCode::NOT_FOUND, "No workspace directory").into_response(),
+    };
+    let git_info = get_git_info(&cwd);
+    Json(git_info).into_response()
 }

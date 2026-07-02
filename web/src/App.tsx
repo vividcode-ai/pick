@@ -102,6 +102,8 @@ export default function App() {
     activeMessages,
     activeStreaming,
     activeConnected,
+    activeTodos,
+    activeGitInfo,
     streamingSessions,
     createSession,
     switchSession,
@@ -148,6 +150,15 @@ export default function App() {
       }
     },
     [activeSessionId, createSession, selectedModel, selectedProvider, ask, thinkingLevel]
+  );
+
+  const handleCommitRequest = useCallback(
+    (message: string) => {
+      if (activeSessionId) {
+        ask(`请提交当前代码修改，提交信息为：${message}。仅执行提交操作，不要做其他事情。`, undefined);
+      }
+    },
+    [activeSessionId, ask]
   );
 
   const handleModelChange = useCallback((modelId: string, provider: string) => {
@@ -260,6 +271,11 @@ export default function App() {
         onToggleSidebarPinned={() => setSidebarPinned((v) => !v)}
         rightPanelDiffs={[]}
         connected={activeConnected}
+        sessionId={activeSessionId}
+        todos={activeTodos}
+        gitInfo={activeGitInfo}
+        baseUrl={baseUrl}
+        onCommitRequest={handleCommitRequest}
         leftPanel={
           <LeftPanel
             onNewSession={handleNewSession}

@@ -35,6 +35,7 @@ pub struct SessionInfo {
     pub message_count: usize,
     pub status: String,
     pub fork_parent_id: Option<String>,
+    pub cwd: Option<String>,
 }
 
 #[derive(Clone)]
@@ -52,6 +53,7 @@ pub struct AgentSession {
     pub fork_parent_id: Option<String>,
     pub session_path: Option<String>,
     pub persisted_messages_count: usize,
+    pub cwd: Option<String>,
 }
 
 impl AgentSession {
@@ -62,6 +64,7 @@ impl AgentSession {
         provider: String,
         system_prompt: String,
         tools: Vec<AgentTool>,
+        cwd: Option<String>,
     ) -> Self {
         let now = chrono::Utc::now().timestamp_millis();
         Self {
@@ -78,6 +81,7 @@ impl AgentSession {
             fork_parent_id: None,
             session_path: None,
             persisted_messages_count: 0,
+            cwd,
         }
     }
 
@@ -92,6 +96,7 @@ impl AgentSession {
             message_count: self.messages.len(),
             status: self.status.clone(),
             fork_parent_id: self.fork_parent_id.clone(),
+            cwd: self.cwd.clone(),
         }
     }
 }
@@ -138,6 +143,7 @@ impl SessionManager {
         system_prompt: String,
         tools: Vec<AgentTool>,
     ) -> (String, String) {
+        let cwd_str = self.cwd.to_string_lossy().to_string();
         match AgentSessionManager::create(
             self.cwd.clone(),
             Some(self.session_dir.clone()),
@@ -169,6 +175,7 @@ impl SessionManager {
                     fork_parent_id: None,
                     session_path: path,
                     persisted_messages_count: 0,
+                    cwd: Some(cwd_str),
                 };
                 self.sessions.write().await.insert(id.clone(), session);
                 (id, title)
@@ -184,6 +191,7 @@ impl SessionManager {
                     provider,
                     system_prompt,
                     tools,
+                    Some(cwd_str),
                 );
                 self.sessions.write().await.insert(id.clone(), session);
                 (id, title)
@@ -417,6 +425,7 @@ impl SessionManager {
                     .session_path()
                     .map(|p| p.to_string_lossy().to_string());
                 let now = chrono::Utc::now().timestamp_millis();
+                let cwd_str = self.cwd.to_string_lossy().to_string();
                 let session = AgentSession {
                     id: new_id.clone(),
                     title: title.clone(),
@@ -431,6 +440,7 @@ impl SessionManager {
                     fork_parent_id: Some(source_id),
                     session_path: path,
                     persisted_messages_count: msg_count,
+                    cwd: Some(cwd_str),
                 };
                 self.sessions.write().await.insert(new_id.clone(), session);
                 Some((new_id, title))
@@ -470,6 +480,10 @@ impl SessionManager {
         } else {
             false
         }
+    }
+
+    pub fn get_cwd(&self) -> PathBuf {
+        self.cwd.clone()
     }
 
     pub async fn get_messages(

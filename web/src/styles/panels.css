@@ -23,38 +23,3 @@
   min-height: 0;
   overflow-y: auto;
 }
-
-.right-panel-container {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-}
-
-.right-panel-tabs {
-  display: flex;
-  border-bottom: 1px solid var(--border-base);
-  background-color: var(--surface-secondary);
-  flex-shrink: 0;
-}
-
-.right-panel-tab {
-  padding: 0.5rem 0.75rem;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-muted);
-  border-bottom: 2px solid transparent;
-  cursor: pointer;
-  transition: color 140ms ease, border-color 140ms ease;
-  background: none;
-  white-space: nowrap;
-}
-
-.right-panel-tab:hover {
-  color: var(--text-primary);
-}
-
-.right-panel-tab[data-active="true"] {
-  color: var(--accent-primary);
-  border-bottom-color: var(--accent-primary);
-}

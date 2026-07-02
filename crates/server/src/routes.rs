@@ -16,6 +16,7 @@ use utoipa::ToSchema;
 
 use crate::AppState;
 use crate::events;
+use crate::git::get_git_info;
 
 #[derive(Deserialize, ToSchema)]
 pub struct AskRequest {
@@ -179,6 +180,10 @@ pub async fn ask(
             as std::sync::Arc<dyn Fn() -> Option<String> + Send + Sync>
     });
 
+    let cwd = state.session_manager.get_cwd();
+    let cwd_for_event = cwd.clone();
+    let et_for_git = et_on_event.clone();
+
     let config = AgentLoopConfig {
         model: model.clone(),
         system_prompt: session.system_prompt.clone(),
@@ -213,9 +218,21 @@ pub async fn ask(
                     .data(serde_json::to_string(&server_event.payload).unwrap_or_default());
                 let _ = et_on_event.send(Ok(sse_event));
             }
+            if matches!(event, pick_agent::core::events::AgentEvent::TurnEnd { .. }) {
+                let et = et_for_git.clone();
+                let cwd = cwd_for_event.clone();
+                tokio::spawn(async move {
+                    let git_info = get_git_info(&cwd);
+                    let payload = serde_json::to_value(&git_info).unwrap_or_default();
+                    let sse_event = Event::default()
+                        .event("git_info_updated")
+                        .data(serde_json::to_string(&payload).unwrap_or_default());
+                    let _ = et.send(Ok(sse_event));
+                });
+            }
         })),
         fs_policy: None,
-        cwd: None,
+        cwd: Some(cwd),
         mode_rulesets: None,
         permission_hooks: None,
         permission_manager: None,

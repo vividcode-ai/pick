@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { Pin, PinOff } from "lucide-react";
 import { RightPanel } from "./RightPanel";
+import type { GitInfo, TodoItem } from "../../types/events";
 
 interface LayoutProps {
   sidebarOpen: boolean;
@@ -13,6 +14,11 @@ interface LayoutProps {
   connected?: boolean;
   rightPanelOpen?: boolean;
   onToggleRightPanel?: () => void;
+  sessionId?: string | null;
+  todos?: TodoItem[];
+  gitInfo?: GitInfo | null;
+  baseUrl?: string;
+  onCommitRequest?: (message: string) => void;
   children: ReactNode;
 }
 
@@ -27,6 +33,11 @@ export function Layout({
   connected,
   rightPanelOpen: rightPanelOpenProp,
   onToggleRightPanel,
+  sessionId,
+  todos,
+  gitInfo,
+  baseUrl,
+  onCommitRequest,
   children,
 }: LayoutProps) {
   const [rightPanelOpenLocal, setRightPanelOpenLocal] = useState(false);
@@ -36,7 +47,17 @@ export function Layout({
   const [rightPanelPinned, setRightPanelPinned] = useState(true);
   const toggleRightPanelPinned = () => setRightPanelPinned((v) => !v);
 
-  const rightPanelContent = rightPanel ?? <RightPanel diffs={rightPanelDiffs} connected={connected ?? false} />;
+  const rightPanelContent = rightPanel ?? (
+    <RightPanel
+      diffs={rightPanelDiffs}
+      connected={connected ?? false}
+      sessionId={sessionId ?? null}
+      todos={todos ?? []}
+      gitInfo={gitInfo ?? null}
+      baseUrl={baseUrl ?? ""}
+      onCommitRequest={onCommitRequest ?? (() => {})}
+    />
+  );
 
   return (
     <div className="flex h-screen overflow-hidden bg-[var(--surface-base)] text-[var(--text-primary)]">
