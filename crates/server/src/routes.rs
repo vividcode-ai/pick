@@ -7,6 +7,7 @@ use axum::response::IntoResponse;
 use axum::response::sse::Event;
 use pick_agent::core::agent_loop::AgentLoopConfig;
 use pick_agent::core::state::ThinkingLevel;
+use pick_agent::permission::manager::PermissionManager;
 use pick_ai::types::Message as AiMessage;
 use pick_ai::types::UserMessage;
 use serde::Deserialize;
@@ -15,6 +16,7 @@ use tracing::{error, info};
 use utoipa::ToSchema;
 
 use crate::AppState;
+use crate::approval::SseApprovalHook;
 use crate::events;
 use crate::git::get_git_info;
 
@@ -132,6 +134,7 @@ pub async fn ask(
                 "approval_id": approval_id,
                 "tool_name": title,
                 "tool_args": msg_body,
+                "source": "tool",
             });
             let _ = et.send(Ok(Event::default()
                 .event("approval_required")
@@ -173,6 +176,18 @@ pub async fn ask(
                 >
         },
     ) as pick_agent::core::state::QuestionFn);
+
+    let permission_manager = Arc::new(PermissionManager::new(
+        "danger-full-access",
+        &std::env::current_dir().unwrap_or_default(),
+        None,
+        &[],
+    ));
+    let sse_hook = Arc::new(SseApprovalHook {
+        event_tx: sse_state.event_tx.clone(),
+        pending_approvals: sse_state.pending_approvals.clone(),
+    });
+    permission_manager.register_permission_hook(sse_hook);
 
     let api_key = state.api_keys.get(&session.provider).cloned();
     let get_api_key = api_key.map(|key| {
@@ -234,8 +249,8 @@ pub async fn ask(
         fs_policy: None,
         cwd: Some(cwd),
         mode_rulesets: None,
-        permission_hooks: None,
-        permission_manager: None,
+        permission_hooks: Some(permission_manager.hook_registry.clone()),
+        permission_manager: Some(permission_manager.clone()),
         tool_event_bus: None,
         sandbox: None,
         sandbox_enabled: None,

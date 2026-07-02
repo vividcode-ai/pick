@@ -294,6 +294,29 @@ pub(crate) fn build_agent_config(
         }
     });
 
+    let approve: Option<pick_agent::core::state::ApproveFn> = Some(Arc::new({
+        let cmd_tx_clone = cmd_tx.clone();
+        move |title: String, message: String| {
+            let cmd_tx = cmd_tx_clone.clone();
+            Box::pin(async move {
+                let (tx, rx) = tokio::sync::oneshot::channel();
+                let _ = cmd_tx.send(TuiCommand::ToolConfirm {
+                    title,
+                    message,
+                    response_tx: tx,
+                });
+                match rx.await {
+                    Ok(Ok(answers)) => answers
+                        .first()
+                        .and_then(|a| a.first())
+                        .map(|s| s == "Allow")
+                        .unwrap_or(false),
+                    _ => false,
+                }
+            }) as std::pin::Pin<Box<dyn std::future::Future<Output = bool> + Send>>
+        }
+    }));
+
     let on_turn_complete: Arc<
         dyn Fn(
                 &[Message],
@@ -372,7 +395,7 @@ pub(crate) fn build_agent_config(
         on_turn_complete: Some(on_turn_complete),
         provider_max_retries: None,
         provider_max_retry_delay_ms: None,
-        approve: None,
+        approve,
         skill_paths,
     }
 }

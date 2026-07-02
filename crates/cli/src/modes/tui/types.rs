@@ -44,6 +44,11 @@ pub(crate) enum TuiCommand {
         permission: String,
         response_tx: tokio::sync::oneshot::Sender<Result<Vec<Vec<String>>, String>>,
     },
+    ToolConfirm {
+        title: String,
+        message: String,
+        response_tx: tokio::sync::oneshot::Sender<Result<Vec<Vec<String>>, String>>,
+    },
     GoalUpdated(serde_json::Value),
     /// Queue state update for UI feedback
     QueueUpdate {

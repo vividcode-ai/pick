@@ -41,10 +41,11 @@ export interface AgentEndPayload {
 }
 
 export interface ApprovalRequiredPayload {
-  id: string;
+  approval_id: string;
   tool_name: string;
   tool_args: string;
-  permission: string;
+  permission?: string;
+  source?: "tool" | "permission_hook";
 }
 
 export interface ChatMessage {

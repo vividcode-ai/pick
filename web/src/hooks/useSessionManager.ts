@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
+  ApprovalRequiredPayload,
   ChatMessage,
   GitInfo,
   ProviderInfo,
@@ -93,8 +94,9 @@ interface SessionData {
   messages: ChatMessage[];
   streaming: boolean;
   connected: boolean;
-  todos: TodoItem[];
-  gitInfo: GitInfo | null;
+  todos?: TodoItem[];
+  gitInfo?: GitInfo | null;
+  pendingApproval?: ApprovalRequiredPayload | null;
 }
 
 export function useSessionManager(baseUrl: string) {
@@ -450,9 +452,16 @@ export function useSessionManager(baseUrl: string) {
       } catch {}
     });
 
+    eventSource.addEventListener("approval_required", (e) => {
+      try {
+        const payload: ApprovalRequiredPayload = JSON.parse(e.data);
+        updateSession(sessionId, (prev) => ({ ...prev, pendingApproval: payload }));
+      } catch {}
+    });
+
     eventSource.addEventListener("agent_end", (e) => {
       turnEndMessageCount = -1;
-      updateSession(sessionId, (prev) => ({ ...prev, streaming: false }));
+      updateSession(sessionId, (prev) => ({ ...prev, streaming: false, pendingApproval: null }));
       if (sessionId !== activeSessionIdRef.current) {
         startEvictionTimer(sessionId);
       }
@@ -491,6 +500,19 @@ export function useSessionManager(baseUrl: string) {
     }).catch(() => {});
 
     updateSession(sessionId, (prev) => ({ ...prev, streaming: false }));
+  }, [baseUrl, updateSession]);
+
+  const respondApproval = useCallback(async (approvalId: string, approved: boolean) => {
+    const sessionId = activeSessionIdRef.current;
+    if (!sessionId) return;
+
+    updateSession(sessionId, (prev) => ({ ...prev, pendingApproval: null }));
+
+    fetch(`${baseUrl}/approve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: sessionId, approval_id: approvalId, approved }),
+    }).catch(() => {});
   }, [baseUrl, updateSession]);
 
   const deleteSession = useCallback(async (id: string) => {
@@ -553,6 +575,8 @@ export function useSessionManager(baseUrl: string) {
     };
   }, []);
 
+  const activePendingApproval = activeData?.pendingApproval ?? null;
+
   return {
     activeSessionId,
     activeMessages,
@@ -560,11 +584,13 @@ export function useSessionManager(baseUrl: string) {
     activeConnected,
     activeTodos,
     activeGitInfo,
+    activePendingApproval,
     streamingSessions,
     createSession,
     switchSession,
     ask,
     cancel,
+    respondApproval,
     deleteSession,
     forkSession,
   };

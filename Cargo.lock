@@ -3995,6 +3995,7 @@ dependencies = [
 name = "pick-server"
 version = "0.1.16"
 dependencies = [
+ "async-trait",
  "axum",
  "chrono",
  "futures",

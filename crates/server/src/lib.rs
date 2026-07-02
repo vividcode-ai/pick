@@ -1,3 +1,4 @@
+pub mod approval;
 pub mod docs;
 pub mod events;
 pub mod files;

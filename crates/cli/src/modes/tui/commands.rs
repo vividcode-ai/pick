@@ -102,6 +102,25 @@ pub(crate) fn apply_tui_command(tui: &mut TuiApp, cmd: TuiCommand) {
             tui.question_response_tx = Some(response_tx);
             tui.state = pick_tui::app::AppState::Questioning;
         }
+        TuiCommand::ToolConfirm {
+            title,
+            message,
+            response_tx,
+        } => {
+            let qdata = vec![(
+                message,
+                title,
+                vec![
+                    ("Allow".to_string(), "Approve this action".to_string()),
+                    ("Deny".to_string(), "Reject this action".to_string()),
+                ],
+                false,
+            )];
+            let dialog = QuestionDialog::new(qdata);
+            tui.question_dialog = Some(dialog);
+            tui.question_response_tx = Some(response_tx);
+            tui.state = pick_tui::app::AppState::Questioning;
+        }
         TuiCommand::GoalUpdated(goal) => {
             apply_goal_update(tui, &goal);
         }
