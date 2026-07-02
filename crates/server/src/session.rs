@@ -1,5 +1,5 @@
 use std::cmp::Reverse;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
@@ -224,10 +224,30 @@ impl SessionManager {
     async fn append_messages_to_jsonl(&self, path: &str, messages: &[Message]) {
         let path = PathBuf::from(path);
 
-        // Load existing content then append new entries
         let mut content = tokio::fs::read_to_string(&path).await.unwrap_or_default();
+
+        // Find current leaf from existing entries to maintain parent chain
+        let leaf_id = {
+            let entries: Vec<SessionEntry> = content
+                .lines()
+                .filter_map(|line| serde_json::from_str(line).ok())
+                .collect();
+            let child_ids: HashSet<&str> = entries
+                .iter()
+                .filter_map(|e| e.parent_id.as_deref())
+                .collect();
+            entries
+                .iter()
+                .filter(|e| !child_ids.contains(e.id.as_str()))
+                .max_by_key(|e| e.timestamp)
+                .map(|e| e.id.clone())
+        };
+
+        let mut prev_id = leaf_id;
         for msg in messages {
-            let entry: SessionEntry = msg.into();
+            let mut entry: SessionEntry = msg.into();
+            entry.parent_id = prev_id;
+            prev_id = Some(entry.id.clone());
             if let Ok(line) = serde_json::to_string(&entry) {
                 content.push_str(&line);
                 content.push('\n');
@@ -302,15 +322,34 @@ impl SessionManager {
     }
 
     async fn append_session_info_to_jsonl(&self, path: &str, name: &str) {
+        let path = PathBuf::from(path);
+        let mut content = tokio::fs::read_to_string(&path).await.unwrap_or_default();
+
+        // Find current leaf to maintain parent chain
+        let leaf_id = {
+            let entries: Vec<SessionEntry> = content
+                .lines()
+                .filter_map(|line| serde_json::from_str(line).ok())
+                .collect();
+            let child_ids: HashSet<&str> = entries
+                .iter()
+                .filter_map(|e| e.parent_id.as_deref())
+                .collect();
+            entries
+                .iter()
+                .filter(|e| !child_ids.contains(e.id.as_str()))
+                .max_by_key(|e| e.timestamp)
+                .map(|e| e.id.clone())
+        };
+
         let entry = SessionEntry {
             id: uuid::Uuid::now_v7().to_string(),
-            parent_id: None,
+            parent_id: leaf_id,
             timestamp: chrono::Utc::now().timestamp_millis(),
             kind: SessionEntryKind::SessionInfo(SessionInfoEntry {
                 name: name.to_string(),
             }),
         };
-        let mut content = tokio::fs::read_to_string(path).await.unwrap_or_default();
         if let Ok(line) = serde_json::to_string(&entry) {
             content.push_str(&line);
             content.push('\n');

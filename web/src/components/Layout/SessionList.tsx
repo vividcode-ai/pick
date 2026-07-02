@@ -22,9 +22,6 @@ export function SessionList({
 
   return (
     <div className="flex flex-col min-h-0 flex-1">
-      <div className="px-4 py-3 border-b border-neutral-800">
-        <span className="text-xs font-semibold uppercase text-neutral-400 tracking-wider">Sessions</span>
-      </div>
       <SessionSearch query={query} onQueryChange={setQuery} />
       <div className="flex-1 overflow-y-auto px-2 py-1 space-y-0.5">
         {filtered.length === 0 ? (
