@@ -479,7 +479,7 @@ export function useSessionManager(baseUrl: string) {
     eventSource.addEventListener("todo_updated", (e) => {
       try {
         const data = JSON.parse(e.data);
-        const todos: TodoItem[] = data.todos || [];
+        const todos: TodoItem[] = Array.isArray(data) ? data : data.todos || [];
         updateSession(sessionId, (prev) => ({ ...prev, todos }));
       } catch {}
     });

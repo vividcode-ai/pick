@@ -113,13 +113,13 @@ export function ChatInput({
       <div className="w-full px-4 py-3">
       <div className="max-w-[90%] md:max-w-[70%] lg:max-w-[40%] mx-auto">
         {streaming && (
-          <div className="flex items-center gap-2 text-neutral-400 px-1 pb-1">
+          <div className="flex items-center gap-2 text-neutral-400 px-1 pb-3">
             <span className="w-2 h-2 bg-neutral-400 rounded-full animate-pulse" />
             <span className="text-sm">Working...</span>
           </div>
         )}
         {pendingMessages.length > 0 && (
-          <div className="flex flex-col gap-1 px-1 pb-2">
+          <div className="flex flex-col gap-1 px-1 pb-3">
             {pendingMessages.map((msg, i) => (
               <div key={i} className="flex items-start gap-2 text-neutral-400 text-xs bg-neutral-800/60 rounded-lg px-3 py-1.5">
                 <span className="w-1.5 h-1.5 bg-neutral-500 rounded-full mt-1 shrink-0" />
