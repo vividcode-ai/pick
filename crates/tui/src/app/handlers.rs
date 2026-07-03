@@ -1050,7 +1050,7 @@ impl TuiApp {
             KeyCode::Up => {
                 if self.editor.is_autocomplete_active() {
                     self.editor.autocomplete_previous();
-                } else if self.editor.history_index.is_some() {
+                } else if self.editor.is_browsing_history() {
                     self.editor.history_previous();
                 } else if self.editor.buffer.is_empty() {
                     self.editor.history_previous();
@@ -1061,7 +1061,7 @@ impl TuiApp {
             KeyCode::Down => {
                 if self.editor.is_autocomplete_active() {
                     self.editor.autocomplete_next();
-                } else if self.editor.history_index.is_some() {
+                } else if self.editor.is_browsing_history() {
                     self.editor.history_next();
                 } else if self.editor.buffer.is_empty() {
                     self.editor.history_next();

@@ -19,6 +19,7 @@ pub mod core;
 pub mod extensions;
 pub mod inter_agent;
 pub mod permission;
+pub mod prompt_history;
 pub mod session;
 pub mod settings;
 pub mod skills;

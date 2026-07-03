@@ -17,6 +17,7 @@ interface ChatInputProps {
   onThinkingLevelChange: (l: string) => void;
   sessionId?: string | null;
   pendingMessages: string[];
+  baseUrl: string;
 }
 
 export function ChatInput({
@@ -33,10 +34,12 @@ export function ChatInput({
   onThinkingLevelChange,
   sessionId,
   pendingMessages,
+  baseUrl,
 }: ChatInputProps) {
   const [input, setInput] = useState("");
   const [currentCommand, setCurrentCommand] = useState<"build" | "plan">("build");
   const [commandOpen, setCommandOpen] = useState(false);
+  const [browsingHistory, setBrowsingHistory] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const commandRef = useRef<HTMLDivElement>(null);
 
@@ -54,23 +57,74 @@ export function ChatInput({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  async function navigateHistory(direction: "up" | "down"): Promise<{ text: string | null; browsing: boolean }> {
+    try {
+      const res = await fetch(`${baseUrl}/prompt-history/navigate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ direction, current_input: input }),
+      });
+      if (!res.ok) return { text: null, browsing: false };
+      const data = await res.json();
+      return { text: data.text ?? null, browsing: data.browsing ?? false };
+    } catch { return { text: null, browsing: false }; }
+  }
+
+  async function pushHistory(text: string) {
+    try {
+      await fetch(`${baseUrl}/prompt-history/push`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+    } catch { /* ignore */ }
+  }
+
   const handleSend = () => {
     const trimmed = input.trim();
     if (!trimmed) return;
     onSend(trimmed);
+    pushHistory(trimmed);
     setInput("");
+    setBrowsingHistory(false);
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
   };
 
-  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleKeyDown = async (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
+      return;
     }
     if (e.key === "Escape" && disabled && onCancel) {
       onCancel();
+      return;
+    }
+    if (e.key === "ArrowUp") {
+      if (!connected || !baseUrl) return;
+      e.preventDefault();
+      const result = await navigateHistory("up");
+      if (result.text !== null) {
+        setInput(result.text);
+        setBrowsingHistory(result.browsing);
+      }
+      return;
+    }
+    if (e.key === "ArrowDown") {
+      if (!connected || !baseUrl) return;
+      e.preventDefault();
+      const result = await navigateHistory("down");
+      if (result.text !== null) {
+        setInput(result.text);
+        setBrowsingHistory(result.browsing);
+      }
+      return;
+    }
+    // Any other key exits history browsing
+    if (browsingHistory) {
+      setBrowsingHistory(false);
     }
   };
 
@@ -85,6 +139,7 @@ export function ChatInput({
   const insertCommand = (cmd: string) => {
     const newVal = cmd + " ";
     setInput(newVal);
+    setBrowsingHistory(false);
     if (textareaRef.current) {
       textareaRef.current.focus();
       const len = newVal.length;

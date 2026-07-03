@@ -5,6 +5,8 @@ use unicode_width::UnicodeWidthStr;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 
+use pick_agent::prompt_history::HistoryProvider;
+
 use crate::autocomplete::{AutocompleteProvider, AutocompleteSuggestions};
 use crate::kill_ring::KillRing;
 use crate::undo_stack::UndoStack;
@@ -60,17 +62,17 @@ pub struct Editor {
     /// Whether to show the autocomplete popup
     autocomplete_visible: bool,
 
-    // --- Input history ---
-    /// Previously submitted input texts (most recent last)
-    pub input_history: Vec<String>,
-    /// Current position when browsing history (None = not browsing)
-    pub history_index: Option<usize>,
-    /// Saved current input buffer when entering history browsing
-    staging_buffer: String,
+    // --- Prompt history (delegated to HistoryProvider) ---
+    /// Optional history provider for input history navigation.
+    pub history: Option<Box<dyn HistoryProvider>>,
+    /// Whether the user is currently browsing history entries.
+    browsing_history: bool,
 
     // --- Pending messages browsing ---
     /// Index into pending_user_messages when browsing (None = not browsing)
     pub pending_index: Option<usize>,
+    /// Saved current input buffer when entering pending-message browsing
+    pending_staging: String,
 
     // --- Paste placeholder ---
     /// Maps a placeholder string (displayed in the buffer) to the actual
@@ -105,10 +107,10 @@ impl Editor {
             autocomplete_suggestions: None,
             autocomplete_selection: 0,
             autocomplete_visible: false,
-            input_history: Vec::new(),
-            history_index: None,
-            staging_buffer: String::new(),
+            history: None,
+            browsing_history: false,
             pending_index: None,
+            pending_staging: String::new(),
             pending_pastes: Vec::new(),
             paste_elements: Vec::new(),
         }
@@ -156,7 +158,7 @@ impl Editor {
     pub fn insert_char(&mut self, c: char) {
         self.push_undo();
         // Any manual edit exits history browsing
-        self.history_index = None;
+        self.reset_history();
         self.buffer.insert(self.cursor, c);
         self.cursor += c.len_utf8();
         self.mark = None;
@@ -187,7 +189,7 @@ impl Editor {
             return;
         }
         self.push_undo();
-        self.history_index = None;
+        self.reset_history();
         self.mark = None;
         self.kill_accumulating = false;
         self.buffer.insert_str(self.cursor, s);
@@ -210,7 +212,7 @@ impl Editor {
         if s.is_empty() {
             return;
         }
-        self.history_index = None;
+        self.reset_history();
         self.mark = None;
         self.kill_accumulating = false;
 
@@ -313,7 +315,7 @@ impl Editor {
     pub fn insert_newline_auto_indent(&mut self) {
         self.push_undo();
         // Any manual edit exits history browsing
-        self.history_index = None;
+        self.reset_history();
         // Get current line's leading whitespace
         let line_start = self.buffer[..self.cursor]
             .rfind('\n')
@@ -645,7 +647,7 @@ impl Editor {
         if self.cursor == 0 {
             return;
         }
-        self.history_index = None;
+        self.reset_history();
         // If cursor is at the end of a paste element, delete the entire
         // element atomically (remove placeholder from buffer + tracking).
         if let Some(idx) = self
@@ -708,7 +710,7 @@ impl Editor {
         if self.cursor >= self.buffer.len() {
             return;
         }
-        self.history_index = None;
+        self.reset_history();
         // If cursor is at the start of a paste element, delete the entire
         // element atomically.
         if let Some(idx) = self
@@ -1134,6 +1136,19 @@ impl Editor {
         self.paste_elements.clear();
     }
 
+    /// Reset history browsing state (called on any manual edit)
+    fn reset_history(&mut self) {
+        self.browsing_history = false;
+        if let Some(h) = &mut self.history {
+            h.reset();
+        }
+    }
+
+    /// Set the history provider for input history navigation.
+    pub fn set_history_provider(&mut self, provider: Box<dyn HistoryProvider>) {
+        self.history = Some(provider);
+    }
+
     /// Get the buffer content
     pub fn text(&self) -> &str {
         &self.buffer
@@ -1155,77 +1170,46 @@ impl Editor {
         text
     }
 
-    // --- Input history ---
+    // --- Prompt history (delegated to HistoryProvider) ---
 
-    /// Maximum number of history entries to keep
-    const MAX_HISTORY: usize = 100;
+    /// Returns `true` when the user is currently navigating history.
+    pub fn is_browsing_history(&self) -> bool {
+        self.browsing_history
+    }
 
-    /// Push a submitted text into input history.
-    /// Deduplicates against the most recent entry and limits to MAX_HISTORY.
-    /// Resets browsing state back to current input.
+    /// Push a submitted text into input history (delegates to provider).
     pub fn push_history(&mut self, text: String) {
-        if text.is_empty() {
-            return;
+        if let Some(h) = &mut self.history {
+            h.push(&text);
         }
-        let trimmed = text.trim().to_string();
-        if trimmed.is_empty() {
-            return;
-        }
-        if self.input_history.last().map(|s| s.as_str()) == Some(trimmed.as_str()) {
-            return;
-        }
-        self.input_history.push(trimmed);
-        if self.input_history.len() > Self::MAX_HISTORY {
-            self.input_history.remove(0);
-        }
-        self.history_index = None;
-        self.staging_buffer.clear();
+        self.browsing_history = false;
     }
 
-    /// Navigate backward in input history.
-    /// Saves current buffer into staging_buffer if entering history mode.
-    pub fn history_previous(&mut self) {
-        if self.input_history.is_empty() {
-            return;
-        }
-        let text = match self.history_index {
-            None => {
-                self.staging_buffer = self.buffer.clone();
-                let idx = self.input_history.len() - 1;
-                self.history_index = Some(idx);
-                self.input_history[idx].clone()
-            }
-            Some(i) if i > 0 => {
-                let idx = i - 1;
-                self.history_index = Some(idx);
-                self.input_history[idx].clone()
-            }
-            _ => return,
-        };
-        self.set_text(&text);
-    }
-
-    /// Navigate forward in input history.
-    /// Restores staging_buffer when past the newest entry.
-    pub fn history_next(&mut self) {
-        let idx = match self.history_index {
-            None => return,
-            Some(i) => i,
-        };
-        if idx + 1 >= self.input_history.len() {
-            self.history_index = None;
-            if self.staging_buffer.is_empty() {
-                self.clear();
-            } else {
-                let text = self.staging_buffer.clone();
-                self.staging_buffer.clear();
-                self.set_text(&text);
-            }
+    /// Navigate backward (older) in input history.
+    /// Returns `true` if navigation occurred.
+    pub fn history_previous(&mut self) -> bool {
+        let text = self.history.as_mut().and_then(|h| h.previous(&self.buffer));
+        if let Some(t) = text {
+            self.set_text(&t);
+            self.browsing_history = true;
+            true
         } else {
-            let next = idx + 1;
-            self.history_index = Some(next);
-            let text = self.input_history[next].clone();
-            self.set_text(&text);
+            false
+        }
+    }
+
+    /// Navigate forward (newer) in input history.
+    /// Returns `true` if navigation occurred.
+    pub fn history_next(&mut self) -> bool {
+        let result = self.history.as_mut().and_then(|h| h.next(&self.buffer));
+        if let Some(ref t) = result {
+            self.set_text(t);
+            // Check if provider exited browse mode
+            let still_browsing = self.history.as_ref().map_or(false, |h| h.is_browsing());
+            self.browsing_history = still_browsing;
+            true
+        } else {
+            false
         }
     }
 
@@ -1239,7 +1223,7 @@ impl Editor {
         let idx = match self.pending_index {
             None => {
                 // Save current buffer the first time
-                self.staging_buffer = self.buffer.clone();
+                self.pending_staging = self.buffer.clone();
                 msgs.len() - 1
             }
             Some(i) if i > 0 => i - 1,
@@ -1257,11 +1241,11 @@ impl Editor {
         };
         if idx + 1 >= msgs.len() {
             self.pending_index = None;
-            if self.staging_buffer.is_empty() {
+            if self.pending_staging.is_empty() {
                 self.clear();
             } else {
-                let text = self.staging_buffer.clone();
-                self.staging_buffer.clear();
+                let text = self.pending_staging.clone();
+                self.pending_staging.clear();
                 self.set_text(&text);
             }
         } else {

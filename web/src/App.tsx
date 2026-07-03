@@ -278,6 +278,7 @@ export default function App() {
       onThinkingLevelChange={setThinkingLevel}
       sessionId={activeSessionId}
       pendingMessages={activePendingMessages}
+      baseUrl={baseUrl ?? ""}
     />
   );
 
@@ -294,6 +295,7 @@ export default function App() {
         todos={activeTodos}
         gitInfo={activeGitInfo}
         onCommitRequest={handleCommitRequest}
+        baseUrl={baseUrl}
         leftPanel={
           <LeftPanel
             onNewSession={handleNewSession}

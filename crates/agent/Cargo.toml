@@ -6,7 +6,6 @@ license.workspace = true
 
 [dependencies]
 pick-ai = { path = "../ai" }
-pick-tui = { path = "../tui" }
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true

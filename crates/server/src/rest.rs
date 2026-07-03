@@ -448,3 +448,18 @@ pub async fn get_session_git_info(
     let git_info = get_git_info(&cwd);
     Json(git_info).into_response()
 }
+
+#[derive(Serialize, ToSchema)]
+pub struct ServerConfigResponse {
+    pub host: String,
+    pub port: u16,
+    pub pty_ws_port: u16,
+}
+
+pub async fn server_config(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    Json(ServerConfigResponse {
+        host: state.config.host.clone(),
+        port: state.config.port,
+        pty_ws_port: state.config.pty_ws_port,
+    })
+}

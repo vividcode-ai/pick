@@ -136,6 +136,13 @@ pub(crate) async fn init_tui_mode(
         }
     };
 
+    // Set up prompt history manager
+    {
+        let mut history = pick_agent::prompt_history::PromptHistoryManager::new(&cwd);
+        history.load();
+        tui.editor.set_history_provider(Box::new(history));
+    }
+
     tui.set_context_info(Some(0.0), model.context_window);
 
     // Restore session name

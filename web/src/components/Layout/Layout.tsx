@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { Terminal } from "lucide-react";
 import { RightPanel } from "./RightPanel";
+import { TerminalPanel } from "./TerminalPanel";
 import type { GitInfo, TodoItem } from "../../types/events";
 
 interface LayoutProps {
@@ -18,6 +19,7 @@ interface LayoutProps {
   todos?: TodoItem[];
   gitInfo?: GitInfo | null;
   onCommitRequest?: (message: string) => void;
+  baseUrl?: string;
   children: ReactNode;
 }
 
@@ -36,11 +38,14 @@ export function Layout({
   todos,
   gitInfo,
   onCommitRequest,
+  baseUrl,
   children,
 }: LayoutProps) {
   const [rightPanelOpenLocal, setRightPanelOpenLocal] = useState(false);
   const rightPanelOpen = rightPanelOpenProp ?? rightPanelOpenLocal;
   const toggleRightPanel = onToggleRightPanel ?? (() => setRightPanelOpenLocal((v) => !v));
+  const [terminalOpen, setTerminalOpen] = useState(false);
+  const toggleTerminal = () => setTerminalOpen((v) => !v);
 
   const rightPanelContent = rightPanel ?? (
     <RightPanel
@@ -107,7 +112,12 @@ export function Layout({
                 {hamburgerIcon}
               </button>
               <button
-                className="p-1 rounded-md hover:bg-[var(--surface-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                onClick={toggleTerminal}
+                className={`p-1 rounded-md hover:bg-[var(--surface-hover)] transition-colors ${
+                  terminalOpen
+                    ? "text-[var(--accent-primary)] bg-[var(--surface-hover)]"
+                    : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                }`}
                 title="打开终端"
               >
                 <Terminal className="w-4 h-4" />
@@ -133,7 +143,12 @@ export function Layout({
         </button>
       )}
 
-      {/* Mobile drawer */}
+        {/* Terminal Panel */}
+        {baseUrl && (
+          <TerminalPanel baseUrl={baseUrl} visible={terminalOpen} onClose={() => setTerminalOpen(false)} />
+        )}
+
+        {/* Mobile drawer */}
       {rightPanelOpen && (
         <div className="md:hidden fixed inset-0 z-40 flex justify-end">
           <div className="fixed inset-0 bg-black/50" onClick={toggleRightPanel} />

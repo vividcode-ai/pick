@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+pick-agent = { path = "../agent" }
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true

@@ -5,6 +5,7 @@ pub mod files;
 pub mod git;
 pub mod mcp_routes;
 pub mod plugins;
+pub mod prompt_history_routes;
 pub mod pty;
 pub mod rest;
 pub mod routes;
@@ -20,6 +21,7 @@ use std::sync::Arc;
 
 use axum::Router;
 use axum::routing::{delete, get, post};
+use pick_agent::prompt_history::PromptHistoryManager;
 use pick_agent::session::manager::SessionManager as AgentSessionManager;
 use pick_ai::types::Message;
 use pick_mcp::McpManager;
@@ -27,6 +29,7 @@ use pick_mcp::config::McpServerConfig;
 use pty::PtyManager;
 use session::SseSessionState;
 use tokio::net::TcpListener;
+use tokio::sync::Mutex as TokioMutex;
 use tokio::sync::RwLock;
 use tower_http::cors::CorsLayer;
 use tracing::{debug, info};
@@ -41,6 +44,7 @@ pub struct AppState {
     pub pty_manager: PtyManager,
     pub mcp_manager: McpManager,
     pub mcp_configs: RwLock<Vec<McpServerConfig>>,
+    pub prompt_history: TokioMutex<PromptHistoryManager>,
 }
 
 impl AppState {
@@ -52,6 +56,7 @@ impl AppState {
             .map(|p| p.to_path_buf())
             .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
         let session_dir = cwd.join(".pick").join("sessions");
+        let history_cwd = cwd.clone();
         Self {
             session_manager: session::SessionManager::new_with_cwd(session_dir, cwd),
             sse_sessions: RwLock::new(HashMap::new()),
@@ -62,6 +67,7 @@ impl AppState {
             pty_manager: PtyManager::new(),
             mcp_manager: McpManager::new(),
             mcp_configs: RwLock::new(Vec::new()),
+            prompt_history: TokioMutex::new(PromptHistoryManager::new(&history_cwd)),
         }
     }
 
@@ -207,6 +213,7 @@ impl Default for ServerConfig {
 pub fn create_app(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/health", get(rest::health))
+        .route("/server-config", get(rest::server_config))
         .route(
             "/sessions",
             get(rest::list_sessions).post(rest::create_session),
@@ -251,6 +258,18 @@ pub fn create_app(state: Arc<AppState>) -> Router {
             "/settings",
             get(settings_routes::get_settings).patch(settings_routes::update_settings),
         )
+        .route(
+            "/prompt-history",
+            get(prompt_history_routes::get_history_window),
+        )
+        .route(
+            "/prompt-history/navigate",
+            post(prompt_history_routes::navigate_history),
+        )
+        .route(
+            "/prompt-history/push",
+            post(prompt_history_routes::push_history),
+        )
         .route("/openapi.json", get(docs::openapi_json))
         .route("/docs", get(docs::docs_ui))
         .fallback(spa::spa_handler)
@@ -268,6 +287,12 @@ pub async fn run_server(config: ServerConfig) -> Result<(), Box<dyn std::error::
         .map(Path::new)
         .unwrap_or_else(|| Path::new("."));
     state.load_persisted_sessions(cwd).await;
+
+    // Load prompt history into memory window
+    {
+        let mut history = state.prompt_history.lock().await;
+        history.load();
+    }
 
     let app = create_app(state.clone());
 
@@ -303,6 +328,12 @@ pub async fn run_server_on_listener(
         .map(Path::new)
         .unwrap_or_else(|| Path::new("."));
     state.load_persisted_sessions(cwd).await;
+
+    // Load prompt history into memory window
+    {
+        let mut history = state.prompt_history.lock().await;
+        history.load();
+    }
 
     let app = create_app(state);
 
