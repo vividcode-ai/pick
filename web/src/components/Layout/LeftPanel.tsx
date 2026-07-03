@@ -35,14 +35,14 @@ export function LeftPanel({
         <button
           onClick={onNewSession}
           title="New Session"
-          className="p-2 rounded-md hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 transition-colors"
+          className="p-2 rounded-md hover:bg-[var(--surface-hover)] text-neutral-400 hover:text-[var(--text-primary)] transition-colors"
         >
           <MessageSquarePlus className="w-5 h-5" />
         </button>
         <button
           onClick={onPlugins}
           title="Plugins"
-          className="p-2 rounded-md hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 transition-colors"
+          className="p-2 rounded-md hover:bg-[var(--surface-hover)] text-neutral-400 hover:text-[var(--text-primary)] transition-colors"
         >
           <Puzzle className="w-5 h-5" />
         </button>
@@ -51,7 +51,7 @@ export function LeftPanel({
           <button
             onClick={onTogglePinned}
             title={pinned ? "Auto-close" : "Keep open"}
-            className="p-2 rounded-md hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 transition-colors"
+            className="p-2 rounded-md hover:bg-[var(--surface-hover)] text-neutral-400 hover:text-[var(--text-primary)] transition-colors"
           >
             {pinned ? <Pin className="w-5 h-5" /> : <PinOff className="w-5 h-5" />}
           </button>

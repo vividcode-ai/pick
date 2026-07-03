@@ -13,7 +13,7 @@ export function ThemeModeToggle({ className }: { className?: string }) {
   return (
     <button
       type="button"
-      className={className ?? "p-2 rounded-md hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 transition-colors"}
+      className={className ?? "p-2 rounded-md hover:bg-[var(--surface-hover)] text-neutral-400 hover:text-[var(--text-primary)] transition-colors"}
       onClick={cycleThemeMode}
       aria-label={`Theme: ${themeMode}`}
       title={`Theme: ${themeMode}`}

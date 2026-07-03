@@ -35,7 +35,7 @@ export function ArchivedSessionsSection({ sessions, onUnarchive, onDelete }: Arc
   }
 
   return (
-    <div className="border border-[var(--border-base)] rounded-md overflow-hidden">
+    <div className="border border-[var(--border-base)] rounded-md overflow-hidden p-1">
       <div className="divide-y divide-[var(--border-base)]">
         {sessions.map((session) => (
           <div
