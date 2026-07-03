@@ -7,17 +7,23 @@ use std::sync::atomic::AtomicBool;
 use std::task::{Context, Poll};
 use std::time::Duration;
 
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::response::sse::{Event, KeepAlive, Sse};
 use pick_agent::core::message_queue::{PendingMessageQueue, QueueMode};
+use serde::Deserialize;
 use tokio::sync::mpsc;
 use tracing::info;
 
 use crate::AppState;
 use crate::git::get_git_info;
 use crate::session::SseSessionState;
+
+#[derive(Deserialize)]
+pub struct SseQuery {
+    pub mode: Option<String>,
+}
 
 struct SseStream {
     rx: mpsc::UnboundedReceiver<Result<Event, Infallible>>,
@@ -47,11 +53,14 @@ impl Drop for SseStream {
 pub async fn handle_sse(
     Path(session_id): Path<String>,
     State(state): State<Arc<AppState>>,
+    Query(query): Query<SseQuery>,
 ) -> impl IntoResponse {
     let session = state.session_manager.get(&session_id).await;
     if session.is_none() {
         return (StatusCode::NOT_FOUND, "Session not found").into_response();
     }
+
+    let mode = query.mode.unwrap_or_else(|| "build".to_string());
 
     let (tx, rx) = mpsc::unbounded_channel::<Result<Event, Infallible>>();
 
@@ -68,6 +77,7 @@ pub async fn handle_sse(
                     QueueMode::OneAtATime,
                 ))),
                 in_flight: Arc::new(AtomicBool::new(false)),
+                agent_mode: Arc::new(std::sync::RwLock::new(mode)),
             },
         );
     }

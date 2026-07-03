@@ -6,9 +6,12 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::response::sse::Event;
+
 use pick_agent::core::agent_loop::AgentLoopConfig;
 use pick_agent::core::state::ThinkingLevel;
+use pick_agent::permission::fs_policy::FileSystemPolicy;
 use pick_agent::permission::manager::PermissionManager;
+use pick_agent::permission::{Action, Rule, Ruleset};
 use pick_ai::types::Message as AiMessage;
 use pick_ai::types::UserMessage;
 use serde::Deserialize;
@@ -103,6 +106,8 @@ pub async fn ask(
                 .into_response();
         }
     };
+
+    let agent_mode = sse_state.agent_mode.read().unwrap().clone();
 
     // Enqueue the user message
     {
@@ -240,6 +245,7 @@ pub async fn ask(
             permission_manager,
             cwd,
             cwd_for_event,
+            agent_mode,
         )
         .await;
     });
@@ -264,6 +270,7 @@ async fn run_agent_loop_queue(
     permission_manager: Arc<PermissionManager>,
     cwd: std::path::PathBuf,
     cwd_for_event: std::path::PathBuf,
+    agent_mode: String,
 ) {
     let et_on_event = sse_state.event_tx.clone();
 
@@ -323,6 +330,71 @@ async fn run_agent_loop_queue(
         let et_follow = sse_state.event_tx.clone();
         let et_for_git = et_on_event.clone();
         let cwd_for_git = cwd_for_event.clone();
+
+        // Build mode-specific ruleset
+        let ruleset = match agent_mode.as_str() {
+            "plan" => Ruleset::new(vec![
+                Rule::new("read", "*", Action::Allow),
+                Rule::new("grep", "*", Action::Allow),
+                Rule::new("glob", "*", Action::Allow),
+                Rule::new("list", "*", Action::Allow),
+                Rule::new("question", "*", Action::Allow),
+                Rule::new("subagent", "*", Action::Allow),
+                Rule::new("edit", "*", Action::Deny),
+                Rule::new("edit", ".pick/plans/*.md", Action::Allow),
+                Rule::new("bash", "ls", Action::Allow),
+                Rule::new("bash", "cat", Action::Allow),
+                Rule::new("bash", "head", Action::Allow),
+                Rule::new("bash", "tail", Action::Allow),
+                Rule::new("bash", "rg", Action::Allow),
+                Rule::new("bash", "grep", Action::Allow),
+                Rule::new("bash", "find", Action::Allow),
+                Rule::new("bash", "which", Action::Allow),
+                Rule::new("bash", "stat", Action::Allow),
+                Rule::new("bash", "wc", Action::Allow),
+                Rule::new("bash", "diff", Action::Allow),
+                Rule::new("bash", "sort", Action::Allow),
+                Rule::new("bash", "uniq", Action::Allow),
+                Rule::new("bash", "echo", Action::Allow),
+                Rule::new("bash", "pwd", Action::Allow),
+                Rule::new("bash", "type", Action::Allow),
+                Rule::new("bash", "where", Action::Allow),
+                Rule::new("bash", "dir", Action::Allow),
+                Rule::new("bash", "more", Action::Allow),
+                Rule::new("bash", "less", Action::Allow),
+                Rule::new("bash", "printf", Action::Allow),
+                Rule::new("bash", "env", Action::Allow),
+                Rule::new("bash", "printenv", Action::Allow),
+                Rule::new("bash", "git diff", Action::Allow),
+                Rule::new("bash", "git log", Action::Allow),
+                Rule::new("bash", "git show", Action::Allow),
+                Rule::new("bash", "git status", Action::Allow),
+                Rule::new("bash", "git branch", Action::Allow),
+                Rule::new("bash", "git ls-files", Action::Allow),
+                Rule::new("bash", "git rev-parse", Action::Allow),
+                Rule::new("bash", "git rev-list", Action::Allow),
+                Rule::new("bash", "git describe", Action::Allow),
+                Rule::new("bash", "git config", Action::Allow),
+                Rule::new("bash", "*", Action::Deny),
+                Rule::new("plan_enter", "*", Action::Deny),
+                Rule::new("plan_exit", "*", Action::Allow),
+            ]),
+            _ => Ruleset::new(vec![
+                Rule::new("read", "*", Action::Allow),
+                Rule::new("grep", "*", Action::Allow),
+                Rule::new("glob", "*", Action::Allow),
+                Rule::new("list", "*", Action::Allow),
+                Rule::new("question", "*", Action::Allow),
+                Rule::new("subagent", "*", Action::Allow),
+                Rule::new("edit", "*", Action::Allow),
+                Rule::new("bash", "*", Action::Allow),
+                Rule::new("webfetch", "*", Action::Allow),
+                Rule::new("plan_enter", "*", Action::Allow),
+                Rule::new("plan_exit", "*", Action::Deny),
+            ]),
+        };
+
+        let fs_policy = Arc::new(FileSystemPolicy::new_workspace_default(&cwd));
 
         let config = AgentLoopConfig {
             model: model.clone(),
@@ -410,9 +482,9 @@ async fn run_agent_loop_queue(
                     });
                 }
             })),
-            fs_policy: None,
+            fs_policy: Some(fs_policy.clone()),
             cwd: Some(cwd.clone()),
-            mode_rulesets: None,
+            mode_rulesets: Some(vec![ruleset]),
             permission_hooks: Some(permission_manager.hook_registry.clone()),
             permission_manager: Some(permission_manager.clone()),
             tool_event_bus: None,

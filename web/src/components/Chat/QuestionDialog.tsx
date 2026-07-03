@@ -103,7 +103,7 @@ export function QuestionDialog({ payload, onSubmit, onCancel }: QuestionDialogPr
   return (
     <div className="w-full px-4 py-3">
       <div className="max-w-[90%] md:max-w-[70%] lg:max-w-[40%] mx-auto">
-        <div className="rounded-2xl border border-neutral-700 bg-neutral-900 overflow-hidden" onKeyDown={handleKeyDown}>
+        <div tabIndex={-1} className="rounded-2xl border border-neutral-700 bg-neutral-900 overflow-hidden" onKeyDown={handleKeyDown}>
           <div className="flex items-center gap-2 px-4 py-3 border-b border-neutral-700">
             <div className="text-blue-400 shrink-0">
               <HelpCircle className="w-5 h-5" />
@@ -113,7 +113,7 @@ export function QuestionDialog({ payload, onSubmit, onCancel }: QuestionDialogPr
             </p>
           </div>
 
-          <div className="px-4 py-3 space-y-3 max-h-[200px] overflow-y-auto">
+          <div className="px-4 py-3 space-y-3">
             {payload.prompts.map((prompt, pi) => (
               <div key={pi}>
                 {payload.prompts.length > 1 && (
@@ -131,10 +131,12 @@ export function QuestionDialog({ payload, onSubmit, onCancel }: QuestionDialogPr
                         ref={(el) => { btnRefs.current[idx] = el; }}
                         tabIndex={focused ? 0 : -1}
                         onClick={() => handleToggle(pi, opt.label)}
-                        className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-colors
-                          bg-neutral-800 border text-neutral-300
-                          ${selected ? "border-blue-500/50 text-blue-200" : "border-neutral-700"}
-                          ${focused ? "ring-2 ring-blue-400" : ""}
+                        className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-colors outline-none
+                          ${selected
+                            ? "bg-blue-600 text-white"
+                            : "bg-neutral-800 text-neutral-300 border border-neutral-700"
+                          }
+                          ${focused && !selected ? "ring-1 ring-blue-400" : ""}
                         `}
                       >
                         <span className="font-medium">{opt.label}</span>
@@ -154,7 +156,7 @@ export function QuestionDialog({ payload, onSubmit, onCancel }: QuestionDialogPr
               ref={(el) => { btnRefs.current[itemIdx] = el; }}
               tabIndex={focusIdx === itemIdx ? 0 : -1}
               onClick={onCancel}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border border-neutral-600 text-neutral-300 hover:bg-neutral-800 hover:text-neutral-100 ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border border-neutral-600 text-neutral-300 hover:bg-neutral-800 hover:text-neutral-100 outline-none ${
                 focusIdx === itemIdx ? "ring-2 ring-neutral-400" : ""
               }`}
             >
@@ -166,7 +168,7 @@ export function QuestionDialog({ payload, onSubmit, onCancel }: QuestionDialogPr
                 tabIndex={focusIdx === idx ? 0 : -1}
                 onClick={() => onSubmit(selections)}
                 disabled={!allAnswered}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed outline-none ${
                   focusIdx === idx ? "ring-2 ring-blue-400" : ""
                 }`}
               >

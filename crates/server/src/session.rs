@@ -525,4 +525,6 @@ pub struct SseSessionState {
     pub message_queue: Arc<Mutex<PendingMessageQueue>>,
     /// Whether an agent loop is currently running for this session
     pub in_flight: Arc<AtomicBool>,
+    /// Agent mode: "build" or "plan"
+    pub agent_mode: Arc<std::sync::RwLock<String>>,
 }

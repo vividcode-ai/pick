@@ -1,7 +1,10 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
+
+const MIN_HEIGHT = 100;
+const MAX_HEIGHT_FRACTION = 0.6;
 
 interface TerminalPanelProps {
   baseUrl: string;
@@ -10,11 +13,13 @@ interface TerminalPanelProps {
 }
 
 export function TerminalPanel({ baseUrl, visible, onClose }: TerminalPanelProps) {
+  const [panelHeight, setPanelHeight] = useState(200);
   const containerRef = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const initializedRef = useRef(false);
+  const draggingRef = useRef(false);
 
   useEffect(() => {
     if (!visible || !containerRef.current || initializedRef.current) return;
@@ -52,6 +57,10 @@ export function TerminalPanel({ baseUrl, visible, onClose }: TerminalPanelProps)
     term.loadAddon(fitAddon);
     fitAddonRef.current = fitAddon;
 
+    // Open terminal immediately (not dependent on WebSocket)
+    term.open(containerRef.current!);
+    setTimeout(() => fitAddon.fit(), 50);
+
     const hostname = (() => {
       try {
         return new URL(baseUrl).hostname;
@@ -72,11 +81,6 @@ export function TerminalPanel({ baseUrl, visible, onClose }: TerminalPanelProps)
 
       const ws = new WebSocket(`ws://${hostname}:${wsPort}`);
       wsRef.current = ws;
-
-      ws.onopen = () => {
-        term.open(containerRef.current!);
-        setTimeout(() => fitAddon.fit(), 50);
-      };
 
       ws.onmessage = (event) => {
         if (event.data instanceof Blob) {
@@ -125,6 +129,31 @@ export function TerminalPanel({ baseUrl, visible, onClose }: TerminalPanelProps)
     };
   }, [visible, baseUrl]);
 
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    draggingRef.current = true;
+    const startY = e.clientY;
+    const startHeight = panelHeight;
+
+    const handleMouseMove = (ev: MouseEvent) => {
+      if (!draggingRef.current) return;
+      const delta = startY - ev.clientY;
+      const newHeight = Math.max(MIN_HEIGHT, Math.min(window.innerHeight * MAX_HEIGHT_FRACTION, startHeight + delta));
+      setPanelHeight(newHeight);
+    };
+
+    const handleMouseUp = () => {
+      if (!draggingRef.current) return;
+      draggingRef.current = false;
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+      fitAddonRef.current?.fit();
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+  }, [panelHeight]);
+
   return (
     <div
       className="border-t border-[var(--border-base)] bg-[#1e1e2e]"
@@ -141,7 +170,11 @@ export function TerminalPanel({ baseUrl, visible, onClose }: TerminalPanelProps)
           </svg>
         </button>
       </div>
-      <div ref={containerRef} className="h-[200px]" />
+      <div
+        onMouseDown={handleMouseDown}
+        className="h-[5px] cursor-row-resize bg-transparent hover:bg-[var(--accent-primary)] transition-colors"
+      />
+      <div ref={containerRef} style={{ height: panelHeight }} />
     </div>
   );
 }
