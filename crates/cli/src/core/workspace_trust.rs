@@ -71,7 +71,7 @@ pub fn is_workspace_trusted(cwd: &Path) -> bool {
     }
     #[cfg(not(windows))]
     {
-        list.workspaces.iter().any(|w| *w == normalized)
+        list.workspaces.contains(&normalized)
     }
 }
 
@@ -182,7 +182,7 @@ fn add_workspace(cwd: &Path) {
         }
         #[cfg(not(windows))]
         {
-            list.workspaces.iter().any(|w| *w == normalized)
+            list.workspaces.contains(&normalized)
         }
     };
 
