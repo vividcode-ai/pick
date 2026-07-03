@@ -64,22 +64,22 @@ export function PermissionDialog({ payload, onRespond }: PermissionDialogProps) 
   return (
     <div className="w-full px-4 py-3">
       <div className="max-w-[90%] md:max-w-[70%] lg:max-w-[40%] mx-auto">
-        <div className="rounded-2xl border border-neutral-700 bg-neutral-900 overflow-hidden" onKeyDown={handleKeyDown}>
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-neutral-700">
+        <div className="rounded-2xl border border-[var(--border-base)] bg-[var(--surface-base)] overflow-hidden" onKeyDown={handleKeyDown}>
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--border-base)]">
             <div className="text-amber-400 shrink-0">
               <ShieldAlert className="w-5 h-5" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-neutral-100 truncate">
+              <p className="text-sm font-medium text-[var(--text-primary)] truncate">
                 {isPermissionHook ? `Permission: ${payload.permission}` : payload.tool_name}
               </p>
-              <p className="text-xs text-neutral-400 truncate">
+              <p className="text-xs text-[var(--text-secondary)] truncate">
                 {isPermissionHook ? `Tool "${payload.tool_name}"` : payload.tool_args}
               </p>
             </div>
           </div>
           <div className="flex items-center justify-between px-4 py-2.5">
-            <div className="flex items-center gap-2 text-xs text-neutral-400 min-w-0">
+            <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)] min-w-0">
               {getToolIcon(payload.tool_name)}
               <span className="truncate">{payload.tool_args}</span>
             </div>
@@ -88,7 +88,7 @@ export function PermissionDialog({ payload, onRespond }: PermissionDialogProps) 
                 ref={(el) => { btnRefs.current[0] = el; }}
                 tabIndex={focusIdx === 0 ? 0 : -1}
                 onClick={() => onRespond(false)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border border-neutral-600 text-neutral-300 hover:bg-neutral-800 hover:text-neutral-100 outline-none ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border border-[var(--border-base)] text-[var(--text-primary)] hover:bg-[var(--surface-hover)] outline-none ${
                   focusIdx === 0 ? "ring-2 ring-amber-500" : ""
                 }`}
               >

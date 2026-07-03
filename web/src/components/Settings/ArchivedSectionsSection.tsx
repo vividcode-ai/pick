@@ -28,37 +28,37 @@ export function ArchivedSessionsSection({ sessions, onUnarchive, onDelete }: Arc
 
   if (sessions.length === 0) {
     return (
-      <div className="text-sm text-neutral-500 text-center py-12">
+      <div className="text-sm text-[var(--text-muted)] text-center py-12">
         No archived sessions
       </div>
     );
   }
 
   return (
-    <div className="border border-neutral-700 rounded-md overflow-hidden divide-y divide-neutral-700">
+    <div className="border border-[var(--border-base)] rounded-md p-2 space-y-1">
       {sessions.map((session) => (
         <div
           key={session.id}
-          className="flex items-center gap-3 px-3 py-2.5 hover:bg-neutral-800/50 transition-colors"
+          className="flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-[var(--surface-hover)] transition-colors"
         >
-          <MessageSquare className="w-4 h-4 text-neutral-500 flex-shrink-0" />
+          <MessageSquare className="w-4 h-4 text-[var(--text-muted)] flex-shrink-0" />
           <div className="flex-1 min-w-0">
-            <div className="text-sm text-neutral-200 truncate">{session.title}</div>
-            <div className="text-[11px] text-neutral-500">
+            <div className="text-sm text-[var(--text-primary)] truncate">{session.title}</div>
+            <div className="text-[11px] text-[var(--text-muted)]">
               Created {formatRelativeTime(session.createdAt)}
             </div>
           </div>
           <div className="flex items-center gap-1">
             <button
               onClick={() => onUnarchive(session.id)}
-              className="p-1.5 rounded hover:bg-neutral-700 text-neutral-500 hover:text-neutral-200 transition-colors"
+              className="p-1.5 rounded hover:bg-[var(--surface-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
               title="Unarchive"
             >
               <ArchiveRestore className="w-4 h-4" />
             </button>
             <button
               onClick={() => setConfirmId(session.id)}
-              className="p-1.5 rounded hover:bg-neutral-700 text-neutral-500 hover:text-red-400 transition-colors"
+              className="p-1.5 rounded hover:bg-[var(--surface-hover)] text-[var(--text-muted)] hover:text-red-400 transition-colors"
               title="Delete"
             >
               <Trash2 className="w-4 h-4" />

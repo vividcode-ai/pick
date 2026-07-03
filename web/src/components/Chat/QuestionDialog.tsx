@@ -154,12 +154,12 @@ export function QuestionDialog({ payload, onSubmit, onCancel }: QuestionDialogPr
   return (
     <div className="w-full px-4 py-3">
       <div className="max-w-[90%] md:max-w-[70%] lg:max-w-[40%] mx-auto">
-        <div tabIndex={-1} className="rounded-2xl border border-neutral-700 bg-neutral-900 overflow-hidden" onKeyDown={handleKeyDown}>
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-neutral-700">
+        <div tabIndex={-1} className="rounded-2xl border border-[var(--border-base)] bg-[var(--surface-base)] overflow-hidden" onKeyDown={handleKeyDown}>
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-[var(--border-base)]">
             <div className="text-blue-400 shrink-0">
               <HelpCircle className="w-5 h-5" />
             </div>
-            <p className="text-sm font-medium text-neutral-100 truncate">
+            <p className="text-sm font-medium text-[var(--text-primary)] truncate">
               {payload.prompts.length > 1 ? "Questions" : payload.prompts[0]?.header || "Question"}
             </p>
           </div>
@@ -168,9 +168,9 @@ export function QuestionDialog({ payload, onSubmit, onCancel }: QuestionDialogPr
             {payload.prompts.map((prompt, pi) => (
               <div key={pi}>
                 {payload.prompts.length > 1 && (
-                  <p className="text-xs font-medium text-neutral-400 mb-1">{prompt.header}</p>
+                  <p className="text-xs font-medium text-[var(--text-secondary)] mb-1">{prompt.header}</p>
                 )}
-                <p className="text-sm text-neutral-200 mb-2">{prompt.question}</p>
+                <p className="text-sm text-[var(--text-primary)] mb-2">{prompt.question}</p>
                 <div className="space-y-1">
                   {prompt.options.map((opt) => {
                     const idx = itemIdx++;
@@ -184,15 +184,15 @@ export function QuestionDialog({ payload, onSubmit, onCancel }: QuestionDialogPr
                         onClick={() => handleToggle(pi, opt.label)}
                         className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-colors outline-none
                           ${selected
-                            ? "bg-blue-800 text-blue-100"
-                            : "bg-neutral-800 text-neutral-300 border border-neutral-700"
+                            ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                            : "bg-[var(--surface-button)] text-[var(--text-primary)] border border-[var(--border-base)]"
                           }
                           ${focused && !selected ? "ring-1 ring-blue-400" : ""}
                         `}
                       >
                         <span className="font-medium">{opt.label}</span>
                         {opt.description && (
-                          <span className="block text-neutral-500 mt-0.5">{opt.description}</span>
+                          <span className="block text-[var(--text-muted)] mt-0.5">{opt.description}</span>
                         )}
                       </button>
                     );
@@ -202,14 +202,14 @@ export function QuestionDialog({ payload, onSubmit, onCancel }: QuestionDialogPr
             ))}
           </div>
 
-          <div className="flex items-center justify-end gap-2 px-4 py-2.5 border-t border-neutral-700">
+          <div className="flex items-center justify-end gap-2 px-4 py-2.5 border-t border-[var(--border-base)]">
             {(() => { const idx = itemIdx++; return (
               <button
                 ref={(el) => { btnRefs.current[idx] = el; }}
                 tabIndex={focusIdx === idx ? 0 : -1}
                 onClick={() => onSubmit(selections)}
                 disabled={!allAnswered}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-blue-800 text-blue-100 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed outline-none ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-[var(--accent-primary)] text-[var(--text-on-accent)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed outline-none ${
                   focusIdx === idx ? "ring-2 ring-blue-400" : ""
                 }`}
               >

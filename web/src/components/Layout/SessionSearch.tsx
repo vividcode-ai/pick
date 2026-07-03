@@ -14,7 +14,7 @@ export function SessionSearch({ query, onQueryChange }: SessionSearchProps) {
         value={query}
         onChange={(e) => onQueryChange(e.target.value)}
         placeholder="Search sessions..."
-        className="w-full pl-8 pr-7 py-1.5 text-xs rounded-md bg-[var(--surface-search)] border border-[var(--border-base)] text-[var(--text-inverted)] placeholder-[var(--text-muted)] outline-none focus:border-[var(--text-muted)] transition-colors"
+        className="w-full pl-8 pr-7 py-1.5 text-xs rounded-md bg-[var(--surface-search)] border border-[var(--border-base)] text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[var(--text-muted)] transition-colors"
       />
       {query && (
         <button
