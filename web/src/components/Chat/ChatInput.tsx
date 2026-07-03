@@ -16,6 +16,7 @@ interface ChatInputProps {
   thinkingLevel: string;
   onThinkingLevelChange: (l: string) => void;
   sessionId?: string | null;
+  pendingMessages: string[];
 }
 
 export function ChatInput({
@@ -31,6 +32,7 @@ export function ChatInput({
   thinkingLevel,
   onThinkingLevelChange,
   sessionId,
+  pendingMessages,
 }: ChatInputProps) {
   const [input, setInput] = useState("");
   const [currentCommand, setCurrentCommand] = useState<"build" | "plan">("build");
@@ -114,6 +116,16 @@ export function ChatInput({
           <div className="flex items-center gap-2 text-neutral-400 px-1 pb-1">
             <span className="w-2 h-2 bg-neutral-400 rounded-full animate-pulse" />
             <span className="text-sm">Working...</span>
+          </div>
+        )}
+        {pendingMessages.length > 0 && (
+          <div className="flex flex-col gap-1 px-1 pb-2">
+            {pendingMessages.map((msg, i) => (
+              <div key={i} className="flex items-start gap-2 text-neutral-400 text-xs bg-neutral-800/60 rounded-lg px-3 py-1.5">
+                <span className="w-1.5 h-1.5 bg-neutral-500 rounded-full mt-1 shrink-0" />
+                <span className="line-clamp-2">{msg}</span>
+              </div>
+            ))}
           </div>
         )}
         <div className="rounded-2xl border border-neutral-700 bg-neutral-800">

@@ -48,6 +48,23 @@ export interface ApprovalRequiredPayload {
   source?: "tool" | "permission_hook";
 }
 
+export interface QuestionOption {
+  label: string;
+  description: string;
+}
+
+export interface QuestionPromptPayload {
+  question: string;
+  header: string;
+  options: QuestionOption[];
+  multiple: boolean;
+}
+
+export interface QuestionPayload {
+  question_id: string;
+  prompts: QuestionPromptPayload[];
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant" | "system" | "tool" | "thinking";

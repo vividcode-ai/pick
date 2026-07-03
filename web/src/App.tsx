@@ -6,6 +6,7 @@ import { ChatInput } from "./components/Chat/ChatInput";
 import { PickLogo } from "./components/PickLogo";
 import { CommandPalette } from "./components/CommandPalette";
 import { PermissionDialog } from "./components/Chat/PermissionDialog";
+import { QuestionDialog } from "./components/Chat/QuestionDialog";
 import { SettingsScreen } from "./components/Settings/SettingsScreen";
 import { useTheme } from "./lib/ThemeProvider";
 import { useSessionManager, fetchProviders } from "./hooks/useSessionManager";
@@ -105,13 +106,16 @@ export default function App() {
     activeConnected,
     activeTodos,
     activeGitInfo,
+    activePendingMessages,
     activePendingApproval,
+    activePendingQuestion,
     streamingSessions,
     createSession,
     switchSession,
     ask,
     cancel,
     respondApproval,
+    answerQuestion,
     deleteSession,
     forkSession,
   } = useSessionManager(baseUrl ?? "");
@@ -248,7 +252,18 @@ export default function App() {
 
   const hasMessages = activeMessages.length > 0;
 
-  const chatInput = (
+  const inputSlot = activePendingApproval ? (
+    <PermissionDialog
+      payload={activePendingApproval}
+      onRespond={(approved) => respondApproval(activePendingApproval.approval_id, approved)}
+    />
+  ) : activePendingQuestion ? (
+    <QuestionDialog
+      payload={activePendingQuestion}
+      onSubmit={(answers) => answerQuestion(activePendingQuestion.question_id, answers)}
+      onCancel={() => answerQuestion(activePendingQuestion.question_id, [])}
+    />
+  ) : (
     <ChatInput
       onSend={handleSend}
       disabled={activeStreaming}
@@ -262,6 +277,7 @@ export default function App() {
       thinkingLevel={thinkingLevel}
       onThinkingLevelChange={setThinkingLevel}
       sessionId={activeSessionId}
+      pendingMessages={activePendingMessages}
     />
   );
 
@@ -297,7 +313,7 @@ export default function App() {
         {hasMessages ? (
           <>
             <ChatView messages={activeMessages} onFork={handleFork} />
-            {chatInput}
+            {inputSlot}
           </>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center gap-6">
@@ -306,17 +322,10 @@ export default function App() {
                 <PickLogo />
               </div>
             </div>
-            {chatInput}
+            {inputSlot}
           </div>
         )}
       </Layout>
-
-      {activePendingApproval && (
-        <PermissionDialog
-          payload={activePendingApproval}
-          onRespond={(approved) => respondApproval(activePendingApproval.approval_id, approved)}
-        />
-      )}
 
       <CommandPalette
         open={commandPaletteOpen}

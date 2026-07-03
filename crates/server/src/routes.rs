@@ -271,6 +271,28 @@ async fn run_agent_loop_queue(
         // --- Drain queued messages ---
         let queued_msgs = { sse_state.message_queue.lock().unwrap().drain_all() };
 
+        // Emit message_dequeued for each message picked up from the queue
+        for msg in &queued_msgs {
+            if let AiMessage::User(user_msg) = msg {
+                let text: String = user_msg
+                    .content
+                    .iter()
+                    .filter_map(|b| {
+                        if let pick_ai::types::ContentBlock::Text(t) = b {
+                            Some(t.text.clone())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                if !text.is_empty() {
+                    let _ = et_on_event.send(Ok(Event::default()
+                        .event("message_dequeued")
+                        .data(serde_json::json!({"text": text}).to_string())));
+                }
+            }
+        }
+
         // --- Get session messages ---
         let session = state.session_manager.get(&session_id).await;
         let mut all_msgs = session
@@ -297,6 +319,8 @@ async fn run_agent_loop_queue(
         let mq_steer = sse_state.message_queue.clone();
         let mq_follow = sse_state.message_queue.clone();
         let et_for_event = sse_state.event_tx.clone();
+        let et_steer = sse_state.event_tx.clone();
+        let et_follow = sse_state.event_tx.clone();
         let et_for_git = et_on_event.clone();
         let cwd_for_git = cwd_for_event.clone();
 
@@ -312,9 +336,53 @@ async fn run_agent_loop_queue(
             get_api_key: get_api_key.clone(),
             before_tool_call: None,
             should_stop_after_turn: None,
-            get_steering_messages: Some(Arc::new(move || mq_steer.lock().unwrap().drain())),
+            get_steering_messages: Some(Arc::new(move || {
+                let msgs = mq_steer.lock().unwrap().drain();
+                for msg in &msgs {
+                    if let AiMessage::User(user_msg) = msg {
+                        let text: String = user_msg
+                            .content
+                            .iter()
+                            .filter_map(|b| {
+                                if let pick_ai::types::ContentBlock::Text(t) = b {
+                                    Some(t.text.clone())
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect();
+                        if !text.is_empty() {
+                            let _ = et_steer.send(Ok(Event::default()
+                                .event("message_dequeued")
+                                .data(serde_json::json!({"text": text}).to_string())));
+                        }
+                    }
+                }
+                msgs
+            })),
             get_follow_up_messages: Some(Arc::new(move |_result| {
-                mq_follow.lock().unwrap().drain()
+                let msgs = mq_follow.lock().unwrap().drain();
+                for msg in &msgs {
+                    if let AiMessage::User(user_msg) = msg {
+                        let text: String = user_msg
+                            .content
+                            .iter()
+                            .filter_map(|b| {
+                                if let pick_ai::types::ContentBlock::Text(t) = b {
+                                    Some(t.text.clone())
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect();
+                        if !text.is_empty() {
+                            let _ = et_follow.send(Ok(Event::default()
+                                .event("message_dequeued")
+                                .data(serde_json::json!({"text": text}).to_string())));
+                        }
+                    }
+                }
+                msgs
             })),
             provider_max_retries: None,
             provider_max_retry_delay_ms: None,

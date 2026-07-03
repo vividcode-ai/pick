@@ -4,6 +4,7 @@ import type {
   ChatMessage,
   GitInfo,
   ProviderInfo,
+  QuestionPayload,
   TodoItem,
   ToolStartPayload,
   ToolEndPayload,
@@ -96,7 +97,9 @@ interface SessionData {
   connected: boolean;
   todos?: TodoItem[];
   gitInfo?: GitInfo | null;
+  pendingMessages?: string[];
   pendingApproval?: ApprovalRequiredPayload | null;
+  pendingQuestion?: QuestionPayload | null;
 }
 
 export function useSessionManager(baseUrl: string) {
@@ -109,6 +112,7 @@ export function useSessionManager(baseUrl: string) {
   const activeConnected = activeData ? activeData.connected : true;
   const activeTodos = activeData?.todos ?? [];
   const activeGitInfo = activeData?.gitInfo ?? null;
+  const activePendingMessages = activeData?.pendingMessages ?? [];
 
   const streamingSessions = useMemo(() => {
     const result: Record<string, boolean> = {};
@@ -129,7 +133,7 @@ export function useSessionManager(baseUrl: string) {
 
   const updateSession = useCallback((id: string, updater: (prev: SessionData) => SessionData) => {
     setSessionData(prev => {
-      const prevState = prev[id] || { messages: [], streaming: false, connected: true, todos: [], gitInfo: null };
+      const prevState = prev[id] || { messages: [], streaming: false, connected: true, todos: [], gitInfo: null, pendingMessages: [] };
       return { ...prev, [id]: updater(prevState) };
     });
   }, []);
@@ -208,7 +212,7 @@ export function useSessionManager(baseUrl: string) {
 
       setSessionData(prev => ({
         ...prev,
-        [newId]: { messages: [], streaming: false, connected: true, todos: [], gitInfo: null },
+        [newId]: { messages: [], streaming: false, connected: true, todos: [], gitInfo: null, pendingMessages: [] },
       }));
       sessionResourcesRef.current[newId] = { eventSource: null, abortController: null };
       evictedSessionsRef.current.delete(newId);
@@ -258,6 +262,10 @@ export function useSessionManager(baseUrl: string) {
 
     if (currentData?.streaming) {
       // Already streaming — server will queue this message
+      updateSession(sessionId, (prev) => ({
+        ...prev,
+        pendingMessages: [...(prev.pendingMessages ?? []), prompt],
+      }));
       sendPrompt(sessionId, prompt, thinkingLevel);
       return;
     }
@@ -483,6 +491,21 @@ export function useSessionManager(baseUrl: string) {
       } catch {}
     });
 
+    eventSource.addEventListener("message_dequeued", (e) => {
+      try {
+        const { text } = JSON.parse(e.data);
+        if (!text) return;
+        updateSession(sessionId, (prev) => {
+          const msgs = prev.pendingMessages ?? [];
+          const idx = msgs.indexOf(text);
+          if (idx === -1) return prev;
+          const next = [...msgs];
+          next.splice(idx, 1);
+          return { ...prev, pendingMessages: next };
+        });
+      } catch {}
+    });
+
     eventSource.addEventListener("approval_required", (e) => {
       try {
         const payload: ApprovalRequiredPayload = JSON.parse(e.data);
@@ -490,9 +513,16 @@ export function useSessionManager(baseUrl: string) {
       } catch {}
     });
 
+    eventSource.addEventListener("question", (e) => {
+      try {
+        const payload: QuestionPayload = JSON.parse(e.data);
+        updateSession(sessionId, (prev) => ({ ...prev, pendingQuestion: payload }));
+      } catch {}
+    });
+
     eventSource.addEventListener("agent_end", (e) => {
       turnEndMessageCount = -1;
-      updateSession(sessionId, (prev) => ({ ...prev, streaming: false, pendingApproval: null }));
+      updateSession(sessionId, (prev) => ({ ...prev, streaming: false, pendingApproval: null, pendingQuestion: null }));
       if (sessionId !== activeSessionIdRef.current) {
         startEvictionTimer(sessionId);
       }
@@ -528,7 +558,7 @@ export function useSessionManager(baseUrl: string) {
       body: JSON.stringify({ session_id: sessionId }),
     }).catch(() => {});
 
-    updateSession(sessionId, (prev) => ({ ...prev, streaming: false }));
+    updateSession(sessionId, (prev) => ({ ...prev, streaming: false, pendingMessages: [] }));
   }, [baseUrl, updateSession]);
 
   const respondApproval = useCallback(async (approvalId: string, approved: boolean) => {
@@ -541,6 +571,19 @@ export function useSessionManager(baseUrl: string) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ session_id: sessionId, approval_id: approvalId, approved }),
+    }).catch(() => {});
+  }, [baseUrl, updateSession]);
+
+  const answerQuestion = useCallback(async (questionId: string, answers: string[][]) => {
+    const sessionId = activeSessionIdRef.current;
+    if (!sessionId) return;
+
+    updateSession(sessionId, (prev) => ({ ...prev, pendingQuestion: null }));
+
+    fetch(`${baseUrl}/answer_question`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: sessionId, question_id: questionId, answers }),
     }).catch(() => {});
   }, [baseUrl, updateSession]);
 
@@ -580,7 +623,7 @@ export function useSessionManager(baseUrl: string) {
 
       setSessionData(prev => ({
         ...prev,
-        [session_id]: { messages: [], streaming: false, connected: true, todos: [], gitInfo: null },
+        [session_id]: { messages: [], streaming: false, connected: true, todos: [], gitInfo: null, pendingMessages: [] },
       }));
       sessionResourcesRef.current[session_id] = { eventSource: null, abortController: null };
       evictedSessionsRef.current.delete(session_id);
@@ -605,6 +648,7 @@ export function useSessionManager(baseUrl: string) {
   }, []);
 
   const activePendingApproval = activeData?.pendingApproval ?? null;
+  const activePendingQuestion = activeData?.pendingQuestion ?? null;
 
   return {
     activeSessionId,
@@ -613,13 +657,16 @@ export function useSessionManager(baseUrl: string) {
     activeConnected,
     activeTodos,
     activeGitInfo,
+    activePendingMessages,
     activePendingApproval,
+    activePendingQuestion,
     streamingSessions,
     createSession,
     switchSession,
     ask,
     cancel,
     respondApproval,
+    answerQuestion,
     deleteSession,
     forkSession,
   };

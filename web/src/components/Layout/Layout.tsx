@@ -95,31 +95,36 @@ export function Layout({
 
         {/* Floating Right Panel (desktop) */}
         {rightPanelOpen && (
-          <div className="hidden md:block absolute top-3 right-3 z-10 w-[320px] max-h-[calc(100vh-6rem)]">
-            <div className="flex flex-col h-full rounded-xl border border-[var(--border-base)] bg-[var(--surface-secondary)] shadow-lg overflow-hidden">
-              <div className="flex-1 overflow-y-auto min-h-0">
-                {rightPanelContent}
-              </div>
+          <div className="hidden md:flex flex-col absolute top-3 right-3 z-10 w-[320px] max-h-[calc(100vh-6rem)] rounded-xl border border-[var(--border-base)] bg-[var(--surface-secondary)] shadow-lg overflow-hidden">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border-base)] flex-shrink-0">
+              <span className="text-xs font-semibold text-[var(--text-primary)]">工具栏</span>
+              <button
+                onClick={toggleRightPanel}
+                className="p-1 rounded-md hover:bg-[var(--surface-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto min-h-0">
+              {rightPanelContent}
             </div>
           </div>
         )}
       </main>
 
-      {/* Toggle right button (always visible, fixed position) */}
-      <button
-        onClick={toggleRightPanel}
-        className="fixed top-3 z-50 p-1.5 rounded-md bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-neutral-200 transition-colors"
-        style={{ right: "8px" }}
-        title={rightPanelOpen ? "隐藏右侧面板" : "显示右侧面板"}
-      >
-        {rightPanelOpen ? (
-          <X className="w-4 h-4" />
-        ) : (
+      {/* Toggle right button (visible when panel closed) */}
+      {!rightPanelOpen && (
+        <button
+          onClick={toggleRightPanel}
+          className="fixed top-3 z-50 p-1.5 rounded-md bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-neutral-200 transition-colors"
+          style={{ right: "8px" }}
+          title="显示右侧面板"
+        >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
-        )}
-      </button>
+        </button>
+      )}
 
       {/* Right Panel (mobile drawer) */}
       {rightPanelOpen && (
