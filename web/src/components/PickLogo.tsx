@@ -6,7 +6,7 @@ export function PickLogo() {
         height="96"
         viewBox="0 0 296 96"
         xmlns="http://www.w3.org/2000/svg"
-        className="text-neutral-100"
+        className="text-[var(--logo-fill)]"
         style={{ fontFamily: "var(--font-family-sans)" }}
       >
         <text

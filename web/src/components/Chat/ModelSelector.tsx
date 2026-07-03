@@ -148,7 +148,7 @@ export function ModelSelector({ providers, selectedModel, selectedProvider, onMo
             <div className="selector-search-container">
               <div className="selector-input-group">
                 <div className="relative flex-1">
-                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-neutral-500" />
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[var(--text-muted)]" />
                   <input
                     ref={searchRef}
                     type="text"

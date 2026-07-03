@@ -72,7 +72,7 @@ export function AppearanceSection() {
     <div className="space-y-6">
       {/* Display */}
       <div>
-        <h3 className="text-sm font-semibold text-neutral-100 mb-3">Display</h3>
+        <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3">Display</h3>
         <div className="settings-card space-y-0">
           <div className="settings-row">
             <div>
@@ -90,7 +90,7 @@ export function AppearanceSection() {
                     className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium transition-colors ${
                       selected
                         ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
-                        : "bg-neutral-800 text-neutral-400 border border-neutral-700 hover:bg-neutral-700"
+                        : "bg-[var(--surface-button)] text-[var(--text-secondary)] border border-[var(--border-base)] hover:opacity-80"
                     }`}
                   >
                     <Icon className="w-3.5 h-3.5" />
@@ -130,7 +130,7 @@ export function AppearanceSection() {
 
       {/* Behavior */}
       <div>
-        <h3 className="text-sm font-semibold text-neutral-100 mb-3">Behavior</h3>
+        <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3">Behavior</h3>
         <div className="settings-card space-y-0">
           <ToggleSetting
             label="Auto-compact"
@@ -167,7 +167,7 @@ export function AppearanceSection() {
 
       {/* Communication */}
       <div>
-        <h3 className="text-sm font-semibold text-neutral-100 mb-3">Communication</h3>
+        <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3">Communication</h3>
         <div className="settings-card space-y-0">
           <SelectSetting
             label="Transport"
@@ -188,7 +188,7 @@ export function AppearanceSection() {
 
       {/* Agent */}
       <div>
-        <h3 className="text-sm font-semibold text-neutral-100 mb-3">Agent</h3>
+        <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3">Agent</h3>
         <div className="settings-card space-y-0">
           <SelectSetting
             label="Steering mode"
@@ -209,7 +209,7 @@ export function AppearanceSection() {
 
       {/* Startup & Privacy */}
       <div>
-        <h3 className="text-sm font-semibold text-neutral-100 mb-3">Startup &amp; Privacy</h3>
+        <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3">Startup &amp; Privacy</h3>
         <div className="settings-card space-y-0">
           <ToggleSetting
             label="Quiet startup"
@@ -234,7 +234,7 @@ export function AppearanceSection() {
 
       {/* Warnings */}
       <div>
-        <h3 className="text-sm font-semibold text-neutral-100 mb-3">Warnings</h3>
+        <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-3">Warnings</h3>
         <div className="settings-card space-y-0">
           <ToggleSetting
             label="Anthropic extra usage"

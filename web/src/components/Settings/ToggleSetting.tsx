@@ -19,7 +19,7 @@ export function ToggleSetting({ label, description, checked, onChange }: ToggleS
           checked={checked}
           onChange={(e) => onChange(e.target.checked)}
         />
-        <div className="w-9 h-5 bg-neutral-700 peer-checked:bg-blue-600 rounded-full after:content-[''] after:absolute after:top-0.5 after:start-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full" />
+        <div className="w-9 h-5 bg-[var(--surface-button)] peer-checked:bg-blue-600 rounded-full after:content-[''] after:absolute after:top-0.5 after:start-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full" />
       </label>
     </div>
   );

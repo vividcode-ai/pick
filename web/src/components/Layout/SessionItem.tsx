@@ -40,7 +40,7 @@ export function SessionItem({ session, isActive, streaming, onSelect, onRename, 
     <div
       className={`group flex flex-col gap-0 px-3 py-2 rounded-md cursor-pointer transition-colors text-sm ${
         isActive
-          ? "bg-neutral-800 text-neutral-100"
+          ? "bg-[var(--surface-hover)] text-[var(--text-primary)]"
           : "text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200"
       }`}
       onClick={() => onSelect(session.id)}

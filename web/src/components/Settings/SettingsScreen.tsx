@@ -74,7 +74,7 @@ export function SettingsScreen({
             <div className="flex flex-col gap-2">
               <button
                 onClick={closeSettings}
-                className="flex items-center gap-2 w-full h-10 px-3 rounded-md bg-neutral-800 hover:bg-neutral-700 text-neutral-200 hover:text-white border border-neutral-700 transition-colors"
+                className="flex items-center gap-2 w-full h-10 px-3 rounded-md bg-[var(--surface-hover)] hover:bg-[var(--border-base)] text-[var(--text-primary)] border border-[var(--border-base)] transition-colors"
                 aria-label="Back to main"
               >
                 <ArrowLeft className="w-4 h-4" />

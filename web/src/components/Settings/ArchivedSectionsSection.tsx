@@ -35,11 +35,11 @@ export function ArchivedSessionsSection({ sessions, onUnarchive, onDelete }: Arc
   }
 
   return (
-    <div className="space-y-1">
+    <div className="border border-neutral-700 rounded-md overflow-hidden divide-y divide-neutral-700">
       {sessions.map((session) => (
         <div
           key={session.id}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-neutral-800/50 transition-colors"
+          className="flex items-center gap-3 px-3 py-2.5 hover:bg-neutral-800/50 transition-colors"
         >
           <MessageSquare className="w-4 h-4 text-neutral-500 flex-shrink-0" />
           <div className="flex-1 min-w-0">

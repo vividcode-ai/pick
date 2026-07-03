@@ -168,22 +168,22 @@ export function ChatInput({
       <div className="w-full px-4 py-3">
       <div className="max-w-[90%] md:max-w-[70%] lg:max-w-[40%] mx-auto">
         {streaming && (
-          <div className="flex items-center gap-2 text-neutral-400 px-1 pb-3">
-            <span className="w-2 h-2 bg-neutral-400 rounded-full animate-pulse" />
+          <div className="flex items-center gap-2 text-[var(--text-muted)] px-1 pb-3">
+            <span className="w-2 h-2 bg-[var(--text-muted)] rounded-full animate-pulse" />
             <span className="text-sm">Working...</span>
           </div>
         )}
         {pendingMessages.length > 0 && (
           <div className="flex flex-col gap-1 px-1 pb-3">
             {pendingMessages.map((msg, i) => (
-              <div key={i} className="flex items-start gap-2 text-neutral-400 text-xs bg-neutral-800/60 rounded-lg px-3 py-1.5">
-                <span className="w-1.5 h-1.5 bg-neutral-500 rounded-full mt-1 shrink-0" />
+              <div key={i} className="flex items-start gap-2 text-[var(--text-muted)] text-xs bg-[var(--surface-elevated)]/60 rounded-lg px-3 py-1.5">
+                <span className="w-1.5 h-1.5 bg-[var(--text-muted)] rounded-full mt-1 shrink-0" />
                 <span className="line-clamp-2">{msg}</span>
               </div>
             ))}
           </div>
         )}
-        <div className="rounded-2xl border border-neutral-700 bg-neutral-800">
+        <div className="rounded-2xl border border-[var(--border-base)] bg-[var(--surface-base)]">
         {/* Top: textarea */}
         <textarea
           ref={textareaRef}
@@ -195,11 +195,11 @@ export function ChatInput({
           placeholder={connected ? "Type a message..." : "Connecting..."}
           rows={1}
           disabled={!connected}
-          className="w-full bg-transparent text-neutral-100 px-4 pt-3 pb-3 text-sm resize-none outline-none placeholder-neutral-500 disabled:opacity-50 min-h-[44px]"
+          className="w-full bg-transparent text-[var(--text-primary)] px-4 pt-3 pb-3 text-sm resize-none outline-none placeholder-[var(--text-muted)] disabled:opacity-50 min-h-[44px]"
         />
 
         {/* Bottom: controls */}
-        <div className="flex items-center justify-between px-3 pb-3 pt-1.5 border-t border-neutral-700/50">
+        <div className="flex items-center justify-between px-3 pb-3 pt-1.5 border-t border-[var(--border-base)]/50">
           {/* Left: command dropdown */}
           <div className="relative" ref={commandRef}>
             <div className="flex">
@@ -207,14 +207,14 @@ export function ChatInput({
                 onClick={() => insertCommand(`/${currentCommand}`)}
                 disabled={disabled || !connected}
                 onKeyDown={handleCommandKeyDown}
-                className="px-2.5 py-1 text-xs rounded-l-md bg-neutral-700 hover:bg-neutral-600 text-neutral-300 disabled:opacity-40 transition-colors"
+                className="px-2.5 py-1 text-xs rounded-l-md bg-[var(--surface-button)] hover:opacity-80 text-[var(--text-primary)] disabled:opacity-40 transition-colors"
               >
                 {currentCommand.charAt(0).toUpperCase() + currentCommand.slice(1)}
               </button>
               <button
                 onClick={() => setCommandOpen((v) => !v)}
                 disabled={disabled || !connected}
-                className="px-1 py-1 text-xs rounded-r-md bg-neutral-700 hover:bg-neutral-600 text-neutral-400 border-l border-neutral-600 disabled:opacity-40 transition-colors"
+                className="px-1 py-1 text-xs rounded-r-md bg-[var(--surface-button)] hover:opacity-80 text-[var(--text-muted)] border-l border-[var(--border-base)] disabled:opacity-40 transition-colors"
               >
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -222,16 +222,16 @@ export function ChatInput({
               </button>
             </div>
             {commandOpen && (
-              <div className="absolute bottom-full left-0 mb-1 w-24 rounded-md bg-neutral-800 border border-neutral-700 shadow-lg z-50 overflow-hidden">
+              <div className="absolute bottom-full left-0 mb-1 w-24 rounded-md bg-[var(--surface-elevated)] border border-[var(--border-base)] shadow-lg z-50 overflow-hidden">
                 <button
                   onClick={() => executeCommand("build")}
-                  className="w-full px-3 py-1.5 text-xs text-left text-neutral-300 hover:bg-neutral-700 transition-colors"
+                  className="w-full px-3 py-1.5 text-xs text-left text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors"
                 >
                   Build
                 </button>
                 <button
                   onClick={() => executeCommand("plan")}
-                  className="w-full px-3 py-1.5 text-xs text-left text-neutral-300 hover:bg-neutral-700 transition-colors"
+                  className="w-full px-3 py-1.5 text-xs text-left text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors"
                 >
                   Plan
                 </button>
@@ -260,7 +260,7 @@ export function ChatInput({
             <button
               onClick={streaming ? onCancel : handleSend}
               disabled={!streaming && (!input.trim() || !connected)}
-              className="p-1.5 rounded-lg bg-neutral-700 hover:bg-neutral-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="p-1.5 rounded-lg bg-[var(--surface-button)] hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               title={streaming ? "Stop" : "Send"}
             >
               {streaming ? (
@@ -268,7 +268,7 @@ export function ChatInput({
                   <rect x="2" y="2" width="12" height="12" rx="1.5" />
                 </svg>
               ) : (
-                <svg className="w-4 h-4 text-white" viewBox="0 0 16 16" fill="currentColor">
+                <svg className="w-4 h-4 text-[var(--text-primary)]" viewBox="0 0 16 16" fill="currentColor">
                   <path d="M8 2l6 6h-4v6H6V8H2z" />
                 </svg>
               )}

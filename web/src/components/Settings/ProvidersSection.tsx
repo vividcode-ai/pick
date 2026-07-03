@@ -10,7 +10,7 @@ export function ProvidersSection({ providers, selectedModel, onModelChange }: Pr
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-sm font-semibold text-neutral-100">AI Providers</h3>
+        <h3 className="text-sm font-semibold text-[var(--text-primary)]">AI Providers</h3>
         <p className="text-xs text-neutral-500 mt-1">Manage AI model providers and select models</p>
       </div>
 
@@ -21,7 +21,7 @@ export function ProvidersSection({ providers, selectedModel, onModelChange }: Pr
           {providers.map((provider) => (
             <div key={provider.provider} className="settings-card">
               <div className="flex items-center justify-between">
-                <span className="font-medium text-sm text-neutral-200">{provider.provider}</span>
+                <span className="font-medium text-sm text-[var(--text-primary)]">{provider.provider}</span>
                 <span className={`text-xs ${provider.has_key ? "text-green-400" : "text-red-400"}`}>
                   {provider.has_key ? "Key configured" : "No API key"}
                 </span>
@@ -33,7 +33,7 @@ export function ProvidersSection({ providers, selectedModel, onModelChange }: Pr
                     className={`flex items-center gap-2 px-2 py-1.5 rounded text-sm cursor-pointer transition-colors ${
                       selectedModel === model.id
                         ? "bg-blue-500/10 text-blue-400"
-                        : "text-neutral-400 hover:bg-neutral-800"
+                        : "text-[var(--text-secondary)] hover:bg-[var(--surface-hover)]"
                     }`}
                   >
                     <input
@@ -46,7 +46,7 @@ export function ProvidersSection({ providers, selectedModel, onModelChange }: Pr
                     />
                     <span>{model.name}</span>
                     {model.reasoning && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-700 text-neutral-400">reasoning</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--surface-button)] text-[var(--text-secondary)]">reasoning</span>
                     )}
                   </label>
                 ))}

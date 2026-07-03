@@ -129,7 +129,6 @@ mod conpty {
     const FALSE: BOOL = 0;
     const TRUE: BOOL = 1;
     const PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE: DWORD = 0x00020016;
-    const PROC_THREAD_ATTRIBUTE_HANDLE_LIST: DWORD = 0x00020002;
     const EXTENDED_STARTUPINFO_PRESENT: DWORD = 0x00080000;
     const HANDLE_FLAG_INHERIT: DWORD = 1;
 
@@ -309,12 +308,12 @@ mod conpty {
 
                 // ── 3. Prepare STARTUPINFOEX with ConPTY attribute ─────
                 let mut attr_list_size: usize = 0;
-                InitializeProcThreadAttributeList(ptr::null_mut(), 2, 0, &mut attr_list_size);
+                InitializeProcThreadAttributeList(ptr::null_mut(), 1, 0, &mut attr_list_size);
 
                 let mut attr_list: Vec<u8> = vec![0u8; attr_list_size];
                 if InitializeProcThreadAttributeList(
                     attr_list.as_mut_ptr(),
-                    2,
+                    1,
                     0,
                     &mut attr_list_size,
                 ) == FALSE
@@ -331,25 +330,6 @@ mod conpty {
                     PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE as usize,
                     &mut h_pc as *mut _ as LPVOID,
                     std::mem::size_of::<HANDLE>(),
-                    ptr::null_mut(),
-                    ptr::null_mut(),
-                ) == FALSE
-                {
-                    let _ = CloseHandle(in_write);
-                    let _ = CloseHandle(out_read);
-                    DeleteProcThreadAttributeList(attr_list.as_mut_ptr());
-                    ClosePseudoConsole(h_pc);
-                    return Err(io::Error::last_os_error());
-                }
-
-                // Add empty HANDLE_LIST to prevent child from inheriting server handles
-                let empty_handle_list: [HANDLE; 0] = [];
-                if UpdateProcThreadAttribute(
-                    attr_list.as_mut_ptr(),
-                    0,
-                    PROC_THREAD_ATTRIBUTE_HANDLE_LIST as usize,
-                    empty_handle_list.as_ptr() as *mut std::ffi::c_void,
-                    std::mem::size_of::<HANDLE>() * empty_handle_list.len(),
                     ptr::null_mut(),
                     ptr::null_mut(),
                 ) == FALSE

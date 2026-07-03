@@ -28,7 +28,7 @@ export function SelectSetting({ label, description, options, value, onChange }: 
               className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
                 selected
                   ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
-                  : "bg-neutral-800 text-neutral-400 border border-neutral-700 hover:bg-neutral-700"
+                  : "bg-[var(--surface-button)] text-[var(--text-secondary)] border border-[var(--border-base)] hover:opacity-80"
               }`}
             >
               {opt.label}
