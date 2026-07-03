@@ -9,6 +9,7 @@
   --border-base: #e0e0e0;
   --border-secondary: #e0e0e0;
   --border-muted: #e0e0e0;
+  --border-divider: #262626;
   --text-primary: #111827;
   --text-secondary: #334155;
   --text-muted: #475569;
@@ -45,6 +46,7 @@
     --border-base: #3a3a3a;
     --border-secondary: #3a3a3a;
     --border-muted: #3a3a3a;
+    --border-divider: rgba(255, 255, 255, 0.25);
     --text-primary: #cfd4dc;
     --text-secondary: #999999;
     --text-muted: #999999;
@@ -79,6 +81,7 @@
   --border-base: #3a3a3a;
   --border-secondary: #3a3a3a;
   --border-muted: #3a3a3a;
+  --border-divider: rgba(255, 255, 255, 0.25);
   --text-primary: #cfd4dc;
   --text-secondary: #999999;
   --text-muted: #999999;

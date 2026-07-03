@@ -129,6 +129,7 @@ mod conpty {
     const FALSE: BOOL = 0;
     const TRUE: BOOL = 1;
     const PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE: DWORD = 0x00020016;
+    const PROC_THREAD_ATTRIBUTE_HANDLE_LIST: DWORD = 0x00020002;
     const EXTENDED_STARTUPINFO_PRESENT: DWORD = 0x00080000;
     const HANDLE_FLAG_INHERIT: DWORD = 1;
 
@@ -245,29 +246,6 @@ mod conpty {
             .collect()
     }
 
-    /// Build a Windows environment block adding TERM=xterm-256color.
-    fn build_env_block() -> Vec<u16> {
-        let mut block = Vec::new();
-        for (key, value) in std::env::vars() {
-            if key == "TERM" {
-                continue;
-            }
-            let entry = format!("{}={}", key, value);
-            let wide: Vec<u16> = std::ffi::OsStr::new(&entry)
-                .encode_wide()
-                .chain(std::iter::once(0))
-                .collect();
-            block.extend_from_slice(&wide);
-        }
-        let term: Vec<u16> = std::ffi::OsStr::new("TERM=xterm-256color")
-            .encode_wide()
-            .chain(std::iter::once(0))
-            .collect();
-        block.extend_from_slice(&term);
-        block.push(0); // double null terminator
-        block
-    }
-
     /// Windows ConPTY wrapper.
     /// On drop, `ClosePseudoConsole` is called, which terminates the child process.
     pub struct WinConPty {
@@ -331,12 +309,12 @@ mod conpty {
 
                 // ── 3. Prepare STARTUPINFOEX with ConPTY attribute ─────
                 let mut attr_list_size: usize = 0;
-                InitializeProcThreadAttributeList(ptr::null_mut(), 1, 0, &mut attr_list_size);
+                InitializeProcThreadAttributeList(ptr::null_mut(), 2, 0, &mut attr_list_size);
 
                 let mut attr_list: Vec<u8> = vec![0u8; attr_list_size];
                 if InitializeProcThreadAttributeList(
                     attr_list.as_mut_ptr(),
-                    1,
+                    2,
                     0,
                     &mut attr_list_size,
                 ) == FALSE
@@ -353,6 +331,25 @@ mod conpty {
                     PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE as usize,
                     &mut h_pc as *mut _ as LPVOID,
                     std::mem::size_of::<HANDLE>(),
+                    ptr::null_mut(),
+                    ptr::null_mut(),
+                ) == FALSE
+                {
+                    let _ = CloseHandle(in_write);
+                    let _ = CloseHandle(out_read);
+                    DeleteProcThreadAttributeList(attr_list.as_mut_ptr());
+                    ClosePseudoConsole(h_pc);
+                    return Err(io::Error::last_os_error());
+                }
+
+                // Add empty HANDLE_LIST to prevent child from inheriting server handles
+                let empty_handle_list: [HANDLE; 0] = [];
+                if UpdateProcThreadAttribute(
+                    attr_list.as_mut_ptr(),
+                    0,
+                    PROC_THREAD_ATTRIBUTE_HANDLE_LIST as usize,
+                    empty_handle_list.as_ptr() as *mut std::ffi::c_void,
+                    std::mem::size_of::<HANDLE>() * empty_handle_list.len(),
                     ptr::null_mut(),
                     ptr::null_mut(),
                 ) == FALSE
@@ -381,11 +378,6 @@ mod conpty {
 
                 let mut cmd_line = shell_wide.clone(); // CreateProcessW may modify this
 
-                // Build environment block with TERM=xterm-256color set
-                let env_block = build_env_block();
-                let env_ptr =
-                    env_block.as_ptr() as *const std::ffi::c_void as *mut std::ffi::c_void;
-
                 if CreateProcessW(
                     ptr::null(),
                     cmd_line.as_mut_ptr(),
@@ -393,7 +385,7 @@ mod conpty {
                     ptr::null(),
                     TRUE,
                     EXTENDED_STARTUPINFO_PRESENT,
-                    env_ptr,
+                    ptr::null_mut(),
                     dir_ptr,
                     &si.startup_info as *const STARTUPINFOW,
                     &mut pi,
@@ -502,14 +494,24 @@ async fn handle_pty_connection(
     };
 
     #[cfg(target_os = "windows")]
-    let pty = {
-        let pty_inner = tokio::task::spawn_blocking({
-            let shell = shell.to_string();
-            let cwd = cwd.clone();
-            move || conpty::WinConPty::spawn(&shell, cwd.as_deref(), 24, 80)
-        })
-        .await??;
-        std::sync::Arc::new(std::sync::Mutex::new(pty_inner))
+    let pty = match tokio::task::spawn_blocking({
+        let shell = shell.to_string();
+        let cwd = cwd.clone();
+        move || conpty::WinConPty::spawn(&shell, cwd.as_deref(), 24, 80)
+    })
+    .await
+    {
+        Ok(Ok(pty_inner)) => std::sync::Arc::new(std::sync::Mutex::new(pty_inner)),
+        Ok(Err(e)) => {
+            let msg = format!("\r\n\x1b[31m[PTY Error: {}]\x1b[0m\r\n", e);
+            let _ = ws_sender.send(Message::Text(msg)).await;
+            return Err(e.into());
+        }
+        Err(e) => {
+            let msg = format!("\r\n\x1b[31m[PTY Error: {}]\x1b[0m\r\n", e);
+            let _ = ws_sender.send(Message::Text(msg)).await;
+            return Err(e.into());
+        }
     };
 
     #[cfg(not(target_os = "windows"))]

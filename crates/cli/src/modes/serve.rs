@@ -22,6 +22,12 @@ pub async fn run_serve_mode(
         .expect("Failed to bind address");
     let actual_port = listener.local_addr().unwrap().port();
 
+    // Set TERM for child PTY processes before any ws connections
+    // Safety: called once at startup before any concurrent threads access env
+    unsafe {
+        std::env::set_var("TERM", "xterm-256color");
+    }
+
     let mut state = pick_server::AppState::new(pick_server::ServerConfig {
         host: host.clone(),
         port: actual_port,
