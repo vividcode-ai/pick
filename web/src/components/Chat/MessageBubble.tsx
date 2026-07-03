@@ -40,7 +40,7 @@ function UserBubble({ message, onCopy }: { message: ChatMessage; onCopy: () => v
   return (
     <div className="flex justify-end message-item">
       <div className="user-message-bubble">
-        <div className="text-sm leading-relaxed whitespace-pre-wrap text-neutral-100">
+        <div className="text-sm leading-relaxed whitespace-pre-wrap text-[var(--text-primary)]">
           {message.content}
         </div>
       </div>

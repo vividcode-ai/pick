@@ -35,12 +35,13 @@ export function ArchivedSessionsSection({ sessions, onUnarchive, onDelete }: Arc
   }
 
   return (
-    <div className="border border-[var(--border-base)] rounded-md p-2 space-y-1">
-      {sessions.map((session) => (
-        <div
-          key={session.id}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-[var(--surface-hover)] transition-colors"
-        >
+    <div className="border border-[var(--border-base)] rounded-md overflow-hidden">
+      <div className="divide-y divide-[var(--border-base)]">
+        {sessions.map((session) => (
+          <div
+            key={session.id}
+            className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-hover)] transition-colors"
+          >
           <MessageSquare className="w-4 h-4 text-[var(--text-muted)] flex-shrink-0" />
           <div className="flex-1 min-w-0">
             <div className="text-sm text-[var(--text-primary)] truncate">{session.title}</div>
@@ -66,10 +67,11 @@ export function ArchivedSessionsSection({ sessions, onUnarchive, onDelete }: Arc
           </div>
         </div>
       ))}
+      </div>
 
       {confirmId && (
         <ConfirmDialog
-          message="确定要永久删除此会话吗？此操作不可撤销。"
+          message="Are you sure you want to permanently delete this session? This action cannot be undone."
           onConfirm={() => {
             onDelete(confirmId);
             setConfirmId(null);
