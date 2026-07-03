@@ -335,6 +335,13 @@ pub async fn run_server_on_listener(
         history.load();
     }
 
+    // Start PTY WebSocket server in background
+    let pty_port = config.pty_ws_port;
+    let pty_manager = state.pty_manager.clone();
+    tokio::spawn(async move {
+        let _ = pty::start_pty_ws_server(Arc::new(pty_manager), pty_port).await;
+    });
+
     let app = create_app(state);
 
     axum::serve(listener, app).await?;
@@ -346,6 +353,13 @@ pub async fn serve_with_state(
     listener: TcpListener,
     state: Arc<AppState>,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    // Start PTY WebSocket server in background
+    let pty_port = state.config.pty_ws_port;
+    let pty_manager = state.pty_manager.clone();
+    tokio::spawn(async move {
+        let _ = pty::start_pty_ws_server(Arc::new(pty_manager), pty_port).await;
+    });
+
     let app = create_app(state);
     axum::serve(listener, app).await?;
     Ok(())

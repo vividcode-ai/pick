@@ -82,14 +82,39 @@ export function QuestionDialog({ payload, onSubmit, onCancel }: QuestionDialogPr
         });
         break;
       case "Enter":
+        e.preventDefault();
+        {
+          const item = allItems[focusIdx];
+          if (item.type === "option") {
+            const prompt = payload.prompts[item.promptIdx];
+            const nextSelections = selections.map((s, i) => {
+              if (i !== item.promptIdx) return [...s];
+              if (prompt.multiple) {
+                const idx = s.indexOf(item.label);
+                if (idx >= 0) return s.filter((_, j) => j !== idx);
+                return [...s, item.label];
+              }
+              return [item.label];
+            });
+            setSelections(nextSelections);
+            if (nextSelections.every((s, i) =>
+              payload.prompts[i].multiple ? s.length > 0 : s.length === 1
+            )) {
+              onSubmit(nextSelections);
+            }
+          } else if (item.type === "cancel") {
+            onCancel();
+          } else if (item.type === "submit") {
+            onSubmit(selections);
+          }
+        }
+        break;
       case " ":
         e.preventDefault();
         {
           const item = allItems[focusIdx];
           if (item.type === "option") {
             handleToggle(item.promptIdx, item.label);
-          } else if (item.type === "cancel") {
-            onCancel();
           } else if (item.type === "submit" && allAnswered) {
             onSubmit(selections);
           }

@@ -200,8 +200,13 @@ async fn handle_pty_connection(
         while let Some(Ok(msg)) = ws_receiver.next().await {
             match msg {
                 Message::Text(text) => {
-                    if text.trim() == "exit" {
+                    let trimmed = text.trim();
+                    if trimmed == "exit" {
                         break;
+                    }
+                    // Skip JSON control messages (e.g. resize)
+                    if trimmed.starts_with('{') {
+                        continue;
                     }
                     let _ = stdin.write_all(text.as_bytes()).await;
                     let _ = stdin.write_all(b"\n").await;
