@@ -88,10 +88,8 @@ export function PermissionDialog({ payload, onRespond }: PermissionDialogProps) 
                 ref={(el) => { btnRefs.current[0] = el; }}
                 tabIndex={focusIdx === 0 ? 0 : -1}
                 onClick={() => onRespond(false)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  focusIdx === 0
-                    ? "ring-2 ring-amber-500 border border-amber-500 bg-neutral-800 text-neutral-100"
-                    : "border border-neutral-600 text-neutral-300 hover:bg-neutral-800 hover:text-neutral-100"
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border border-neutral-600 text-neutral-300 hover:bg-neutral-800 hover:text-neutral-100 ${
+                  focusIdx === 0 ? "ring-2 ring-amber-500" : ""
                 }`}
               >
                 Deny
@@ -100,10 +98,8 @@ export function PermissionDialog({ payload, onRespond }: PermissionDialogProps) 
                 ref={(el) => { btnRefs.current[1] = el; }}
                 tabIndex={focusIdx === 1 ? 0 : -1}
                 onClick={() => onRespond(true)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  focusIdx === 1
-                    ? "ring-2 ring-amber-500 border border-amber-500 bg-amber-700 text-white"
-                    : "bg-amber-600 text-white hover:bg-amber-500"
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-amber-600 text-white hover:bg-amber-500 ${
+                  focusIdx === 1 ? "ring-2 ring-amber-500" : ""
                 }`}
               >
                 Allow

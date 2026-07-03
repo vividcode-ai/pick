@@ -131,13 +131,11 @@ export function QuestionDialog({ payload, onSubmit, onCancel }: QuestionDialogPr
                         ref={(el) => { btnRefs.current[idx] = el; }}
                         tabIndex={focused ? 0 : -1}
                         onClick={() => handleToggle(pi, opt.label)}
-                        className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-colors ${
-                          focused
-                            ? "ring-2 ring-blue-400 border border-blue-400 bg-neutral-800 text-neutral-100"
-                            : selected
-                              ? "bg-blue-600/20 border border-blue-500/50 text-blue-200"
-                              : "bg-neutral-800 border border-neutral-700 text-neutral-300"
-                        }`}
+                        className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-colors
+                          bg-neutral-800 border text-neutral-300
+                          ${selected ? "border-blue-500/50 text-blue-200" : "border-neutral-700"}
+                          ${focused ? "ring-2 ring-blue-400" : ""}
+                        `}
                       >
                         <span className="font-medium">{opt.label}</span>
                         {opt.description && (
@@ -156,10 +154,8 @@ export function QuestionDialog({ payload, onSubmit, onCancel }: QuestionDialogPr
               ref={(el) => { btnRefs.current[itemIdx] = el; }}
               tabIndex={focusIdx === itemIdx ? 0 : -1}
               onClick={onCancel}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                focusIdx === itemIdx
-                  ? "ring-2 ring-neutral-400 border border-neutral-400 bg-neutral-800 text-neutral-100"
-                  : "border border-neutral-600 text-neutral-300 hover:bg-neutral-800 hover:text-neutral-100"
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border border-neutral-600 text-neutral-300 hover:bg-neutral-800 hover:text-neutral-100 ${
+                focusIdx === itemIdx ? "ring-2 ring-neutral-400" : ""
               }`}
             >
               Cancel
@@ -170,11 +166,9 @@ export function QuestionDialog({ payload, onSubmit, onCancel }: QuestionDialogPr
                 tabIndex={focusIdx === idx ? 0 : -1}
                 onClick={() => onSubmit(selections)}
                 disabled={!allAnswered}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  focusIdx === idx
-                    ? "ring-2 ring-blue-400 border border-blue-400 bg-blue-700 text-white"
-                    : "bg-blue-600 text-white hover:bg-blue-500"
-                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed ${
+                  focusIdx === idx ? "ring-2 ring-blue-400" : ""
+                }`}
               >
                 Submit
               </button>
