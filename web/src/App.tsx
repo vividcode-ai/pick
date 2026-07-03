@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Layout } from "./components/Layout/Layout";
 import { LeftPanel } from "./components/Layout/LeftPanel";
 import { ChatView } from "./components/Chat/ChatView";
@@ -17,12 +17,16 @@ import {
 } from "./stores/commands";
 import {
   openSettings,
+  subscribeToSettings,
+  getSettingsSnapshot,
 } from "./stores/settings";
 import { initAppSettings } from "./stores/appSettings";
 import {
   addSessionEntry,
   removeSessionEntry,
   renameSessionEntry,
+  archiveSessionEntry,
+  unarchiveSessionEntry,
   initSessions,
 } from "./stores/sessions";
 import type { ChatMessage, ProviderInfo } from "./types/events";
@@ -93,6 +97,7 @@ export default function App() {
           title: s.title,
           createdAt: s.created_at,
           updatedAt: s.updated_at,
+          archived: s.archived || false,
         }));
         if (entries.length > 0) initSessions(entries);
       })
@@ -211,6 +216,50 @@ export default function App() {
     [deleteSession]
   );
 
+  const handleArchiveSession = useCallback(
+    async (id: string) => {
+      try {
+        if (baseUrl) {
+          await fetch(`${baseUrl}/sessions/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ archived: true }),
+          });
+        }
+      } catch (e) {
+        console.error("Failed to archive session:", e);
+      }
+      archiveSessionEntry(id);
+    },
+    [baseUrl]
+  );
+
+  const handleUnarchiveSession = useCallback(
+    async (id: string) => {
+      try {
+        if (baseUrl) {
+          await fetch(`${baseUrl}/sessions/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ archived: false }),
+          });
+        }
+      } catch (e) {
+        console.error("Failed to unarchive session:", e);
+      }
+      unarchiveSessionEntry(id);
+    },
+    [baseUrl]
+  );
+
+  const handleDeleteArchivedSession = useCallback(
+    async (id: string) => {
+      await deleteSession(id);
+      removeSessionEntry(id);
+    },
+    [deleteSession]
+  );
+
   const handleFork = useCallback(async (message: ChatMessage) => {
     if (!activeSessionId || !baseUrl) return;
     const msgIdx = activeMessages.indexOf(message);
@@ -234,6 +283,7 @@ export default function App() {
   );
 
   const { open: commandPaletteOpen, close: closeCommandPalette, commands } = useCommandPalette();
+  const settingsState = useSyncExternalStore(subscribeToSettings, getSettingsSnapshot, getSettingsSnapshot);
 
   const handleExecuteCommand = useCallback(
     (cmd: Command) => {
@@ -247,6 +297,20 @@ export default function App() {
       <div className="flex h-screen items-center justify-center bg-neutral-950 text-neutral-400">
         Connecting...
       </div>
+    );
+  }
+
+  if (settingsState.open) {
+    return (
+      <SettingsScreen
+        providers={providers}
+        selectedModel={selectedModel}
+        onModelChange={handleModelChange}
+        serverUrl={settingsUrl}
+        onSaveServerUrl={handleSaveUrl}
+        onUnarchiveSession={handleUnarchiveSession}
+        onDeleteArchivedSession={handleDeleteArchivedSession}
+      />
     );
   }
 
@@ -305,7 +369,7 @@ export default function App() {
             activeSessionId={activeSessionId}
             onSelectSession={handleSelectSession}
             onRenameSession={handleRenameSession}
-            onDeleteSession={handleDeleteSession}
+            onArchiveSession={handleArchiveSession}
             streamingSessions={streamingSessions}
             pinned={sidebarPinned}
             onTogglePinned={() => setSidebarPinned((v) => !v)}
@@ -334,14 +398,6 @@ export default function App() {
         onClose={closeCommandPalette}
         commands={commands}
         onExecute={handleExecuteCommand}
-      />
-
-      <SettingsScreen
-        providers={providers}
-        selectedModel={selectedModel}
-        onModelChange={handleModelChange}
-        serverUrl={settingsUrl}
-        onSaveServerUrl={handleSaveUrl}
       />
     </>
   );

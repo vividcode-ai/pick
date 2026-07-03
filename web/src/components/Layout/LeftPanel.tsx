@@ -12,7 +12,7 @@ interface LeftPanelProps {
   activeSessionId: string | null;
   onSelectSession: (id: string) => void;
   onRenameSession: (id: string, title: string) => void;
-  onDeleteSession: (id: string) => void;
+  onArchiveSession: (id: string) => void;
   streamingSessions?: Record<string, boolean>;
 }
 
@@ -26,7 +26,7 @@ export function LeftPanel({
   activeSessionId,
   onSelectSession,
   onRenameSession,
-  onDeleteSession,
+  onArchiveSession,
   streamingSessions,
 }: LeftPanelProps) {
   return (
@@ -63,7 +63,7 @@ export function LeftPanel({
         onSelectSession={onSelectSession}
         onNewSession={onNewSession}
         onRenameSession={onRenameSession}
-        onDeleteSession={onDeleteSession}
+        onArchiveSession={onArchiveSession}
         streamingSessions={streamingSessions}
       />
 

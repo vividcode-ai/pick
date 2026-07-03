@@ -8,6 +8,7 @@ use pick_agent::core::message_queue::PendingMessageQueue;
 use pick_agent::core::state::AgentTool;
 use pick_agent::session::entries::{SessionEntry, SessionEntryKind, SessionInfoEntry};
 use pick_agent::session::manager::SessionManager as AgentSessionManager;
+use pick_agent::session::storage::{JsonlStorage, SessionStorage};
 use pick_ai::types::Message;
 use serde::Serialize;
 use tokio::sync::{RwLock, oneshot, watch};
@@ -38,6 +39,8 @@ pub struct SessionInfo {
     pub status: String,
     pub fork_parent_id: Option<String>,
     pub cwd: Option<String>,
+    #[serde(default)]
+    pub archived: bool,
 }
 
 #[derive(Clone)]
@@ -56,6 +59,7 @@ pub struct AgentSession {
     pub session_path: Option<String>,
     pub persisted_messages_count: usize,
     pub cwd: Option<String>,
+    pub archived: bool,
 }
 
 impl AgentSession {
@@ -84,6 +88,7 @@ impl AgentSession {
             session_path: None,
             persisted_messages_count: 0,
             cwd,
+            archived: false,
         }
     }
 
@@ -99,6 +104,7 @@ impl AgentSession {
             status: self.status.clone(),
             fork_parent_id: self.fork_parent_id.clone(),
             cwd: self.cwd.clone(),
+            archived: self.archived,
         }
     }
 }
@@ -178,6 +184,7 @@ impl SessionManager {
                     session_path: path,
                     persisted_messages_count: 0,
                     cwd: Some(cwd_str),
+                    archived: false,
                 };
                 self.sessions.write().await.insert(id.clone(), session);
                 (id, title)
@@ -186,7 +193,7 @@ impl SessionManager {
                 error!("Failed to create session: {}", e);
                 let id = uuid::Uuid::now_v7().to_string();
                 let title = format!("Session - {}", chrono::Utc::now().format("%Y-%m-%d %H:%M"));
-                let session = AgentSession::new(
+                let mut session = AgentSession::new(
                     id.clone(),
                     title.clone(),
                     model_id,
@@ -195,6 +202,7 @@ impl SessionManager {
                     tools,
                     Some(cwd_str),
                 );
+                session.archived = false;
                 self.sessions.write().await.insert(id.clone(), session);
                 (id, title)
             }
@@ -298,6 +306,7 @@ impl SessionManager {
         title: Option<String>,
         model_id: Option<String>,
         provider: Option<String>,
+        archived: Option<bool>,
     ) -> bool {
         // For title persistence, we need the path before locking
         let needs_persist = if title.is_some() {
@@ -305,6 +314,15 @@ impl SessionManager {
             sessions.get(id).and_then(|s| s.session_path.clone())
         } else {
             None
+        };
+
+        let need_archive_persist = {
+            let sessions = self.sessions.read().await;
+            if sessions.get(id).is_some() {
+                archived.is_some()
+            } else {
+                return false;
+            }
         };
 
         let mut sessions = self.sessions.write().await;
@@ -324,10 +342,31 @@ impl SessionManager {
             if let Some(p) = provider {
                 s.provider = p;
             }
+            if let Some(a) = archived {
+                s.archived = a;
+            }
             s.updated_at = chrono::Utc::now().timestamp_millis();
+            if need_archive_persist && archived.is_some() {
+                drop(sessions);
+                self.persist_archived_flag(&id, archived.unwrap()).await;
+            }
             true
         } else {
             false
+        }
+    }
+
+    async fn persist_archived_flag(&self, id: &str, archived: bool) {
+        let path = {
+            let sessions = self.sessions.read().await;
+            sessions.get(id).and_then(|s| s.session_path.clone())
+        };
+        if let Some(p) = path {
+            let storage = JsonlStorage::new(PathBuf::from(&p));
+            if let Ok(Some(mut header)) = storage.load_header().await {
+                header.archived = archived;
+                let _ = storage.save_header(header).await;
+            }
         }
     }
 
@@ -443,6 +482,7 @@ impl SessionManager {
                     session_path: path,
                     persisted_messages_count: msg_count,
                     cwd: Some(cwd_str),
+                    archived: false,
                 };
                 self.sessions.write().await.insert(new_id.clone(), session);
                 Some((new_id, title))

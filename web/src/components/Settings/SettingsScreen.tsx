@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { X, Palette, Cpu, Server, Bell } from "lucide-react";
+import { ArrowLeft, Palette, Cpu, Server, Bell, Archive } from "lucide-react";
 import {
   closeSettings,
   setActiveSettingsSection,
@@ -7,10 +7,12 @@ import {
   getSettingsSnapshot,
   type SettingsSectionId,
 } from "../../stores/settings";
+import { useArchivedSessions } from "../../stores/sessions";
 import { AppearanceSection } from "./AppearanceSection";
 import { ProvidersSection } from "./ProvidersSection";
 import { ServerSection } from "./ServerSection";
 import { NotificationsSection } from "./NotificationsSection";
+import { ArchivedSessionsSection } from "./ArchivedSectionsSection";
 import type { ProviderInfo } from "../../types/events";
 
 interface SettingsScreenProps {
@@ -19,6 +21,8 @@ interface SettingsScreenProps {
   onModelChange: (modelId: string, provider: string) => void;
   serverUrl: string;
   onSaveServerUrl: (url: string) => void;
+  onUnarchiveSession: (id: string) => void;
+  onDeleteArchivedSession: (id: string) => void;
 }
 
 const navItems: { id: SettingsSectionId; icon: typeof Palette; label: string }[] = [
@@ -26,6 +30,7 @@ const navItems: { id: SettingsSectionId; icon: typeof Palette; label: string }[]
   { id: "providers", icon: Cpu, label: "Providers" },
   { id: "server", icon: Server, label: "Server" },
   { id: "notifications", icon: Bell, label: "Notifications" },
+  { id: "archived", icon: Archive, label: "Archived" },
 ];
 
 export function SettingsScreen({
@@ -34,10 +39,11 @@ export function SettingsScreen({
   onModelChange,
   serverUrl,
   onSaveServerUrl,
+  onUnarchiveSession,
+  onDeleteArchivedSession,
 }: SettingsScreenProps) {
   const state = useSyncExternalStore(subscribeToSettings, getSettingsSnapshot, getSettingsSnapshot);
-
-  if (!state.open) return null;
+  const archivedSessions = useArchivedSessions();
 
   const renderSection = () => {
     switch (state.activeSection) {
@@ -49,12 +55,20 @@ export function SettingsScreen({
         return <ServerSection currentUrl={serverUrl} onSave={onSaveServerUrl} />;
       case "notifications":
         return <NotificationsSection />;
+      case "archived":
+        return (
+          <ArchivedSessionsSection
+            sessions={archivedSessions}
+            onUnarchive={onUnarchiveSession}
+            onDelete={onDeleteArchivedSession}
+          />
+        );
     }
   };
 
   return (
-    <div className="settings-overlay" onClick={closeSettings}>
-      <div className="settings-shell" onClick={(e) => e.stopPropagation()}>
+    <div className="settings-page">
+      <div className="settings-shell">
         <nav className="settings-nav">
           <div className="settings-nav-header">
             <h2 className="settings-nav-title">Settings</h2>
@@ -83,19 +97,23 @@ export function SettingsScreen({
 
         <div className="settings-content">
           <header className="settings-content-header">
-            <h1 className="settings-content-title">
-              {navItems.find((i) => i.id === state.activeSection)?.label}
-            </h1>
-            <button
-              onClick={closeSettings}
-              className="p-1.5 rounded-md hover:bg-neutral-800 text-neutral-400 hover:text-neutral-200 transition-colors"
-              aria-label="Close settings"
-            >
-              <X className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={closeSettings}
+                className="p-2 rounded-md bg-neutral-800 hover:bg-neutral-700 text-neutral-200 hover:text-white border border-neutral-700 transition-colors"
+                aria-label="Back to main"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+              <h1 className="settings-content-title">
+                {navItems.find((i) => i.id === state.activeSection)?.label}
+              </h1>
+            </div>
           </header>
           <div className="settings-scroll">
-            {renderSection()}
+            <div className="settings-content-card">
+              {renderSection()}
+            </div>
           </div>
         </div>
       </div>

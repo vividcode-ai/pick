@@ -6,7 +6,7 @@ interface SessionListProps {
   onSelectSession: (id: string) => void;
   onNewSession: () => void;
   onRenameSession: (id: string, title: string) => void;
-  onDeleteSession: (id: string) => void;
+  onArchiveSession: (id: string) => void;
   streamingSessions?: Record<string, boolean>;
 }
 
@@ -15,7 +15,7 @@ export function SessionList({
   onSelectSession,
   onNewSession,
   onRenameSession,
-  onDeleteSession,
+  onArchiveSession,
   streamingSessions,
 }: SessionListProps) {
   const { query, setQuery, filtered } = useSessionSearch();
@@ -37,7 +37,7 @@ export function SessionList({
               streaming={!!streamingSessions?.[session.id]}
               onSelect={onSelectSession}
               onRename={onRenameSession}
-              onDelete={onDeleteSession}
+              onArchive={onArchiveSession}
             />
           ))
         )}

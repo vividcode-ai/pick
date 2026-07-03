@@ -52,6 +52,7 @@ impl SessionManager {
             cwd: Some(cwd.to_string_lossy().to_string()),
             model,
             provider,
+            archived: false,
         };
         storage.save_header(header.clone()).await?;
 
@@ -164,6 +165,7 @@ impl SessionManager {
             cwd: Some(cwd.to_string_lossy().to_string()),
             model,
             provider,
+            archived: false,
         });
         new_header.id = uuid::Uuid::now_v7().to_string();
         new_header.cwd = Some(cwd.to_string_lossy().to_string());

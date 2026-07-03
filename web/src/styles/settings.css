@@ -1,26 +1,18 @@
-/* Settings screen - adapted from EmbeddedCowork */
-.settings-overlay {
+/* Settings screen - full page */
+.settings-page {
   position: fixed;
   inset: 0;
   z-index: 50;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 5dvh 1rem;
-  background-color: var(--overlay-scrim);
+  flex-direction: column;
+  background-color: var(--surface-base);
 }
 
 .settings-shell {
-  width: min(1120px, 100%);
-  height: 100%;
-  max-height: none;
+  flex: 1;
   display: grid;
   grid-template-columns: minmax(200px, 240px) minmax(0, 1fr);
   overflow: hidden;
-  border: 1px solid var(--border-base);
-  border-radius: 1rem;
-  background-color: var(--surface-base);
-  box-shadow: 0 32px 96px rgba(0, 0, 0, 0.35);
 }
 
 .settings-nav {
@@ -106,6 +98,12 @@
   padding: 1rem;
 }
 
+.settings-content-card {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 0 0.5rem;
+}
+
 .settings-card {
   padding: 1.25rem;
   border: 1px solid var(--border-base);
@@ -155,8 +153,6 @@
 @media (max-width: 768px) {
   .settings-shell {
     grid-template-columns: 1fr;
-    border-radius: 0;
-    height: 100%;
   }
 
   .settings-nav-list {

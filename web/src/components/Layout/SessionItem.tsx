@@ -1,4 +1,4 @@
-import { MessageSquare, Trash2, Pencil } from "lucide-react";
+import { MessageSquare, Archive, Pencil } from "lucide-react";
 import { useState } from "react";
 import type { SessionEntry } from "../../stores/sessions";
 
@@ -8,7 +8,7 @@ interface SessionItemProps {
   streaming: boolean;
   onSelect: (id: string) => void;
   onRename: (id: string, title: string) => void;
-  onDelete: (id: string) => void;
+  onArchive: (id: string) => void;
 }
 
 function formatRelativeTime(ts: number): string {
@@ -25,7 +25,7 @@ function formatRelativeTime(ts: number): string {
   return `${months}mo ago`;
 }
 
-export function SessionItem({ session, isActive, streaming, onSelect, onRename, onDelete }: SessionItemProps) {
+export function SessionItem({ session, isActive, streaming, onSelect, onRename, onArchive }: SessionItemProps) {
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(session.title);
 
@@ -79,11 +79,11 @@ export function SessionItem({ session, isActive, streaming, onSelect, onRename, 
             <Pencil className="w-3 h-3" />
           </button>
           <button
-            onClick={(e) => { e.stopPropagation(); onDelete(session.id); }}
-            className="p-1 rounded hover:bg-neutral-700 text-neutral-500 hover:text-red-400"
-            title="Delete"
+            onClick={(e) => { e.stopPropagation(); onArchive(session.id); }}
+            className="p-1 rounded hover:bg-neutral-700 text-neutral-500 hover:text-neutral-300"
+            title="Archive"
           >
-            <Trash2 className="w-3 h-3" />
+            <Archive className="w-3 h-3" />
           </button>
         </div>
       </div>

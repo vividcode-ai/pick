@@ -82,11 +82,20 @@ export function TerminalPanel({ baseUrl, visible, onClose }: TerminalPanelProps)
       const ws = new WebSocket(`ws://${hostname}:${wsPort}`);
       wsRef.current = ws;
 
+      const decodeBuffer = (buf: ArrayBuffer): string => {
+        try {
+          const utf8 = new TextDecoder("utf-8", { fatal: true });
+          return utf8.decode(buf);
+        } catch {
+          const gbk = new TextDecoder("gbk");
+          return gbk.decode(buf);
+        }
+      };
+
       ws.onmessage = (event) => {
         if (event.data instanceof Blob) {
           event.data.arrayBuffer().then((buf) => {
-            const decoded = new TextDecoder().decode(buf);
-            term.write(decoded.replace(/\n/g, "\r\n"));
+            term.write(decodeBuffer(buf).replace(/\n/g, "\r\n"));
           });
         } else {
           term.write(event.data.replace(/\n/g, "\r\n"));

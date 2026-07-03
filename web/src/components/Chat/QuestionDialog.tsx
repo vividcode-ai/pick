@@ -16,8 +16,10 @@ interface FocusItem {
 }
 
 export function QuestionDialog({ payload, onSubmit, onCancel }: QuestionDialogProps) {
-  const [selections, setSelections] = useState<string[][]>(
-    payload.prompts.map(() => [])
+  const [selections, setSelections] = useState<string[][]>(() =>
+    payload.prompts.map((p) =>
+      p.multiple ? [] : [p.options[0]?.label].filter(Boolean)
+    )
   );
   const [focusIdx, setFocusIdx] = useState(0);
   const btnRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -29,7 +31,6 @@ export function QuestionDialog({ payload, onSubmit, onCancel }: QuestionDialogPr
         items.push({ type: "option", promptIdx: pi, optionIdx: oi, label: payload.prompts[pi].options[oi].label });
       }
     }
-    items.push({ type: "cancel" });
     items.push({ type: "submit" });
     return items;
   }, [payload.prompts]);
@@ -64,22 +65,49 @@ export function QuestionDialog({ payload, onSubmit, onCancel }: QuestionDialogPr
     payload.prompts[i].multiple ? s.length > 0 : s.length === 1
   );
 
+  const selectOption = (promptIdx: number, label: string) => {
+    setSelections((prev) => {
+      const next = prev.map((s) => [...s]);
+      const prompt = payload.prompts[promptIdx];
+      if (prompt.multiple) {
+        const idx = next[promptIdx].indexOf(label);
+        if (idx >= 0) {
+          next[promptIdx].splice(idx, 1);
+        } else {
+          next[promptIdx].push(label);
+        }
+      } else {
+        next[promptIdx] = [label];
+      }
+      return next;
+    });
+  };
+
+  const moveFocus = (next: number) => {
+    setFocusIdx(next);
+    const item = allItems[next];
+    if (item?.type === "option") {
+      selectOption(item.promptIdx, item.label);
+    }
+  };
+
   const handleKeyDown = (e: KeyboardEvent) => {
     switch (e.key) {
       case "ArrowUp":
         e.preventDefault();
-        setFocusIdx((prev) => Math.max(0, prev - 1));
+        moveFocus(Math.max(0, focusIdx - 1));
         break;
       case "ArrowDown":
         e.preventDefault();
-        setFocusIdx((prev) => Math.min(allItems.length - 1, prev + 1));
+        moveFocus(Math.min(allItems.length - 1, focusIdx + 1));
         break;
       case "Tab":
         e.preventDefault();
-        setFocusIdx((prev) => {
-          if (e.shiftKey) return Math.max(0, prev - 1);
-          return Math.min(allItems.length - 1, prev + 1);
-        });
+        if (e.shiftKey) {
+          moveFocus(Math.max(0, focusIdx - 1));
+        } else {
+          moveFocus(Math.min(allItems.length - 1, focusIdx + 1));
+        }
         break;
       case "Enter":
         e.preventDefault();
@@ -102,8 +130,6 @@ export function QuestionDialog({ payload, onSubmit, onCancel }: QuestionDialogPr
             )) {
               onSubmit(nextSelections);
             }
-          } else if (item.type === "cancel") {
-            onCancel();
           } else if (item.type === "submit") {
             onSubmit(selections);
           }
@@ -115,7 +141,7 @@ export function QuestionDialog({ payload, onSubmit, onCancel }: QuestionDialogPr
           const item = allItems[focusIdx];
           if (item.type === "option") {
             handleToggle(item.promptIdx, item.label);
-          } else if (item.type === "submit" && allAnswered) {
+          } else if (item.type === "submit") {
             onSubmit(selections);
           }
         }
@@ -158,7 +184,7 @@ export function QuestionDialog({ payload, onSubmit, onCancel }: QuestionDialogPr
                         onClick={() => handleToggle(pi, opt.label)}
                         className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-colors outline-none
                           ${selected
-                            ? "bg-blue-600 text-white"
+                            ? "bg-blue-800 text-blue-100"
                             : "bg-neutral-800 text-neutral-300 border border-neutral-700"
                           }
                           ${focused && !selected ? "ring-1 ring-blue-400" : ""}
@@ -177,16 +203,6 @@ export function QuestionDialog({ payload, onSubmit, onCancel }: QuestionDialogPr
           </div>
 
           <div className="flex items-center justify-end gap-2 px-4 py-2.5 border-t border-neutral-700">
-            <button
-              ref={(el) => { btnRefs.current[itemIdx] = el; }}
-              tabIndex={focusIdx === itemIdx ? 0 : -1}
-              onClick={onCancel}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border border-neutral-600 text-neutral-300 hover:bg-neutral-800 hover:text-neutral-100 outline-none ${
-                focusIdx === itemIdx ? "ring-2 ring-neutral-400" : ""
-              }`}
-            >
-              Cancel
-            </button>
             {(() => { const idx = itemIdx++; return (
               <button
                 ref={(el) => { btnRefs.current[idx] = el; }}

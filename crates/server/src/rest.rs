@@ -36,6 +36,7 @@ pub struct UpdateSessionRequest {
     pub title: Option<String>,
     pub model_id: Option<String>,
     pub provider: Option<String>,
+    pub archived: Option<bool>,
 }
 
 #[derive(Deserialize)]
@@ -180,7 +181,7 @@ pub async fn update_session(
 ) -> StatusCode {
     if state
         .session_manager
-        .update_session(&id, req.title, req.model_id, req.provider)
+        .update_session(&id, req.title, req.model_id, req.provider, req.archived)
         .await
     {
         StatusCode::OK

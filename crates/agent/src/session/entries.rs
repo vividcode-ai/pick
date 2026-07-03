@@ -163,6 +163,8 @@ pub struct SessionHeader {
     pub cwd: Option<String>,
     pub model: Option<String>,
     pub provider: Option<String>,
+    #[serde(default)]
+    pub archived: bool,
 }
 
 impl From<&Message> for SessionEntry {

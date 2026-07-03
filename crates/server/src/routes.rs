@@ -16,7 +16,7 @@ use pick_ai::types::Message as AiMessage;
 use pick_ai::types::UserMessage;
 use serde::Deserialize;
 use tokio::sync::watch;
-use tracing::{error, info};
+use tracing::{debug, error};
 use utoipa::ToSchema;
 
 use crate::AppState;
@@ -118,7 +118,7 @@ pub async fn ask(
     // Try to claim the in_flight flag
     let already_running = sse_state.in_flight.swap(true, Ordering::AcqRel);
     if already_running {
-        info!(
+        debug!(
             "Message queued for session {} (agent running)",
             req.session_id
         );
@@ -250,7 +250,7 @@ pub async fn ask(
         .await;
     });
 
-    info!("Agent loop started for session {}", req.session_id);
+    debug!("Agent loop started for session {}", req.session_id);
     (StatusCode::ACCEPTED, "Agent started").into_response()
 }
 
@@ -552,7 +552,7 @@ async fn run_agent_loop_queue(
                             if let Some(t) = title {
                                 state
                                     .session_manager
-                                    .update_session(&sid, Some(t.clone()), None, None)
+                                    .update_session(&sid, Some(t.clone()), None, None, None)
                                     .await;
                                 Some(t)
                             } else {
@@ -575,7 +575,7 @@ async fn run_agent_loop_queue(
 
                 // Check if cancelled by user
                 if *cancel_rx.borrow() {
-                    info!("Agent loop cancelled by user for session {}", sid);
+                    debug!("Agent loop cancelled by user for session {}", sid);
                     cleanup_loop(&state, &session_id, &sse_state, true).await;
                     break;
                 }

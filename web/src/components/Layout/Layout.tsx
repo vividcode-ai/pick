@@ -105,9 +105,8 @@ export function Layout({
           <TerminalPanel baseUrl={baseUrl} visible={terminalOpen} onClose={() => setTerminalOpen(false)} />
         )}
 
-        {/* Desktop: toolbar (always visible) + cards (conditional) */}
-        <div className="hidden md:block absolute top-3 right-3 z-10">
-          {/* Toolbar — always visible */}
+        {/* Desktop toolbar — always visible, fixed at top-right */}
+        <div className="hidden md:block fixed top-3 right-3 z-20">
           <div className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-xl border border-[var(--border-base)] bg-[var(--surface-secondary)] shadow-sm w-fit">
             <button
               onClick={toggleRightPanel}
@@ -127,13 +126,15 @@ export function Layout({
               <Monitor className="w-4 h-4" />
             </button>
           </div>
-          {/* Cards below toolbar — conditional */}
-          {rightPanelOpen && (
-            <div className="mt-2 space-y-2 max-h-[calc(100vh-8rem)] overflow-y-auto">
+        </div>
+        {/* Desktop cards — conditional, fixed below toolbar */}
+        {rightPanelOpen && (
+          <div className="hidden md:block fixed top-3 right-3 z-10" style={{ marginTop: "44px" }}>
+            <div className="mt-2 space-y-2 max-h-[calc(100vh-8rem)] overflow-y-auto w-[320px]">
               {rightPanelContent}
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </main>
 
         {/* Mobile drawer */}

@@ -151,20 +151,23 @@ fn run_update_action(action: UpdateAction) -> anyhow::Result<()> {
 
 #[tokio::main]
 async fn main() {
-    // Initialize tracing
+    // Parse CLI arguments first to check for verbose flag
+    let args = parse_args(std::env::args().skip(1).collect());
+
+    // Initialize tracing (RUST_LOG env var takes precedence over defaults)
+    let default_level = if args.verbose { "debug" } else { "info" };
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-                tracing_subscriber::EnvFilter::new("info,rmcp=warn,pick_mcp=warn")
+                tracing_subscriber::EnvFilter::new(format!(
+                    "{default_level},rmcp=warn,pick_mcp=warn"
+                ))
             }),
         )
         .init();
 
     // Register built-in AI providers
     register_builtins();
-
-    // Parse CLI arguments
-    let args = parse_args(std::env::args().skip(1).collect());
 
     if args.help {
         print_help();

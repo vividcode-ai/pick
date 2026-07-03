@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 
-export type SettingsSectionId = "appearance" | "providers" | "server" | "notifications";
+export type SettingsSectionId = "appearance" | "providers" | "server" | "notifications" | "archived";
 
 interface SettingsState {
   open: boolean;

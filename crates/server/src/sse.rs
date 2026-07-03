@@ -14,7 +14,7 @@ use axum::response::sse::{Event, KeepAlive, Sse};
 use pick_agent::core::message_queue::{PendingMessageQueue, QueueMode};
 use serde::Deserialize;
 use tokio::sync::mpsc;
-use tracing::info;
+use tracing::debug;
 
 use crate::AppState;
 use crate::git::get_git_info;
@@ -108,6 +108,6 @@ pub async fn handle_sse(
             .text("heartbeat"),
     );
 
-    info!("SSE connected for session {}", session_id);
+    debug!("SSE connected for session {}", session_id);
     sse.into_response()
 }

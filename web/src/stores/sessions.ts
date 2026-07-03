@@ -5,6 +5,7 @@ export interface SessionEntry {
   title: string;
   createdAt: number;
   updatedAt: number;
+  archived?: boolean;
 }
 
 let sessions: SessionEntry[] = [];
@@ -47,6 +48,16 @@ export function renameSessionEntry(id: string, title: string) {
   emitChange();
 }
 
+export function archiveSessionEntry(id: string) {
+  sessions = sessions.map((s) => (s.id === id ? { ...s, archived: true } : s));
+  emitChange();
+}
+
+export function unarchiveSessionEntry(id: string) {
+  sessions = sessions.map((s) => (s.id === id ? { ...s, archived: false } : s));
+  emitChange();
+}
+
 export function useSessionList() {
   const list = useSyncExternalStore(subscribeToSessions, getSnapshot, getSnapshot);
   return list;
@@ -56,9 +67,16 @@ export function useSessionSearch() {
   const [query, setQuery] = useState("");
   const list = useSessionList();
 
+  const activeList = list.filter((s) => !s.archived);
+
   const filtered = query.trim()
-    ? list.filter((s) => s.title.toLowerCase().includes(query.toLowerCase()))
-    : list;
+    ? activeList.filter((s) => s.title.toLowerCase().includes(query.toLowerCase()))
+    : activeList;
 
   return { query, setQuery, filtered };
+}
+
+export function useArchivedSessions() {
+  const list = useSessionList();
+  return list.filter((s) => s.archived);
 }

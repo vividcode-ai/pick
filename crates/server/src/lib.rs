@@ -32,7 +32,7 @@ use tokio::net::TcpListener;
 use tokio::sync::Mutex as TokioMutex;
 use tokio::sync::RwLock;
 use tower_http::cors::CorsLayer;
-use tracing::{debug, info};
+use tracing::debug;
 
 pub struct AppState {
     pub session_manager: session::SessionManager,
@@ -49,22 +49,26 @@ pub struct AppState {
 
 impl AppState {
     pub fn new(config: ServerConfig) -> Self {
-        let cwd = config
-            .cwd
-            .as_deref()
-            .map(Path::new)
-            .map(|p| p.to_path_buf())
-            .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
-        let session_dir = cwd.join(".pick").join("sessions");
-        let history_cwd = cwd.clone();
+        let cwd = config.cwd.clone().unwrap_or_else(|| {
+            std::env::current_dir()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .into_owned()
+        });
+        let cwd_path = Path::new(&cwd);
+        let session_dir = cwd_path.join(".pick").join("sessions");
+        let history_cwd = cwd_path.to_path_buf();
         Self {
-            session_manager: session::SessionManager::new_with_cwd(session_dir, cwd),
+            session_manager: session::SessionManager::new_with_cwd(
+                session_dir,
+                cwd_path.to_path_buf(),
+            ),
             sse_sessions: RwLock::new(HashMap::new()),
             config,
             default_provider: None,
             default_model: None,
             api_keys: HashMap::new(),
-            pty_manager: PtyManager::new(),
+            pty_manager: PtyManager::new(Some(cwd)),
             mcp_manager: McpManager::new(),
             mcp_configs: RwLock::new(Vec::new()),
             prompt_history: TokioMutex::new(PromptHistoryManager::new(&history_cwd)),
@@ -108,13 +112,13 @@ impl AppState {
             let mut d = Vec::new();
             let project_dir = cwd.join(".pick").join("sessions");
             if project_dir.exists() {
-                info!("Loading session metadata from {}", project_dir.display());
+                debug!("Loading session metadata from {}", project_dir.display());
                 d.push(project_dir);
             }
             if let Some(home) = Self::home_dir() {
                 let global_dir = home.join(".pick").join("agent").join("sessions");
                 if global_dir.exists() {
-                    info!("Loading session metadata from {}", global_dir.display());
+                    debug!("Loading session metadata from {}", global_dir.display());
                     d.push(global_dir);
                 }
             }
@@ -163,6 +167,8 @@ impl AppState {
                             .session_path()
                             .map(|p| p.to_string_lossy().to_string());
 
+                        let archived = agent.header().map(|h| h.archived).unwrap_or(false);
+
                         let session = session::AgentSession {
                             id,
                             title,
@@ -178,6 +184,7 @@ impl AppState {
                             session_path: path,
                             persisted_messages_count: msg_count,
                             cwd: Some(cwd.to_string_lossy().to_string()),
+                            archived,
                         };
                         self.session_manager.insert_session(session).await;
                         debug!("Loaded session meta: {}", entry.path().display());
@@ -300,11 +307,11 @@ pub async fn run_server(config: ServerConfig) -> Result<(), Box<dyn std::error::
     let pty_port = config.pty_ws_port;
     let pty_manager = state.pty_manager.clone();
     tokio::spawn(async move {
-        let _ = pty::start_pty_ws_server(Arc::new(pty_manager), pty_port).await;
+        let _ = pty::start_pty_ws_server(pty_manager, pty_port).await;
     });
 
     let addr = format!("{}:{}", config.host, config.port);
-    info!(
+    debug!(
         "pick-server starting on {} (PTY WS on port {})",
         addr, pty_port
     );
@@ -339,7 +346,7 @@ pub async fn run_server_on_listener(
     let pty_port = config.pty_ws_port;
     let pty_manager = state.pty_manager.clone();
     tokio::spawn(async move {
-        let _ = pty::start_pty_ws_server(Arc::new(pty_manager), pty_port).await;
+        let _ = pty::start_pty_ws_server(pty_manager, pty_port).await;
     });
 
     let app = create_app(state);
@@ -357,7 +364,7 @@ pub async fn serve_with_state(
     let pty_port = state.config.pty_ws_port;
     let pty_manager = state.pty_manager.clone();
     tokio::spawn(async move {
-        let _ = pty::start_pty_ws_server(Arc::new(pty_manager), pty_port).await;
+        let _ = pty::start_pty_ws_server(pty_manager, pty_port).await;
     });
 
     let app = create_app(state);
