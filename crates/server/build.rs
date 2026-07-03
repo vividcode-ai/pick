@@ -16,12 +16,9 @@ fn main() {
         ("sh", "-c")
     };
     let status = std::process::Command::new(shell)
-        .args([flag, "npm run build"])
+        .args([flag, "npm install && npm run build"])
         .current_dir("../../web")
         .status()
         .expect("Failed to run npm build");
-    assert!(
-        status.success(),
-        "npm run build failed. cd web && npm install && npm run build"
-    );
+    assert!(status.success(), "npm build failed");
 }
