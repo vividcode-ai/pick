@@ -346,9 +346,9 @@ impl SessionManager {
                 s.archived = a;
             }
             s.updated_at = chrono::Utc::now().timestamp_millis();
-            if need_archive_persist && archived.is_some() {
+            if need_archive_persist && let Some(archived) = archived {
                 drop(sessions);
-                self.persist_archived_flag(&id, archived.unwrap()).await;
+                self.persist_archived_flag(id, archived).await;
             }
             true
         } else {

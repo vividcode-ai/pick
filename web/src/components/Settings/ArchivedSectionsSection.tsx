@@ -35,13 +35,10 @@ export function ArchivedSessionsSection({ sessions, onUnarchive, onDelete }: Arc
   }
 
   return (
-    <div className="border border-[var(--border-base)] rounded-md overflow-hidden p-1">
-      <div className="divide-y divide-[var(--border-base)]">
-        {sessions.map((session) => (
-          <div
-            key={session.id}
-            className="flex items-center gap-3 px-4 py-3 hover:bg-[var(--surface-hover)] transition-colors"
-          >
+    <div className="border border-[var(--border-base)] rounded-md overflow-hidden p-3">
+      {sessions.map((session, i) => (
+        <div key={session.id}>
+          <div className="flex items-center gap-3 px-4 py-3 rounded-md hover:bg-[var(--surface-hover)] transition-colors">
           <MessageSquare className="w-4 h-4 text-[var(--text-muted)] flex-shrink-0" />
           <div className="flex-1 min-w-0">
             <div className="text-sm text-[var(--text-primary)] truncate">{session.title}</div>
@@ -66,8 +63,9 @@ export function ArchivedSessionsSection({ sessions, onUnarchive, onDelete }: Arc
             </button>
           </div>
         </div>
-      ))}
+        {i < sessions.length - 1 && <div className="h-px bg-[var(--border-base)] mx-2" />}
       </div>
+      ))}
 
       {confirmId && (
         <ConfirmDialog

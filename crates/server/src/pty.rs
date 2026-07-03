@@ -222,10 +222,10 @@ async fn handle_pty_connection(
     // Write to stdin from input channel
     let write_handle = tokio::spawn(async move {
         while let Some(data) = input_rx.recv().await {
-            if (&mut pty_input).write_all(&data).await.is_err() {
+            if pty_input.write_all(&data).await.is_err() {
                 break;
             }
-            let _ = (&mut pty_input).flush().await;
+            let _ = pty_input.flush().await;
         }
     });
 

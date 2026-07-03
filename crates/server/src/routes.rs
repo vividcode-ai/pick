@@ -256,6 +256,7 @@ pub async fn ask(
 
 /// Sequential agent loop that drains the message queue between iterations.
 /// This ensures messages are processed one after another without concurrent agent loops.
+#[allow(clippy::too_many_arguments)]
 async fn run_agent_loop_queue(
     state: Arc<AppState>,
     session_id: String,
@@ -400,7 +401,7 @@ async fn run_agent_loop_queue(
             model: model.clone(),
             system_prompt: system_prompt.clone(),
             tools: tools.clone(),
-            thinking_level: thinking_level.clone(),
+            thinking_level,
             max_tokens: None,
             temperature: None,
             extension_runner: None,

@@ -1205,7 +1205,7 @@ impl Editor {
         if let Some(ref t) = result {
             self.set_text(t);
             // Check if provider exited browse mode
-            let still_browsing = self.history.as_ref().map_or(false, |h| h.is_browsing());
+            let still_browsing = self.history.as_ref().is_some_and(|h| h.is_browsing());
             self.browsing_history = still_browsing;
             true
         } else {

@@ -55,7 +55,7 @@ pub async fn get_history_window(State(state): State<Arc<AppState>>) -> impl Into
 /// Navigate history in the given direction.
 /// - `direction: "up"` → go older
 /// - `direction: "down"` → go newer
-/// Returns the entry text (or `None`) and the updated window.
+///   Returns the entry text (or `None`) and the updated window.
 pub async fn navigate_history(
     State(state): State<Arc<AppState>>,
     Json(req): Json<NavigateRequest>,
