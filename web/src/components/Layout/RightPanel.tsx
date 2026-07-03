@@ -13,13 +13,13 @@ interface RightPanelProps {
 
 export function RightPanel({ sessionId, todos, gitInfo, onCommitRequest }: RightPanelProps) {
   return (
-    <div className="flex flex-col gap-3 p-3 h-full min-h-0 overflow-y-auto">
+    <>
       <StatusCard
         gitInfo={gitInfo}
         sessionId={sessionId}
         onCommitRequest={onCommitRequest}
       />
       <TodoCard todos={todos} />
-    </div>
+    </>
   );
 }

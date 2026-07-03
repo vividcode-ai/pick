@@ -202,20 +202,21 @@ export function ChatInput({
               disabled={disabled}
             />
 
-            {streaming && (
-              <button
-                onClick={onCancel}
-                className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs hover:bg-red-700 transition-colors"
-              >
-                Stop
-              </button>
-            )}
             <button
-              onClick={handleSend}
-              disabled={!input.trim() || !connected}
-              className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              onClick={streaming ? onCancel : handleSend}
+              disabled={!streaming && (!input.trim() || !connected)}
+              className="p-1.5 rounded-lg bg-neutral-700 hover:bg-neutral-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              title={streaming ? "Stop" : "Send"}
             >
-              Send
+              {streaming ? (
+                <svg className="w-4 h-4" viewBox="0 0 16 16" fill="#ef4444">
+                  <rect x="2" y="2" width="12" height="12" rx="1.5" />
+                </svg>
+              ) : (
+                <svg className="w-4 h-4 text-white" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M8 2l6 6h-4v6H6V8H2z" />
+                </svg>
+              )}
             </button>
           </div>
         </div>

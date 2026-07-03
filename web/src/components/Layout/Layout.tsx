@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { X } from "lucide-react";
+import { Terminal } from "lucide-react";
 import { RightPanel } from "./RightPanel";
 import type { GitInfo, TodoItem } from "../../types/events";
 
@@ -53,6 +53,12 @@ export function Layout({
     />
   );
 
+  const hamburgerIcon = (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  );
+
   return (
     <div className="flex h-screen overflow-hidden bg-[var(--surface-base)] text-[var(--text-primary)]">
       {/* Mobile overlay */}
@@ -81,38 +87,41 @@ export function Layout({
           className="fixed top-3 z-50 p-1.5 rounded-md bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-neutral-200 transition-colors md:top-3"
           style={{ left: "8px" }}
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
+          {hamburgerIcon}
         </button>
       )}
 
       {/* Center content */}
-      <main
-        className="flex-1 flex flex-col min-w-0"
-      >
+      <main className="flex-1 flex flex-col min-w-0">
         {children}
 
-        {/* Floating Right Panel (desktop) */}
+        {/* Desktop: toolbar + cards */}
         {rightPanelOpen && (
-          <div className="hidden md:flex flex-col absolute top-3 right-3 z-10 w-[320px] max-h-[calc(100vh-6rem)] rounded-xl border border-[var(--border-base)] bg-[var(--surface-secondary)] shadow-lg overflow-hidden">
-            <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border-base)] flex-shrink-0">
-              <span className="text-xs font-semibold text-[var(--text-primary)]">工具栏</span>
+          <div className="hidden md:block absolute top-3 right-3 z-10 w-[320px]">
+            {/* Toolbar */}
+            <div className="flex items-center justify-between px-2 py-1.5 rounded-xl border border-[var(--border-base)] bg-[var(--surface-secondary)] shadow-sm">
               <button
                 onClick={toggleRightPanel}
                 className="p-1 rounded-md hover:bg-[var(--surface-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
               >
-                <X className="w-4 h-4" />
+                {hamburgerIcon}
+              </button>
+              <button
+                className="p-1 rounded-md hover:bg-[var(--surface-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                title="打开终端"
+              >
+                <Terminal className="w-4 h-4" />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto min-h-0">
+            {/* Cards below toolbar */}
+            <div className="mt-2 space-y-2 max-h-[calc(100vh-8rem)] overflow-y-auto">
               {rightPanelContent}
             </div>
           </div>
         )}
       </main>
 
-      {/* Toggle right button (visible when panel closed) */}
+      {/* Fixed toggle right button (visible when panel closed) */}
       {!rightPanelOpen && (
         <button
           onClick={toggleRightPanel}
@@ -120,23 +129,24 @@ export function Layout({
           style={{ right: "8px" }}
           title="显示右侧面板"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
+          {hamburgerIcon}
         </button>
       )}
 
-      {/* Right Panel (mobile drawer) */}
+      {/* Mobile drawer */}
       {rightPanelOpen && (
         <div className="md:hidden fixed inset-0 z-40 flex justify-end">
           <div className="fixed inset-0 bg-black/50" onClick={toggleRightPanel} />
           <aside className="relative w-[85vw] max-w-[320px] h-full flex flex-col bg-[var(--surface-secondary)] shadow-lg">
-            <div className="flex items-center justify-end px-3 py-2 border-b border-[var(--border-base)]">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border-base)]">
               <button
                 onClick={toggleRightPanel}
-                className="p-1.5 rounded-md hover:bg-neutral-700 text-neutral-400 hover:text-neutral-200 transition-colors"
+                className="p-1 rounded-md hover:bg-[var(--surface-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
               >
-                <X className="w-4 h-4" />
+                {hamburgerIcon}
+              </button>
+              <button className="p-1 rounded-md hover:bg-[var(--surface-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
+                <Terminal className="w-4 h-4" />
               </button>
             </div>
             {rightPanelContent}
