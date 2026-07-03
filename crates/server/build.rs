@@ -4,10 +4,16 @@ fn main() {
     println!("cargo::rerun-if-changed=../../web/package.json");
     println!("cargo::rerun-if-changed=../../web/vite.config.ts");
 
-    // Clean dist directory to avoid EPERM issues on Windows (locked files from previous builds)
-    let dist = std::path::Path::new("../../web/dist");
+    let web_dir = std::path::Path::new("../../web");
+
+    // Clean previous build artifacts to avoid EPERM issues on Windows
+    let dist = web_dir.join("dist");
     if dist.exists() {
-        let _ = std::fs::remove_dir_all(dist);
+        let _ = std::fs::remove_dir_all(&dist);
+    }
+    let nm = web_dir.join("node_modules");
+    if nm.exists() {
+        let _ = std::fs::remove_dir_all(&nm);
     }
 
     let (shell, flag) = if cfg!(windows) {
@@ -17,7 +23,7 @@ fn main() {
     };
     let status = std::process::Command::new(shell)
         .args([flag, "npm install && npm run build"])
-        .current_dir("../../web")
+        .current_dir(web_dir)
         .status()
         .expect("Failed to run npm build");
     assert!(status.success(), "npm build failed");

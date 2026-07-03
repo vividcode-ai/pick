@@ -8,23 +8,6 @@ fn main() {
     let out_dir = PathBuf::from(std::env::var("OUT_DIR").unwrap());
     let output_rs = out_dir.join("embedded_docs_generated.rs");
 
-    // Build web frontend so pick-server embeds latest dist/
-    println!("cargo::rerun-if-changed=../../web/src");
-    println!("cargo::rerun-if-changed=../../web/index.html");
-    println!("cargo::rerun-if-changed=../../web/package.json");
-    println!("cargo::rerun-if-changed=../../web/vite.config.ts");
-    let (shell, flag) = if cfg!(windows) {
-        ("cmd", "/c")
-    } else {
-        ("sh", "-c")
-    };
-    let status = std::process::Command::new(shell)
-        .args([flag, "npm install && npm run build"])
-        .current_dir("../../web")
-        .status()
-        .expect("Failed to run npm build");
-    assert!(status.success(), "npm build failed");
-
     let project_root = manifest_dir.join("..").join("..");
     let project_root = project_root.canonicalize().unwrap_or(project_root);
 
