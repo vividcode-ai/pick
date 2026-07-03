@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Monitor } from "lucide-react";
+import { Activity, Monitor } from "lucide-react";
 import { RightPanel } from "./RightPanel";
 import { TerminalPanel } from "./TerminalPanel";
 import type { GitInfo, TodoItem } from "../../types/events";
@@ -112,7 +112,7 @@ export function Layout({
               onClick={toggleRightPanel}
               className="p-1 rounded-md hover:bg-[var(--surface-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
             >
-              {hamburgerIcon}
+              <Activity className="w-4 h-4" />
             </button>
             <button
               onClick={toggleTerminal}
@@ -147,7 +147,7 @@ export function Layout({
                 onClick={toggleRightPanel}
                 className="p-1 rounded-md hover:bg-[var(--surface-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
               >
-                {hamburgerIcon}
+                <Activity className="w-4 h-4" />
               </button>
               <button
                 onClick={toggleTerminal}

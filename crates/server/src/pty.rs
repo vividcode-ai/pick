@@ -245,6 +245,29 @@ mod conpty {
             .collect()
     }
 
+    /// Build a Windows environment block adding TERM=xterm-256color.
+    fn build_env_block() -> Vec<u16> {
+        let mut block = Vec::new();
+        for (key, value) in std::env::vars() {
+            if key == "TERM" {
+                continue;
+            }
+            let entry = format!("{}={}", key, value);
+            let wide: Vec<u16> = std::ffi::OsStr::new(&entry)
+                .encode_wide()
+                .chain(std::iter::once(0))
+                .collect();
+            block.extend_from_slice(&wide);
+        }
+        let term: Vec<u16> = std::ffi::OsStr::new("TERM=xterm-256color")
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
+        block.extend_from_slice(&term);
+        block.push(0); // double null terminator
+        block
+    }
+
     /// Windows ConPTY wrapper.
     /// On drop, `ClosePseudoConsole` is called, which terminates the child process.
     pub struct WinConPty {
@@ -357,14 +380,20 @@ mod conpty {
                 };
 
                 let mut cmd_line = shell_wide.clone(); // CreateProcessW may modify this
+
+                // Build environment block with TERM=xterm-256color set
+                let env_block = build_env_block();
+                let env_ptr =
+                    env_block.as_ptr() as *const std::ffi::c_void as *mut std::ffi::c_void;
+
                 if CreateProcessW(
                     ptr::null(),
                     cmd_line.as_mut_ptr(),
                     ptr::null(),
                     ptr::null(),
-                    FALSE,
+                    TRUE,
                     EXTENDED_STARTUPINFO_PRESENT,
-                    ptr::null_mut(),
+                    env_ptr,
                     dir_ptr,
                     &si.startup_info as *const STARTUPINFOW,
                     &mut pi,
@@ -653,12 +682,7 @@ async fn handle_pty_connection(
                             }
                             continue;
                         }
-                        let to_write = if cfg!(target_os = "windows") {
-                            text.replace("\r", "\r\n")
-                        } else {
-                            text
-                        };
-                        let _ = input_tx.send(to_write.into_bytes());
+                        let _ = input_tx.send(text.into_bytes());
                     }
                     Message::Binary(data) => {
                         let _ = input_tx.send(data);
@@ -683,12 +707,7 @@ async fn handle_pty_connection(
                         if trimmed.starts_with('{') {
                             continue;
                         }
-                        let to_write = if cfg!(target_os = "windows") {
-                            text.replace("\r", "\r\n")
-                        } else {
-                            text
-                        };
-                        let _ = input_tx.send(to_write.into_bytes());
+                        let _ = input_tx.send(text.into_bytes());
                     }
                     Message::Binary(data) => {
                         let _ = input_tx.send(data);

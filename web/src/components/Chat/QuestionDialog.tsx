@@ -209,7 +209,7 @@ export function QuestionDialog({ payload, onSubmit, onCancel }: QuestionDialogPr
                 tabIndex={focusIdx === idx ? 0 : -1}
                 onClick={() => onSubmit(selections)}
                 disabled={!allAnswered}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed outline-none ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-blue-800 text-blue-100 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed outline-none ${
                   focusIdx === idx ? "ring-2 ring-blue-400" : ""
                 }`}
               >

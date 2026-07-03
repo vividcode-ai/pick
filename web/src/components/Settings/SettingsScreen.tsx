@@ -71,7 +71,17 @@ export function SettingsScreen({
       <div className="settings-shell">
         <nav className="settings-nav">
           <div className="settings-nav-header">
-            <h2 className="settings-nav-title">Settings</h2>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={closeSettings}
+                className="flex items-center gap-1.5 px-2 py-1.5 rounded-md bg-neutral-800 hover:bg-neutral-700 text-neutral-200 hover:text-white border border-neutral-700 transition-colors self-start"
+                aria-label="Back to main"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span className="text-xs">Back to main</span>
+              </button>
+              <h2 className="settings-nav-title">Settings</h2>
+            </div>
           </div>
           <div className="settings-nav-list">
             {navItems.map((item) => {
@@ -97,18 +107,9 @@ export function SettingsScreen({
 
         <div className="settings-content">
           <header className="settings-content-header">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={closeSettings}
-                className="p-2 rounded-md bg-neutral-800 hover:bg-neutral-700 text-neutral-200 hover:text-white border border-neutral-700 transition-colors"
-                aria-label="Back to main"
-              >
-                <ArrowLeft className="w-4 h-4" />
-              </button>
-              <h1 className="settings-content-title">
-                {navItems.find((i) => i.id === state.activeSection)?.label}
-              </h1>
-            </div>
+            <h1 className="settings-content-title">
+              {navItems.find((i) => i.id === state.activeSection)?.label}
+            </h1>
           </header>
           <div className="settings-scroll">
             <div className="settings-content-card">
