@@ -50,7 +50,7 @@ export function LeftPanel({
         {onTogglePinned && (
           <button
             onClick={onTogglePinned}
-            title={pinned ? "Auto-close" : "Keep open"}
+            title={pinned ? "Auto-close mode" : "Always show mode"}
             className="p-2 rounded-md hover:bg-[var(--surface-hover)] text-neutral-400 hover:text-[var(--text-primary)] transition-colors"
           >
             {pinned ? <Pin className="w-5 h-5" /> : <PinOff className="w-5 h-5" />}

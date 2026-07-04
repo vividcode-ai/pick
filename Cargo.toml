@@ -55,7 +55,7 @@ textwrap = { version = "0.16", features = ["unicode-width"] }
 itertools = "0.14"
 derive_more = { version = "2", features = ["is_variant"] }
 walkdir = "2"
-axum = { version = "0.8" }
+axum = { version = "0.8", features = ["ws"] }
 tokio-stream = "0.1"
 tower-http = { version = "0.6", features = ["cors", "compression-gzip"] }
 utoipa = { version = "5", features = ["axum_extras"] }

@@ -33,7 +33,6 @@ fn run_desktop() {
                 let config = pick_server::ServerConfig {
                     host: "127.0.0.1".to_string(),
                     port,
-                    pty_ws_port: 9000,
                     cwd: None,
                 };
 

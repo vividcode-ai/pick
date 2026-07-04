@@ -162,6 +162,12 @@ export function AppearanceSection() {
             checked={settings.show_thinking}
             onChange={toggle("show_thinking")}
           />
+          <ToggleSetting
+            label="Show tool calls"
+            description="Display tool execution details in chat"
+            checked={settings.show_tool_calls}
+            onChange={toggle("show_tool_calls")}
+          />
         </div>
       </div>
 

@@ -31,7 +31,6 @@ pub async fn run_serve_mode(
     let mut state = pick_server::AppState::new(pick_server::ServerConfig {
         host: host.clone(),
         port: actual_port,
-        pty_ws_port: 9000,
         cwd: None,
     });
     state.default_provider = default_provider;

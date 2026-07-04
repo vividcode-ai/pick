@@ -33,6 +33,7 @@ pub struct SessionInfo {
     pub title: String,
     pub model_id: String,
     pub provider: String,
+    pub thinking_level: String,
     pub created_at: i64,
     pub updated_at: i64,
     pub message_count: usize,
@@ -49,6 +50,7 @@ pub struct AgentSession {
     pub title: String,
     pub model_id: String,
     pub provider: String,
+    pub thinking_level: String,
     pub system_prompt: String,
     pub tools: Vec<AgentTool>,
     pub messages: Vec<Message>,
@@ -68,6 +70,7 @@ impl AgentSession {
         title: String,
         model_id: String,
         provider: String,
+        thinking_level: String,
         system_prompt: String,
         tools: Vec<AgentTool>,
         cwd: Option<String>,
@@ -78,6 +81,7 @@ impl AgentSession {
             title,
             model_id,
             provider,
+            thinking_level,
             system_prompt,
             tools,
             messages: Vec::new(),
@@ -98,6 +102,7 @@ impl AgentSession {
             title: self.title.clone(),
             model_id: self.model_id.clone(),
             provider: self.provider.clone(),
+            thinking_level: self.thinking_level.clone(),
             created_at: self.created_at,
             updated_at: self.updated_at,
             message_count: self.messages.len(),
@@ -148,6 +153,7 @@ impl SessionManager {
         &self,
         model_id: String,
         provider: String,
+        thinking_level: String,
         system_prompt: String,
         tools: Vec<AgentTool>,
     ) -> (String, String) {
@@ -174,6 +180,7 @@ impl SessionManager {
                     title: title.clone(),
                     model_id,
                     provider,
+                    thinking_level,
                     system_prompt,
                     tools,
                     messages: Vec::new(),
@@ -198,6 +205,7 @@ impl SessionManager {
                     title.clone(),
                     model_id,
                     provider,
+                    thinking_level,
                     system_prompt,
                     tools,
                     Some(cwd_str),
@@ -306,10 +314,25 @@ impl SessionManager {
         title: Option<String>,
         model_id: Option<String>,
         provider: Option<String>,
+        thinking_level: Option<String>,
         archived: Option<bool>,
     ) -> bool {
         // For title persistence, we need the path before locking
         let needs_persist = if title.is_some() {
+            let sessions = self.sessions.read().await;
+            sessions.get(id).and_then(|s| s.session_path.clone())
+        } else {
+            None
+        };
+
+        let needs_model_persist = if model_id.is_some() || provider.is_some() {
+            let sessions = self.sessions.read().await;
+            sessions.get(id).and_then(|s| s.session_path.clone())
+        } else {
+            None
+        };
+
+        let needs_thinking_level_persist = if thinking_level.is_some() {
             let sessions = self.sessions.read().await;
             sessions.get(id).and_then(|s| s.session_path.clone())
         } else {
@@ -336,16 +359,33 @@ impl SessionManager {
                     return true;
                 }
             }
+            let model_for_persist = (model_id.clone(), provider.clone());
             if let Some(m) = model_id {
                 s.model_id = m;
             }
             if let Some(p) = provider {
                 s.provider = p;
             }
+            if let Some(l) = thinking_level {
+                s.thinking_level = l;
+            }
             if let Some(a) = archived {
                 s.archived = a;
             }
             s.updated_at = chrono::Utc::now().timestamp_millis();
+            if let Some(path) = needs_model_persist {
+                drop(sessions);
+                self.persist_model_to_header(&path, &model_for_persist.0, &model_for_persist.1)
+                    .await;
+                return true;
+            }
+            let thinking_for_persist = s.thinking_level.clone();
+            if let Some(path) = needs_thinking_level_persist {
+                drop(sessions);
+                self.persist_thinking_level_to_header(&path, &thinking_for_persist)
+                    .await;
+                return true;
+            }
             if need_archive_persist && let Some(archived) = archived {
                 drop(sessions);
                 self.persist_archived_flag(id, archived).await;
@@ -353,6 +393,34 @@ impl SessionManager {
             true
         } else {
             false
+        }
+    }
+
+    async fn persist_model_to_header(
+        &self,
+        path: &str,
+        model_id: &Option<String>,
+        provider: &Option<String>,
+    ) {
+        let storage = JsonlStorage::new(PathBuf::from(path));
+        if let Ok(Some(mut header)) = storage.load_header().await {
+            if let Some(m) = model_id {
+                header.model = Some(m.clone());
+            }
+            if let Some(p) = provider {
+                header.provider = Some(p.clone());
+            }
+            header.updated_at = chrono::Utc::now().timestamp_millis();
+            let _ = storage.save_header(header).await;
+        }
+    }
+
+    async fn persist_thinking_level_to_header(&self, path: &str, thinking_level: &str) {
+        let storage = JsonlStorage::new(PathBuf::from(path));
+        if let Ok(Some(mut header)) = storage.load_header().await {
+            header.thinking_level = Some(thinking_level.to_string());
+            header.updated_at = chrono::Utc::now().timestamp_millis();
+            let _ = storage.save_header(header).await;
         }
     }
 
@@ -412,6 +480,7 @@ impl SessionManager {
             title,
             model_id,
             provider,
+            thinking_level,
             system_prompt,
             tools,
             source_messages,
@@ -441,6 +510,7 @@ impl SessionManager {
                 format!("{} (fork)", source.title),
                 source.model_id.clone(),
                 source.provider.clone(),
+                source.thinking_level.clone(),
                 source.system_prompt.clone(),
                 source.tools.clone(),
                 msgs,
@@ -472,6 +542,7 @@ impl SessionManager {
                     title: title.clone(),
                     model_id,
                     provider,
+                    thinking_level,
                     system_prompt,
                     tools,
                     messages: source_messages.clone(),

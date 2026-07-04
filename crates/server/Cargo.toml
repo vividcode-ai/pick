@@ -25,5 +25,7 @@ walkdir = { workspace = true }
 regex = { workspace = true }
 utoipa = { workspace = true }
 tokio-tungstenite = { workspace = true }
+anyhow = { workspace = true }
+portable-pty = "0.9.0"
 
 

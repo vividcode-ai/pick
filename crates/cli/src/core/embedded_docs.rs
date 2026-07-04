@@ -30,7 +30,7 @@ pub fn extract_embedded_docs(agent_dir: &Path) -> std::io::Result<()> {
 
     std::fs::write(&version_file, EMBEDDED_VERSION)?;
 
-    tracing::info!(
+    tracing::debug!(
         "Extracted embedded documentation ({} files, v{})",
         EMBEDDED_FILES.len(),
         EMBEDDED_VERSION

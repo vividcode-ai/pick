@@ -553,7 +553,7 @@ async fn run_agent_loop_queue(
                             if let Some(t) = title {
                                 state
                                     .session_manager
-                                    .update_session(&sid, Some(t.clone()), None, None, None)
+                                    .update_session(&sid, Some(t.clone()), None, None, None, None)
                                     .await;
                                 Some(t)
                             } else {

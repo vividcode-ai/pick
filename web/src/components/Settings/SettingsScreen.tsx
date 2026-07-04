@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { ArrowLeft, Palette, Cpu, Server, Bell, Archive } from "lucide-react";
 import {
   closeSettings,
@@ -44,6 +44,16 @@ export function SettingsScreen({
 }: SettingsScreenProps) {
   const state = useSyncExternalStore(subscribeToSettings, getSettingsSnapshot, getSettingsSnapshot);
   const archivedSessions = useArchivedSessions();
+  const [serverVersion, setServerVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(`${serverUrl}/health`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.version) setServerVersion(data.version);
+      })
+      .catch(() => {});
+  }, [serverUrl]);
 
   const renderSection = () => {
     switch (state.activeSection) {
@@ -101,7 +111,7 @@ export function SettingsScreen({
           </div>
           <div className="flex-1" />
           <div className="text-[10px] text-neutral-500 pt-3 border-t border-neutral-800">
-            Pick v0.1.0
+            {serverVersion ? `Pick v${serverVersion}` : "Pick"}
           </div>
         </nav>
 

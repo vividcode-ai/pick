@@ -1,14 +1,15 @@
 use std::collections::HashMap;
+use std::io::{Read, Write};
+use std::path::Path;
 use std::sync::Arc;
 
+use axum::extract::State;
+use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use futures::{SinkExt, StreamExt};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpListener;
+use portable_pty::{CommandBuilder, NativePtySystem, PtySize, PtySystem};
 use tokio::sync::{Mutex, RwLock};
-use tokio_tungstenite::accept_async;
-use tokio_tungstenite::tungstenite::Message;
 use tracing::{debug, warn};
 
 /// Manages PTY (terminal) sessions
@@ -54,13 +55,8 @@ impl PtyManager {
     pub async fn create(&self) -> String {
         let id = uuid::Uuid::now_v7().to_string();
         let now = chrono::Utc::now().timestamp_millis();
-        let shell = if cfg!(target_os = "windows") {
-            "cmd.exe"
-        } else {
-            "bash"
-        };
-
-        let child = match spawn_shell_piped(shell, self.cwd.as_deref()) {
+        let shell = detect_shell();
+        let child = match spawn_shell_piped(&shell, self.cwd.as_deref()) {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to spawn shell {}: {}", shell, e);
@@ -71,7 +67,7 @@ impl PtyManager {
         let session = PtySession {
             child: Arc::new(Mutex::new(child)),
             created_at: now,
-            shell: shell.to_string(),
+            shell: shell.clone(),
         };
         self.sessions.write().await.insert(id.clone(), session);
         debug!("PTY session {} created with shell {}", id, shell);
@@ -109,81 +105,184 @@ fn spawn_shell_piped(
     cmd.spawn()
 }
 
-/// Start the WebSocket PTY server on a background task
-pub async fn start_pty_ws_server(pty_manager: PtyManager, port: u16) -> Result<(), std::io::Error> {
-    let addr = format!("127.0.0.1:{}", port);
-    let listener = TcpListener::bind(&addr).await?;
-    debug!("PTY WebSocket server listening on {}", addr);
+/// Shells that should not be auto-selected as default.
+#[allow(dead_code)]
+const SHELL_BLACKLIST: &[&str] = &["fish", "nu"];
 
-    loop {
-        match listener.accept().await {
-            Ok((stream, peer_addr)) => {
-                debug!("PTY WebSocket connection from {}", peer_addr);
-                let cwd = pty_manager.cwd().map(|s| s.to_string());
-                tokio::spawn(async move {
-                    if let Err(e) = handle_pty_connection(stream, cwd).await {
-                        warn!("PTY WebSocket error: {}", e);
-                    }
-                });
-            }
-            Err(e) => {
-                warn!("PTY accept error: {}", e);
-            }
+/// Extract the lowercase file stem from a shell path (e.g. "/usr/bin/fish" → "fish").
+#[allow(dead_code)]
+fn shell_name(path: &str) -> String {
+    Path::new(path)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .map(|s| s.to_lowercase())
+        .unwrap_or_default()
+}
+
+/// Find an executable in PATH, like the `which` command.
+fn which(cmd: &str) -> Option<String> {
+    let exe = if cfg!(target_os = "windows") {
+        if cmd.ends_with(".exe") {
+            cmd.to_string()
+        } else {
+            format!("{}.exe", cmd)
         }
+    } else {
+        cmd.to_string()
+    };
+    std::env::var_os("PATH").and_then(|paths| {
+        std::env::split_paths(&paths).find_map(|dir| {
+            let full = dir.join(&exe);
+            if full.is_file() {
+                Some(full.to_string_lossy().into_owned())
+            } else {
+                None
+            }
+        })
+    })
+}
+
+/// On Windows, detect Git-bundled bash.exe via git --exec-path.
+fn git_bash_path() -> Option<String> {
+    let git = which("git.exe")?;
+    let git_dir = Path::new(&git).parent()?;
+    let bash = git_dir.parent()?.join("bin").join("bash.exe");
+    if bash.is_file() {
+        Some(bash.to_string_lossy().into_owned())
+    } else {
+        None
     }
 }
 
+/// Detect the best available shell, matching OpenCode's logic.
+fn detect_shell() -> String {
+    // Check $SHELL first on non-Windows (skip blacklisted shells)
+    #[cfg(not(target_os = "windows"))]
+    {
+        if let Ok(shell) = std::env::var("SHELL") {
+            if !shell.is_empty() && !SHELL_BLACKLIST.contains(&shell_name(&shell)) {
+                return shell;
+            }
+        }
+        if let Some(path) = which("bash") {
+            return path;
+        }
+        #[cfg(target_os = "macos")]
+        {
+            if Path::new("/bin/zsh").is_file() {
+                return "/bin/zsh".to_string();
+            }
+        }
+        return "/bin/sh".to_string();
+    }
+
+    // Windows fallback chain
+    #[cfg(target_os = "windows")]
+    {
+        // 1. PowerShell Core
+        if let Some(path) = which("pwsh.exe") {
+            return path;
+        }
+        // 2. Windows PowerShell
+        if let Some(path) = which("powershell.exe") {
+            return path;
+        }
+        // 3. Git Bash
+        if let Some(path) = git_bash_path() {
+            return path;
+        }
+        // 4. COMSPEC or cmd.exe
+        std::env::var("COMSPEC").unwrap_or_else(|_| "cmd.exe".to_string())
+    }
+}
+
+/// Axum handler: upgrade to WebSocket and run a PTY session.
+pub async fn ws_handler(
+    ws: WebSocketUpgrade,
+    State(state): State<Arc<crate::AppState>>,
+) -> impl IntoResponse {
+    let cwd = state.pty_manager.cwd().map(|s| s.to_string());
+    ws.on_upgrade(move |socket| async move {
+        if let Err(e) = handle_pty_connection(socket, cwd).await {
+            warn!("PTY session error: {}", e);
+        }
+    })
+}
+
 async fn handle_pty_connection(
-    stream: tokio::net::TcpStream,
+    socket: WebSocket,
     cwd: Option<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let ws_stream = accept_async(stream).await?;
-    let (mut ws_sender, mut ws_receiver) = ws_stream.split();
+    let (mut ws_sender, mut ws_receiver) = socket.split();
 
-    let shell = if cfg!(target_os = "windows") {
-        "cmd.exe"
-    } else {
-        "bash"
+    let shell = detect_shell();
+
+    // Spawn shell with portable-pty (ConPTY on Windows, forkpty on Unix)
+    let pair_result = tokio::task::spawn_blocking({
+        let shell = shell.to_string();
+        let cwd = cwd.clone();
+        move || {
+            let pty_system = NativePtySystem::default();
+            let size = PtySize {
+                rows: 24,
+                cols: 80,
+                pixel_width: 0,
+                pixel_height: 0,
+            };
+            let pair = pty_system.openpty(size)?;
+            let mut cmd = CommandBuilder::new(&shell);
+            if let Some(ref cwd) = cwd {
+                cmd.cwd(cwd);
+            }
+            cmd.env("TERM", "xterm-256color");
+            let child = pair.slave.spawn_command(cmd)?;
+            Ok::<_, anyhow::Error>((pair.master, child))
+        }
+    })
+    .await;
+
+    let (master_pty, _child_pty) = match pair_result {
+        Ok(Ok(pair)) => pair,
+        Ok(Err(e)) => {
+            return Err(
+                std::io::Error::new(std::io::ErrorKind::Other, format!("PTY: {}", e)).into(),
+            );
+        }
+        Err(e) => {
+            return Err(
+                std::io::Error::new(std::io::ErrorKind::Other, format!("PTY join: {}", e)).into(),
+            );
+        }
     };
-
-    // Spawn shell with piped stdio (uses tokio process for async I/O)
-    let mut cmd = tokio::process::Command::new(shell);
-    cmd.stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped());
-    if let Some(ref cwd) = cwd {
-        cmd.current_dir(cwd);
-    }
-    let mut child = cmd.spawn()?;
-
-    let mut pty_input = child.stdin.take().ok_or("shell has no stdin")?;
-    let pty_output = child.stdout.take().ok_or("shell has no stdout")?;
-    let pty_err = child.stderr.take().ok_or("shell has no stderr")?;
 
     // Welcome message
     let welcome = format!(
         "\r\n*** Pick Terminal ({}): Type 'exit' to close ***\r\n",
         shell
     );
-    let _ = ws_sender.send(Message::Text(welcome)).await;
+    let _ = ws_sender.send(Message::Text(welcome.into())).await;
 
     // ── Set up I/O channels ──────────────────────────────────────────
     let (output_tx, mut output_rx) = tokio::sync::mpsc::unbounded_channel::<Vec<u8>>();
     let (input_tx, mut input_rx) = tokio::sync::mpsc::unbounded_channel::<Vec<u8>>();
 
+    // ── Clone PTY reader/writer and share master for resize ──────────
+    let pty_reader = master_pty.try_clone_reader()?;
+    let pty_writer = master_pty.take_writer()?;
+    let master = Arc::new(std::sync::Mutex::new(master_pty));
+
     // ── I/O tasks ────────────────────────────────────────────────────
 
-    // Read from stdout → output channel
+    // Read from PTY output → output channel (blocking I/O)
     let read_tx = output_tx.clone();
-    let rh_out = tokio::spawn(async move {
+    let read_handle = tokio::task::spawn_blocking(move || {
         let mut buf = vec![0u8; 8192];
-        let mut reader = tokio::io::BufReader::new(pty_output);
+        let mut reader = pty_reader;
         loop {
-            buf.clear();
-            match reader.read(&mut buf).await {
+            match reader.read(&mut buf) {
                 Ok(0) => break,
-                Ok(_) => {
-                    if read_tx.send(buf.clone()).is_err() {
+                Ok(n) => {
+                    if read_tx.send(buf[..n].to_vec()).is_err() {
                         break;
                     }
                 }
@@ -192,53 +291,28 @@ async fn handle_pty_connection(
         }
     });
 
-    // Read from stderr → output channel
-    let err_tx = output_tx.clone();
-    let rh_err = tokio::spawn(async move {
-        let mut buf = vec![0u8; 8192];
-        let mut reader = tokio::io::BufReader::new(pty_err);
-        loop {
-            buf.clear();
-            match reader.read(&mut buf).await {
-                Ok(0) => break,
-                Ok(_) => {
-                    if err_tx.send(buf.clone()).is_err() {
-                        break;
-                    }
-                }
-                Err(_) => break,
-            }
-        }
-    });
-
-    // Merge stdout + stderr into one read handle
-    let read_handle = tokio::spawn(async move {
-        tokio::select! {
-            _ = rh_out => {},
-            _ = rh_err => {},
-        }
-    });
-
-    // Write to stdin from input channel
-    let write_handle = tokio::spawn(async move {
-        while let Some(data) = input_rx.recv().await {
-            if pty_input.write_all(&data).await.is_err() {
+    // Write to PTY input from input channel (blocking I/O)
+    let write_handle = tokio::task::spawn_blocking(move || {
+        let mut writer = pty_writer;
+        while let Some(data) = input_rx.blocking_recv() {
+            if writer.write_all(&data).is_err() {
                 break;
             }
-            let _ = pty_input.flush().await;
+            let _ = writer.flush();
         }
     });
 
     // Forward output channel → WebSocket sender
     let ws_write_handle = tokio::spawn(async move {
         while let Some(data) = output_rx.recv().await {
-            if ws_sender.send(Message::Binary(data)).await.is_err() {
+            if ws_sender.send(Message::Binary(data.into())).await.is_err() {
                 break;
             }
         }
     });
 
-    // Read from WebSocket receiver → input channel (raw data, no \r\n conversion)
+    // Read from WebSocket receiver → input channel (with resize handling)
+    let master_for_resize = master.clone();
     let ws_read_handle = tokio::spawn(async move {
         while let Some(Ok(msg)) = ws_receiver.next().await {
             match msg {
@@ -248,12 +322,30 @@ async fn handle_pty_connection(
                         break;
                     }
                     if trimmed.starts_with('{') {
+                        #[derive(serde::Deserialize)]
+                        struct ResizeData {
+                            #[serde(rename = "type")]
+                            _type: String,
+                            cols: u16,
+                            rows: u16,
+                        }
+                        if let Ok(rd) = serde_json::from_str::<ResizeData>(trimmed) {
+                            let size = PtySize {
+                                rows: rd.rows,
+                                cols: rd.cols,
+                                pixel_width: 0,
+                                pixel_height: 0,
+                            };
+                            if let Ok(m) = master_for_resize.lock() {
+                                let _ = m.resize(size);
+                            }
+                        }
                         continue;
                     }
-                    let _ = input_tx.send(text.into_bytes());
+                    let _ = input_tx.send(text.to_string().into_bytes());
                 }
                 Message::Binary(data) => {
-                    let _ = input_tx.send(data);
+                    let _ = input_tx.send(data.to_vec());
                 }
                 Message::Close(_) => break,
                 _ => {}

@@ -151,6 +151,10 @@ impl AppState {
                             .header()
                             .and_then(|h| h.provider.clone())
                             .unwrap_or_else(|| "anthropic".to_string());
+                        let thinking_level = agent
+                            .header()
+                            .and_then(|h| h.thinking_level.clone())
+                            .unwrap_or_else(|| "off".to_string());
                         let messages: Vec<Message> = {
                             let leaf_id = match agent.get_leaf_id() {
                                 Some(id) => id.to_string(),
@@ -174,6 +178,7 @@ impl AppState {
                             title,
                             model_id,
                             provider,
+                            thinking_level,
                             system_prompt: String::new(),
                             tools: Vec::new(),
                             messages,
@@ -202,7 +207,6 @@ impl AppState {
 pub struct ServerConfig {
     pub host: String,
     pub port: u16,
-    pub pty_ws_port: u16,
     pub cwd: Option<String>,
 }
 
@@ -211,7 +215,6 @@ impl Default for ServerConfig {
         Self {
             host: "127.0.0.1".to_string(),
             port: 8080,
-            pty_ws_port: 9000,
             cwd: None,
         }
     }
@@ -251,6 +254,7 @@ pub fn create_app(state: Arc<AppState>) -> Router {
             post(pty::create_pty_handler).get(pty::list_pty_handler),
         )
         .route("/pty/{id}", delete(pty::destroy_pty_handler))
+        .route("/pty-ws", get(pty::ws_handler))
         .route("/plugins", get(plugins::list_plugins))
         .route(
             "/mcp",
@@ -303,18 +307,8 @@ pub async fn run_server(config: ServerConfig) -> Result<(), Box<dyn std::error::
 
     let app = create_app(state.clone());
 
-    // Start PTY WebSocket server in background
-    let pty_port = config.pty_ws_port;
-    let pty_manager = state.pty_manager.clone();
-    tokio::spawn(async move {
-        let _ = pty::start_pty_ws_server(pty_manager, pty_port).await;
-    });
-
     let addr = format!("{}:{}", config.host, config.port);
-    debug!(
-        "pick-server starting on {} (PTY WS on port {})",
-        addr, pty_port
-    );
+    debug!("pick-server starting on {}", addr);
 
     let listener = TcpListener::bind(&addr).await?;
     axum::serve(listener, app).await?;
@@ -342,13 +336,6 @@ pub async fn run_server_on_listener(
         history.load();
     }
 
-    // Start PTY WebSocket server in background
-    let pty_port = config.pty_ws_port;
-    let pty_manager = state.pty_manager.clone();
-    tokio::spawn(async move {
-        let _ = pty::start_pty_ws_server(pty_manager, pty_port).await;
-    });
-
     let app = create_app(state);
 
     axum::serve(listener, app).await?;
@@ -360,13 +347,6 @@ pub async fn serve_with_state(
     listener: TcpListener,
     state: Arc<AppState>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Start PTY WebSocket server in background
-    let pty_port = state.config.pty_ws_port;
-    let pty_manager = state.pty_manager.clone();
-    tokio::spawn(async move {
-        let _ = pty::start_pty_ws_server(pty_manager, pty_port).await;
-    });
-
     let app = create_app(state);
     axum::serve(listener, app).await?;
     Ok(())

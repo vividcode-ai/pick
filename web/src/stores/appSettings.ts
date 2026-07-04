@@ -14,6 +14,7 @@ export interface WebSettings {
   mcp_tools: boolean;
   skill_commands: boolean;
   show_thinking: boolean;
+  show_tool_calls: boolean;
 
   // Communication
   transport: string;
@@ -43,6 +44,7 @@ const DEFAULTS: WebSettings = {
   mcp_tools: true,
   skill_commands: true,
   show_thinking: true,
+  show_tool_calls: true,
 
   transport: "auto",
   http_idle_timeout_ms: 300_000,
@@ -88,6 +90,7 @@ interface RawSettings {
   enable_mcp_tools?: boolean;
   enable_skill_commands?: boolean;
   hide_thinking_block?: boolean;
+  hide_tool_call_block?: boolean;
   quiet_startup?: boolean;
   collapse_changelog?: boolean;
   enable_install_telemetry?: boolean;
@@ -109,6 +112,7 @@ function fromRust(raw: RawSettings): WebSettings {
     mcp_tools: raw.enable_mcp_tools ?? DEFAULTS.mcp_tools,
     skill_commands: raw.enable_skill_commands ?? DEFAULTS.skill_commands,
     show_thinking: !(raw.hide_thinking_block ?? false),
+    show_tool_calls: !(raw.hide_tool_call_block ?? false),
     transport: raw.transport ?? DEFAULTS.transport,
     http_idle_timeout_ms: raw.http_idle_timeout_ms ?? DEFAULTS.http_idle_timeout_ms,
     steering_mode: raw.steering_mode ?? DEFAULTS.steering_mode,
@@ -135,6 +139,7 @@ function toRustPatch(ws: WebSettings): Record<string, unknown> {
     enable_mcp_tools: ws.mcp_tools,
     enable_skill_commands: ws.skill_commands,
     hide_thinking_block: !ws.show_thinking,
+    hide_tool_call_block: !ws.show_tool_calls,
     quiet_startup: ws.quiet_startup,
     collapse_changelog: ws.collapse_changelog,
     enable_install_telemetry: ws.install_telemetry,

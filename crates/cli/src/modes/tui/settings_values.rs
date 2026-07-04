@@ -252,6 +252,25 @@ pub(crate) async fn toggle_auto_resize_images(sm: &mut SettingsManager, ctx: &mu
     }
 }
 
+pub(crate) fn toggle_show_tool_calls(sm: &mut SettingsManager, ctx: &mut TuiContext) {
+    let current = sm.get().hide_tool_call_block.unwrap_or(false);
+    let new = !current;
+    let mut update = Settings::default();
+    update.hide_tool_call_block = Some(new);
+    match sm.set_global(update) {
+        Ok(()) => {
+            ctx.hide_tool_calls.store(new, Ordering::Relaxed);
+            ctx.tui.chat.add_system_message(&format!(
+                "Show tool calls \x1b[1m{}\x1b[0m.",
+                if new { "disabled" } else { "enabled" }
+            ));
+        }
+        Err(e) => ctx
+            .tui
+            .show_error(&format!("Failed to save setting: {}", e)),
+    }
+}
+
 pub(crate) async fn toggle_block_images(sm: &mut SettingsManager, ctx: &mut TuiContext) {
     let current = sm
         .get()

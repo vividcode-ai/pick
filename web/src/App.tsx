@@ -27,6 +27,8 @@ import {
   renameSessionEntry,
   archiveSessionEntry,
   unarchiveSessionEntry,
+  updateSessionEntry,
+  getSessionEntry,
   initSessions,
 } from "./stores/sessions";
 import type { ChatMessage, ProviderInfo } from "./types/events";
@@ -53,9 +55,9 @@ export default function App() {
   const [sidebarPinned, setSidebarPinned] = useState(true);
   const [settingsUrl, setSettingsUrl] = useState("");
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
-  const [selectedModel, setSelectedModel] = useState("");
-  const [selectedProvider, setSelectedProvider] = useState("");
-  const [thinkingLevel, setThinkingLevel] = useState("off");
+  const [selectedModel, setSelectedModel] = useState(() => localStorage.getItem("pick_selected_model") ?? "");
+  const [selectedProvider, setSelectedProvider] = useState(() => localStorage.getItem("pick_selected_provider") ?? "");
+  const [thinkingLevel, setThinkingLevel] = useState(() => localStorage.getItem("pick_thinking_level") ?? "off");
   const { cycleThemeMode } = useTheme();
 
   useEffect(() => {
@@ -76,7 +78,10 @@ export default function App() {
   useEffect(() => {
     if (providers.length === 0) return;
     const currentProvider = providers.find(p => p.provider === selectedProvider);
-    if (currentProvider?.has_key) return;
+    if (currentProvider?.has_key) {
+      const modelExists = currentProvider.models.some(m => m.id === selectedModel);
+      if (modelExists) return;
+    }
     const firstWithKey = providers.find(p => p.has_key);
     if (firstWithKey && firstWithKey.models.length > 0) {
       setSelectedModel(firstWithKey.models[0].id);
@@ -85,7 +90,7 @@ export default function App() {
       setSelectedModel("");
       setSelectedProvider("");
     }
-  }, [providers]);
+  }, [providers, selectedModel, selectedProvider]);
 
   useEffect(() => {
     if (!baseUrl) return;
@@ -97,6 +102,9 @@ export default function App() {
           title: s.title,
           createdAt: s.created_at,
           updatedAt: s.updated_at,
+          modelId: s.model_id,
+          provider: s.provider,
+          thinkingLevel: s.thinking_level,
           archived: s.archived || false,
         }));
         if (entries.length > 0) initSessions(entries);
@@ -138,13 +146,23 @@ export default function App() {
   useEffect(() => {
     registerDefaultCommands({
       newSession: () => {
-        createSession(selectedModel, selectedProvider);
+        createSession(selectedModel, selectedProvider).then((result) => {
+          if (result) {
+            addSessionEntry(result.id, result.title, selectedModel, selectedProvider, thinkingLevel);
+          }
+        });
       },
       toggleSidebar: () => setSidebarOpen((v) => !v),
       toggleTheme: cycleThemeMode,
       openSettings: () => openSettings(),
     });
-  }, [createSession, selectedModel, selectedProvider, cycleThemeMode]);
+  }, [createSession, selectedModel, selectedProvider, thinkingLevel, cycleThemeMode]);
+
+  useEffect(() => {
+    if (sidebarPinned) {
+      setSidebarOpen(true);
+    }
+  }, [sidebarPinned]);
 
   const handleSend = useCallback(
     (text: string) => {
@@ -152,7 +170,7 @@ export default function App() {
         pendingSendRef.current = text;
         createSession(selectedModel, selectedProvider).then((result) => {
           if (result) {
-            addSessionEntry(result.id, result.title);
+            addSessionEntry(result.id, result.title, selectedModel, selectedProvider, thinkingLevel);
           } else {
             pendingSendRef.current = null;
           }
@@ -176,6 +194,11 @@ export default function App() {
   const handleModelChange = useCallback((modelId: string, provider: string) => {
     setSelectedModel(modelId);
     setSelectedProvider(provider);
+    localStorage.setItem("pick_selected_model", modelId);
+    localStorage.setItem("pick_selected_provider", provider);
+    if (activeSessionId) {
+      updateSessionEntry(activeSessionId, { modelId, provider });
+    }
     cancel();
     if (activeSessionId && baseUrl) {
       fetch(`${baseUrl}/sessions/${activeSessionId}`, {
@@ -186,17 +209,42 @@ export default function App() {
     }
   }, [activeSessionId, baseUrl, cancel]);
 
+  const handleThinkingLevelChange = useCallback((level: string) => {
+    setThinkingLevel(level);
+    localStorage.setItem("pick_thinking_level", level);
+    if (activeSessionId) {
+      updateSessionEntry(activeSessionId, { thinkingLevel: level });
+    }
+    if (activeSessionId && baseUrl) {
+      fetch(`${baseUrl}/sessions/${activeSessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ thinking_level: level }),
+      }).catch(() => {});
+    }
+  }, [activeSessionId, baseUrl]);
+
   const handleNewSession = useCallback(() => {
     createSession(selectedModel, selectedProvider).then((result) => {
       if (result) {
-        addSessionEntry(result.id, result.title);
+        addSessionEntry(result.id, result.title, selectedModel, selectedProvider, thinkingLevel);
       }
     });
-  }, [createSession, selectedModel, selectedProvider]);
+  }, [createSession, selectedModel, selectedProvider, thinkingLevel]);
 
   const handleSelectSession = useCallback(
     (id: string) => {
       switchSession(id);
+      const session = getSessionEntry(id);
+      if (session) {
+        if (session.modelId && session.provider) {
+          setSelectedModel(session.modelId);
+          setSelectedProvider(session.provider);
+        }
+        if (session.thinkingLevel) {
+          setThinkingLevel(session.thinkingLevel);
+        }
+      }
     },
     [switchSession]
   );
@@ -270,9 +318,9 @@ export default function App() {
     }
     const result = await forkSession(activeSessionId, userCount);
     if (result) {
-      addSessionEntry(result.id as string, result.title as string);
+      addSessionEntry(result.id as string, result.title as string, selectedModel, selectedProvider, thinkingLevel);
     }
-  }, [baseUrl, activeSessionId, forkSession, activeMessages]);
+  }, [baseUrl, activeSessionId, forkSession, activeMessages, selectedModel, selectedProvider, thinkingLevel]);
 
   const handleSaveUrl = useCallback(
     (url: string) => {
@@ -339,7 +387,7 @@ export default function App() {
       selectedProvider={selectedProvider}
       onModelChange={handleModelChange}
       thinkingLevel={thinkingLevel}
-      onThinkingLevelChange={setThinkingLevel}
+      onThinkingLevelChange={handleThinkingLevelChange}
       sessionId={activeSessionId}
       pendingMessages={activePendingMessages}
       baseUrl={baseUrl ?? ""}
@@ -352,7 +400,6 @@ export default function App() {
         sidebarOpen={sidebarOpen}
         onToggleSidebar={() => setSidebarOpen((v) => !v)}
         sidebarPinned={sidebarPinned}
-        onToggleSidebarPinned={() => setSidebarPinned((v) => !v)}
         rightPanelDiffs={[]}
         connected={activeConnected}
         sessionId={activeSessionId}

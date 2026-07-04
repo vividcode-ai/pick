@@ -63,7 +63,7 @@ export function ArchivedSessionsSection({ sessions, onUnarchive, onDelete }: Arc
             </button>
           </div>
         </div>
-        {i < sessions.length - 1 && <div className="h-px bg-[var(--border-base)] mx-2" />}
+        {i < sessions.length - 1 && <div className="h-px bg-[var(--border-base)] mx-4" />}
       </div>
       ))}
 

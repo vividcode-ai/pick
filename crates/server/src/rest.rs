@@ -23,6 +23,7 @@ pub struct HealthResponse {
 pub struct CreateSessionRequest {
     pub model_id: Option<String>,
     pub provider: Option<String>,
+    pub thinking_level: Option<String>,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -36,6 +37,7 @@ pub struct UpdateSessionRequest {
     pub title: Option<String>,
     pub model_id: Option<String>,
     pub provider: Option<String>,
+    pub thinking_level: Option<String>,
     pub archived: Option<bool>,
 }
 
@@ -98,12 +100,13 @@ pub async fn create_session(
     let model_id = req
         .model_id
         .unwrap_or_else(|| "claude-sonnet-4-20250514".to_string());
+    let thinking_level = req.thinking_level.unwrap_or_else(|| "off".to_string());
     let system_prompt = state.build_system_prompt(&provider, &model_id);
     let tools = state.get_tools();
 
     let (session_id, title) = state
         .session_manager
-        .create(model_id, provider, system_prompt, tools)
+        .create(model_id, provider, thinking_level, system_prompt, tools)
         .await;
 
     (
@@ -181,7 +184,14 @@ pub async fn update_session(
 ) -> StatusCode {
     if state
         .session_manager
-        .update_session(&id, req.title, req.model_id, req.provider, req.archived)
+        .update_session(
+            &id,
+            req.title,
+            req.model_id,
+            req.provider,
+            req.thinking_level,
+            req.archived,
+        )
         .await
     {
         StatusCode::OK
@@ -454,13 +464,11 @@ pub async fn get_session_git_info(
 pub struct ServerConfigResponse {
     pub host: String,
     pub port: u16,
-    pub pty_ws_port: u16,
 }
 
 pub async fn server_config(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     Json(ServerConfigResponse {
         host: state.config.host.clone(),
         port: state.config.port,
-        pty_ws_port: state.config.pty_ws_port,
     })
 }

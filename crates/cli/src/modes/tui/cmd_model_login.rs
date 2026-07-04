@@ -119,6 +119,7 @@ pub(crate) fn handle_settings_command(ctx: &mut TuiContext) {
     let clear_shrink = sm.get_clear_on_shrink();
     let term_prog = sm.get_show_terminal_progress();
     let show_thinking = !sm.get_hide_thinking_block(); // inverted: "Show thinking" = enabled when NOT hiding
+    let show_tool_calls = !sm.get_hide_tool_call_block(); // inverted
     let collapse = sm.get_collapse_changelog();
     let quiet = sm.get_quiet_startup();
     let telemetry = sm.get().enable_install_telemetry.unwrap_or(false);
@@ -172,6 +173,10 @@ pub(crate) fn handle_settings_command(ctx: &mut TuiContext) {
         SelectItem::new(
             format!("Show thinking  [{}]", s(show_thinking)),
             "hide-thinking",
+        ),
+        SelectItem::new(
+            format!("Show tool calls  [{}]", s(show_tool_calls)),
+            "show-tool-calls",
         ),
         SelectItem::new(
             format!("Collapse changelog  [{}]", s(collapse)),

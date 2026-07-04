@@ -61,67 +61,60 @@ export function TerminalPanel({ baseUrl, visible, onClose }: TerminalPanelProps)
     term.open(containerRef.current!);
     setTimeout(() => fitAddon.fit(), 50);
 
-    const hostname = (() => {
+    // Build WebSocket URL from the same origin as the HTTP page
+    const wsUrl = (() => {
       try {
-        return new URL(baseUrl).hostname;
+        const url = new URL(baseUrl);
+        url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+        url.pathname = "/pty-ws";
+        return url.toString();
       } catch {
-        return "127.0.0.1";
+        return "ws://127.0.0.1/pty-ws";
       }
     })();
 
-    (async () => {
-      let wsPort = 9000;
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
+
+    const decodeBuffer = (buf: ArrayBuffer): string => {
       try {
-        const res = await fetch(`${baseUrl}/server-config`);
-        if (res.ok) {
-          const cfg = await res.json();
-          wsPort = cfg.pty_ws_port ?? 9000;
-        }
-      } catch {}
+        const utf8 = new TextDecoder("utf-8", { fatal: true });
+        return utf8.decode(buf);
+      } catch {
+        const gbk = new TextDecoder("gbk");
+        return gbk.decode(buf);
+      }
+    };
 
-      const ws = new WebSocket(`ws://${hostname}:${wsPort}`);
-      wsRef.current = ws;
+    ws.onmessage = (event) => {
+      if (event.data instanceof Blob) {
+        event.data.arrayBuffer().then((buf) => {
+          term.write(decodeBuffer(buf).replace(/\n/g, "\r\n"));
+        });
+      } else {
+        term.write(event.data.replace(/\n/g, "\r\n"));
+      }
+    };
 
-      const decodeBuffer = (buf: ArrayBuffer): string => {
-        try {
-          const utf8 = new TextDecoder("utf-8", { fatal: true });
-          return utf8.decode(buf);
-        } catch {
-          const gbk = new TextDecoder("gbk");
-          return gbk.decode(buf);
-        }
-      };
+    ws.onclose = () => {
+      term.write("\r\n\x1b[31m[Connection closed]\x1b[0m\r\n");
+    };
 
-      ws.onmessage = (event) => {
-        if (event.data instanceof Blob) {
-          event.data.arrayBuffer().then((buf) => {
-            term.write(decodeBuffer(buf).replace(/\n/g, "\r\n"));
-          });
-        } else {
-          term.write(event.data.replace(/\n/g, "\r\n"));
-        }
-      };
+    ws.onerror = () => {
+      term.write("\r\n\x1b[31m[Connection error]\x1b[0m\r\n");
+    };
 
-      ws.onclose = () => {
-        term.write("\r\n\x1b[31m[Connection closed]\x1b[0m\r\n");
-      };
+    term.onData((data) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(data);
+      }
+    });
 
-      ws.onerror = () => {
-        term.write("\r\n\x1b[31m[Connection error]\x1b[0m\r\n");
-      };
-
-      term.onData((data) => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(data);
-        }
-      });
-
-      term.onResize(({ cols, rows }) => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: "resize", cols, rows }));
-        }
-      });
-    })();
+    term.onResize(({ cols, rows }) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "resize", cols, rows }));
+      }
+    });
 
     termRef.current = term;
 
@@ -168,6 +161,10 @@ export function TerminalPanel({ baseUrl, visible, onClose }: TerminalPanelProps)
       className="border-t border-[var(--border-base)] bg-[#1e1e2e]"
       style={{ display: visible ? "block" : "none" }}
     >
+      <div
+        onMouseDown={handleMouseDown}
+        className="h-[5px] cursor-row-resize bg-transparent hover:bg-[var(--accent-primary)] transition-colors"
+      />
       <div className="flex items-center justify-between px-3 py-1 bg-[#181825] border-b border-[var(--border-base)]">
         <span className="text-xs text-[var(--text-muted)] font-medium">Terminal</span>
         <button
@@ -179,10 +176,6 @@ export function TerminalPanel({ baseUrl, visible, onClose }: TerminalPanelProps)
           </svg>
         </button>
       </div>
-      <div
-        onMouseDown={handleMouseDown}
-        className="h-[5px] cursor-row-resize bg-transparent hover:bg-[var(--accent-primary)] transition-colors"
-      />
       <div ref={containerRef} style={{ height: panelHeight }} />
     </div>
   );

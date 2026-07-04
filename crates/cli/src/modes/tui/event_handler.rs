@@ -17,6 +17,7 @@ pub(crate) fn create_on_event(
     hide_thinking: Arc<AtomicBool>,
     show_images: Arc<AtomicBool>,
     block_images: Arc<AtomicBool>,
+    hide_tool_calls: Arc<AtomicBool>,
 ) -> Arc<dyn Fn(AgentEvent) + Send + Sync> {
     let cmd_tx_for_events = cmd_tx;
     let tool_times = tool_start_times;
@@ -24,6 +25,7 @@ pub(crate) fn create_on_event(
     let hide = hide_thinking;
     let show_img = show_images;
     let block_img = block_images;
+    let hide_tc = hide_tool_calls;
     Arc::new(move |event| match event {
         AgentEvent::MessageUpdate { message, .. } => {
             if let Message::Assistant(msg) = message {
@@ -44,6 +46,9 @@ pub(crate) fn create_on_event(
             ref partial_result,
             ..
         } => {
+            if hide_tc.load(Ordering::Relaxed) {
+                return;
+            }
             if tool_name == "todo_plan"
                 || matches!(
                     tool_name.as_str(),
@@ -71,6 +76,9 @@ pub(crate) fn create_on_event(
             ref args,
             ..
         } => {
+            if hide_tc.load(Ordering::Relaxed) {
+                return;
+            }
             if tool_name.to_lowercase() == "bash"
                 && let Ok(mut times) = tool_times.lock()
             {
@@ -92,6 +100,9 @@ pub(crate) fn create_on_event(
             is_error,
             ..
         } => {
+            if hide_tc.load(Ordering::Relaxed) {
+                return;
+            }
             let raw_output = if is_error {
                 result
                     .get("error")

@@ -271,6 +271,13 @@ pub(crate) async fn init_tui_mode(
         }
     });
 
+    // Enable keyboard enhancement protocol (Kitty protocol) before spawning
+    // the keyboard reader thread, to avoid stdin contention on WSL.
+    // On supported terminals (Windows Terminal, Alacritty, Wezterm, kitty,
+    // iTerm2, etc.), modified keys like Ctrl+Enter, Shift+Enter report
+    // correct modifiers.  Unsupported terminals silently ignore this.
+    pick_tui::keyboard_enhancement::enable();
+
     // Spawn keyboard reader thread
     std::thread::spawn(move || {
         loop {
@@ -291,12 +298,6 @@ pub(crate) async fn init_tui_mode(
     print!("\x1b[?2004h");
     let _ = std::io::Write::flush(&mut std::io::stdout());
 
-    // Enable keyboard enhancement protocol (Kitty protocol).
-    // On supported terminals (Windows Terminal, Alacritty, Wezterm, kitty,
-    // iTerm2, etc.), modified keys like Ctrl+Enter, Shift+Enter report
-    // correct modifiers.  Unsupported terminals silently ignore this.
-    pick_tui::keyboard_enhancement::enable();
-
     // Tool tracking state
     let tool_start_times: Arc<Mutex<HashMap<String, Instant>>> =
         Arc::new(Mutex::new(HashMap::new()));
@@ -308,6 +309,7 @@ pub(crate) async fn init_tui_mode(
     let hide_thinking = Arc::new(AtomicBool::new(settings.get_hide_thinking_block()));
     let show_images = Arc::new(AtomicBool::new(settings.get_show_images()));
     let block_images = Arc::new(AtomicBool::new(settings.get_block_images()));
+    let hide_tool_calls = Arc::new(AtomicBool::new(settings.get_hide_tool_call_block()));
     let mcp_enabled = Arc::new(AtomicBool::new(settings.get_enable_mcp_tools()));
     let system_notifications_enabled =
         Arc::new(AtomicBool::new(settings.get_enable_system_notifications()));
@@ -328,6 +330,7 @@ pub(crate) async fn init_tui_mode(
         hide_thinking.clone(),
         show_images.clone(),
         block_images.clone(),
+        hide_tool_calls.clone(),
     );
 
     // Restore session history
@@ -368,6 +371,7 @@ pub(crate) async fn init_tui_mode(
         hide_thinking,
         show_images,
         block_images,
+        hide_tool_calls,
         tool_start_times,
         tool_args_map,
         on_event,

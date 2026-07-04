@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState, useEffect, useRef, type ReactNode } from "react";
 import { Activity, Monitor } from "lucide-react";
 import { RightPanel } from "./RightPanel";
 import { TerminalPanel } from "./TerminalPanel";
@@ -8,7 +8,6 @@ interface LayoutProps {
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
   sidebarPinned: boolean;
-  onToggleSidebarPinned: () => void;
   leftPanel: ReactNode;
   rightPanel?: ReactNode;
   rightPanelDiffs?: { filePath: string; content: string }[];
@@ -27,7 +26,6 @@ export function Layout({
   sidebarOpen,
   onToggleSidebar,
   sidebarPinned,
-  onToggleSidebarPinned,
   leftPanel,
   rightPanel,
   rightPanelDiffs,
@@ -47,6 +45,64 @@ export function Layout({
   const [terminalOpen, setTerminalOpen] = useState(false);
   const toggleTerminal = () => setTerminalOpen((v) => !v);
 
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
+  const [sidebarWidthPercent, setSidebarWidthPercent] = useState(() => {
+    try {
+      const saved = localStorage.getItem("pick_sidebar_width");
+      if (saved) {
+        const n = Number(saved);
+        if (!isNaN(n)) return Math.max(10, Math.min(30, n));
+      }
+    } catch {}
+    return 15;
+  });
+
+  const [isResizing, setIsResizing] = useState(false);
+  const resizeStartX = useRef(0);
+  const resizeStartWidth = useRef(0);
+  const currentWidthRef = useRef(sidebarWidthPercent);
+  currentWidthRef.current = sidebarWidthPercent;
+
+  const handleResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsResizing(true);
+    resizeStartX.current = e.clientX;
+    resizeStartWidth.current = sidebarWidthPercent;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  };
+
+  useEffect(() => {
+    if (!isResizing) return;
+    const handleMouseMove = (e: MouseEvent) => {
+      const deltaX = e.clientX - resizeStartX.current;
+      const newWidth = Math.max(10, Math.min(30,
+        resizeStartWidth.current + (deltaX / window.innerWidth) * 100
+      ));
+      setSidebarWidthPercent(newWidth);
+    };
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      localStorage.setItem("pick_sidebar_width", String(currentWidthRef.current));
+    };
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isResizing]);
+
   const rightPanelContent = rightPanel ?? (
     <RightPanel
       diffs={rightPanelDiffs}
@@ -64,48 +120,54 @@ export function Layout({
     </svg>
   );
 
+  const isDrawer = !sidebarPinned || isMobile;
+
   return (
     <div className="flex h-screen overflow-hidden bg-[var(--surface-base)] text-[var(--text-primary)]">
-      {/* Mobile overlay */}
-      {sidebarOpen && (
+      {isDrawer && sidebarOpen && (
         <div
-          className="fixed inset-0 z-30 bg-black/50 md:hidden"
+          className="fixed inset-0 z-30 bg-black/50"
           onClick={onToggleSidebar}
         />
       )}
 
-      {/* Left Panel */}
       <aside
         className={`${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } fixed md:static z-40 h-full transition-transform duration-200 ease-in-out
-        w-[80vw] max-w-[280px] md:w-[10%] md:min-w-[180px] md:max-w-[280px]
-        flex flex-col border-r border-[var(--border-base)] bg-[var(--surface-secondary)]`}
+          isDrawer
+            ? `${sidebarOpen ? "translate-x-0" : "-translate-x-full"} fixed z-40 transition-transform duration-200 ease-in-out`
+            : "relative"
+        } flex flex-col h-full border-r border-[var(--border-base)] bg-[var(--surface-secondary)]`}
+        style={{
+          width: `${sidebarWidthPercent}%`,
+          minWidth: "max(10vw, 180px)",
+          maxWidth: "30vw",
+        }}
       >
         {leftPanel}
+
+        <div
+          className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-[var(--accent-primary)] active:bg-[var(--accent-primary)] transition-colors z-10"
+          onMouseDown={handleResizeStart}
+        />
       </aside>
 
-      {/* Toggle left button (visible when sidebar closed) */}
-      {!sidebarOpen && (
+      {isDrawer && !sidebarOpen && (
         <button
           onClick={onToggleSidebar}
-          className="fixed top-3 z-50 p-1.5 rounded-md bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-neutral-200 transition-colors md:top-3"
+          className="fixed top-3 z-50 p-1.5 rounded-md bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-neutral-200 transition-colors"
           style={{ left: "8px" }}
         >
           {hamburgerIcon}
         </button>
       )}
 
-      {/* Center content */}
       <main className="flex-1 flex flex-col min-w-0">
         {children}
 
-        {/* Terminal Panel */}
         {baseUrl && (
           <TerminalPanel baseUrl={baseUrl} visible={terminalOpen} onClose={() => setTerminalOpen(false)} />
         )}
 
-        {/* Desktop toolbar — always visible, fixed at top-right */}
         <div className="hidden md:block fixed top-3 right-3 z-20">
           <div className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-xl border border-[var(--border-base)] bg-[var(--surface-secondary)] shadow-sm w-fit">
             <button
@@ -127,7 +189,7 @@ export function Layout({
             </button>
           </div>
         </div>
-        {/* Desktop cards — conditional, fixed below toolbar */}
+
         {rightPanelOpen && (
           <div className="hidden md:block fixed top-3 right-3 z-10" style={{ marginTop: "44px" }}>
             <div className="mt-2 space-y-2 max-h-[calc(100vh-8rem)] overflow-y-auto w-[320px]">
@@ -137,7 +199,6 @@ export function Layout({
         )}
       </main>
 
-        {/* Mobile drawer */}
       {rightPanelOpen && (
         <div className="md:hidden fixed inset-0 z-40 flex justify-end">
           <div className="fixed inset-0 bg-black/50" onClick={toggleRightPanel} />

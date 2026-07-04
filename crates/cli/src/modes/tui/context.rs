@@ -79,6 +79,8 @@ pub(crate) struct TuiContext {
     pub show_images: Arc<AtomicBool>,
     /// Whether to prevent images from being sent to the LLM
     pub block_images: Arc<AtomicBool>,
+    /// Whether to hide tool call executions in the chat
+    pub hide_tool_calls: Arc<AtomicBool>,
 
     // Tool tracking
     pub tool_start_times: Arc<Mutex<HashMap<String, Instant>>>,

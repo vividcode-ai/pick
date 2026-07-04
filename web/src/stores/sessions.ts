@@ -5,6 +5,9 @@ export interface SessionEntry {
   title: string;
   createdAt: number;
   updatedAt: number;
+  modelId?: string;
+  provider?: string;
+  thinkingLevel?: string;
   archived?: boolean;
 }
 
@@ -16,7 +19,7 @@ function subscribeToSessions(callback: () => void) {
   return () => listeners.delete(callback);
 }
 
-function getSnapshot() {
+export function getSnapshot() {
   return sessions;
 }
 
@@ -29,10 +32,10 @@ export function initSessions(list: SessionEntry[]) {
   emitChange();
 }
 
-export function addSessionEntry(id: string, title?: string) {
+export function addSessionEntry(id: string, title?: string, modelId?: string, provider?: string, thinkingLevel?: string) {
   const now = Date.now();
   sessions = [
-    { id, title: title || `Session ${sessions.length + 1}`, createdAt: now, updatedAt: now },
+    { id, title: title || `Session ${sessions.length + 1}`, createdAt: now, updatedAt: now, modelId, provider, thinkingLevel },
     ...sessions,
   ];
   emitChange();
@@ -56,6 +59,15 @@ export function archiveSessionEntry(id: string) {
 export function unarchiveSessionEntry(id: string) {
   sessions = sessions.map((s) => (s.id === id ? { ...s, archived: false } : s));
   emitChange();
+}
+
+export function updateSessionEntry(id: string, partial: Partial<SessionEntry>) {
+  sessions = sessions.map((s) => (s.id === id ? { ...s, ...partial, updatedAt: Date.now() } : s));
+  emitChange();
+}
+
+export function getSessionEntry(id: string): SessionEntry | undefined {
+  return sessions.find((s) => s.id === id);
 }
 
 export function useSessionList() {

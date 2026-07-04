@@ -189,6 +189,8 @@ pub struct Settings {
     pub dismissed_update_version: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub enable_system_notifications: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hide_tool_call_block: Option<bool>,
     #[serde(flatten)]
     pub extra: HashMap<String, serde_json::Value>,
 }
