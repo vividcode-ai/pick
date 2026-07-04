@@ -43,6 +43,7 @@ export function Layout({
   const rightPanelOpen = rightPanelOpenProp ?? rightPanelOpenLocal;
   const toggleRightPanel = onToggleRightPanel ?? (() => setRightPanelOpenLocal((v) => !v));
   const [terminalOpen, setTerminalOpen] = useState(false);
+  const [terminalFullscreen, setTerminalFullscreen] = useState(false);
   const toggleTerminal = () => setTerminalOpen((v) => !v);
 
   const [isMobile, setIsMobile] = useState(false);
@@ -162,10 +163,17 @@ export function Layout({
       )}
 
       <main className="flex-1 flex flex-col min-w-0">
-        {children}
+        <div className={terminalFullscreen ? "hidden" : "flex-1 flex flex-col min-h-0"}>
+          {children}
+        </div>
 
         {baseUrl && (
-          <TerminalPanel baseUrl={baseUrl} visible={terminalOpen} onClose={() => setTerminalOpen(false)} />
+          <TerminalPanel
+            baseUrl={baseUrl}
+            visible={terminalOpen}
+            onClose={() => setTerminalOpen(false)}
+            onFullscreenChange={setTerminalFullscreen}
+          />
         )}
 
         <div className="hidden md:block fixed top-3 right-3 z-20">
