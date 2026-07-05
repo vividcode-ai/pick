@@ -58,7 +58,12 @@ export async function highlightCode(code: string, filePath: string): Promise<str
   if (cached) return cached;
 
   try {
-    const html = await codeToHtml(code, { lang, theme: THEME });
+    let html = await codeToHtml(code, { lang, theme: THEME });
+    let lineNum = 0;
+    html = html.replace(
+      /<span class="line">/g,
+      () => `<span class="line"><span class="line-num">${++lineNum}</span>`
+    );
     htmlCache.set(cacheKey, html);
     if (htmlCache.size > 50) {
       const firstKey = htmlCache.keys().next().value;
@@ -66,7 +71,13 @@ export async function highlightCode(code: string, filePath: string): Promise<str
     }
     return html;
   } catch {
-    return `<pre class="shiki" style="padding:1rem;font-size:12px;line-height:1.5;overflow:auto;"><code><span class="line">${escapeHtml(code)}</span></code></pre>`;
+    let fallbackHtml = `<pre class="shiki" style="padding:0;font-size:12px;line-height:1.5;overflow:auto;background:transparent;"><code>${escapeHtml(code)}</code></pre>`;
+    let lineNum = 0;
+    fallbackHtml = fallbackHtml.replace(
+      /<span class="line">/g,
+      () => `<span class="line"><span class="line-num">${++lineNum}</span>`
+    );
+    return fallbackHtml;
   }
 }
 

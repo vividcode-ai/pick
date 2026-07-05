@@ -99,6 +99,8 @@ pub struct McpServerConfigJson {
     pub url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_name_prefix: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub auth: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]

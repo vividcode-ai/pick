@@ -18,6 +18,9 @@ interface EnvVar {
   value: string;
 }
 
+type TransportTab = "stdio" | "http";
+type AuthType = "none" | "bearer" | "oauth2";
+
 interface McpSectionProps {
   serverUrl: string;
 }
@@ -27,15 +30,28 @@ export function McpSection({ serverUrl }: McpSectionProps) {
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    name: "",
-    command: "",
-    args: "",
-    url: "",
-    tool_name_prefix: "",
-    scope: "global",
-  });
+
+  // Common fields
+  const [formName, setFormName] = useState("");
+  const [formPrefix, setFormPrefix] = useState("");
+  const [formScope, setFormScope] = useState("global");
+
+  // Stdio fields
+  const [formCommand, setFormCommand] = useState("");
+  const [formArgs, setFormArgs] = useState("");
   const [envVars, setEnvVars] = useState<EnvVar[]>([]);
+
+  // HTTP fields
+  const [formUrl, setFormUrl] = useState("");
+  const [authType, setAuthType] = useState<AuthType>("none");
+  const [bearerToken, setBearerToken] = useState("");
+  const [oauthClientId, setOauthClientId] = useState("");
+  const [oauthClientSecret, setOauthClientSecret] = useState("");
+  const [oauthScopes, setOauthScopes] = useState("");
+  const [oauthAuthUrl, setOauthAuthUrl] = useState("");
+  const [oauthTokenUrl, setOauthTokenUrl] = useState("");
+
+  const [transportTab, setTransportTab] = useState<TransportTab>("stdio");
 
   const fetchServers = async () => {
     try {
@@ -57,29 +73,56 @@ export function McpSection({ serverUrl }: McpSectionProps) {
   }, [serverUrl]);
 
   const resetForm = () => {
-    setForm({ name: "", command: "", args: "", url: "", tool_name_prefix: "", scope: "global" });
+    setFormName("");
+    setFormPrefix("");
+    setFormScope("global");
+    setFormCommand("");
+    setFormArgs("");
     setEnvVars([]);
+    setFormUrl("");
+    setAuthType("none");
+    setBearerToken("");
+    setOauthClientId("");
+    setOauthClientSecret("");
+    setOauthScopes("");
+    setOauthAuthUrl("");
+    setOauthTokenUrl("");
+    setTransportTab("stdio");
   };
 
   const handleAdd = async () => {
-    const env: Record<string, string> = {};
-    envVars.forEach((ev) => {
-      if (ev.key) env[ev.key] = ev.value;
-    });
-
-    const args = form.args
-      ? form.args.split(",").map((a) => a.trim()).filter(Boolean)
-      : undefined;
-
     const body: Record<string, unknown> = {
-      name: form.name,
-      command: form.command || undefined,
-      args: args,
-      url: form.url || undefined,
-      env: Object.keys(env).length > 0 ? env : undefined,
-      tool_name_prefix: form.tool_name_prefix || undefined,
-      scope: form.scope,
+      name: formName,
+      tool_name_prefix: formPrefix || undefined,
+      scope: formScope,
     };
+
+    if (transportTab === "stdio") {
+      const env: Record<string, string> = {};
+      envVars.forEach((ev) => {
+        if (ev.key) env[ev.key] = ev.value;
+      });
+      const args = formArgs
+        ? formArgs.split(",").map((a) => a.trim()).filter(Boolean)
+        : undefined;
+      body.command = formCommand || undefined;
+      body.args = args;
+      body.env = Object.keys(env).length > 0 ? env : undefined;
+    } else {
+      body.url = formUrl || undefined;
+      if (authType === "bearer") {
+        body.auth = { type: "bearer", token: bearerToken };
+      } else if (authType === "oauth2") {
+        const oauth: Record<string, unknown> = { type: "oauth2", client_id: oauthClientId };
+        if (oauthClientSecret) oauth.client_secret = oauthClientSecret;
+        if (oauthScopes) {
+          oauth.scopes = oauthScopes.split(",").map((s) => s.trim()).filter(Boolean);
+        }
+        if (oauthAuthUrl) oauth.auth_url = oauthAuthUrl;
+        if (oauthTokenUrl) oauth.token_url = oauthTokenUrl;
+        body.auth = oauth;
+      }
+    }
 
     const res = await fetch(`${serverUrl}/mcp`, {
       method: "POST",
@@ -114,6 +157,20 @@ export function McpSection({ serverUrl }: McpSectionProps) {
   const inputCls =
     "w-full px-2.5 py-1.5 rounded text-xs bg-[var(--surface-button)] text-[var(--text-primary)] border border-[var(--border-base)] outline-none focus:border-blue-500/50 transition-colors";
   const labelCls = "text-xs font-medium text-[var(--text-secondary)]";
+
+  const tabCls = (active: boolean) =>
+    `flex-1 text-center px-3 py-1.5 rounded text-xs font-medium cursor-pointer transition-colors ${
+      active
+        ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+        : "bg-[var(--surface-button)] text-[var(--text-secondary)] border border-[var(--border-base)] hover:opacity-80"
+    }`;
+
+  const authRadioCls = (selected: boolean) =>
+    `flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium cursor-pointer transition-colors ${
+      selected
+        ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+        : "bg-[var(--surface-button)] text-[var(--text-secondary)] border border-[var(--border-base)] hover:opacity-80"
+    }`;
 
   return (
     <div className="space-y-6">
@@ -230,49 +287,183 @@ export function McpSection({ serverUrl }: McpSectionProps) {
                 <input
                   className={inputCls}
                   placeholder="my-server"
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  value={formName}
+                  onChange={(e) => setFormName(e.target.value)}
                 />
               </div>
 
-              {/* Command */}
+              {/* Transport Tabs */}
               <div>
-                <label className={labelCls}>
-                  Command <span className="text-[var(--text-muted)]">(for stdio transport)</span>
-                </label>
-                <input
-                  className={inputCls}
-                  placeholder="npx"
-                  value={form.command}
-                  onChange={(e) => setForm({ ...form, command: e.target.value })}
-                />
+                <label className={labelCls}>Transport</label>
+                <div className="flex gap-2 mt-1">
+                  <div className={tabCls(transportTab === "stdio")} onClick={() => setTransportTab("stdio")}>
+                    Local (stdio)
+                  </div>
+                  <div className={tabCls(transportTab === "http")} onClick={() => setTransportTab("http")}>
+                    HTTP/SSE
+                  </div>
+                </div>
               </div>
 
-              {/* Args */}
-              <div>
-                <label className={labelCls}>
-                  Args <span className="text-[var(--text-muted)]">(comma-separated)</span>
-                </label>
-                <input
-                  className={inputCls}
-                  placeholder="-y, @modelcontextprotocol/server-filesystem, ."
-                  value={form.args}
-                  onChange={(e) => setForm({ ...form, args: e.target.value })}
-                />
-              </div>
+              {/* Stdio Fields */}
+              {transportTab === "stdio" && (
+                <>
+                  <div>
+                    <label className={labelCls}>Command</label>
+                    <input
+                      className={inputCls}
+                      placeholder="npx"
+                      value={formCommand}
+                      onChange={(e) => setFormCommand(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Args <span className="text-[var(--text-muted)]">(comma-separated)</span></label>
+                    <input
+                      className={inputCls}
+                      placeholder="-y, @modelcontextprotocol/server-filesystem, ."
+                      value={formArgs}
+                      onChange={(e) => setFormArgs(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Environment Variables</label>
+                    <div className="space-y-1.5 mt-1">
+                      {envVars.map((ev, i) => (
+                        <div key={i} className="flex items-center gap-1.5">
+                          <input
+                            className={`${inputCls} w-[120px]`}
+                            placeholder="KEY"
+                            value={ev.key}
+                            onChange={(e) => {
+                              const next = [...envVars];
+                              next[i] = { ...next[i], key: e.target.value };
+                              setEnvVars(next);
+                            }}
+                          />
+                          <input
+                            className={`${inputCls} flex-1`}
+                            placeholder="VALUE"
+                            value={ev.value}
+                            onChange={(e) => {
+                              const next = [...envVars];
+                              next[i] = { ...next[i], value: e.target.value };
+                              setEnvVars(next);
+                            }}
+                          />
+                          <button
+                            onClick={() => setEnvVars(envVars.filter((_, j) => j !== i))}
+                            className="p-1 rounded text-neutral-500 hover:text-red-400 transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        onClick={() => setEnvVars([...envVars, { key: "", value: "" }])}
+                        className="flex items-center gap-1 text-xs text-blue-400 hover:opacity-80 transition-colors"
+                      >
+                        <Plus className="w-3 h-3" /> Add env var
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
 
-              {/* URL */}
-              <div>
-                <label className={labelCls}>
-                  URL <span className="text-[var(--text-muted)]">(for HTTP/SSE transport)</span>
-                </label>
-                <input
-                  className={inputCls}
-                  placeholder="https://api.example.com/mcp"
-                  value={form.url}
-                  onChange={(e) => setForm({ ...form, url: e.target.value })}
-                />
-              </div>
+              {/* HTTP Fields */}
+              {transportTab === "http" && (
+                <>
+                  <div>
+                    <label className={labelCls}>URL</label>
+                    <input
+                      className={inputCls}
+                      placeholder="https://api.example.com/mcp"
+                      value={formUrl}
+                      onChange={(e) => setFormUrl(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Auth Type */}
+                  <div>
+                    <label className={labelCls}>Authentication</label>
+                    <div className="flex gap-2 mt-1">
+                      {(["none", "bearer", "oauth2"] as const).map((t) => (
+                        <div
+                          key={t}
+                          className={authRadioCls(authType === t)}
+                          onClick={() => setAuthType(t)}
+                        >
+                          {t === "none" ? "None" : t === "bearer" ? "Bearer" : "OAuth2"}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Bearer Token */}
+                  {authType === "bearer" && (
+                    <div>
+                      <label className={labelCls}>Token</label>
+                      <input
+                        className={inputCls}
+                        placeholder="sk-your-token"
+                        value={bearerToken}
+                        onChange={(e) => setBearerToken(e.target.value)}
+                      />
+                    </div>
+                  )}
+
+                  {/* OAuth2 */}
+                  {authType === "oauth2" && (
+                    <>
+                      <div>
+                        <label className={labelCls}>Client ID</label>
+                        <input
+                          className={inputCls}
+                          placeholder="your-client-id"
+                          value={oauthClientId}
+                          onChange={(e) => setOauthClientId(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Client Secret</label>
+                        <input
+                          className={inputCls}
+                          placeholder="optional"
+                          value={oauthClientSecret}
+                          onChange={(e) => setOauthClientSecret(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Scopes <span className="text-[var(--text-muted)]">(comma-separated)</span></label>
+                        <input
+                          className={inputCls}
+                          placeholder="repo, user"
+                          value={oauthScopes}
+                          onChange={(e) => setOauthScopes(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Auth URL</label>
+                        <input
+                          className={inputCls}
+                          placeholder="https://auth.example.com/authorize"
+                          value={oauthAuthUrl}
+                          onChange={(e) => setOauthAuthUrl(e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Token URL</label>
+                        <input
+                          className={inputCls}
+                          placeholder="https://auth.example.com/token"
+                          value={oauthTokenUrl}
+                          onChange={(e) => setOauthTokenUrl(e.target.value)}
+                        />
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
 
               {/* Tool Name Prefix */}
               <div>
@@ -280,77 +471,23 @@ export function McpSection({ serverUrl }: McpSectionProps) {
                 <input
                   className={inputCls}
                   placeholder="my_"
-                  value={form.tool_name_prefix}
-                  onChange={(e) => setForm({ ...form, tool_name_prefix: e.target.value })}
+                  value={formPrefix}
+                  onChange={(e) => setFormPrefix(e.target.value)}
                 />
-              </div>
-
-              {/* Env Vars */}
-              <div>
-                <label className={labelCls}>Environment Variables</label>
-                <div className="space-y-1.5 mt-1">
-                  {envVars.map((ev, i) => (
-                    <div key={i} className="flex items-center gap-1.5">
-                      <input
-                        className={`${inputCls} w-[120px]`}
-                        placeholder="KEY"
-                        value={ev.key}
-                        onChange={(e) => {
-                          const next = [...envVars];
-                          next[i] = { ...next[i], key: e.target.value };
-                          setEnvVars(next);
-                        }}
-                      />
-                      <input
-                        className={`${inputCls} flex-1`}
-                        placeholder="VALUE"
-                        value={ev.value}
-                        onChange={(e) => {
-                          const next = [...envVars];
-                          next[i] = { ...next[i], value: e.target.value };
-                          setEnvVars(next);
-                        }}
-                      />
-                      <button
-                        onClick={() => setEnvVars(envVars.filter((_, j) => j !== i))}
-                        className="p-1 rounded text-neutral-500 hover:text-red-400 transition-colors"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                  <button
-                    onClick={() => setEnvVars([...envVars, { key: "", value: "" }])}
-                    className="flex items-center gap-1 text-xs text-blue-400 hover:opacity-80 transition-colors"
-                  >
-                    <Plus className="w-3 h-3" /> Add env var
-                  </button>
-                </div>
               </div>
 
               {/* Scope */}
               <div>
                 <label className={labelCls}>Save to</label>
-                <div className="flex gap-3 mt-1">
+                <div className="flex gap-2 mt-1">
                   {(["global", "project"] as const).map((s) => (
-                    <label
+                    <div
                       key={s}
-                      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium cursor-pointer transition-colors ${
-                        form.scope === s
-                          ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
-                          : "bg-[var(--surface-button)] text-[var(--text-secondary)] border border-[var(--border-base)] hover:opacity-80"
-                      }`}
+                      className={authRadioCls(formScope === s)}
+                      onClick={() => setFormScope(s)}
                     >
-                      <input
-                        type="radio"
-                        name="scope"
-                        value={s}
-                        checked={form.scope === s}
-                        onChange={() => setForm({ ...form, scope: s })}
-                        className="hidden"
-                      />
                       {s === "global" ? "Global (~/.pick/)" : "Project (.pick/)"}
-                    </label>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -365,7 +502,7 @@ export function McpSection({ serverUrl }: McpSectionProps) {
               </button>
               <button
                 onClick={handleAdd}
-                disabled={!form.name}
+                disabled={!formName}
                 className="px-3 py-1.5 rounded text-xs font-medium bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:opacity-80 transition-colors disabled:opacity-40"
               >
                 Save

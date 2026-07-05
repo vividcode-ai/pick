@@ -92,7 +92,7 @@ export function FilePreview({ baseUrl, filePath }: FilePreviewProps) {
         <span className="ml-2">— {totalLines} lines</span>
       </div>
       <div
-        className="flex-1 overflow-auto [&_pre]:!m-0 [&_pre]:!h-full [&_pre]:!rounded-none [&_pre]:!bg-transparent"
+        className="flex-1 overflow-auto [&_pre]:!m-0 [&_pre]:!h-full [&_pre]:!rounded-none [&_pre]:!bg-transparent [&_.line-num]:inline-block [&_.line-num]:w-[3rem] [&_.line-num]:text-right [&_.line-num]:pr-3 [&_.line-num]:mr-3 [&_.line-num]:text-[var(--text-muted)] [&_.line-num]:select-none [&_.line-num]:border-r [&_.line-num]:border-[var(--border-base)] [&_.line-num]:text-[11px]"
         dangerouslySetInnerHTML={{ __html: html }}
       />
     </div>

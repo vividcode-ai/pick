@@ -20,6 +20,7 @@ pub struct AddMcpServerRequest {
     pub url: Option<String>,
     pub env: Option<HashMap<String, String>>,
     pub tool_name_prefix: Option<String>,
+    pub auth: Option<serde_json::Value>,
     pub scope: Option<String>,
 }
 
@@ -80,13 +81,18 @@ pub async fn add_mcp_server(
     State(state): State<Arc<AppState>>,
     Json(req): Json<AddMcpServerRequest>,
 ) -> impl IntoResponse {
+    let auth = req
+        .auth
+        .as_ref()
+        .and_then(|v| serde_json::from_value::<pick_mcp::config::McpAuthConfig>(v.clone()).ok());
+
     let config = McpServerConfig {
         name: req.name.clone(),
         command: req.command.clone(),
         args: req.args.clone(),
         url: req.url.clone(),
         env: req.env.clone(),
-        auth: None,
+        auth,
         tool_name_prefix: req.tool_name_prefix.clone(),
     };
 
@@ -107,6 +113,7 @@ pub async fn add_mcp_server(
                 &req.url,
                 &req.env,
                 &req.tool_name_prefix,
+                &req.auth,
                 req.scope.as_deref(),
             );
 
@@ -240,6 +247,7 @@ fn persist_mcp_server_to_settings(
     url: &Option<String>,
     env: &Option<HashMap<String, String>>,
     tool_name_prefix: &Option<String>,
+    auth: &Option<serde_json::Value>,
     scope: Option<&str>,
 ) {
     let cwd = get_cwd(state);
@@ -254,6 +262,7 @@ fn persist_mcp_server_to_settings(
         env: env.clone(),
         url: url.clone(),
         tool_name_prefix: tool_name_prefix.clone(),
+        auth: auth.clone(),
     };
 
     let current = sm.get().clone();
