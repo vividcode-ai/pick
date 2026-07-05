@@ -1,5 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { ArrowLeft, Palette, Cpu, Server, Bell, Archive } from "lucide-react";
+import { ArrowLeft, Palette, Cpu, Server, Bell, Archive, Activity } from "lucide-react";
 import {
   closeSettings,
   setActiveSettingsSection,
@@ -13,6 +13,7 @@ import { ProvidersSection } from "./ProvidersSection";
 import { ServerSection } from "./ServerSection";
 import { NotificationsSection } from "./NotificationsSection";
 import { ArchivedSessionsSection } from "./ArchivedSectionsSection";
+import { McpSection } from "./McpSection";
 import type { ProviderInfo } from "../../types/events";
 
 interface SettingsScreenProps {
@@ -31,6 +32,7 @@ const navItems: { id: SettingsSectionId; icon: typeof Palette; label: string }[]
   { id: "server", icon: Server, label: "Server" },
   { id: "notifications", icon: Bell, label: "Notifications" },
   { id: "archived", icon: Archive, label: "Archived" },
+  { id: "mcp", icon: Activity, label: "MCP" },
 ];
 
 export function SettingsScreen({
@@ -73,6 +75,8 @@ export function SettingsScreen({
             onDelete={onDeleteArchivedSession}
           />
         );
+      case "mcp":
+        return <McpSection serverUrl={serverUrl} />;
     }
   };
 

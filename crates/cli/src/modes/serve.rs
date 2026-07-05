@@ -42,6 +42,9 @@ pub async fn run_serve_mode(
     let cwd = std::env::current_dir().unwrap_or_default();
     state.load_persisted_sessions(&cwd).await;
 
+    // Load MCP servers from settings
+    state.load_mcp_from_settings(&cwd).await;
+
     let state = Arc::new(state);
 
     if args.open_browser {

@@ -93,6 +93,34 @@ impl AppState {
         registry::create_coding_tools_with_goal_manager(agent_mode, gm)
     }
 
+    /// Load MCP servers from settings.json and connect them at startup
+    pub async fn load_mcp_from_settings(&self, cwd: &std::path::Path) {
+        use pick_agent::settings::{
+            SettingsManager, get_global_settings_path, get_project_settings_path,
+        };
+        use pick_mcp::config::parse_mcp_configs_from_value;
+
+        let sm = SettingsManager::load_from_paths(
+            get_global_settings_path(),
+            get_project_settings_path(cwd),
+        );
+        if let Some(servers) = &sm.get().mcp_servers {
+            let disabled = sm.get_disabled_mcp_servers();
+            let configs =
+                parse_mcp_configs_from_value(&serde_json::to_value(servers).unwrap_or_default());
+            let active: Vec<_> = configs
+                .into_iter()
+                .filter(|c| !disabled.contains(&c.name))
+                .collect();
+            if !active.is_empty() {
+                let tools = self.mcp_manager.connect_from_config(&active).await;
+                tracing::info!("Loaded {} MCP server(s) from settings", tools.len());
+                let mut saved = self.mcp_configs.write().await;
+                *saved = active;
+            }
+        }
+    }
+
     fn home_dir() -> Option<std::path::PathBuf> {
         #[cfg(target_os = "windows")]
         {
@@ -299,6 +327,9 @@ pub async fn run_server(config: ServerConfig) -> Result<(), Box<dyn std::error::
         .unwrap_or_else(|| Path::new("."));
     state.load_persisted_sessions(cwd).await;
 
+    // Load MCP servers from settings
+    state.load_mcp_from_settings(cwd).await;
+
     // Load prompt history into memory window
     {
         let mut history = state.prompt_history.lock().await;
@@ -329,6 +360,9 @@ pub async fn run_server_on_listener(
         .map(Path::new)
         .unwrap_or_else(|| Path::new("."));
     state.load_persisted_sessions(cwd).await;
+
+    // Load MCP servers from settings
+    state.load_mcp_from_settings(cwd).await;
 
     // Load prompt history into memory window
     {
