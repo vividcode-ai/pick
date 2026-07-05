@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, useCallback, type ReactNode } from "react";
+import { useMemo, useRef, useState, useCallback, useEffect, type ReactNode } from "react";
 import { useLineHover } from "../../hooks/useLineHover";
 import { CommentBadge } from "../Comment/CommentBadge";
 import { CommentEditor } from "../Comment/CommentEditor";
@@ -50,8 +50,20 @@ export function DiffViewer({ diffText, filePath, baseUrl, onAsk, className }: Di
   const [editorLine, setEditorLine] = useState<number | null>(null);
   const [sendToAI, setSendToAI] = useState(false);
   const [showComments, setShowComments] = useState<number | null>(null);
+  const [fileComments, setFileComments] = useState<LineComment[]>([]);
 
-  const fileComments = filePath ? getCommentsByFile(filePath) : [];
+  useEffect(() => {
+    if (!filePath) {
+      setFileComments([]);
+      return;
+    }
+    setFileComments(getCommentsByFile(filePath));
+    const unsub = subscribeToComments(() => {
+      setFileComments(getCommentsByFile(filePath));
+    });
+    return () => { unsub(); };
+  }, [filePath]);
+
   const commentsByLine = new Map<number, LineComment[]>();
   for (const c of fileComments) {
     const list = commentsByLine.get(c.line) || [];

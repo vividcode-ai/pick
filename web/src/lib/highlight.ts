@@ -59,11 +59,26 @@ export async function highlightCode(code: string, filePath: string): Promise<str
 
   try {
     let html = await codeToHtml(code, { lang, theme: THEME });
+
     let lineNum = 0;
     html = html.replace(
       /<span class="line">/g,
-      () => `<span class="line"><span class="line-num">${++lineNum}</span>`
+      () => {
+        lineNum++;
+        return `<div class="line-wrapper" data-line="${lineNum}"><span class="line"><span class="line-num">${lineNum}</span>`;
+      }
     );
+
+    html = html.replace(
+      /<\/span>\n(?=<div class="line-wrapper")/g,
+      '<button class="line-add-btn">+</button></div>\n'
+    );
+
+    html = html.replace(
+      /<\/span>(<\/code>)/g,
+      '<button class="line-add-btn">+</button></div>$1'
+    );
+
     htmlCache.set(cacheKey, html);
     if (htmlCache.size > 50) {
       const firstKey = htmlCache.keys().next().value;
@@ -71,13 +86,24 @@ export async function highlightCode(code: string, filePath: string): Promise<str
     }
     return html;
   } catch {
-    let fallbackHtml = `<pre class="shiki" style="padding:0;font-size:12px;line-height:1.5;overflow:auto;background:transparent;"><code>${escapeHtml(code)}</code></pre>`;
+    let fallback = `<pre class="shiki" style="padding:0;font-size:12px;line-height:1.5;overflow:auto;background:transparent;"><code>${escapeHtml(code)}</code></pre>`;
     let lineNum = 0;
-    fallbackHtml = fallbackHtml.replace(
+    fallback = fallback.replace(
       /<span class="line">/g,
-      () => `<span class="line"><span class="line-num">${++lineNum}</span>`
+      () => {
+        lineNum++;
+        return `<div class="line-wrapper" data-line="${lineNum}"><span class="line"><span class="line-num">${lineNum}</span>`;
+      }
     );
-    return fallbackHtml;
+    fallback = fallback.replace(
+      /<\/span>\n(?=<div class="line-wrapper")/g,
+      '<button class="line-add-btn">+</button></div>\n'
+    );
+    fallback = fallback.replace(
+      /<\/span>(<\/code>)/g,
+      '<button class="line-add-btn">+</button></div>$1'
+    );
+    return fallback;
   }
 }
 
