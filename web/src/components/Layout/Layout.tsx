@@ -176,27 +176,29 @@ export function Layout({
           />
         )}
 
-        <div className="hidden md:block fixed top-3 right-3 z-20">
-          <div className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-xl border border-[var(--border-base)] bg-[var(--surface-secondary)] shadow-sm w-fit">
-            <button
-              onClick={toggleRightPanel}
-              className="p-1 rounded-md hover:bg-[var(--surface-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
-            >
-              <Activity className="w-4 h-4" />
-            </button>
-            <button
-              onClick={toggleTerminal}
-              className={`p-1 rounded-md hover:bg-[var(--surface-hover)] transition-colors ${
-                terminalOpen
-                  ? "text-[var(--accent-primary)] bg-[var(--surface-hover)]"
-                  : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-              }`}
-              title="打开终端"
-            >
-              <Monitor className="w-4 h-4" />
-            </button>
+        {!terminalFullscreen && (
+          <div className="hidden md:block fixed top-3 right-3 z-20">
+            <div className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-xl border border-[var(--border-base)] bg-[var(--surface-secondary)] shadow-sm w-fit">
+              <button
+                onClick={toggleRightPanel}
+                className="p-1 rounded-md hover:bg-[var(--surface-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+              >
+                <Activity className="w-4 h-4" />
+              </button>
+              <button
+                onClick={toggleTerminal}
+                className={`p-1 rounded-md hover:bg-[var(--surface-hover)] transition-colors ${
+                  terminalOpen
+                    ? "text-[var(--accent-primary)] bg-[var(--surface-hover)]"
+                    : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                }`}
+                title="打开终端"
+              >
+                <Monitor className="w-4 h-4" />
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         {rightPanelOpen && (
           <div className="hidden md:block fixed top-3 right-3 z-10" style={{ marginTop: "44px" }}>
