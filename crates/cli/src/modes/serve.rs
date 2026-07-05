@@ -42,10 +42,14 @@ pub async fn run_serve_mode(
     let cwd = std::env::current_dir().unwrap_or_default();
     state.load_persisted_sessions(&cwd).await;
 
-    // Load MCP servers from settings
-    state.load_mcp_from_settings(&cwd).await;
-
     let state = Arc::new(state);
+
+    // Load MCP servers from settings in background (don't block startup)
+    let state_for_mcp = state.clone();
+    let cwd_for_mcp = cwd.clone();
+    tokio::spawn(async move {
+        state_for_mcp.load_mcp_from_settings(&cwd_for_mcp).await;
+    });
 
     if args.open_browser {
         let url = format!("http://{}:{}", host, actual_port);

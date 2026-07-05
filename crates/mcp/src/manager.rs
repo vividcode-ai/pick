@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Duration;
 
 use futures::future::join_all;
 use pick_agent::core::state::AgentTool;
@@ -56,16 +57,29 @@ impl McpManager {
             .map(|config| {
                 let config = config.clone();
                 let executor = self.executor.clone();
+                let name = config.name.clone();
                 tokio::spawn(async move {
-                    match connect_and_discover(&config).await {
-                        Ok(client) => {
+                    match tokio::time::timeout(
+                        Duration::from_secs(30),
+                        connect_and_discover(&config),
+                    )
+                    .await
+                    {
+                        Ok(Ok(client)) => {
                             let entries = client.tools.clone();
                             let tools = build_agent_tools(entries, &executor);
                             let mut ex = executor.lock().await;
                             ex.add_client(client);
                             tools
                         }
-                        Err(_) => Vec::new(),
+                        Ok(Err(e)) => {
+                            tracing::warn!("MCP server '{}' connection failed: {}", name, e);
+                            Vec::new()
+                        }
+                        Err(_) => {
+                            tracing::warn!("MCP server '{}' connection timed out after 30s", name);
+                            Vec::new()
+                        }
                     }
                 })
             })

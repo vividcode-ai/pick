@@ -324,11 +324,18 @@ pub async fn run_server(config: ServerConfig) -> Result<(), Box<dyn std::error::
         .cwd
         .as_deref()
         .map(Path::new)
-        .unwrap_or_else(|| Path::new("."));
-    state.load_persisted_sessions(cwd).await;
+        .unwrap_or_else(|| Path::new("."))
+        .to_path_buf();
+    state.load_persisted_sessions(&cwd).await;
 
-    // Load MCP servers from settings
-    state.load_mcp_from_settings(cwd).await;
+    // Load MCP servers from settings in background (don't block startup)
+    {
+        let state_for_mcp = state.clone();
+        let cwd_for_mcp = cwd.clone();
+        tokio::spawn(async move {
+            state_for_mcp.load_mcp_from_settings(&cwd_for_mcp).await;
+        });
+    }
 
     // Load prompt history into memory window
     {
@@ -358,11 +365,18 @@ pub async fn run_server_on_listener(
         .cwd
         .as_deref()
         .map(Path::new)
-        .unwrap_or_else(|| Path::new("."));
-    state.load_persisted_sessions(cwd).await;
+        .unwrap_or_else(|| Path::new("."))
+        .to_path_buf();
+    state.load_persisted_sessions(&cwd).await;
 
-    // Load MCP servers from settings
-    state.load_mcp_from_settings(cwd).await;
+    // Load MCP servers from settings in background (don't block startup)
+    {
+        let state_for_mcp = state.clone();
+        let cwd_for_mcp = cwd.clone();
+        tokio::spawn(async move {
+            state_for_mcp.load_mcp_from_settings(&cwd_for_mcp).await;
+        });
+    }
 
     // Load prompt history into memory window
     {
