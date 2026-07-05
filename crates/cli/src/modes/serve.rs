@@ -3,6 +3,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::args::Args;
+use ratatui::prelude::Stylize;
 
 pub async fn run_serve_mode(
     args: Args,
@@ -53,8 +54,25 @@ pub async fn run_serve_mode(
         println!("Opening {} in browser...", url);
     }
 
-    println!("Pick server listening on http://{}:{}", host, actual_port);
-    println!("  Web UI:  http://{}:{}", host, actual_port);
+    println!(
+        "{} {} {}",
+        "Pick".green().bold(),
+        "server is running".bold(),
+        "▶".green()
+    );
+    println!(
+        "  {}  http://{}:{}",
+        "Local".bold(),
+        host,
+        actual_port.cyan()
+    );
+    println!(
+        "  {} http://{}:{}",
+        "Web UI".bold(),
+        host,
+        actual_port.cyan()
+    );
+    println!("  Press Ctrl+C to stop");
 
     pick_server::serve_with_state(listener, state)
         .await

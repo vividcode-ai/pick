@@ -1,5 +1,25 @@
 import { useState, useEffect } from "react";
 import { File, Loader2, AlertCircle } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypePrettyCode from "rehype-pretty-code";
+
+const EXT_TO_LANG: Record<string, string> = {
+  ts: "typescript", tsx: "tsx", js: "javascript", jsx: "jsx",
+  rs: "rust", py: "python", go: "go", zig: "zig",
+  css: "css", scss: "scss", less: "less",
+  json: "json", md: "markdown", html: "html", xml: "xml",
+  yaml: "yaml", yml: "yaml", toml: "toml",
+  sh: "bash", bash: "bash", zsh: "bash", ps1: "powershell",
+  sql: "sql", graphql: "graphql",
+  dockerfile: "dockerfile", makefile: "makefile",
+  c: "c", cpp: "cpp", h: "c", hpp: "cpp",
+  java: "java", kotlin: "kotlin", swift: "swift",
+  ruby: "ruby", php: "php", r: "r",
+  lua: "lua", dart: "dart",
+  svelte: "svelte", vue: "vue", astro: "astro",
+  txt: "text", gitignore: "text", env: "text",
+};
 
 interface FilePreviewProps {
   baseUrl: string;
@@ -73,18 +93,8 @@ export function FilePreview({ baseUrl, filePath }: FilePreviewProps) {
   }
 
   const ext = filePath.split(".").pop()?.toLowerCase() || "";
-  const isMarkdown = ext === "md";
-
-  if (isMarkdown) {
-    return (
-      <div className="h-full overflow-auto p-4">
-        <div className="text-xs text-[var(--text-muted)] mb-2">{filePath}</div>
-        <pre className="text-sm whitespace-pre-wrap font-sans leading-relaxed">{content}</pre>
-      </div>
-    );
-  }
-
-  const lines = content?.split("\n") || [];
+  const lang = EXT_TO_LANG[ext] || ext;
+  const codeFence = "```" + lang + "\n" + (content ?? "") + "\n```";
 
   return (
     <div className="h-full flex flex-col">
@@ -92,19 +102,15 @@ export function FilePreview({ baseUrl, filePath }: FilePreviewProps) {
         {filePath}
         <span className="ml-2">— {totalLines} lines</span>
       </div>
-      <div className="flex-1 overflow-auto">
-        <table className="w-full border-collapse font-mono text-xs leading-relaxed">
-          <tbody>
-            {lines.map((line, i) => (
-              <tr key={i} className="hover:bg-[var(--surface-hover)]/50">
-                <td className="text-right text-[var(--text-muted)] px-3 select-none w-12 border-r border-[var(--border-base)] align-top">
-                  {i + 1}
-                </td>
-                <td className="px-3 whitespace-pre">{line}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="flex-1 overflow-auto p-0">
+        <div className="markdown-body !p-0 !m-0">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            rehypePlugins={[[rehypePrettyCode, { theme: "github-dark-dimmed" }]]}
+          >
+            {codeFence}
+          </ReactMarkdown>
+        </div>
       </div>
     </div>
   );

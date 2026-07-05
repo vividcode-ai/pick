@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypePrettyCode from "rehype-pretty-code";
 import type { Components } from "react-markdown";
 
 interface MarkdownProps {
@@ -47,6 +48,7 @@ export function Markdown({ content, className }: MarkdownProps) {
     <div className={`markdown-body ${className ?? ""}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
+        rehypePlugins={[[rehypePrettyCode, { theme: "github-dark-dimmed" }]]}
         components={components}
       >
         {content}
