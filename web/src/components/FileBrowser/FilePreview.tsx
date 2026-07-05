@@ -1,25 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { File, Loader2, AlertCircle } from "lucide-react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import rehypePrettyCode from "rehype-pretty-code";
-
-const EXT_TO_LANG: Record<string, string> = {
-  ts: "typescript", tsx: "tsx", js: "javascript", jsx: "jsx",
-  rs: "rust", py: "python", go: "go", zig: "zig",
-  css: "css", scss: "scss", less: "less",
-  json: "json", md: "markdown", html: "html", xml: "xml",
-  yaml: "yaml", yml: "yaml", toml: "toml",
-  sh: "bash", bash: "bash", zsh: "bash", ps1: "powershell",
-  sql: "sql", graphql: "graphql",
-  dockerfile: "dockerfile", makefile: "makefile",
-  c: "c", cpp: "cpp", h: "c", hpp: "cpp",
-  java: "java", kotlin: "kotlin", swift: "swift",
-  ruby: "ruby", php: "php", r: "r",
-  lua: "lua", dart: "dart",
-  svelte: "svelte", vue: "vue", astro: "astro",
-  txt: "text", gitignore: "text", env: "text",
-};
+import { highlightCode } from "../../lib/highlight";
 
 interface FilePreviewProps {
   baseUrl: string;
@@ -28,20 +9,25 @@ interface FilePreviewProps {
 
 export function FilePreview({ baseUrl, filePath }: FilePreviewProps) {
   const [content, setContent] = useState<string | null>(null);
+  const [html, setHtml] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [totalLines, setTotalLines] = useState<number>(0);
+  const activePathRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!filePath) {
       setContent(null);
+      setHtml("");
       setError(null);
       return;
     }
 
+    activePathRef.current = filePath;
     setLoading(true);
     setError(null);
     setContent(null);
+    setHtml("");
 
     fetch(`${baseUrl}/files/content?path=${encodeURIComponent(filePath)}`)
       .then(async (res) => {
@@ -51,18 +37,25 @@ export function FilePreview({ baseUrl, filePath }: FilePreviewProps) {
         }
         return res.json();
       })
-      .then((data) => {
+      .then(async (data) => {
+        if (activePathRef.current !== filePath) return;
         if (data.binary) {
           setError("Binary file - cannot preview");
         } else {
           setContent(data.content);
           setTotalLines(data.total_lines ?? 0);
+          const highlighted = await highlightCode(data.content, filePath);
+          if (activePathRef.current === filePath) {
+            setHtml(highlighted);
+          }
         }
         setLoading(false);
       })
       .catch((e) => {
-        setError(e.message || "Failed to load file");
-        setLoading(false);
+        if (activePathRef.current === filePath) {
+          setError(e.message || "Failed to load file");
+          setLoading(false);
+        }
       });
   }, [baseUrl, filePath]);
 
@@ -92,26 +85,16 @@ export function FilePreview({ baseUrl, filePath }: FilePreviewProps) {
     );
   }
 
-  const ext = filePath.split(".").pop()?.toLowerCase() || "";
-  const lang = EXT_TO_LANG[ext] || ext;
-  const codeFence = "```" + lang + "\n" + (content ?? "") + "\n```";
-
   return (
     <div className="h-full flex flex-col">
       <div className="text-xs text-[var(--text-muted)] px-4 py-1.5 border-b border-[var(--border-base)] shrink-0">
         {filePath}
         <span className="ml-2">— {totalLines} lines</span>
       </div>
-      <div className="flex-1 overflow-auto p-0">
-        <div className="markdown-body !p-0 !m-0">
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            rehypePlugins={[[rehypePrettyCode, { theme: "github-dark-dimmed" }]]}
-          >
-            {codeFence}
-          </ReactMarkdown>
-        </div>
-      </div>
+      <div
+        className="flex-1 overflow-auto [&_pre]:!m-0 [&_pre]:!h-full [&_pre]:!rounded-none [&_pre]:!bg-transparent"
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
     </div>
   );
 }
