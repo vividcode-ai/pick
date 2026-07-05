@@ -8,9 +8,10 @@ const MAX_RIGHT_WIDTH = 600;
 
 interface FileBrowserContentProps {
   baseUrl: string;
+  onAsk?: ((prompt: string) => void) | null;
 }
 
-export function FileBrowserContent({ baseUrl }: FileBrowserContentProps) {
+export function FileBrowserContent({ baseUrl, onAsk }: FileBrowserContentProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<{ path: string; name: string }[] | null>(null);
   const [searching, setSearching] = useState(false);
@@ -88,7 +89,7 @@ export function FileBrowserContent({ baseUrl }: FileBrowserContentProps) {
     <div className="flex h-full">
       {/* Left: File Preview */}
       <div className="flex-1 min-w-0">
-        <FilePreview baseUrl={baseUrl} filePath={selectedFile} />
+        <FilePreview baseUrl={baseUrl} filePath={selectedFile} onAsk={onAsk} />
       </div>
 
       {/* Resize handle */}

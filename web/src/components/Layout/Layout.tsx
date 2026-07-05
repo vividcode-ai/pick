@@ -19,6 +19,7 @@ interface LayoutProps {
   gitInfo?: GitInfo | null;
   onCommitRequest?: (message: string) => void;
   baseUrl?: string;
+  onAsk?: ((prompt: string) => void) | null;
   children: ReactNode;
 }
 
@@ -37,6 +38,7 @@ export function Layout({
   gitInfo,
   onCommitRequest,
   baseUrl,
+  onAsk,
   children,
 }: LayoutProps) {
   const [rightPanelOpenLocal, setRightPanelOpenLocal] = useState(false);
@@ -174,6 +176,7 @@ export function Layout({
             onClose={() => setTerminalOpen(false)}
             onFullscreenChange={setTerminalFullscreen}
             sessionId={sessionId ?? null}
+            onAsk={onAsk}
           />
         )}
 

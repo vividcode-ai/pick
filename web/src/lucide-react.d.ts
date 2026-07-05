@@ -54,4 +54,5 @@ declare module "lucide-react" {
   export const AlertCircle: Icon;
   export const File: Icon;
   export const Folder: Icon;
+  export const Send: Icon;
 }

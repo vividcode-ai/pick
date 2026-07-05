@@ -183,7 +183,7 @@ Provide specific suggestions with code examples where applicable.`;
                       </div>
                       {isExpanded && fileDiffs[change.path] && (
                         <div className="ml-8 mr-2 mb-1 border border-[var(--border-base)] rounded overflow-hidden">
-                          <DiffViewer diffText={fileDiffs[change.path]} />
+                          <DiffViewer diffText={fileDiffs[change.path]} filePath={change.path} baseUrl={baseUrl} />
                         </div>
                       )}
                     </div>

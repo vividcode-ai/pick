@@ -1,4 +1,5 @@
 pub mod approval;
+pub mod comments_routes;
 pub mod docs;
 pub mod events;
 pub mod files;
@@ -45,6 +46,7 @@ pub struct AppState {
     pub mcp_manager: McpManager,
     pub mcp_configs: RwLock<Vec<McpServerConfig>>,
     pub prompt_history: TokioMutex<PromptHistoryManager>,
+    pub comments: RwLock<HashMap<String, Vec<comments_routes::CommentEntry>>>,
 }
 
 impl AppState {
@@ -72,6 +74,7 @@ impl AppState {
             mcp_manager: McpManager::new(),
             mcp_configs: RwLock::new(Vec::new()),
             prompt_history: TokioMutex::new(PromptHistoryManager::new(&history_cwd)),
+            comments: RwLock::new(HashMap::new()),
         }
     }
 
@@ -296,6 +299,10 @@ pub fn create_app(state: Arc<AppState>) -> Router {
         .route(
             "/settings",
             get(settings_routes::get_settings).patch(settings_routes::update_settings),
+        )
+        .route(
+            "/comments/{session_id}",
+            get(comments_routes::get_comments).put(comments_routes::put_comments),
         )
         .route(
             "/prompt-history",

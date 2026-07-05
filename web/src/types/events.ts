@@ -114,3 +114,12 @@ export interface GitInfo {
   changes: GitChange[];
   cwd: string;
 }
+
+export interface LineComment {
+  id: string;
+  file: string;
+  line: number;
+  comment: string;
+  time: number;
+  resolved: boolean;
+}

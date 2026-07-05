@@ -407,6 +407,7 @@ export default function App() {
         gitInfo={activeGitInfo}
         onCommitRequest={handleCommitRequest}
         baseUrl={baseUrl}
+        onAsk={ask}
         leftPanel={
           <LeftPanel
             onNewSession={handleNewSession}
