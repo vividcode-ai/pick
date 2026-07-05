@@ -615,6 +615,7 @@ pub fn create_subagent_tool_with_mode(agent_mode: Option<String>) -> AgentTool {
             "Parallel: { tasks: [{ agent: \"scout\", task: \"...\" }, ...] }".to_string(),
             "Chain: { chain: [{ agent: \"scout\", task: \"...\" }, { agent: \"planner\", task: \"{previous}\" }] }".to_string(),
             "Available agents and their descriptions will be listed in the response.".to_string(),
+            "When you need to execute tasks in parallel or handle multiple independent subtasks simultaneously, you MUST use the subagent tool with the tasks array (parallel mode) rather than processing them sequentially yourself.".to_string(),
         ],
         label: "Subagent".to_string(),
         parameters: params,

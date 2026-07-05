@@ -167,12 +167,13 @@ export function Layout({
           {children}
         </div>
 
-        {baseUrl && (
+        {baseUrl && terminalOpen && (
           <TerminalPanel
             baseUrl={baseUrl}
-            visible={terminalOpen}
+            visible={true}
             onClose={() => setTerminalOpen(false)}
             onFullscreenChange={setTerminalFullscreen}
+            sessionId={sessionId ?? null}
           />
         )}
 

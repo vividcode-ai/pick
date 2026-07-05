@@ -3,22 +3,35 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import { useTheme } from "../../lib/ThemeProvider";
+import { AddMenu } from "../AddMenu";
+import { CodeReviewContent } from "../CodeReview/CodeReviewContent";
+import { FileBrowserContent } from "../FileBrowser/FileBrowserContent";
 
 const MIN_HEIGHT = 100;
 const MAX_HEIGHT_FRACTION = 0.6;
+
+type TabKind = "terminal" | "codereview" | "filebrowser";
+
+interface TabItem {
+  id: number;
+  kind: TabKind;
+  shellName?: string;
+}
 
 interface TerminalPanelProps {
   baseUrl: string;
   visible: boolean;
   onClose: () => void;
   onFullscreenChange?: (fullscreen: boolean) => void;
+  sessionId: string | null;
 }
 
-export function TerminalPanel({ baseUrl, visible, onClose, onFullscreenChange }: TerminalPanelProps) {
-  const [tabs, setTabs] = useState<{ id: number; shellName?: string }[]>([{ id: 0 }]);
+export function TerminalPanel({ baseUrl, visible, onClose, onFullscreenChange, sessionId }: TerminalPanelProps) {
+  const [tabs, setTabs] = useState<TabItem[]>([{ id: 0, kind: "terminal" }]);
   const [activeIdx, setActiveIdx] = useState(0);
   const [panelHeight, setPanelHeight] = useState(200);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
   const prevHeightRef = useRef(200);
 
   const containerRefs = useRef<Map<number, HTMLDivElement>>(new Map());
@@ -59,7 +72,8 @@ export function TerminalPanel({ baseUrl, visible, onClose, onFullscreenChange }:
     brightWhite: isDark ? "#a6adc8" : "#d4d4d4",
   }), [isDark]);
 
-  const activeTabId = tabs[activeIdx]?.id;
+  const activeTab = tabs[activeIdx];
+  const activeTabId = activeTab?.id;
 
   const wsUrl = useMemo(() => {
     try {
@@ -75,6 +89,7 @@ export function TerminalPanel({ baseUrl, visible, onClose, onFullscreenChange }:
   // Lazy-init terminal when active tab changes (and panel is visible)
   useEffect(() => {
     if (!visible) return;
+    if (activeTab?.kind !== "terminal") return;
     const id = activeTabId;
     if (id == null) return;
     if (termMapRef.current.has(id)) return;
@@ -125,7 +140,7 @@ export function TerminalPanel({ baseUrl, visible, onClose, onFullscreenChange }:
         fitAddonMapRef.current.delete(id);
       }
     };
-  }, [visible, activeTabId]);
+  }, [visible, activeTab, activeTabId]);
 
   // Update terminal themes when app theme changes
   useEffect(() => {
@@ -138,30 +153,32 @@ export function TerminalPanel({ baseUrl, visible, onClose, onFullscreenChange }:
   useEffect(() => {
     if (!visible) return;
     const onResize = () => {
-      const id = tabs[activeIdx]?.id;
-      if (id == null) return;
-      fitAddonMapRef.current.get(id)?.fit();
+      const tab = tabs[activeIdx];
+      if (tab?.kind !== "terminal") return;
+      fitAddonMapRef.current.get(tab.id)?.fit();
     };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, [visible, activeIdx, tabs]);
 
-  // Init first tab's WS when panel opens
+  // Init first terminal tab's WS when panel opens
   useEffect(() => {
     if (!visible || tabs.length === 0) return;
-    const firstId = tabs[0].id;
+    const firstTerminalTab = tabs.find((t) => t.kind === "terminal");
+    if (!firstTerminalTab) return;
+    const firstId = firstTerminalTab.id;
     if (!wsMapRef.current.has(firstId)) {
       const ws = createWs(firstId);
       activeWsRef.current = ws;
     }
-  }, [visible]);
+  }, [visible, tabs]);
 
   // Refocus terminal when panel becomes visible
   useEffect(() => {
     if (!visible) return;
-    const id = tabs[activeIdx]?.id;
-    if (id == null) return;
-    const term = termMapRef.current.get(id);
+    const tab = tabs[activeIdx];
+    if (tab?.kind !== "terminal") return;
+    const term = termMapRef.current.get(tab.id);
     term?.focus();
   }, [visible, tabs, activeIdx]);
   const decodeBuffer = (buf: ArrayBuffer): string => {
@@ -216,25 +233,41 @@ export function TerminalPanel({ baseUrl, visible, onClose, onFullscreenChange }:
 
   // ── Actions ──────────────────────────────────────────────────────
 
-  const handleNew = useCallback(() => {
-    const newId = tabs.length > 0 ? Math.max(...tabs.map((t) => t.id)) + 1 : 0;
+  const nextId = useCallback(() => {
+    return tabs.length > 0 ? Math.max(...tabs.map((t) => t.id)) + 1 : 0;
+  }, [tabs]);
+
+  const handleNewTerminal = useCallback(() => {
+    const newId = nextId();
     const ws = createWs(newId);
     activeWsRef.current = ws;
-    setTabs((prev) => [...prev, { id: newId }]);
+    setTabs((prev) => [...prev, { id: newId, kind: "terminal" }]);
     setActiveIdx(tabs.length);
-  }, [tabs, createWs]);
+  }, [tabs, nextId, createWs]);
+
+  const handleAddCodeReview = useCallback(() => {
+    const newId = nextId();
+    setTabs((prev) => [...prev, { id: newId, kind: "codereview" }]);
+    setActiveIdx(tabs.length);
+  }, [tabs, nextId]);
+
+  const handleAddFileBrowser = useCallback(() => {
+    const newId = nextId();
+    setTabs((prev) => [...prev, { id: newId, kind: "filebrowser" }]);
+    setActiveIdx(tabs.length);
+  }, [tabs, nextId]);
 
   const handleSelect = useCallback(
     (idx: number) => {
       const tab = tabs[idx];
       if (!tab) return;
-      const ws = wsMapRef.current.get(tab.id);
-      if (ws) {
-        activeWsRef.current = ws;
+      if (tab.kind === "terminal") {
+        const ws = wsMapRef.current.get(tab.id);
+        if (ws) activeWsRef.current = ws;
+        const term = termMapRef.current.get(tab.id);
+        term?.focus();
       }
       setActiveIdx(idx);
-      const term = termMapRef.current.get(tab.id);
-      term?.focus();
     },
     [tabs],
   );
@@ -243,16 +276,18 @@ export function TerminalPanel({ baseUrl, visible, onClose, onFullscreenChange }:
     (idx: number) => {
       if (tabs.length <= 1) return;
       const tab = tabs[idx];
-      wsMapRef.current.get(tab.id)?.close();
-      wsMapRef.current.delete(tab.id);
-      termMapRef.current.get(tab.id)?.dispose();
-      termMapRef.current.delete(tab.id);
-      fitAddonMapRef.current.delete(tab.id);
+      if (tab.kind === "terminal") {
+        wsMapRef.current.get(tab.id)?.close();
+        wsMapRef.current.delete(tab.id);
+        termMapRef.current.get(tab.id)?.dispose();
+        termMapRef.current.delete(tab.id);
+        fitAddonMapRef.current.delete(tab.id);
+      }
       containerRefs.current.delete(tab.id);
       const newTabs = tabs.filter((_, i) => i !== idx);
       const newIdx = Math.min(idx, newTabs.length - 1);
       const newActiveTab = newTabs[newIdx];
-      if (newActiveTab) {
+      if (newActiveTab?.kind === "terminal") {
         const ws = wsMapRef.current.get(newActiveTab.id);
         if (ws) activeWsRef.current = ws;
       }
@@ -266,18 +301,16 @@ export function TerminalPanel({ baseUrl, visible, onClose, onFullscreenChange }:
     setIsFullscreen((prev) => {
       const next = !prev;
       onFullscreenChange?.(next);
+      const fitTerm = () => {
+        const tab = tabs[activeIdx];
+        if (tab?.kind === "terminal") fitAddonMapRef.current.get(tab.id)?.fit();
+      };
       if (next) {
         prevHeightRef.current = panelHeight;
-        setTimeout(() => {
-          const id = tabs[activeIdx]?.id;
-          if (id != null) fitAddonMapRef.current.get(id)?.fit();
-        }, 50);
+        setTimeout(fitTerm, 50);
       } else {
         setPanelHeight(prevHeightRef.current);
-        setTimeout(() => {
-          const id = tabs[activeIdx]?.id;
-          if (id != null) fitAddonMapRef.current.get(id)?.fit();
-        }, 50);
+        setTimeout(fitTerm, 50);
       }
       return next;
     });
@@ -338,8 +371,8 @@ export function TerminalPanel({ baseUrl, visible, onClose, onFullscreenChange }:
         draggingRef.current = false;
         document.removeEventListener("mousemove", handleMouseMove);
         document.removeEventListener("mouseup", handleMouseUp);
-        const id = tabs[activeIdx]?.id;
-        if (id != null) fitAddonMapRef.current.get(id)?.fit();
+        const tab = tabs[activeIdx];
+        if (tab?.kind === "terminal") fitAddonMapRef.current.get(tab.id)?.fit();
       };
 
       document.addEventListener("mousemove", handleMouseMove);
@@ -384,7 +417,7 @@ export function TerminalPanel({ baseUrl, visible, onClose, onFullscreenChange }:
         {/* Tab list */}
         <div
           ref={tabListRef}
-          className="flex items-center gap-0 flex-1 min-w-0 self-stretch overflow-hidden"
+          className="flex items-center gap-0 min-w-0 self-stretch overflow-hidden"
         >
           {tabs.map((tab, i) => (
             <div
@@ -396,11 +429,17 @@ export function TerminalPanel({ baseUrl, visible, onClose, onFullscreenChange }:
               }`}
               onClick={() => handleSelect(i)}
             >
-              <span className="py-1">T{tab.id + 1}: {tab.shellName || "..."}</span>
+              <span className="py-1">
+                {tab.kind === "terminal"
+                  ? `T${tab.id + 1}: ${tab.shellName || "..."}`
+                  : tab.kind === "codereview"
+                  ? "Code Review"
+                  : "File Browser"}
+              </span>
               <button
                 onClick={(e) => { e.stopPropagation(); handleDeleteTab(i); }}
                 className="p-0.5 rounded hover:bg-red-500/20 text-[var(--text-muted)] hover:text-red-400 transition-colors"
-                title="Delete terminal"
+                title="Close tab"
               >
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -408,15 +447,27 @@ export function TerminalPanel({ baseUrl, visible, onClose, onFullscreenChange }:
               </button>
             </div>
           ))}
+        </div>
+
+        {/* "+" button OUTSIDE overflow-hidden */}
+        <div className="relative shrink-0 self-stretch flex items-center">
           <button
-            onClick={handleNew}
-            title="New terminal"
-            className="self-stretch px-2 hover:bg-[var(--surface-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors shrink-0"
+            onClick={() => setAddMenuOpen((v) => !v)}
+            title="Add"
+            className="self-stretch px-2 rounded hover:bg-[var(--surface-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
           </button>
+          {addMenuOpen && (
+            <AddMenu
+              onNewTerminal={() => { handleNewTerminal(); setAddMenuOpen(false); }}
+              onCodeReview={() => { handleAddCodeReview(); setAddMenuOpen(false); }}
+              onFileBrowser={() => { handleAddFileBrowser(); setAddMenuOpen(false); }}
+              onClose={() => setAddMenuOpen(false)}
+            />
+          )}
         </div>
 
         {/* Scroll right */}
@@ -466,19 +517,28 @@ export function TerminalPanel({ baseUrl, visible, onClose, onFullscreenChange }:
         </div>
       </div>
 
-      {/* Terminal body: xterm + tab list */}
+      {/* Tab body */}
       <div className="flex flex-1 min-h-0" style={isFullscreen ? {} : { height: panelHeight }}>
-        {/* Per-tab terminal containers */}
         <div className="flex-1 min-w-0 relative">
           {tabs.map((tab) => (
             <div
               key={tab.id}
-              ref={(el) => {
-                if (el) containerRefs.current.set(tab.id, el);
-              }}
               className="absolute inset-0"
               style={{ display: tab.id === activeTabId ? "block" : "none" }}
-            />
+            >
+              {tab.kind === "terminal" ? (
+                <div
+                  ref={(el) => {
+                    if (el) containerRefs.current.set(tab.id, el);
+                  }}
+                  className="h-full"
+                />
+              ) : tab.kind === "codereview" ? (
+                <CodeReviewContent baseUrl={baseUrl} sessionId={sessionId} />
+              ) : (
+                <FileBrowserContent baseUrl={baseUrl} />
+              )}
+            </div>
           ))}
         </div>
       </div>
