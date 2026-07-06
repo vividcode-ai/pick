@@ -10,12 +10,12 @@ interface StatusCardProps {
 }
 
 const statusLabel: Record<string, string> = {
-  M: "修改",
-  A: "新增",
-  D: "删除",
-  R: "重命名",
-  "??": "未跟踪",
-  "!!": "忽略",
+  M: "Modified",
+  A: "Added",
+  D: "Deleted",
+  R: "Renamed",
+  "??": "Untracked",
+  "!!": "Ignored",
 };
 
 const statusColor: Record<string, string> = {
@@ -44,7 +44,7 @@ export function StatusCard({ gitInfo, sessionId, onCommitRequest }: StatusCardPr
     <div className="rounded-xl border border-[var(--border-base)] bg-[var(--surface-secondary)] shadow-sm overflow-hidden">
       <div className="px-3 py-2.5 border-b border-[var(--border-base)]">
         <h3 className="text-xs font-semibold text-[var(--text-primary)] uppercase tracking-wider">
-          状态
+          Status
         </h3>
       </div>
       <div className="p-3 space-y-3">
@@ -52,7 +52,7 @@ export function StatusCard({ gitInfo, sessionId, onCommitRequest }: StatusCardPr
         <div className="flex items-start gap-2">
           <FolderOpen className="w-3.5 h-3.5 mt-0.5 text-[var(--text-muted)] flex-shrink-0" />
           <div className="min-w-0 flex-1">
-            <div className="text-[10px] text-[var(--text-muted)] font-medium">工作目录</div>
+            <div className="text-[10px] text-[var(--text-muted)] font-medium">Working Directory</div>
             <div className="text-xs text-[var(--text-primary)] truncate" title={gitInfo?.cwd ?? ""}>
               {gitInfo?.cwd ?? "—"}
             </div>
@@ -63,7 +63,7 @@ export function StatusCard({ gitInfo, sessionId, onCommitRequest }: StatusCardPr
         <div className="flex items-start gap-2">
           <GitBranch className="w-3.5 h-3.5 mt-0.5 text-[var(--text-muted)] flex-shrink-0" />
           <div className="min-w-0 flex-1">
-            <div className="text-[10px] text-[var(--text-muted)] font-medium">分支</div>
+            <div className="text-[10px] text-[var(--text-muted)] font-medium">Branch</div>
             <div className="text-xs text-[var(--accent-primary)] font-mono">
               {gitInfo?.branch ?? "—"}
             </div>
@@ -75,7 +75,7 @@ export function StatusCard({ gitInfo, sessionId, onCommitRequest }: StatusCardPr
           <FileCode className="w-3.5 h-3.5 mt-0.5 text-[var(--text-muted)] flex-shrink-0" />
           <div className="min-w-0 flex-1">
             <div className="text-[10px] text-[var(--text-muted)] font-medium">
-              修改文件
+              Modified Files
               {changeCount > 0 && (
                 <span className="ml-1.5 text-[var(--accent-primary)]">
                   ({changeCount})
@@ -104,7 +104,7 @@ export function StatusCard({ gitInfo, sessionId, onCommitRequest }: StatusCardPr
                     onClick={() => setShowAll(true)}
                     className="text-xs text-[var(--accent-primary)] hover:underline mt-1"
                   >
-                    显示全部 {changeCount} 个
+                    Show all {changeCount}
                   </button>
                 )}
                 {showAll && changeCount > 5 && (
@@ -112,13 +112,13 @@ export function StatusCard({ gitInfo, sessionId, onCommitRequest }: StatusCardPr
                     onClick={() => setShowAll(false)}
                     className="text-xs text-[var(--text-muted)] hover:underline mt-1"
                   >
-                    收起
+                    Collapse
                   </button>
                 )}
               </div>
             ) : (
               <div className="text-xs text-[var(--text-muted)] mt-0.5">
-                没有未提交的修改
+                No uncommitted changes
               </div>
             )}
           </div>
@@ -131,7 +131,7 @@ export function StatusCard({ gitInfo, sessionId, onCommitRequest }: StatusCardPr
             className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-hover)] transition-colors"
           >
             <RotateCw className="w-3.5 h-3.5" />
-            提交代码
+            Commit
           </button>
         )}
       </div>

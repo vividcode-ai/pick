@@ -28,7 +28,7 @@ export function CommitModal({ open, onClose, onCommit }: CommitModalProps) {
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-base)]">
           <h3 className="text-sm font-semibold text-[var(--text-primary)]">
-            提交代码修改
+            Commit Changes
           </h3>
           <button
             onClick={onClose}
@@ -42,7 +42,7 @@ export function CommitModal({ open, onClose, onCommit }: CommitModalProps) {
             autoFocus
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            placeholder="输入提交信息..."
+            placeholder="Enter commit message..."
             className="w-full h-24 px-3 py-2 text-sm rounded-lg border border-[var(--border-base)] bg-[var(--surface-base)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] resize-none outline-none focus:ring-1 focus:ring-[var(--accent-primary)]"
             onKeyDown={(e) => {
               if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
@@ -55,14 +55,14 @@ export function CommitModal({ open, onClose, onCommit }: CommitModalProps) {
               onClick={onClose}
               className="px-3 py-1.5 text-xs font-medium rounded-lg border border-[var(--border-base)] text-[var(--text-muted)] hover:bg-[var(--surface-hover)] transition-colors"
             >
-              取消
+              Cancel
             </button>
             <button
               onClick={handleSubmit}
               disabled={!message.trim()}
               className="px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--accent-primary)] text-white hover:bg-[var(--accent-hover)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
-              提交
+              Commit
             </button>
           </div>
         </div>

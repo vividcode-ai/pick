@@ -30,17 +30,18 @@ export function CommentView({ comment, onSendToAgent, inline }: CommentViewProps
 
   if (inline) {
     return (
-      <div className={`mx-8 my-1 px-3 py-1.5 border border-[var(--border-base)] rounded-lg text-xs transition-colors ${
-        comment.resolved ? "opacity-50" : "bg-[var(--surface-base)]"
+      <div className={`mx-2 my-0.5 px-3 py-1.5 text-xs transition-colors ${
+        comment.resolved ? "opacity-50" : ""
       }`}>
         <div className="flex items-center justify-between">
-          <span className="text-[10px] text-[var(--text-muted)]">{timeStr}</span>
           {comment.resolved && <span className="text-[10px] text-green-400">Resolved</span>}
+          <span className="text-[10px] text-[var(--text-muted)]">{timeStr}</span>
         </div>
         <div className={`whitespace-pre-wrap leading-relaxed mt-0.5 ${comment.resolved ? "line-through" : ""}`}>
           {comment.comment}
         </div>
-        <div className="flex items-center gap-2 mt-1">
+        <div className="border-t border-[var(--border-base)] my-1" />
+        <div className="flex items-center justify-end gap-2">
           <button onClick={handleToggleResolve} className="text-[10px] text-[var(--text-muted)] hover:text-[var(--text-primary)]" title={comment.resolved ? "Reopen" : "Resolve"}>
             {comment.resolved ? <RotateCw className="w-3 h-3" /> : <CheckCircle className="w-3 h-3" />}
           </button>

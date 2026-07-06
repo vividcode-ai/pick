@@ -185,7 +185,7 @@ export default function App() {
   const handleCommitRequest = useCallback(
     (message: string) => {
       if (activeSessionId) {
-        ask(`请提交当前代码修改，提交信息为：${message}。仅执行提交操作，不要做其他事情。`, undefined);
+        ask(`Please commit the current code changes with message: ${message}. Only perform the commit, do nothing else.`, undefined);
       }
     },
     [activeSessionId, ask]

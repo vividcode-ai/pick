@@ -92,7 +92,7 @@ export function FilePreview({ baseUrl, filePath, onAsk }: FilePreviewProps) {
     if (!filePath || editingLine == null) return;
     addComment({ file: filePath, line: editingLine, comment, resolved: false });
     if (sendToAI && onAsk) {
-      onAsk(`用户对文件 \`${filePath}\` 第 ${editingLine} 行的评论:\n\n${comment}\n\n请分析该行代码并给出处理建议。`);
+      onAsk(`User comment on file \`${filePath}\` line ${editingLine}:\n\n${comment}\n\nPlease analyze this line of code and suggest how to address it.`);
     }
     setEditingLine(null);
   }, [filePath, editingLine, sendToAI, onAsk]);
@@ -136,7 +136,7 @@ export function FilePreview({ baseUrl, filePath, onAsk }: FilePreviewProps) {
       <div className="flex-1 min-h-0 relative">
         <div
           ref={containerRef}
-          className="absolute inset-0 overflow-auto font-mono text-xs leading-tight"
+          className="absolute inset-0 overflow-auto font-mono text-xs leading-tight whitespace-pre"
         >
           {lineHtmls.map((innerHtml, idx) => {
             const lineNum = idx + 1;
@@ -161,23 +161,32 @@ export function FilePreview({ baseUrl, filePath, onAsk }: FilePreviewProps) {
                     <MessageSquare className="w-3 h-3" />
                   </span>
                 </div>
-                {lineComments.length > 0 && !isEditing && (
-                  <div className="border-l-2 border-[var(--accent-primary)]/30 ml-[3rem]">
-                    {lineComments.map((c) => (
-                      <CommentView key={c.id} comment={c} inline onSendToAgent={onAsk ? (cmt) => onAsk(`用户对文件 \`${cmt.file}\` 第 ${cmt.line} 行的评论:\n\n${cmt.comment}\n\n请分析该行代码并给出处理建议。`) : undefined} />
-                    ))}
+                {(isEditing || lineComments.length > 0) && (
+                  <div className="ml-[3rem] max-w-[30%] min-w-[280px] border border-[var(--border-base)] rounded-lg overflow-hidden bg-[var(--surface-base)]">
+                    <div className="flex items-center justify-between px-3 py-1.5 border-b border-[var(--border-base)] text-[10px]">
+                      <span className="font-medium text-[var(--text-primary)]">Local Comment</span>
+                      <span className="text-[var(--text-muted)]">{filePath.split("/").pop()}:{lineNum}</span>
+                    </div>
+                    {lineComments.length > 0 && !isEditing && (
+                      <div>
+                        {lineComments.map((c) => (
+                          <CommentView key={c.id} comment={c} inline onSendToAgent={onAsk ? (cmt) => onAsk(`User comment on file \`${cmt.file}\` line ${cmt.line}:\n\n${cmt.comment}\n\nPlease analyze this line of code and suggest how to address it.`) : undefined} />
+                        ))}
+                      </div>
+                    )}
+                    {isEditing && (
+                      <CommentEditor
+                        file={filePath}
+                        line={lineNum}
+                        sendToAI={sendToAI}
+                        onSendToAIToggle={setSendToAI}
+                        onSubmit={handleEditorSubmit}
+                        onCancel={handleEditorCancel}
+                        baseUrl={baseUrl}
+                        embedded
+                      />
+                    )}
                   </div>
-                )}
-                {isEditing && (
-                  <CommentEditor
-                    file={filePath}
-                    line={lineNum}
-                    sendToAI={sendToAI}
-                    onSendToAIToggle={setSendToAI}
-                    onSubmit={handleEditorSubmit}
-                    onCancel={handleEditorCancel}
-                    baseUrl={baseUrl}
-                  />
                 )}
               </div>
             );

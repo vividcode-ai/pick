@@ -196,7 +196,7 @@ export function Layout({
                     ? "text-[var(--accent-primary)] bg-[var(--surface-hover)]"
                     : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                 }`}
-                title="打开终端"
+                title="Open Terminal"
               >
                 <Monitor className="w-4 h-4" />
               </button>
@@ -231,7 +231,7 @@ export function Layout({
                     ? "text-[var(--accent-primary)] bg-[var(--surface-hover)]"
                     : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                 }`}
-                title="打开终端"
+                title="Open Terminal"
               >
                 <Monitor className="w-4 h-4" />
               </button>

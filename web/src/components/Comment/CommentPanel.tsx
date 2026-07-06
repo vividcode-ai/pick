@@ -37,7 +37,7 @@ export function CommentPanel({ baseUrl, sessionId, onAsk, onClose }: CommentPane
 
   const handleSendToAgent = (comment: LineComment) => {
     if (!onAsk) return;
-    const prompt = `用户对文件 \`${comment.file}\` 第 ${comment.line} 行的评论:\n\n${comment.comment}\n\n请分析该行代码并给出处理建议。`;
+    const prompt = `User comment on file \`${comment.file}\` line ${comment.line}:\n\n${comment.comment}\n\nPlease analyze this line of code and suggest how to address it.`;
     onAsk(prompt);
   };
 

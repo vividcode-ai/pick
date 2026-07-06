@@ -15,6 +15,7 @@ interface CommentEditorProps {
   onSubmit: (comment: string) => void;
   onCancel: () => void;
   baseUrl?: string;
+  embedded?: boolean;
 }
 
 export function CommentEditor({
@@ -26,6 +27,7 @@ export function CommentEditor({
   onSubmit,
   onCancel,
   baseUrl,
+  embedded,
 }: CommentEditorProps) {
   const [text, setText] = useState(initialValue);
   const [mentionOpen, setMentionOpen] = useState(false);
@@ -124,16 +126,16 @@ export function CommentEditor({
     setText("");
   }, [text, onSubmit]);
 
-  const fileName = file.split("/").pop() || file;
-
   return (
-    <div className="border border-[var(--border-base)] rounded-lg bg-[var(--surface-base)] shadow-md mx-8 my-1">
-      <div className="flex items-center justify-between px-3 py-1.5 border-b border-[var(--border-base)]">
-        <span className="text-[10px] text-[var(--text-muted)]">
-          {fileName}:{line}
-        </span>
-        <span className="text-[10px] text-[var(--text-muted)]">Comment</span>
-      </div>
+    <div className={embedded ? "" : "border border-[var(--border-base)] rounded-lg bg-[var(--surface-base)] shadow-md mx-8 my-1"}>
+      {!embedded && (
+        <div className="flex items-center justify-between px-3 py-1.5 border-b border-[var(--border-base)]">
+          <span className="text-[10px] text-[var(--text-muted)]">
+            {file.split("/").pop() || file}:{line}
+          </span>
+          <span className="text-[10px] text-[var(--text-muted)]">Comment</span>
+        </div>
+      )}
 
       <div className="relative">
         <textarea
@@ -144,6 +146,7 @@ export function CommentEditor({
           placeholder="Write a comment... (@ to reference files)"
           rows={2}
           className="w-full resize-none px-3 py-1.5 text-xs bg-transparent text-[var(--text-primary)] outline-none placeholder-[var(--text-muted)] font-mono"
+          style={{ fieldSizing: "content" }}
         />
 
         {mentionOpen && mentionItems.length > 0 && (

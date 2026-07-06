@@ -29,7 +29,7 @@ export function TodoCard({ todos }: TodoCardProps) {
     <div className="rounded-xl border border-[var(--border-base)] bg-[var(--surface-secondary)] shadow-sm overflow-hidden">
       <div className="px-3 py-2.5 border-b border-[var(--border-base)]">
         <h3 className="text-xs font-semibold text-[var(--text-primary)] uppercase tracking-wider">
-          待办工具
+          Todo Tools
         </h3>
       </div>
       <div className="p-2 space-y-1">

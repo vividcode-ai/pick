@@ -80,7 +80,7 @@ export function DiffViewer({ diffText, filePath, baseUrl, onAsk, className }: Di
     if (!filePath || editingLine == null) return;
     addComment({ file: filePath, line: editingLine, comment, resolved: false });
     if (sendToAI && onAsk) {
-      onAsk(`用户对文件 \`${filePath}\` 第 ${editingLine} 行的评论:\n\n${comment}\n\n请分析该行代码并给出处理建议。`);
+      onAsk(`User comment on file \`${filePath}\` line ${editingLine}:\n\n${comment}\n\nPlease analyze this line of code and suggest how to address it.`);
     }
     setEditingLine(null);
   }, [filePath, editingLine, sendToAI, onAsk]);
@@ -146,7 +146,7 @@ export function DiffViewer({ diffText, filePath, baseUrl, onAsk, className }: Di
         {lineComments.length > 0 && !isEditing && (
           <div className="ml-8 border-l-2 border-[var(--accent-primary)]/30">
             {lineComments.map((c) => (
-              <CommentView key={c.id} comment={c} inline onSendToAgent={onAsk ? (cmt) => onAsk(`用户对文件 \`${cmt.file}\` 第 ${cmt.line} 行的评论:\n\n${cmt.comment}\n\n请分析该行代码并给出处理建议。`) : undefined} />
+              <CommentView key={c.id} comment={c} inline onSendToAgent={onAsk ? (cmt) => onAsk(`User comment on file \`${cmt.file}\` line ${cmt.line}:\n\n${cmt.comment}\n\nPlease analyze this line of code and suggest how to address it.`) : undefined} />
             ))}
           </div>
         )}
