@@ -74,6 +74,12 @@ export async function highlightCode(code: string, filePath: string): Promise<str
       '<button class="line-add-btn">+</button></div>\n'
     );
 
+    // Remove newlines between line-wrapper divs to prevent white-space:pre from creating extra blank lines
+    html = html.replace(
+      /<\/div>\n(?=<div class="line-wrapper")/g,
+      '</div>'
+    );
+
     html = html.replace(
       /<\/span>(<\/code>)/g,
       '<button class="line-add-btn">+</button></div>$1'
@@ -102,6 +108,12 @@ export async function highlightCode(code: string, filePath: string): Promise<str
     fallback = fallback.replace(
       /<\/span>(<\/code>)/g,
       '<button class="line-add-btn">+</button></div>$1'
+    );
+
+    // Remove newlines between line-wrapper divs
+    fallback = fallback.replace(
+      /<\/div>\n(?=<div class="line-wrapper")/g,
+      '</div>'
     );
     return fallback;
   }

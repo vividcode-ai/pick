@@ -6,10 +6,13 @@ interface McpServer {
   transport: string;
   tool_count: number;
   tool_names: string[];
+  tool_descriptions: string[];
   prompt_count: number;
   prompt_names: string[];
+  prompt_descriptions: string[];
   resource_count: number;
   resource_names: string[];
+  resource_descriptions: string[];
   is_connected: boolean;
 }
 
@@ -259,14 +262,19 @@ export function McpSection({ serverUrl }: McpSectionProps) {
                         <div className="text-xs font-medium text-[var(--text-secondary)] mb-1.5">
                           Tools ({srv.tool_count})
                         </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {srv.tool_names.map((tool) => (
-                            <span
+                        <div className="flex flex-col gap-1.5">
+                          {srv.tool_names.map((tool, i) => (
+                            <div
                               key={tool}
-                              className="px-2 py-0.5 rounded text-[11px] bg-blue-500/10 text-blue-400 border border-blue-500/20"
+                              className="px-2.5 py-1.5 rounded text-[11px] bg-blue-500/10 text-blue-400 border border-blue-500/20"
                             >
-                              {tool}
-                            </span>
+                              <div className="font-medium">{tool}</div>
+                              {srv.tool_descriptions[i] && (
+                                <div className="text-[10px] text-blue-300/70 mt-0.5 leading-tight">
+                                  {srv.tool_descriptions[i]}
+                                </div>
+                              )}
+                            </div>
                           ))}
                         </div>
                       </div>
@@ -276,14 +284,19 @@ export function McpSection({ serverUrl }: McpSectionProps) {
                         <div className="text-xs font-medium text-[var(--text-secondary)] mb-1.5">
                           Prompts ({srv.prompt_count})
                         </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {srv.prompt_names.map((prompt) => (
-                            <span
+                        <div className="flex flex-col gap-1.5">
+                          {srv.prompt_names.map((prompt, i) => (
+                            <div
                               key={prompt}
-                              className="px-2 py-0.5 rounded text-[11px] bg-purple-500/10 text-purple-400 border border-purple-500/20"
+                              className="px-2.5 py-1.5 rounded text-[11px] bg-purple-500/10 text-purple-400 border border-purple-500/20"
                             >
-                              {prompt}
-                            </span>
+                              <div className="font-medium">{prompt}</div>
+                              {srv.prompt_descriptions[i] && (
+                                <div className="text-[10px] text-purple-300/70 mt-0.5 leading-tight">
+                                  {srv.prompt_descriptions[i]}
+                                </div>
+                              )}
+                            </div>
                           ))}
                         </div>
                       </div>
@@ -293,14 +306,19 @@ export function McpSection({ serverUrl }: McpSectionProps) {
                         <div className="text-xs font-medium text-[var(--text-secondary)] mb-1.5">
                           Resources ({srv.resource_count})
                         </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {srv.resource_names.map((resource) => (
-                            <span
+                        <div className="flex flex-col gap-1.5">
+                          {srv.resource_names.map((resource, i) => (
+                            <div
                               key={resource}
-                              className="px-2 py-0.5 rounded text-[11px] bg-green-500/10 text-green-400 border border-green-500/20"
+                              className="px-2.5 py-1.5 rounded text-[11px] bg-green-500/10 text-green-400 border border-green-500/20"
                             >
-                              {resource}
-                            </span>
+                              <div className="font-medium">{resource}</div>
+                              {srv.resource_descriptions[i] && (
+                                <div className="text-[10px] text-green-300/70 mt-0.5 leading-tight">
+                                  {srv.resource_descriptions[i]}
+                                </div>
+                              )}
+                            </div>
                           ))}
                         </div>
                       </div>

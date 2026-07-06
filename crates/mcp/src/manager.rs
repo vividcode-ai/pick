@@ -15,10 +15,13 @@ pub struct ConnectedServerInfo {
     pub transport: String,
     pub tool_count: usize,
     pub tool_names: Vec<String>,
+    pub tool_descriptions: Vec<String>,
     pub prompt_count: usize,
     pub prompt_names: Vec<String>,
+    pub prompt_descriptions: Vec<String>,
     pub resource_count: usize,
     pub resource_names: Vec<String>,
+    pub resource_descriptions: Vec<String>,
     pub command: Option<String>,
     pub args: Option<Vec<String>>,
     pub url: Option<String>,
@@ -179,10 +182,13 @@ impl McpManager {
                     transport: config.transport_type().to_string(),
                     tool_count: 0,
                     tool_names: Vec::new(),
+                    tool_descriptions: Vec::new(),
                     prompt_count: 0,
                     prompt_names: Vec::new(),
+                    prompt_descriptions: Vec::new(),
                     resource_count: 0,
                     resource_names: Vec::new(),
+                    resource_descriptions: Vec::new(),
                     command: config.command.clone(),
                     args: config.args.clone(),
                     url: config.url.clone(),
@@ -203,17 +209,25 @@ impl McpManager {
 
 fn build_connected_info(c: &crate::client::ConnectedClient) -> ConnectedServerInfo {
     let tool_names: Vec<String> = c.tools.iter().map(|t| t.prefixed_name.clone()).collect();
+    let tool_descriptions: Vec<String> = c.tools.iter().map(|t| t.description.clone()).collect();
     let prompt_names: Vec<String> = c.prompts.iter().map(|p| p.name.clone()).collect();
+    let prompt_descriptions: Vec<String> =
+        c.prompts.iter().map(|p| p.description.clone()).collect();
     let resource_names: Vec<String> = c.resources.iter().map(|r| r.name.clone()).collect();
+    let resource_descriptions: Vec<String> =
+        c.resources.iter().map(|r| r.description.clone()).collect();
     ConnectedServerInfo {
         name: c.config.name.clone(),
         transport: c.config.transport_type().to_string(),
         tool_count: c.tools.len(),
         tool_names,
+        tool_descriptions,
         prompt_count: c.prompts.len(),
         prompt_names,
+        prompt_descriptions,
         resource_count: c.resources.len(),
         resource_names,
+        resource_descriptions,
         command: c.config.command.clone(),
         args: c.config.args.clone(),
         url: c.config.url.clone(),

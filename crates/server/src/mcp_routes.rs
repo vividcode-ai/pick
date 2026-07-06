@@ -30,10 +30,13 @@ pub struct McpServerStatus {
     pub transport: String,
     pub tool_count: usize,
     pub tool_names: Vec<String>,
+    pub tool_descriptions: Vec<String>,
     pub prompt_count: usize,
     pub prompt_names: Vec<String>,
+    pub prompt_descriptions: Vec<String>,
     pub resource_count: usize,
     pub resource_names: Vec<String>,
+    pub resource_descriptions: Vec<String>,
     pub is_connected: bool,
 }
 
@@ -56,10 +59,13 @@ pub async fn list_mcp_servers(State(state): State<Arc<AppState>>) -> impl IntoRe
             transport: i.transport,
             tool_count: i.tool_count,
             tool_names: i.tool_names,
+            tool_descriptions: i.tool_descriptions,
             prompt_count: i.prompt_count,
             prompt_names: i.prompt_names,
+            prompt_descriptions: i.prompt_descriptions,
             resource_count: i.resource_count,
             resource_names: i.resource_names,
+            resource_descriptions: i.resource_descriptions,
             is_connected: i.is_connected,
         })
         .collect();
