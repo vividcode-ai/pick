@@ -119,6 +119,33 @@ export async function highlightCode(code: string, filePath: string): Promise<str
   }
 }
 
+export async function highlightCodeLines(code: string, filePath: string): Promise<string[]> {
+  const ext = filePath.split(".").pop()?.toLowerCase() || "";
+  const lang = EXT_TO_LANG[ext] || ext;
+
+  try {
+    let html = await codeToHtml(code, { lang, theme: THEME });
+
+    const codeMatch = html.match(/<code>(.*?)<\/code>/s);
+    const codeContent = codeMatch ? codeMatch[1] : "";
+
+    const lines: string[] = [];
+    const lineRegex = /<span class="line">(.*?)<\/span>/gs;
+    let match;
+    while ((match = lineRegex.exec(codeContent)) !== null) {
+      lines.push(match[1]);
+    }
+
+    if (lines.length === 0) {
+      return code.split("\n").map((l) => escapeHtml(l));
+    }
+
+    return lines;
+  } catch {
+    return code.split("\n").map((l) => escapeHtml(l));
+  }
+}
+
 function escapeHtml(text: string): string {
   return text
     .replace(/&/g, "&amp;")

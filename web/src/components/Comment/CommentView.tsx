@@ -6,9 +6,10 @@ import { removeComment, resolveComment, unresolveComment } from "../../stores/co
 interface CommentViewProps {
   comment: LineComment;
   onSendToAgent?: (comment: LineComment) => void;
+  inline?: boolean;
 }
 
-export function CommentView({ comment, onSendToAgent }: CommentViewProps) {
+export function CommentView({ comment, onSendToAgent, inline }: CommentViewProps) {
   const [deleting, setDeleting] = useState(false);
 
   const handleDelete = () => {
@@ -27,7 +28,37 @@ export function CommentView({ comment, onSendToAgent }: CommentViewProps) {
     month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
   });
 
-  const fileName = comment.file.split("/").pop() || comment.file;
+  if (inline) {
+    return (
+      <div className={`mx-8 my-1 px-3 py-1.5 border border-[var(--border-base)] rounded-lg text-xs transition-colors ${
+        comment.resolved ? "opacity-50" : "bg-[var(--surface-base)]"
+      }`}>
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] text-[var(--text-muted)]">{timeStr}</span>
+          {comment.resolved && <span className="text-[10px] text-green-400">Resolved</span>}
+        </div>
+        <div className={`whitespace-pre-wrap leading-relaxed mt-0.5 ${comment.resolved ? "line-through" : ""}`}>
+          {comment.comment}
+        </div>
+        <div className="flex items-center gap-2 mt-1">
+          <button onClick={handleToggleResolve} className="text-[10px] text-[var(--text-muted)] hover:text-[var(--text-primary)]" title={comment.resolved ? "Reopen" : "Resolve"}>
+            {comment.resolved ? <RotateCw className="w-3 h-3" /> : <CheckCircle className="w-3 h-3" />}
+          </button>
+          {onSendToAgent && (
+            <button onClick={() => onSendToAgent(comment)} className="text-[10px] text-[var(--text-muted)] hover:text-[var(--text-primary)]" title="Ask AI">
+              <Send className="w-3 h-3" />
+            </button>
+          )}
+          <button onClick={handleDelete} className="text-[10px] text-red-400 hover:text-red-300" title="Delete">
+            <Trash2 className="w-3 h-3" />
+          </button>
+          <button onClick={() => setDeleting(false)} className="text-[10px] text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+            <MessageSquare className="w-3 h-3" /> Reply
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -37,7 +68,7 @@ export function CommentView({ comment, onSendToAgent }: CommentViewProps) {
     >
       <div className="flex items-center justify-between mb-1">
         <span className="text-[10px] text-[var(--text-muted)]">
-          <span className="font-medium text-[var(--text-primary)]">{fileName}</span>
+          <span className="font-medium text-[var(--text-primary)]">{comment.file.split("/").pop() || comment.file}</span>
           <span className="mx-1">:</span>
           <span className="font-mono">{comment.line}</span>
           <span className="mx-1">·</span>

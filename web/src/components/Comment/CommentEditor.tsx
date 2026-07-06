@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Send, X, Loader2 } from "lucide-react";
+import { Send, Loader2 } from "lucide-react";
 
 interface MentionItem {
   path: string;
@@ -127,25 +127,12 @@ export function CommentEditor({
   const fileName = file.split("/").pop() || file;
 
   return (
-    <div
-      className="fixed z-[2200] bg-[var(--surface-base)] border border-[var(--border-base)] rounded-lg shadow-2xl w-[380px]"
-      style={{
-        top: "50%",
-        left: "50%",
-        transform: "translate(-50%, -50%)",
-      }}
-      onMouseDown={(e) => e.stopPropagation()}
-    >
-      <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border-base)]">
+    <div className="border border-[var(--border-base)] rounded-lg bg-[var(--surface-base)] shadow-md mx-8 my-1">
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-[var(--border-base)]">
         <span className="text-[10px] text-[var(--text-muted)]">
           {fileName}:{line}
         </span>
-        <button
-          onClick={onCancel}
-          className="p-0.5 rounded hover:bg-[var(--surface-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-        >
-          <X className="w-3 h-3" />
-        </button>
+        <span className="text-[10px] text-[var(--text-muted)]">Comment</span>
       </div>
 
       <div className="relative">
@@ -155,14 +142,14 @@ export function CommentEditor({
           onChange={(e) => handleInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Write a comment... (@ to reference files)"
-          rows={3}
-          className="w-full resize-none px-3 py-2 text-xs bg-transparent text-[var(--text-primary)] outline-none placeholder-[var(--text-muted)] font-mono"
+          rows={2}
+          className="w-full resize-none px-3 py-1.5 text-xs bg-transparent text-[var(--text-primary)] outline-none placeholder-[var(--text-muted)] font-mono"
         />
 
         {mentionOpen && mentionItems.length > 0 && (
-          <div className="absolute bottom-full left-2 right-2 mb-1 bg-[var(--surface-elevated)] border border-[var(--border-base)] rounded-md shadow-lg max-h-[200px] overflow-auto z-10">
+          <div className="absolute bottom-full left-2 right-2 mb-1 bg-[var(--surface-elevated)] border border-[var(--border-base)] rounded-md shadow-lg max-h-[160px] overflow-auto z-10">
             {searching && (
-              <div className="flex items-center gap-2 px-3 py-2 text-xs text-[var(--text-muted)]">
+              <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-[var(--text-muted)]">
                 <Loader2 className="w-3 h-3 animate-spin" />
                 Searching...
               </div>
@@ -170,7 +157,7 @@ export function CommentEditor({
             {!searching && mentionItems.map((item, i) => (
               <div
                 key={item.path}
-                className={`flex items-center gap-2 px-3 py-1.5 text-xs cursor-pointer ${
+                className={`flex items-center gap-2 px-3 py-1 text-xs cursor-pointer ${
                   i === mentionIdx
                     ? "bg-[var(--surface-hover)] text-[var(--text-primary)]"
                     : "text-[var(--text-muted)] hover:bg-[var(--surface-hover)]"
@@ -178,7 +165,7 @@ export function CommentEditor({
                 onMouseDown={(e) => { e.preventDefault(); insertMention(item); }}
                 onMouseEnter={() => setMentionIdx(i)}
               >
-                <span>📄</span>
+                <span className="text-[11px]">📄</span>
                 <span className="truncate">{item.path}</span>
               </div>
             ))}
@@ -186,7 +173,7 @@ export function CommentEditor({
         )}
       </div>
 
-      <div className="flex items-center justify-between px-3 py-2 border-t border-[var(--border-base)]">
+      <div className="flex items-center justify-between px-3 py-1.5 border-t border-[var(--border-base)]">
         <label className="flex items-center gap-1.5 text-[10px] text-[var(--text-muted)] cursor-pointer">
           <input
             type="checkbox"
@@ -201,14 +188,14 @@ export function CommentEditor({
         <div className="flex items-center gap-2">
           <button
             onClick={onCancel}
-            className="px-2 py-1 text-[10px] rounded text-[var(--text-muted)] hover:bg-[var(--surface-hover)]"
+            className="px-2 py-0.5 text-[10px] rounded text-[var(--text-muted)] hover:bg-[var(--surface-hover)]"
           >
             Cancel
           </button>
           <button
             onClick={handleSubmit}
             disabled={!text.trim()}
-            className="px-3 py-1 text-[10px] font-medium rounded bg-[var(--accent-primary)] text-white hover:opacity-90 disabled:opacity-40"
+            className="px-3 py-0.5 text-[10px] font-medium rounded bg-[var(--accent-primary)] text-white hover:opacity-90 disabled:opacity-40"
           >
             Comment
           </button>

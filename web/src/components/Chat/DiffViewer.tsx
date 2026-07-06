@@ -46,10 +46,8 @@ export function DiffViewer({ diffText, filePath, baseUrl, onAsk, className }: Di
   const containerRef = useRef<HTMLDivElement>(null);
   const { hoveredLine } = useLineHover(containerRef);
 
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [editorLine, setEditorLine] = useState<number | null>(null);
+  const [editingLine, setEditingLine] = useState<number | null>(null);
   const [sendToAI, setSendToAI] = useState(false);
-  const [showComments, setShowComments] = useState<number | null>(null);
   const [fileComments, setFileComments] = useState<LineComment[]>([]);
 
   useEffect(() => {
@@ -74,29 +72,21 @@ export function DiffViewer({ diffText, filePath, baseUrl, onAsk, className }: Di
   const lines = useMemo(() => parseDiff(diffText), [diffText]);
 
   const handleBadgeClick = useCallback((line: number) => {
-    const comments = commentsByLine.get(line);
-    if (comments && comments.length > 0) {
-      setShowComments(showComments === line ? null : line);
-    } else {
-      setEditorLine(line);
-      setEditorOpen(true);
-      setSendToAI(false);
-    }
-  }, [commentsByLine, showComments]);
+    setEditingLine((prev) => (prev === line ? null : line));
+    setSendToAI(false);
+  }, []);
 
   const handleEditorSubmit = useCallback((comment: string) => {
-    if (!filePath || editorLine == null) return;
-    addComment({ file: filePath, line: editorLine, comment, resolved: false });
+    if (!filePath || editingLine == null) return;
+    addComment({ file: filePath, line: editingLine, comment, resolved: false });
     if (sendToAI && onAsk) {
-      onAsk(`用户对文件 \`${filePath}\` 第 ${editorLine} 行的评论:\n\n${comment}\n\n请分析该行代码并给出处理建议。`);
+      onAsk(`用户对文件 \`${filePath}\` 第 ${editingLine} 行的评论:\n\n${comment}\n\n请分析该行代码并给出处理建议。`);
     }
-    setEditorOpen(false);
-    setEditorLine(null);
-  }, [filePath, editorLine, sendToAI, onAsk]);
+    setEditingLine(null);
+  }, [filePath, editingLine, sendToAI, onAsk]);
 
   const handleEditorCancel = useCallback(() => {
-    setEditorOpen(false);
-    setEditorLine(null);
+    setEditingLine(null);
   }, []);
 
   if (!diffText) {
@@ -130,33 +120,46 @@ export function DiffViewer({ diffText, filePath, baseUrl, onAsk, className }: Di
 
     const typeClass = line.type === "add" ? "diff-line-add" : line.type === "remove" ? "diff-line-remove" : "";
     const displayLineNum = line.type === "remove" ? oldLineNum : newLineNum;
-    const hasComments = filePath && commentsByLine.has(displayLineNum);
     const isHoveredLine = filePath && hoveredLine === displayLineNum;
-    const showLineComments = filePath && showComments === displayLineNum;
+    const isEditing = filePath && editingLine === displayLineNum;
+    const lineComments = filePath ? (commentsByLine.get(displayLineNum) || []) : [];
 
     lineEls.push(
-      <div key={i} className={`diff-line ${typeClass} relative`}>
-        <span className="diff-line-number">
-          {line.type === "remove" || line.type === "context" ? String(oldLineNum) : ""}
-        </span>
-        <span className="diff-line-number relative">
-          {filePath && (
-            <CommentBadge
-              line={displayLineNum}
-              hasComments={!!hasComments}
-              isHovered={!!isHoveredLine}
-              onClick={() => handleBadgeClick(displayLineNum)}
-            />
-          )}
-          {line.type === "add" || line.type === "context" ? String(newLineNum) : ""}
-        </span>
-        <span className="diff-line-content">{line.content}</span>
-        {showLineComments && hasComments && (
-          <div className="absolute left-0 right-0 top-full z-10 bg-[var(--surface-base)] border border-[var(--border-base)] rounded shadow-lg">
-            {commentsByLine.get(displayLineNum)?.map((c) => (
-              <CommentView key={c.id} comment={c} onSendToAgent={onAsk ? (cmt) => onAsk(`用户对文件 \`${cmt.file}\` 第 ${cmt.line} 行的评论:\n\n${cmt.comment}\n\n请分析该行代码并给出处理建议。`) : undefined} />
+      <div key={i}>
+        <div className={`diff-line ${typeClass} relative cursor-pointer`} onClick={() => filePath && handleBadgeClick(displayLineNum)}>
+          <span className="diff-line-number">
+            {line.type === "remove" || line.type === "context" ? String(oldLineNum) : ""}
+          </span>
+          <span className="diff-line-number relative">
+            {filePath && (
+              <CommentBadge
+                line={displayLineNum}
+                hasComments={lineComments.length > 0}
+                isHovered={!!isHoveredLine}
+                onClick={() => handleBadgeClick(displayLineNum)}
+              />
+            )}
+            {line.type === "add" || line.type === "context" ? String(newLineNum) : ""}
+          </span>
+          <span className="diff-line-content">{line.content}</span>
+        </div>
+        {lineComments.length > 0 && !isEditing && (
+          <div className="ml-8 border-l-2 border-[var(--accent-primary)]/30">
+            {lineComments.map((c) => (
+              <CommentView key={c.id} comment={c} inline onSendToAgent={onAsk ? (cmt) => onAsk(`用户对文件 \`${cmt.file}\` 第 ${cmt.line} 行的评论:\n\n${cmt.comment}\n\n请分析该行代码并给出处理建议。`) : undefined} />
             ))}
           </div>
+        )}
+        {isEditing && filePath && (
+          <CommentEditor
+            file={filePath}
+            line={displayLineNum}
+            sendToAI={sendToAI}
+            onSendToAIToggle={setSendToAI}
+            onSubmit={handleEditorSubmit}
+            onCancel={handleEditorCancel}
+            baseUrl={baseUrl}
+          />
         )}
       </div>
     );
@@ -165,21 +168,6 @@ export function DiffViewer({ diffText, filePath, baseUrl, onAsk, className }: Di
   return (
     <div ref={containerRef} className={`diff-viewer ${className ?? ""}`}>
       {lineEls}
-
-      {editorOpen && editorLine != null && filePath && (
-        <>
-          <div className="fixed inset-0 z-[2199] bg-black/30" onClick={handleEditorCancel} />
-          <CommentEditor
-            file={filePath}
-            line={editorLine}
-            sendToAI={sendToAI}
-            onSendToAIToggle={setSendToAI}
-            onSubmit={handleEditorSubmit}
-            onCancel={handleEditorCancel}
-            baseUrl={baseUrl}
-          />
-        </>
-      )}
     </div>
   );
 }
