@@ -20,6 +20,8 @@ interface LayoutProps {
   onCommitRequest?: (message: string) => void;
   baseUrl?: string;
   onAsk?: ((prompt: string) => void) | null;
+  provider?: string;
+  modelId?: string;
   children: ReactNode;
 }
 
@@ -39,6 +41,8 @@ export function Layout({
   onCommitRequest,
   baseUrl,
   onAsk,
+  provider,
+  modelId,
   children,
 }: LayoutProps) {
   const [rightPanelOpenLocal, setRightPanelOpenLocal] = useState(false);
@@ -177,6 +181,8 @@ export function Layout({
             onFullscreenChange={setTerminalFullscreen}
             sessionId={sessionId ?? null}
             onAsk={onAsk}
+            provider={provider}
+            modelId={modelId}
           />
         )}
 

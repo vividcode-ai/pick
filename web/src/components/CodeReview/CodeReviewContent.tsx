@@ -15,9 +15,11 @@ interface CodeReviewContentProps {
   baseUrl: string;
   sessionId: string | null;
   onAsk?: ((prompt: string) => void) | null;
+  provider?: string;
+  modelId?: string;
 }
 
-export function CodeReviewContent({ baseUrl, sessionId, onAsk }: CodeReviewContentProps) {
+export function CodeReviewContent({ baseUrl, sessionId, onAsk, provider, modelId }: CodeReviewContentProps) {
   // ── URL builder: use session endpoint when available, standalone otherwise ──
   const gitApi = useCallback((path: string) => {
     const base = sessionId ? `${baseUrl}/sessions/${sessionId}` : baseUrl;
@@ -196,10 +198,13 @@ export function CodeReviewContent({ baseUrl, sessionId, onAsk }: CodeReviewConte
       // ── Resolve session: use existing or auto-create ──
       let sid = sessionId;
       if (!sid) {
+        const body: Record<string, string> = {};
+        if (provider) body.provider = provider;
+        if (modelId) body.model_id = modelId;
         const createRes = await fetch(`${baseUrl}/sessions`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({}),
+          body: JSON.stringify(body),
         });
         if (!createRes.ok) throw new Error("Failed to create session");
         const { session_id } = await createRes.json();
@@ -252,7 +257,7 @@ export function CodeReviewContent({ baseUrl, sessionId, onAsk }: CodeReviewConte
       setReviewState("error");
       setReviewError(e.message || "Failed to start review");
     }
-  }, [baseUrl, sessionId]);
+  }, [baseUrl, sessionId, provider, modelId]);
 
   // ── Apply AI review as inline comments ──
   const handleApplyAsComments = useCallback(() => {

@@ -1,9 +1,8 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { ChevronDown, Check, Plus, Clock, Search } from "lucide-react";
+import { ChevronDown, Plus, Search } from "lucide-react";
 import fuzzysort from "fuzzysort";
 import type { ProviderInfo, FlatModel } from "../../types/events";
 import { openSettings } from "../../stores/settings";
-import { ModelTooltip } from "./ModelTooltip";
 
 interface ModelSelectorProps {
   providers: ProviderInfo[];
@@ -62,32 +61,8 @@ const PROVIDER_COLORS: Record<string, string> = {
   "xiaomi": "#ff6900",
 };
 
-const RECENT_MODELS_KEY = "pick_recent_models";
-const RECENT_LIMIT = 5;
-
 function getProviderColor(provider: string): string {
   return PROVIDER_COLORS[provider] || "#64748b";
-}
-
-function getRecentModels(): string[] {
-  try {
-    const raw = localStorage.getItem(RECENT_MODELS_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveRecentModels(ids: string[]) {
-  localStorage.setItem(RECENT_MODELS_KEY, JSON.stringify(ids.slice(0, RECENT_LIMIT)));
-}
-
-function pushRecentModel(provider: string, modelId: string) {
-  const key = `${provider}/${modelId}`;
-  const recent = getRecentModels();
-  const filtered = recent.filter((k) => k !== key);
-  filtered.unshift(key);
-  saveRecentModels(filtered);
 }
 
 export function ModelSelector({
@@ -125,19 +100,7 @@ export function ModelSelector({
       );
   }, [providers, displayNameCache]);
 
-  const recentKeys = useMemo(() => getRecentModels(), [open]);
-
   const [searchQuery, setSearchQuery] = useState("");
-
-  const recentSet = useMemo(() => {
-    const set = new Set(recentKeys);
-    return set;
-  }, [recentKeys]);
-
-  const recentModels: FlatModel[] = useMemo(() => {
-    const map = new Map(allModels.map((m) => [`${m.provider}/${m.id}`, m]));
-    return recentKeys.map((k) => map.get(k)).filter((m): m is FlatModel => !!m);
-  }, [allModels, recentKeys]);
 
   const selectedDetail = useMemo(
     () => allModels.find((m) => m.id === selectedModel && m.provider === selectedProvider) || null,
@@ -148,14 +111,10 @@ export function ModelSelector({
     (item: FlatModel | undefined) => {
       if (!item) return;
       onModelChange(item.id, item.provider);
-      pushRecentModel(item.provider, item.id);
       setOpen(false);
     },
     [onModelChange]
   );
-
-  const recentKeysRef = useRef(recentKeys);
-  recentKeysRef.current = recentKeys;
 
   return (
     <div className="relative" ref={containerRef}>
@@ -215,8 +174,6 @@ export function ModelSelector({
               <ModelListContent
                 allModels={allModels}
                 searchQuery={searchQuery}
-                recentModels={recentModels}
-                recentKeys={recentKeys}
                 selectedModel={selectedModel}
                 selectedProvider={selectedProvider}
                 onSelect={handleSelect}
@@ -242,13 +199,11 @@ export function ModelSelector({
   );
 }
 
-// ── Model list content with fuzzy search, recent section, tooltips ──
+// ── Model list content with fuzzy search ──
 
 interface ModelListContentProps {
   allModels: FlatModel[];
   searchQuery: string;
-  recentModels: FlatModel[];
-  recentKeys: string[];
   selectedModel: string;
   selectedProvider?: string;
   onSelect: (item: FlatModel) => void;
@@ -257,8 +212,6 @@ interface ModelListContentProps {
 function ModelListContent({
   allModels,
   searchQuery,
-  recentModels,
-  recentKeys,
   selectedModel,
   selectedProvider,
   onSelect,
@@ -280,24 +233,16 @@ function ModelListContent({
     return results.map((r) => r.obj);
   }, [allModels, searchQuery, isSearching]);
 
-  const recentSet = useMemo(() => new Set(recentKeys), [recentKeys]);
-
   const groupMap = useMemo(() => {
     const groups = new Map<string, FlatModel[]>();
-
-    if (!isSearching && recentModels.length > 0) {
-      groups.set("\x00Recent", recentModels);
-    }
-
     const source = isSearching ? filteredModels : allModels;
     for (const m of source) {
-      if (!isSearching && recentSet.has(`${m.provider}/${m.id}`)) continue;
       const cat = m.providerDisplayName;
       if (!groups.has(cat)) groups.set(cat, []);
       groups.get(cat)!.push(m);
     }
     return groups;
-  }, [isSearching, recentModels, filteredModels, allModels, recentSet]);
+  }, [isSearching, filteredModels, allModels]);
 
   const sortedGroups = useMemo(() => {
     return Array.from(groupMap.entries())
@@ -305,11 +250,7 @@ function ModelListContent({
         category: cat,
         items: items.sort((a, b) => a.name.localeCompare(b.name)),
       }))
-      .sort((a, b) => {
-        if (a.category === "\x00Recent") return -1;
-        if (b.category === "\x00Recent") return 1;
-        return a.category.localeCompare(b.category);
-      });
+      .sort((a, b) => a.category.localeCompare(b.category));
   }, [groupMap]);
 
   const flatList = useMemo(() => sortedGroups.flatMap((g) => g.items), [sortedGroups]);
@@ -382,62 +323,38 @@ function ModelListContent({
 
   return (
     <div ref={scrollRef} className="flex-1 overflow-y-auto max-h-[260px] min-h-0" onKeyDown={handleKeyDown} tabIndex={-1}>
-      {sortedGroups.map((group) => {
-        const isRecent = group.category === "\x00Recent";
-        return (
-          <div key={group.category}>
-            <div className="sticky top-0 z-[1] px-3 py-1 text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider bg-[var(--surface-base)] border-b border-[var(--border-base)]">
-              {isRecent ? (
-                <div className="flex items-center gap-1.5 normal-case">
-                  <Clock className="w-3 h-3" />
-                  <span>Recent</span>
-                </div>
-              ) : (
-                group.category
-              )}
-            </div>
-            {group.items.map((item) => {
-              const key = `${item.provider}/${item.id}`;
-              const globalIdx = flatList.indexOf(item);
-              const selected = item.id === selectedModel && item.provider === selectedProvider;
-              const highlighted = globalIdx === activeIdx;
-              return (
-                <div
-                  key={key}
-                  ref={(el) => setRowRef(key, el)}
-                  className="group relative flex items-center gap-2 px-3 py-1.5 cursor-pointer text-xs"
-                  style={{
-                    backgroundColor: highlighted
-                      ? "var(--surface-hover)"
-                      : selected
-                        ? "color-mix(in oklab, var(--accent-primary) 12%, var(--surface-base))"
-                        : "transparent",
-                    color: "var(--text-primary)",
-                  }}
-                  onClick={() => onSelect(item)}
-                  onMouseEnter={() => { setMouseActive(true); setActiveIdx(globalIdx); }}
-                >
-                  <span
-                    className="w-2 h-2 rounded-full shrink-0"
-                    style={{ backgroundColor: getProviderColor(item.provider) }}
-                  />
-                  <span className="truncate flex-1">{item.name}</span>
-                  {selected && (
-                    <Check className="w-3 h-3 shrink-0 text-[var(--accent-primary)]" />
-                  )}
-
-                  {/* Tooltip on hover */}
-                  <div className="absolute left-full top-0 ml-2 invisible group-hover:visible z-10 pointer-events-none">
-                    <div className="bg-[var(--surface-elevated)] border border-[var(--border-base)] rounded-md shadow-lg px-3 py-2 whitespace-nowrap">
-                      <ModelTooltip model={item} providerName={item.providerDisplayName} />
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+      {sortedGroups.map((group) => (
+        <div key={group.category}>
+          <div className="sticky top-0 z-[1] px-3 py-1 text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider bg-[var(--surface-base)] border-b border-[var(--border-base)]">
+            {group.category}
           </div>
-        );
-      })}
+          {group.items.map((item) => {
+            const key = `${item.provider}/${item.id}`;
+            const globalIdx = flatList.indexOf(item);
+            const selected = item.id === selectedModel && item.provider === selectedProvider;
+            const highlighted = globalIdx === activeIdx;
+            return (
+              <div
+                key={key}
+                ref={(el) => setRowRef(key, el)}
+                className="px-3 py-1.5 cursor-pointer text-xs"
+                style={{
+                  backgroundColor: highlighted
+                    ? "var(--surface-hover)"
+                    : selected
+                      ? "color-mix(in oklab, var(--accent-primary) 12%, var(--surface-base))"
+                      : "transparent",
+                  color: "var(--text-primary)",
+                }}
+                onClick={() => onSelect(item)}
+                onMouseEnter={() => { setMouseActive(true); setActiveIdx(globalIdx); }}
+              >
+                {item.name}
+              </div>
+            );
+          })}
+        </div>
+      ))}
     </div>
   );
 }

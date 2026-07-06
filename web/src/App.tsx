@@ -400,6 +400,8 @@ export default function App() {
         onCommitRequest={handleCommitRequest}
         baseUrl={baseUrl}
         onAsk={handleAsk}
+        provider={selectedProvider}
+        modelId={selectedModel}
         leftPanel={
           <LeftPanel
             onNewSession={handleNewSession}

@@ -25,9 +25,11 @@ interface TerminalPanelProps {
   onFullscreenChange?: (fullscreen: boolean) => void;
   sessionId: string | null;
   onAsk?: ((prompt: string) => void) | null;
+  provider?: string;
+  modelId?: string;
 }
 
-export function TerminalPanel({ baseUrl, visible, onClose, onFullscreenChange, sessionId, onAsk }: TerminalPanelProps) {
+export function TerminalPanel({ baseUrl, visible, onClose, onFullscreenChange, sessionId, onAsk, provider, modelId }: TerminalPanelProps) {
   const [tabs, setTabs] = useState<TabItem[]>([{ id: 0, kind: "terminal" }]);
   const [activeIdx, setActiveIdx] = useState(0);
   const [panelHeight, setPanelHeight] = useState(200);
@@ -535,7 +537,7 @@ export function TerminalPanel({ baseUrl, visible, onClose, onFullscreenChange, s
                   className="h-full"
                 />
               ) : tab.kind === "codereview" ? (
-                <CodeReviewContent baseUrl={baseUrl} sessionId={sessionId} onAsk={onAsk} />
+                <CodeReviewContent baseUrl={baseUrl} sessionId={sessionId} onAsk={onAsk} provider={provider} modelId={modelId} />
               ) : (
                 <FileBrowserContent baseUrl={baseUrl} onAsk={onAsk} />
               )}
