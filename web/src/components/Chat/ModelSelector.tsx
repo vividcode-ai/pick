@@ -427,7 +427,7 @@ function ModelListContent({
                   )}
 
                   {/* Tooltip on hover */}
-                  <div className="absolute left-full top-0 ml-2 hidden group-hover:block z-10 pointer-events-none">
+                  <div className="absolute left-full top-0 ml-2 invisible group-hover:visible z-10 pointer-events-none">
                     <div className="bg-[var(--surface-elevated)] border border-[var(--border-base)] rounded-md shadow-lg px-3 py-2 whitespace-nowrap">
                       <ModelTooltip model={item} providerName={item.providerDisplayName} />
                     </div>
