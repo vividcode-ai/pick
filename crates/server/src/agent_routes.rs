@@ -43,6 +43,12 @@ pub(super) struct PromptsUpdate {
     scope: String,
 }
 
+#[derive(Deserialize)]
+pub(super) struct PromptsDelete {
+    scope: String,
+    target: String,
+}
+
 /// GET /agent/prompts — return SYSTEM.md and APPEND_SYSTEM.md content for both scopes
 pub(super) async fn get_prompts(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let cwd = state
@@ -117,6 +123,35 @@ pub(super) async fn update_prompts(
                 .into_response();
         }
     }
+
+    Json(serde_json::json!({"status": "ok"})).into_response()
+}
+
+/// DELETE /agent/prompts — remove SYSTEM.md or APPEND_SYSTEM.md for a given scope
+pub(super) async fn delete_prompts(
+    State(state): State<Arc<AppState>>,
+    Json(delete): Json<PromptsDelete>,
+) -> impl IntoResponse {
+    let cwd = state
+        .config
+        .cwd
+        .as_deref()
+        .map(Path::new)
+        .unwrap_or_else(|| Path::new("."));
+    let agent_dir = pick_agent::system_prompt::get_agent_dir();
+    let scope = if delete.scope == "global" {
+        "global"
+    } else {
+        "project"
+    };
+
+    let filename = match delete.target.as_str() {
+        "append_prompt" => "APPEND_SYSTEM.md",
+        _ => "SYSTEM.md",
+    };
+
+    let path = scope_path(cwd, &agent_dir, scope, filename);
+    let _ = std::fs::remove_file(&path);
 
     Json(serde_json::json!({"status": "ok"})).into_response()
 }

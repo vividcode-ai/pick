@@ -319,7 +319,9 @@ pub fn create_app(state: Arc<AppState>) -> Router {
         )
         .route(
             "/agent/prompts",
-            get(agent_routes::get_prompts).put(agent_routes::update_prompts),
+            get(agent_routes::get_prompts)
+                .put(agent_routes::update_prompts)
+                .delete(agent_routes::delete_prompts),
         )
         .route(
             "/settings",

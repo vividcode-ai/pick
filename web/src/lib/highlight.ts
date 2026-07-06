@@ -1,4 +1,4 @@
-import { codeToHtml } from "shiki";
+import { codeToHtml, codeToTokens } from "shiki";
 
 const EXT_TO_LANG: Record<string, string> = {
   ts: "typescript", tsx: "tsx", js: "javascript", jsx: "jsx", mjs: "javascript", cjs: "javascript",
@@ -124,23 +124,17 @@ export async function highlightCodeLines(code: string, filePath: string): Promis
   const lang = EXT_TO_LANG[ext] || ext;
 
   try {
-    let html = await codeToHtml(code, { lang, theme: THEME });
+    const { tokens } = await codeToTokens(code, { lang: lang as any, theme: THEME });
 
-    const codeMatch = html.match(/<code>(.*?)<\/code>/s);
-    const codeContent = codeMatch ? codeMatch[1] : "";
-
-    const lines: string[] = [];
-    const lineRegex = /<span class="line">(.*?)<\/span>/gs;
-    let match;
-    while ((match = lineRegex.exec(codeContent)) !== null) {
-      lines.push(match[1]);
-    }
-
-    if (lines.length === 0) {
-      return code.split("\n").map((l) => escapeHtml(l));
-    }
-
-    return lines;
+    return tokens.map((line) => {
+      if (line.length === 0) return "";
+      return line
+        .map((token) => {
+          const color = token.color || "var(--text-primary)";
+          return `<span style="color:${color}">${escapeHtml(token.content)}</span>`;
+        })
+        .join("");
+    });
   } catch {
     return code.split("\n").map((l) => escapeHtml(l));
   }
