@@ -212,17 +212,15 @@ export function ModelSelector({
               </div>
 
               {/* Results */}
-              <div className="flex-1 overflow-y-auto max-h-[260px]">
-                <ModelListContent
-                  allModels={allModels}
-                  searchQuery={searchQuery}
-                  recentModels={recentModels}
-                  recentKeys={recentKeys}
-                  selectedModel={selectedModel}
-                  selectedProvider={selectedProvider}
-                  onSelect={handleSelect}
-                />
-              </div>
+              <ModelListContent
+                allModels={allModels}
+                searchQuery={searchQuery}
+                recentModels={recentModels}
+                recentKeys={recentKeys}
+                selectedModel={selectedModel}
+                selectedProvider={selectedProvider}
+                onSelect={handleSelect}
+              />
             </div>
 
             <div className="border-t border-[var(--border-base)]">
@@ -383,7 +381,7 @@ function ModelListContent({
   }
 
   return (
-    <div ref={scrollRef} className="min-h-0" onKeyDown={handleKeyDown} tabIndex={-1}>
+    <div ref={scrollRef} className="flex-1 overflow-y-auto max-h-[260px] min-h-0" onKeyDown={handleKeyDown} tabIndex={-1}>
       {sortedGroups.map((group) => {
         const isRecent = group.category === "\x00Recent";
         return (
