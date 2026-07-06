@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { ChevronDown, Plus, Search, Check } from "lucide-react";
 import fuzzysort from "fuzzysort";
 import type { ProviderInfo, FlatModel } from "../../types/events";
-import { openSettings } from "../../stores/settings";
+import { ModelManageDialog } from "./ModelManageDialog";
 
 interface ModelSelectorProps {
   providers: ProviderInfo[];
@@ -12,7 +12,7 @@ interface ModelSelectorProps {
   disabled?: boolean;
 }
 
-const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
+export const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
   "anthropic": "Anthropic",
   "amazon-bedrock": "Amazon Bedrock",
   "azure-openai-responses": "Azure OpenAI",
@@ -73,6 +73,7 @@ export function ModelSelector({
   disabled,
 }: ModelSelectorProps) {
   const [open, setOpen] = useState(false);
+  const [manageOpen, setManageOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -163,7 +164,7 @@ export function ModelSelector({
                 <button
                   className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors"
                   title="Manage models"
-                  onClick={() => { setOpen(false); openSettings("providers"); }}
+                  onClick={() => { setOpen(false); setManageOpen(true); }}
                   tabIndex={-1}
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -181,6 +182,16 @@ export function ModelSelector({
             </div>
           </div>
         </>
+      )}
+
+      {manageOpen && (
+        <ModelManageDialog
+          providers={providers}
+          selectedModel={selectedModel}
+          selectedProvider={selectedProvider}
+          onModelSelect={onModelChange}
+          onClose={() => setManageOpen(false)}
+        />
       )}
     </div>
   );
@@ -324,7 +335,7 @@ function ModelListContent({
               <div
                 key={key}
                 ref={(el) => setRowRef(key, el)}
-                className="px-3 py-1.5 cursor-pointer text-xs"
+                className="flex items-center gap-2 px-3 py-1.5 cursor-pointer text-xs"
                 style={{
                   backgroundColor: highlighted
                     ? "var(--surface-hover)"
