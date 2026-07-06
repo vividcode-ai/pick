@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { ChevronDown, Plus, Search } from "lucide-react";
+import { ChevronDown, Plus, Search, Check } from "lucide-react";
 import fuzzysort from "fuzzysort";
 import type { ProviderInfo, FlatModel } from "../../types/events";
 import { openSettings } from "../../stores/settings";
@@ -123,7 +123,7 @@ export function ModelSelector({
           setOpen((v) => !v);
         }}
         disabled={disabled}
-        className="selector-trigger max-w-[140px]"
+        className="selector-trigger"
       >
         {selectedDetail && (
           <span
@@ -178,19 +178,6 @@ export function ModelSelector({
                 selectedProvider={selectedProvider}
                 onSelect={handleSelect}
               />
-            </div>
-
-            <div className="border-t border-[var(--border-base)]">
-              <button
-                className="w-full px-3 py-2 text-xs text-center text-[var(--text-muted)] hover:text-[var(--accent-primary)] hover:bg-[var(--surface-hover)] transition-colors border-none bg-transparent cursor-pointer"
-                onClick={() => {
-                  setOpen(false);
-                  openSettings("providers");
-                }}
-              >
-                <Plus className="w-3 h-3 inline mr-1 -mt-0.5" />
-                Configure providers
-              </button>
             </div>
           </div>
         </>
@@ -349,7 +336,10 @@ function ModelListContent({
                 onClick={() => onSelect(item)}
                 onMouseEnter={() => { setMouseActive(true); setActiveIdx(globalIdx); }}
               >
-                {item.name}
+                <span className="truncate">{item.name}</span>
+                {selected && (
+                  <Check className="w-3 h-3 shrink-0 text-[var(--accent-primary)] ml-auto" />
+                )}
               </div>
             );
           })}
