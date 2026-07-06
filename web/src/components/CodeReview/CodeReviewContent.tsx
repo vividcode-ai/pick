@@ -185,21 +185,48 @@ export function CodeReviewContent({ baseUrl, sessionId, onAsk }: CodeReviewConte
 
   // ── Handle AI Review ──
   const handleStartReview = useCallback(async () => {
-    if (!sessionId) return;
     setReviewState("streaming");
     setReviewText("");
+    setReviewError(null);
+
+    // Close any existing EventSource
+    eventSourceRef.current?.close();
 
     try {
-      const res = await fetch(`${baseUrl}/review/${sessionId}`, {
+      // ── Resolve session: use existing or auto-create ──
+      let sid = sessionId;
+      if (!sid) {
+        const createRes = await fetch(`${baseUrl}/sessions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        });
+        if (!createRes.ok) throw new Error("Failed to create session");
+        const { session_id } = await createRes.json();
+        sid = session_id;
+      }
+
+      // ── Establish SSE connection (must be open before /review) ──
+      const es = new EventSource(`${baseUrl}/events/${sid}`);
+      eventSourceRef.current = es;
+
+      await Promise.race([
+        new Promise<void>((resolve, reject) => {
+          es.onopen = () => resolve();
+          es.onerror = () => reject(new Error("SSE connection failed"));
+        }),
+        new Promise<void>((resolve) => setTimeout(() => resolve(), 5000)),
+      ]);
+
+      // ── Start review ──
+      const reviewRes = await fetch(`${baseUrl}/review/${sid}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!reviewRes.ok) throw new Error(`HTTP ${reviewRes.status}`);
 
-      const es = new EventSource(`${baseUrl}/events/${sessionId}`);
-      eventSourceRef.current = es;
-
+      // ── Listen for streaming results ──
       es.addEventListener("message_update", (e) => {
         try {
           const payload = JSON.parse(e.data);
