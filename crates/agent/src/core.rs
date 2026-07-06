@@ -1,6 +1,7 @@
 //! Agent core module
 
 pub mod agent_loop;
+pub mod agent_mode;
 pub mod compaction;
 pub mod config;
 pub mod diagnostics;

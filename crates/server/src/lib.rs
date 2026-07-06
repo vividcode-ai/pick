@@ -1,3 +1,4 @@
+pub mod agent_routes;
 pub mod approval;
 pub mod comments_routes;
 pub mod docs;
@@ -79,12 +80,32 @@ impl AppState {
     }
 
     pub fn build_system_prompt(&self, provider: &str, model_id: &str) -> String {
-        format!(
-            "You are Pick, an AI-powered coding assistant.\n\
-             You help users with software engineering tasks.\n\
-             You can use tools to read, write, edit files, run commands, search code, etc.\n\
-             Provider: {}  Model: {}",
-            provider, model_id
+        use pick_agent::system_prompt;
+        use std::path::Path;
+
+        let cwd = self
+            .config
+            .cwd
+            .as_deref()
+            .map(Path::new)
+            .unwrap_or_else(|| Path::new("."));
+        let agent_dir = system_prompt::get_agent_dir();
+        let tools = self.get_tools();
+
+        let context_files = system_prompt::load_project_context_files(cwd, &agent_dir);
+
+        let custom = system_prompt::discover_custom_prompt(&agent_dir, cwd);
+        let append = system_prompt::discover_append_prompt(&agent_dir, cwd);
+        let mut append_parts = append;
+        append_parts.push(format!("Provider: {}  Model: {}", provider, model_id));
+
+        system_prompt::build_system_prompt_with_defaults(
+            &tools,
+            &[],
+            &context_files,
+            custom.as_deref(),
+            Some(&append_parts.join("\n")),
+            cwd,
         )
     }
 
@@ -295,6 +316,10 @@ pub fn create_app(state: Arc<AppState>) -> Router {
         .route(
             "/mcp/{name}/reconnect",
             post(mcp_routes::reconnect_mcp_server),
+        )
+        .route(
+            "/agent/prompts",
+            get(agent_routes::get_prompts).put(agent_routes::update_prompts),
         )
         .route(
             "/settings",

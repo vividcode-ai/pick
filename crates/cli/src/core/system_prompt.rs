@@ -1,14 +1,13 @@
-//! System prompt construction and project context loading
+//! CLI-specific system prompt construction — delegates to pick-agent for core logic
 
-use std::collections::HashMap;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use crate::config::{get_docs_path, get_examples_path, get_readme_path};
 use crate::core::agent_mode::AgentMode;
-use crate::core::resource_loader::ContextFile;
-use pick_agent::core::state::AgentTool;
 use pick_agent::skills::{Skill, format_skills_for_prompt};
+use pick_agent::system_prompt::{ContextFile, ContextFileRef};
+use pick_agent::system_prompt::{build_context_file_refs, build_tool_names, build_tool_snippets};
 
 /// Options for building a system prompt
 pub struct BuildSystemPromptOptions<'a> {
@@ -32,81 +31,20 @@ pub struct BuildSystemPromptOptions<'a> {
     pub agent_mode: Option<&'a AgentMode>,
 }
 
-/// Reference to a context file for the system prompt
-pub struct ContextFileRef<'a> {
-    pub path: &'a str,
-    pub content: &'a str,
-}
-
-/// Build the system prompt with tools, guidelines, and context
-pub fn build_system_prompt(options: BuildSystemPromptOptions) -> String {
-    let custom_prompt = options.custom_prompt;
-    let selected_tools = options.selected_tools;
-    let tool_snippets = options.tool_snippets;
-    let prompt_guidelines = options.prompt_guidelines;
-    let append_system_prompt = options.append_system_prompt;
-    let cwd = options.cwd;
-    let context_files = options.context_files.unwrap_or(&[]);
-    let skills = options.skills.unwrap_or(&[]);
-
+/// Build the CLI default prompt string
+fn build_cli_default_prompt(
+    selected_tools: Option<&[String]>,
+    tool_snippets: Option<&HashMap<String, String>>,
+    prompt_guidelines: Option<&[String]>,
+    cwd: &Path,
+    context_files: &[ContextFileRef],
+    skills: &[Skill],
+    agent_mode: Option<&str>,
+) -> String {
     let prompt_cwd = cwd.to_string_lossy().replace('\\', "/");
 
     let now = chrono::Local::now();
     let date = now.format("%Y-%m-%d").to_string();
-
-    let append_section = append_system_prompt
-        .filter(|s| !s.is_empty())
-        .map(|s| format!("\n\n{}", s))
-        .unwrap_or_default();
-
-    if let Some(custom) = custom_prompt {
-        let mut prompt = custom.to_string();
-
-        if !append_section.is_empty() {
-            prompt.push_str(&append_section);
-        }
-
-        // Append project context files
-        if !context_files.is_empty() {
-            prompt.push_str("\n\n<project_context>\n\n");
-            prompt.push_str("Project-specific instructions and guidelines:\n\n");
-            for ctx in context_files {
-                prompt.push_str(&format!(
-                    "<project_instructions path=\"{}\">\n{}\n</project_instructions>\n\n",
-                    ctx.path, ctx.content
-                ));
-            }
-            prompt.push_str("</project_context>\n");
-        }
-
-        // Append skills section if read tool is available
-        let has_read = selected_tools
-            .map(|t| t.iter().any(|t| t == "read"))
-            .unwrap_or(true);
-        if has_read && !skills.is_empty() {
-            prompt.push_str(&format_skills_for_prompt(skills));
-        }
-
-        prompt.push_str(&format!("\nCurrent date: {}", date));
-        prompt.push_str(&format!("\nCurrent working directory: {}", prompt_cwd));
-        prompt.push_str(&format!(
-            "\nPlatform: {} / {}",
-            std::env::consts::OS,
-            std::env::consts::ARCH
-        ));
-
-        // Add agent mode indicator so LLM always knows its current mode
-        if let Some(mode) = options.agent_mode {
-            prompt.push_str(&format!("\nAgent mode: {}", mode));
-        }
-
-        return prompt;
-    }
-
-    // Default system prompt
-    let readme_path = get_readme_path().to_string_lossy().to_string();
-    let docs_path = get_docs_path().to_string_lossy().to_string();
-    let examples_path = get_examples_path().to_string_lossy().to_string();
 
     // Build tools list
     let default_tools = ["read", "bash", "edit", "write"];
@@ -176,6 +114,10 @@ pub fn build_system_prompt(options: BuildSystemPromptOptions) -> String {
         .collect::<Vec<_>>()
         .join("\n");
 
+    let readme_path = get_readme_path().to_string_lossy().to_string();
+    let docs_path = get_docs_path().to_string_lossy().to_string();
+    let examples_path = get_examples_path().to_string_lossy().to_string();
+
     let mut prompt = format!(
         r#"You are an expert-level programming assistant Pick, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.
 
@@ -239,10 +181,6 @@ Pick documentation (read only when the user asks about Pick itself, its SDK, ext
         tools_list, guidelines, readme_path, docs_path, examples_path,
     );
 
-    if !append_section.is_empty() {
-        prompt.push_str(&append_section);
-    }
-
     // Append project context files
     if !context_files.is_empty() {
         prompt.push_str("\n\n<project_context>\n\n");
@@ -270,51 +208,72 @@ Pick documentation (read only when the user asks about Pick itself, its SDK, ext
         std::env::consts::ARCH
     ));
 
-    // Add agent mode indicator so LLM always knows its current mode
-    if let Some(mode) = options.agent_mode {
+    // Add agent mode indicator
+    if let Some(mode) = agent_mode {
         prompt.push_str(&format!("\nAgent mode: {}", mode));
     }
 
     prompt
 }
 
-/// Build a tool snippets map from a list of AgentTools.
-/// Maps tool name → one-line description for inclusion in the system prompt.
-/// Uses prompt_snippet if available, falling back to description.
-pub fn build_tool_snippets(tools: &[AgentTool]) -> HashMap<String, String> {
-    tools
-        .iter()
-        .map(|t| {
-            let snippet = t
-                .prompt_snippet
-                .clone()
-                .unwrap_or_else(|| t.description.clone());
-            (t.name.clone(), snippet)
-        })
-        .collect()
+/// Build the system prompt with tools, guidelines, and context
+pub fn build_system_prompt(options: BuildSystemPromptOptions) -> String {
+    let custom_prompt = options.custom_prompt;
+    let selected_tools = options.selected_tools;
+    let tool_snippets = options.tool_snippets;
+    let prompt_guidelines = options.prompt_guidelines;
+    let append_system_prompt = options.append_system_prompt;
+    let cwd = options.cwd;
+    let context_files = options.context_files.unwrap_or(&[]);
+    let skills = options.skills.unwrap_or(&[]);
+    let agent_mode = options.agent_mode;
+
+    let append_section = append_system_prompt
+        .filter(|s| !s.is_empty())
+        .map(|s| format!("\n\n{}", s))
+        .unwrap_or_default();
+
+    if let Some(custom) = custom_prompt {
+        // Custom prompt path: delegate to agent crate (no default prompt)
+        return pick_agent::system_prompt::build_system_prompt(
+            pick_agent::system_prompt::BuildSystemPromptOptions {
+                custom_prompt: Some(custom),
+                default_prompt: None,
+                selected_tools,
+                tool_snippets,
+                prompt_guidelines,
+                append_system_prompt,
+                cwd,
+                context_files: Some(context_files),
+                skills: Some(skills),
+                agent_mode: agent_mode.map(|m| m.as_str()),
+            },
+        );
+    }
+
+    // CLI default prompt path
+    let agent_mode_str = agent_mode.map(|m| m.as_str());
+    let default_prompt = build_cli_default_prompt(
+        selected_tools,
+        tool_snippets,
+        prompt_guidelines,
+        cwd,
+        context_files,
+        skills,
+        agent_mode_str,
+    );
+
+    let mut result = default_prompt;
+    if !append_section.is_empty() {
+        result.push_str(&append_section);
+    }
+    result
 }
 
-/// Extract tool names from a list of AgentTools.
-pub fn build_tool_names(tools: &[AgentTool]) -> Vec<String> {
-    tools.iter().map(|t| t.name.clone()).collect()
-}
-
-/// Convert ContextFile list (from ResourceLoader) to the ContextFileRef slices
-/// needed by BuildSystemPromptOptions.
-pub fn build_context_file_refs(files: &[ContextFile]) -> Vec<ContextFileRef<'_>> {
-    files
-        .iter()
-        .map(|f| ContextFileRef {
-            path: &f.path,
-            content: &f.content,
-        })
-        .collect()
-}
-
-/// Convenience wrapper that builds a system prompt from the most common inputs.
-/// Internally constructs tool snippets, context file refs, and guidelines.
+/// CLI-specific convenience wrapper — delegates to agent when custom prompt is given,
+/// otherwise uses CLI default prompt.
 pub fn build_system_prompt_with_defaults(
-    tools: &[AgentTool],
+    tools: &[pick_agent::core::state::AgentTool],
     skills: &[Skill],
     context_files: &[ContextFile],
     custom_prompt: Option<&str>,
@@ -332,9 +291,9 @@ pub fn build_system_prompt_with_defaults(
     )
 }
 
-/// Build system prompt with defaults and agent mode
+/// CLI-specific convenience wrapper with agent mode support
 pub fn build_system_prompt_with_defaults_and_mode(
-    tools: &[AgentTool],
+    tools: &[pick_agent::core::state::AgentTool],
     skills: &[Skill],
     context_files: &[ContextFile],
     custom_prompt: Option<&str>,
@@ -346,7 +305,7 @@ pub fn build_system_prompt_with_defaults_and_mode(
     let tool_snippets = build_tool_snippets(tools);
     let context_refs: Vec<ContextFileRef> = build_context_file_refs(context_files);
 
-    // Collect tool-based guidelines: per-tool guidelines + global
+    // Collect per-tool prompt_guidelines from active tools
     let mut prompt_guidelines: Vec<String> = Vec::new();
     let has_bash = selected_tools.iter().any(|t| t == "bash");
     let has_grep = selected_tools.iter().any(|t| t == "grep");
@@ -358,8 +317,6 @@ pub fn build_system_prompt_with_defaults_and_mode(
                 .to_string(),
         );
     }
-
-    // Collect per-tool prompt_guidelines from active tools
     for tool in tools {
         for g in &tool.prompt_guidelines {
             if !prompt_guidelines.iter().any(|existing| existing == g) {
@@ -368,15 +325,45 @@ pub fn build_system_prompt_with_defaults_and_mode(
         }
     }
 
-    build_system_prompt(BuildSystemPromptOptions {
-        custom_prompt,
-        selected_tools: Some(&selected_tools),
-        tool_snippets: Some(&tool_snippets),
-        prompt_guidelines: Some(&prompt_guidelines),
-        append_system_prompt,
+    let agent_mode_str = agent_mode.map(|m| m.as_str());
+
+    if let Some(custom) = custom_prompt {
+        // Custom prompt: delegate to agent crate
+        return pick_agent::system_prompt::build_system_prompt(
+            pick_agent::system_prompt::BuildSystemPromptOptions {
+                custom_prompt: Some(custom),
+                default_prompt: None,
+                selected_tools: Some(&selected_tools),
+                tool_snippets: Some(&tool_snippets),
+                prompt_guidelines: Some(&prompt_guidelines),
+                append_system_prompt,
+                cwd,
+                context_files: Some(&context_refs),
+                skills: Some(skills),
+                agent_mode: agent_mode_str,
+            },
+        );
+    }
+
+    // No custom prompt: build CLI default prompt
+    let default = build_cli_default_prompt(
+        Some(&selected_tools),
+        Some(&tool_snippets),
+        Some(&prompt_guidelines),
         cwd,
-        context_files: Some(&context_refs),
-        skills: Some(skills),
-        agent_mode,
-    })
+        &context_refs,
+        skills,
+        agent_mode_str,
+    );
+
+    let append_section = append_system_prompt
+        .filter(|s| !s.is_empty())
+        .map(|s| format!("\n\n{}", s))
+        .unwrap_or_default();
+
+    let mut result = default;
+    if !append_section.is_empty() {
+        result.push_str(&append_section);
+    }
+    result
 }

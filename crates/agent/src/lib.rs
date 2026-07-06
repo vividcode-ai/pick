@@ -23,6 +23,7 @@ pub mod prompt_history;
 pub mod session;
 pub mod settings;
 pub mod skills;
+pub mod system_prompt;
 pub mod tools;
 pub mod utils;
 
