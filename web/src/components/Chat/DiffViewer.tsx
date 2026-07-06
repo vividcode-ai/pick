@@ -210,7 +210,7 @@ function renderUnifiedDiff(
         {lineComments.length > 0 && !isEditing && (
           <div className="ml-8 border-l-2 border-[var(--accent-primary)]/30">
             {lineComments.map((c) => (
-              <CommentView key={c.id} comment={c} inline onSendToAgent={onAsk ? (cmt) => onAsk(`User comment on file \`${cmt.file}\` line ${cmt.line}:\n\n${cmt.comment}\n\nPlease analyze this line of code and suggest how to address it.`) : undefined} />
+              <CommentView key={c.id} comment={c} inline onReply={(c) => handleBadgeClick(c.line)} onSendToAgent={onAsk ? (cmt) => onAsk(`User comment on file \`${cmt.file}\` line ${cmt.line}:\n\n${cmt.comment}\n\nPlease analyze this line of code and suggest how to address it.`) : undefined} />
             ))}
           </div>
         )}

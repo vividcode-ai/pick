@@ -18,11 +18,21 @@ interface CodeReviewContentProps {
 }
 
 export function CodeReviewContent({ baseUrl, sessionId, onAsk }: CodeReviewContentProps) {
+  // ── URL builder: use session endpoint when available, standalone otherwise ──
+  const gitApi = useCallback((path: string) => {
+    const base = sessionId ? `${baseUrl}/sessions/${sessionId}` : baseUrl;
+    return `${base}${path}`;
+  }, [baseUrl, sessionId]);
+
   // ── Git diffs state ──
   const [gitInfo, setGitInfo] = useState<GitInfo | null>(null);
   const [gitDiffs, setGitDiffs] = useState<GitDiffEntry[]>([]);
   const [loadingDiffs, setLoadingDiffs] = useState(false);
   const [diffError, setDiffError] = useState<string | null>(null);
+
+  // ── Progressive patch loading ──
+  const [patches, setPatches] = useState<Record<string, string>>({});
+  const [loadingPatches, setLoadingPatches] = useState<Record<string, boolean>>({});
 
   // ── Settings ──
   const [diffSource, setDiffSource] = useState<DiffSource>("git");
@@ -45,39 +55,45 @@ export function CodeReviewContent({ baseUrl, sessionId, onAsk }: CodeReviewConte
   const visibilityRef = useRef<ReturnType<typeof createVisibilityTracker> | null>(null);
   const visibilityReadyRef = useRef(false);
 
+  // ── Build params for git API calls ──
+  const diffParams = useCallback(() => {
+    const params = new URLSearchParams();
+    if (diffSource === "branch" && branchName) {
+      params.set("base", branchName);
+    }
+    return params;
+  }, [diffSource, branchName]);
+
   // ── Fetch git info ──
   useEffect(() => {
-    if (!sessionId) return;
-    fetch(`${baseUrl}/sessions/${sessionId}/git-info`)
+    fetch(`${gitApi("/git-info")}`)
       .then(async (res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
       })
       .then((data: GitInfo) => setGitInfo(data))
       .catch(() => {});
-  }, [baseUrl, sessionId]);
+  }, [gitApi]);
 
   // ── Fetch branch suggestions ──
   useEffect(() => {
-    if (!sessionId) return;
-    fetch(`${baseUrl}/sessions/${sessionId}/branches`)
+    fetch(`${gitApi("/branches")}`)
       .then((r) => r.json())
       .then((data: string[]) => setBranchSuggestions(data))
       .catch(() => {});
-  }, [baseUrl, sessionId]);
+  }, [gitApi]);
 
-  // ── Fetch git diffs ──
+  // ── Fetch git diffs (meta only = instant) ──
   useEffect(() => {
-    if (!sessionId) return;
     setLoadingDiffs(true);
     setDiffError(null);
+    setExpandedFiles([]);
+    setPatches({});
 
-    let url = `${baseUrl}/sessions/${sessionId}/git-diffs`;
-    if (diffSource === "branch" && branchName) {
-      url += `?base=${encodeURIComponent(branchName)}`;
-    }
+    const params = diffParams();
+    params.set("meta_only", "true");
 
-    fetch(url)
+    fetch(`${gitApi("/git-diffs")}?${params}`)
       .then(async (res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
@@ -90,7 +106,35 @@ export function CodeReviewContent({ baseUrl, sessionId, onAsk }: CodeReviewConte
         setDiffError(e.message || "Failed to load diffs");
         setLoadingDiffs(false);
       });
-  }, [baseUrl, sessionId, diffSource, branchName]);
+  }, [gitApi, diffParams]);
+
+  // ── Load patch on demand when a file is expanded ──
+  const loadPatch = useCallback(async (filePath: string) => {
+    if (patches[filePath] !== undefined || loadingPatches[filePath]) return;
+
+    setLoadingPatches((prev) => ({ ...prev, [filePath]: true }));
+
+    try {
+      const params = new URLSearchParams({ file: filePath });
+      const res = await fetch(`${gitApi("/git-diff")}?${params}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const entry: GitDiffEntry = await res.json();
+      setPatches((prev) => ({ ...prev, [filePath]: entry.patch }));
+    } catch (e) {
+      console.error("Failed to load patch for", filePath, e);
+    }
+    setLoadingPatches((prev) => ({ ...prev, [filePath]: false }));
+  }, [gitApi, patches, loadingPatches]);
+
+  // Auto-load patch when accordion item opens
+  const handleOpenChange = useCallback((next: string[]) => {
+    // Newly opened files
+    const newlyOpened = next.filter((f) => !expandedFiles.includes(f));
+    for (const file of newlyOpened) {
+      loadPatch(file);
+    }
+    setExpandedFiles(next);
+  }, [expandedFiles, loadPatch]);
 
   // ── Load comments from server ──
   useEffect(() => {
@@ -110,7 +154,6 @@ export function CodeReviewContent({ baseUrl, sessionId, onAsk }: CodeReviewConte
   useEffect(() => {
     if (!sessionId) return;
     scrollSaverRef.current = createScrollSaver(sessionId);
-    // Restore scroll position after a short delay
     const saved = getReviewScroll(sessionId);
     if (saved && scrollContainerRef.current) {
       requestAnimationFrame(() => {
@@ -147,7 +190,7 @@ export function CodeReviewContent({ baseUrl, sessionId, onAsk }: CodeReviewConte
     setReviewText("");
 
     try {
-      const filesContext = gitDiffs.map((f) => `  ${f.status} ${f.path} (+${f.additions}/-${f.deletions})`).join("\n");
+      const filesContext = gitDiffs.map((f) => `  ${f.status} ${f.path}`).join("\n");
       const prompt = `Please review the following code changes and provide a thorough code review.\n\nCurrent branch: ${gitInfo?.branch || "unknown"}\nChanged files:\n${filesContext}\n\nPlease analyze the changes for:\n1. Potential bugs and logic errors\n2. Security issues and risks\n3. Code style and best practices\n4. Performance optimization suggestions\n5. Maintainability and readability improvements\n\nFor each issue found, reference the specific file and line numbers where applicable. Use the format "FILE:LINE - description" so issues can be mapped to inline comments.\n\nProvide specific suggestions with code examples where applicable.`;
 
       const askRes = await fetch(`${baseUrl}/ask`, {
@@ -189,7 +232,6 @@ export function CodeReviewContent({ baseUrl, sessionId, onAsk }: CodeReviewConte
 
   // ── Apply AI review as inline comments ──
   const handleApplyAsComments = useCallback(() => {
-    // Parse FILE:LINE pattern from review text
     const pattern = /(\S+?):(\d+)\s*[-–—]\s*(.+?)(?=\n\S+?:\d+\s*[-–—]|\n\n|$)/gs;
     let match;
     let count = 0;
@@ -202,7 +244,6 @@ export function CodeReviewContent({ baseUrl, sessionId, onAsk }: CodeReviewConte
       }
     }
     if (count > 0) {
-      // Expand files where comments were added
       const filesWithComments = gitDiffs
         .filter((f) => getCommentsByFile(f.path).length > 0)
         .map((f) => f.path);
@@ -212,9 +253,6 @@ export function CodeReviewContent({ baseUrl, sessionId, onAsk }: CodeReviewConte
 
   // ── Helper ──
   const allFilePaths = useMemo(() => gitDiffs.map((f) => f.path), [gitDiffs]);
-  const statusMap: Record<string, string> = {
-    "M": "Modified", "A": "Added", "D": "Deleted", "R": "Renamed", "??": "Untracked",
-  };
 
   const handleScroll = useCallback(() => {
     const el = scrollContainerRef.current;
@@ -275,7 +313,7 @@ export function CodeReviewContent({ baseUrl, sessionId, onAsk }: CodeReviewConte
     ),
     children: (
       <DiffViewer
-        diffText={diff.patch}
+        diffText={patches[diff.path] ?? ""}
         filePath={diff.path}
         baseUrl={baseUrl}
         onAsk={onAsk ?? null}
@@ -283,9 +321,9 @@ export function CodeReviewContent({ baseUrl, sessionId, onAsk }: CodeReviewConte
         visible={true}
       />
     ),
-  })), [gitDiffs, baseUrl, onAsk, diffStyle, expandedFiles]);
+  })), [gitDiffs, baseUrl, onAsk, diffStyle, expandedFiles, patches]);
 
-  // ── Loading state ──
+  // ── Loading state (initial meta load) ──
   if (loadingDiffs) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -308,14 +346,6 @@ export function CodeReviewContent({ baseUrl, sessionId, onAsk }: CodeReviewConte
     );
   }
 
-  if (!sessionId) {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <div className="text-xs text-[var(--text-muted)]">Select a session to review</div>
-      </div>
-    );
-  }
-
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
@@ -329,7 +359,10 @@ export function CodeReviewContent({ baseUrl, sessionId, onAsk }: CodeReviewConte
         branchSuggestions={branchSuggestions}
         expandedCount={expandedFiles.length}
         totalFiles={gitDiffs.length}
-        onExpandAll={() => setExpandedFiles(allFilePaths)}
+        onExpandAll={() => {
+          setExpandedFiles(allFilePaths);
+          allFilePaths.forEach(loadPatch);
+        }}
         onCollapseAll={() => setExpandedFiles([])}
         onStartReview={handleStartReview}
         reviewState={reviewState}
@@ -358,7 +391,7 @@ export function CodeReviewContent({ baseUrl, sessionId, onAsk }: CodeReviewConte
           <ReviewAccordion
             items={accordionItems}
             open={expandedFiles}
-            onOpenChange={setExpandedFiles}
+            onOpenChange={handleOpenChange}
           />
         ) : (
           <div className="px-3 py-4 text-xs text-[var(--text-muted)]">

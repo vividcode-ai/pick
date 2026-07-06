@@ -186,7 +186,10 @@ pub(crate) fn apply_goal_update(tui: &mut TuiApp, goal: &serde_json::Value) {
             "complete" => "✅",
             _ => "🎯",
         };
-        let tokens_used = goal.get("tokensUsed").and_then(|v| v.as_i64()).unwrap_or(0);
+        let tokens_used = goal
+            .get("tokens_used")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(0);
         tui.set_goal_status(Some(&format!(
             "{} {}  [{} tokens]",
             icon, short, tokens_used

@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Trash2, CheckCircle, RotateCw, Send, MessageSquare } from "lucide-react";
 import type { LineComment } from "../../types/events";
 import { removeComment, resolveComment, unresolveComment } from "../../stores/comments";
@@ -6,12 +5,11 @@ import { removeComment, resolveComment, unresolveComment } from "../../stores/co
 interface CommentViewProps {
   comment: LineComment;
   onSendToAgent?: (comment: LineComment) => void;
+  onReply?: (comment: LineComment) => void;
   inline?: boolean;
 }
 
-export function CommentView({ comment, onSendToAgent, inline }: CommentViewProps) {
-  const [deleting, setDeleting] = useState(false);
-
+export function CommentView({ comment, onSendToAgent, onReply, inline }: CommentViewProps) {
   const handleDelete = () => {
     removeComment(comment.id);
   };
@@ -53,7 +51,7 @@ export function CommentView({ comment, onSendToAgent, inline }: CommentViewProps
           <button onClick={handleDelete} className="text-[10px] text-red-400 hover:text-red-300" title="Delete">
             <Trash2 className="w-3 h-3" />
           </button>
-          <button onClick={() => setDeleting(false)} className="text-[10px] text-[var(--text-muted)] hover:text-[var(--text-primary)]">
+          <button onClick={() => onReply?.(comment)} className="text-[10px] text-[var(--text-muted)] hover:text-[var(--text-primary)]" title="Reply">
             <MessageSquare className="w-3 h-3" /> Reply
           </button>
         </div>

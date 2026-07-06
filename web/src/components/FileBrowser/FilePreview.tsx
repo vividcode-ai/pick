@@ -170,7 +170,7 @@ export function FilePreview({ baseUrl, filePath, onAsk }: FilePreviewProps) {
                     {lineComments.length > 0 && !isEditing && (
                       <div>
                         {lineComments.map((c) => (
-                          <CommentView key={c.id} comment={c} inline onSendToAgent={onAsk ? (cmt) => onAsk(`User comment on file \`${cmt.file}\` line ${cmt.line}:\n\n${cmt.comment}\n\nPlease analyze this line of code and suggest how to address it.`) : undefined} />
+                          <CommentView key={c.id} comment={c} inline onReply={(c) => handleLineClick(c.line)} onSendToAgent={onAsk ? (cmt) => onAsk(`User comment on file \`${cmt.file}\` line ${cmt.line}:\n\n${cmt.comment}\n\nPlease analyze this line of code and suggest how to address it.`) : undefined} />
                         ))}
                       </div>
                     )}

@@ -10,7 +10,10 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::AppState;
-use crate::git::{GitDiffsResponse, get_git_diffs, get_git_info, list_git_branches};
+use crate::git::{
+    GitDiffEntry, GitDiffsResponse, get_git_diffs, get_git_info, get_git_single_diff,
+    list_git_branches,
+};
 use crate::session::SessionInfo;
 
 #[derive(Serialize, ToSchema)]
@@ -456,16 +459,26 @@ pub async fn get_session_git_info(
         Some(ref c) => std::path::PathBuf::from(c),
         None => return (StatusCode::NOT_FOUND, "No workspace directory").into_response(),
     };
-    let git_info = get_git_info(&cwd);
+    let git_info = tokio::task::spawn_blocking(move || get_git_info(&cwd))
+        .await
+        .unwrap_or_else(|_| crate::git::GitInfo {
+            branch: String::new(),
+            changes: Vec::new(),
+            cwd: String::new(),
+        });
     Json(git_info).into_response()
 }
 
 #[derive(Deserialize)]
 pub struct GitDiffsQuery {
     pub base: Option<String>,
+    pub meta_only: Option<bool>,
 }
 
 /// Get git diffs for a session's workspace
+///
+/// When `meta_only=true`, returns file list with empty patches (lightweight).
+/// Full patches are loaded on demand via `/sessions/{id}/git-diff?file=…`.
 #[utoipa::path(
     get,
     path = "/sessions/{id}/git-diffs",
@@ -491,8 +504,80 @@ pub async fn get_session_git_diffs(
         Some(ref c) => std::path::PathBuf::from(c),
         None => return (StatusCode::NOT_FOUND, "No workspace directory").into_response(),
     };
-    let diffs: GitDiffsResponse = get_git_diffs(&cwd, query.base.as_deref());
+
+    if query.meta_only.unwrap_or(false) {
+        // Lightweight: return file list with empty patches
+        let meta = tokio::task::spawn_blocking(move || {
+            let info = get_git_info(&cwd);
+            let branch = info.branch.clone();
+            let files: Vec<GitDiffEntry> = info
+                .changes
+                .iter()
+                .map(|c| GitDiffEntry {
+                    path: c.path.clone(),
+                    status: c.status.clone(),
+                    additions: 0,
+                    deletions: 0,
+                    patch: String::new(),
+                    binary: false,
+                })
+                .collect();
+            GitDiffsResponse { branch, files }
+        })
+        .await
+        .unwrap_or_else(|_| GitDiffsResponse {
+            branch: String::new(),
+            files: Vec::new(),
+        });
+        return Json(meta).into_response();
+    }
+
+    let base = query.base.clone();
+    let diffs = tokio::task::spawn_blocking(move || get_git_diffs(&cwd, base.as_deref()))
+        .await
+        .unwrap_or_else(|_| GitDiffsResponse {
+            branch: String::new(),
+            files: Vec::new(),
+        });
     Json(diffs).into_response()
+}
+
+#[derive(Deserialize)]
+pub struct GitSingleDiffQuery {
+    pub file: String,
+}
+
+/// Get a single file's full git diff (for progressive loading).
+#[utoipa::path(
+    get,
+    path = "/sessions/{id}/git-diff",
+    tag = "sessions",
+    params(
+        ("id" = String, Path, description = "Session ID"),
+    ),
+    responses(
+        (status = 200, description = "Single file diff"),
+        (status = 404, description = "Session not found"),
+    )
+)]
+pub async fn get_session_single_diff(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+    Query(query): Query<GitSingleDiffQuery>,
+) -> impl IntoResponse {
+    let session = match state.session_manager.get(&id).await {
+        Some(s) => s,
+        None => return (StatusCode::NOT_FOUND, "Session not found").into_response(),
+    };
+    let cwd = match session.cwd {
+        Some(ref c) => std::path::PathBuf::from(c),
+        None => return (StatusCode::NOT_FOUND, "No workspace directory").into_response(),
+    };
+    let file = query.file.clone();
+    let entry = tokio::task::spawn_blocking(move || get_git_single_diff(&cwd, &file))
+        .await
+        .unwrap_or_default();
+    Json(entry).into_response()
 }
 
 /// List git branches for a session's workspace
@@ -517,8 +602,98 @@ pub async fn get_session_branches(
         Some(ref c) => std::path::PathBuf::from(c),
         None => return (StatusCode::NOT_FOUND, "No workspace directory").into_response(),
     };
-    let branches = list_git_branches(&cwd);
+    let branches = tokio::task::spawn_blocking(move || list_git_branches(&cwd))
+        .await
+        .unwrap_or_default();
     Json(branches).into_response()
+}
+
+/// Get git info for the server's workspace (no session required).
+pub async fn get_workspace_git_info(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let cwd = resolve_workspace_cwd(&state);
+    let git_info = tokio::task::spawn_blocking(move || get_git_info(&cwd))
+        .await
+        .unwrap_or_else(|_| crate::git::GitInfo {
+            branch: String::new(),
+            changes: Vec::new(),
+            cwd: String::new(),
+        });
+    Json(git_info).into_response()
+}
+
+/// Get git diffs for the server's workspace (no session required).
+pub async fn get_workspace_git_diffs(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<GitDiffsQuery>,
+) -> impl IntoResponse {
+    let cwd = resolve_workspace_cwd(&state);
+
+    if query.meta_only.unwrap_or(false) {
+        let meta = tokio::task::spawn_blocking(move || {
+            let info = get_git_info(&cwd);
+            let branch = info.branch.clone();
+            let files: Vec<GitDiffEntry> = info
+                .changes
+                .iter()
+                .map(|c| GitDiffEntry {
+                    path: c.path.clone(),
+                    status: c.status.clone(),
+                    additions: 0,
+                    deletions: 0,
+                    patch: String::new(),
+                    binary: false,
+                })
+                .collect();
+            GitDiffsResponse { branch, files }
+        })
+        .await
+        .unwrap_or_else(|_| GitDiffsResponse {
+            branch: String::new(),
+            files: Vec::new(),
+        });
+        return Json(meta).into_response();
+    }
+
+    let base = query.base.clone();
+    let diffs = tokio::task::spawn_blocking(move || get_git_diffs(&cwd, base.as_deref()))
+        .await
+        .unwrap_or_else(|_| GitDiffsResponse {
+            branch: String::new(),
+            files: Vec::new(),
+        });
+    Json(diffs).into_response()
+}
+
+/// Get a single file's diff for the server's workspace (no session required).
+pub async fn get_workspace_git_single_diff(
+    State(state): State<Arc<AppState>>,
+    Query(query): Query<GitSingleDiffQuery>,
+) -> impl IntoResponse {
+    let cwd = resolve_workspace_cwd(&state);
+    let file = query.file.clone();
+    let entry = tokio::task::spawn_blocking(move || get_git_single_diff(&cwd, &file))
+        .await
+        .unwrap_or_default();
+    Json(entry).into_response()
+}
+
+/// Get git branches for the server's workspace (no session required).
+pub async fn get_workspace_branches(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let cwd = resolve_workspace_cwd(&state);
+    let branches = tokio::task::spawn_blocking(move || list_git_branches(&cwd))
+        .await
+        .unwrap_or_default();
+    Json(branches).into_response()
+}
+
+/// Resolve the server's workspace directory from AppState.
+fn resolve_workspace_cwd(state: &AppState) -> std::path::PathBuf {
+    state
+        .config
+        .cwd
+        .as_ref()
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_default())
 }
 
 #[derive(Serialize, ToSchema)]

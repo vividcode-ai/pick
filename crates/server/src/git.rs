@@ -1,4 +1,5 @@
 use serde::Serialize;
+use std::collections::HashMap;
 use std::path::Path;
 
 #[derive(Debug, Clone, Serialize)]
@@ -14,7 +15,7 @@ pub struct GitInfo {
     pub cwd: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Default)]
 pub struct GitDiffEntry {
     pub path: String,
     pub status: String,
@@ -69,63 +70,163 @@ pub fn list_git_branches(cwd: &Path) -> Vec<String> {
         .filter(|l| !l.is_empty())
         .map(|l| {
             let trimmed = l.trim();
-            // Remove leading * (current branch marker)
             trimmed.strip_prefix("* ").unwrap_or(trimmed).to_string()
         })
         .collect()
 }
 
+/// Batch all tracked-file diffs into a single `git diff` call, then handle
+/// untracked files by reading them directly. This is ~10-50x faster than
+/// spawning N separate git processes.
 pub fn get_git_diffs(cwd: &Path, base: Option<&str>) -> GitDiffsResponse {
     let info = get_git_info(cwd);
     let branch = info.branch.clone();
 
-    let files: Vec<GitDiffEntry> = info
+    if info.changes.is_empty() {
+        return GitDiffsResponse {
+            branch,
+            files: Vec::new(),
+        };
+    }
+
+    // Collect tracked paths (M/A/D/R) for a single batched git diff.
+    // Untracked files (??) are handled separately by reading their content.
+    let tracked: Vec<&GitChange> = info
         .changes
         .iter()
-        .map(|change| get_file_diff(cwd, &change.path, &change.status, base))
+        .filter(|c| c.status.trim() != "??")
         .collect();
+
+    // ── Single batched git diff for all tracked files ──
+    let mut combined_patch = String::new();
+    if !tracked.is_empty() {
+        let mut args = vec!["diff".to_string(), "--unified=3".to_string()];
+        if let Some(b) = base {
+            args.push(format!("{}...HEAD", b));
+        } else {
+            args.push("HEAD".to_string());
+        }
+        args.push("--".to_string());
+        for change in &tracked {
+            args.push(change.path.clone());
+        }
+        combined_patch = run_git_vec(cwd, &args);
+    }
+
+    // Split combined diff output → per-file map
+    let file_patches = split_combined_diff(&combined_patch);
+
+    // ── Build entries ──
+    let mut files: Vec<GitDiffEntry> = Vec::with_capacity(info.changes.len());
+
+    for change in &info.changes {
+        let patch = if change.status.trim() == "??" {
+            get_untracked_patch(cwd, &change.path)
+        } else {
+            file_patches.get(&change.path).cloned().unwrap_or_default()
+        };
+
+        let has_binary_marker = patch.contains("Binary files");
+        let is_empty = patch.trim().is_empty();
+
+        let (additions, deletions) = if has_binary_marker || is_empty {
+            (0, 0)
+        } else {
+            count_diff_changes(&patch)
+        };
+
+        files.push(GitDiffEntry {
+            path: change.path.clone(),
+            status: change.status.clone(),
+            additions,
+            deletions,
+            patch,
+            binary: has_binary_marker || is_empty,
+        });
+    }
 
     GitDiffsResponse { branch, files }
 }
 
-fn get_file_diff(cwd: &Path, path: &str, status: &str, base: Option<&str>) -> GitDiffEntry {
-    let status_short = status.trim();
+/// Split `git diff` output (which may contain multiple files) into a
+/// path→patch map.  Each file section begins with `diff --git a/…`.
+fn split_combined_diff(combined: &str) -> HashMap<String, String> {
+    let mut map = HashMap::new();
+    let mut current_file: Option<String> = None;
+    let mut current_start = 0usize;
+    let lines: Vec<&str> = combined.lines().collect();
 
-    let patch = match status_short {
-        "M" | "D" | "R" => {
-            let args = build_diff_args(path, base, false);
-            run_git_vec(cwd, &args)
-        }
-        "A" => {
-            let args = build_diff_args(path, base, true);
-            run_git_vec(cwd, &args)
-        }
-        "?" | "??" => {
-            // Untracked: show entire file as addition
-            let content = run_git(cwd, &["show", "--", path]);
-            if content.is_empty() {
-                // Try reading file directly
-                let full_path = cwd.join(path);
-                match std::fs::read_to_string(&full_path) {
-                    Ok(text) => format!(
-                        "diff --git a/{path} b/{path}\nnew file mode 100644\n--- /dev/null\n+++ b/{path}\n@@ -0,0 +1,{} @@\n{}",
-                        text.lines().count(),
-                        text.lines()
-                            .map(|l| format!("+{l}"))
-                            .collect::<Vec<_>>()
-                            .join("\n")
-                    ),
-                    Err(_) => String::new(),
+    for (i, line) in lines.iter().enumerate() {
+        if line.starts_with("diff --git a/") {
+            // Save previous file
+            if let Some(file) = current_file.take() {
+                let patch = lines[current_start..i].join("\n");
+                if !patch.is_empty() {
+                    map.insert(file, patch);
                 }
-            } else {
-                content
+            }
+            // Extract filename from "diff --git a/<path> b/<path>"
+            if let Some(rest) = line.strip_prefix("diff --git a/") {
+                if let Some(path) = rest.split(" b/").next() {
+                    current_file = Some(path.to_string());
+                    current_start = i;
+                }
             }
         }
-        _ => String::new(),
+    }
+    // Last file
+    if let Some(file) = current_file {
+        let patch = lines[current_start..].join("\n");
+        if !patch.is_empty() {
+            map.insert(file, patch);
+        }
+    }
+
+    map
+}
+
+/// Construct a synthetic diff for a new/untracked file by reading its content.
+fn get_untracked_patch(cwd: &Path, path: &str) -> String {
+    let full_path = cwd.join(path);
+    match std::fs::read_to_string(&full_path) {
+        Ok(text) => {
+            let line_count = text.lines().count();
+            let added_lines: Vec<String> = text.lines().map(|l| format!("+{l}")).collect();
+            format!(
+                "diff --git a/{path} b/{path}\n\
+                 new file mode 100644\n\
+                 --- /dev/null\n\
+                 +++ b/{path}\n\
+                 @@ -0,0 +1,{line_count} @@\n\
+                 {}",
+                added_lines.join("\n")
+            )
+        }
+        Err(_) => String::new(),
+    }
+}
+
+/// Get a single file's full diff (for progressive/on-demand loading).
+pub fn get_git_single_diff(cwd: &Path, file: &str) -> GitDiffEntry {
+    let info = get_git_info(cwd);
+    let change = info.changes.iter().find(|c| c.path == file);
+
+    let (status, patch) = match change {
+        Some(c) if c.status.trim() == "??" => (c.status.clone(), get_untracked_patch(cwd, &c.path)),
+        Some(c) => {
+            let args = vec![
+                "diff".to_string(),
+                "--unified=3".to_string(),
+                "HEAD".to_string(),
+                "--".to_string(),
+                c.path.clone(),
+            ];
+            (c.status.clone(), run_git_vec(cwd, &args))
+        }
+        None => (String::new(), String::new()),
     };
 
     let binary = patch.contains("Binary files") || patch.is_empty();
-
     let (additions, deletions) = if binary {
         (0, 0)
     } else {
@@ -133,8 +234,8 @@ fn get_file_diff(cwd: &Path, path: &str, status: &str, base: Option<&str>) -> Gi
     };
 
     GitDiffEntry {
-        path: path.to_string(),
-        status: status.to_string(),
+        path: file.to_string(),
+        status,
         additions,
         deletions,
         patch,
@@ -142,27 +243,13 @@ fn get_file_diff(cwd: &Path, path: &str, status: &str, base: Option<&str>) -> Gi
     }
 }
 
-fn build_diff_args(path: &str, base: Option<&str>, cached: bool) -> Vec<String> {
-    let mut args = vec!["diff".to_string(), "--unified=3".to_string()];
-    if let Some(b) = base {
-        args.push(format!("{b}...HEAD"));
-    } else if cached {
-        args.push("--cached".to_string());
-    } else {
-        args.push("HEAD".to_string());
-    }
-    args.push("--".to_string());
-    args.push(path.to_string());
-    args
-}
-
 fn count_diff_changes(patch: &str) -> (usize, usize) {
     let mut additions = 0usize;
     let mut deletions = 0usize;
     for line in patch.lines() {
-        if line.starts_with("+") && !line.starts_with("+++") {
+        if line.starts_with('+') && !line.starts_with("+++") {
             additions += 1;
-        } else if line.starts_with("-") && !line.starts_with("---") {
+        } else if line.starts_with('-') && !line.starts_with("---") {
             deletions += 1;
         }
     }

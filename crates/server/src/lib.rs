@@ -276,6 +276,10 @@ pub fn create_app(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/health", get(rest::health))
         .route("/server-config", get(rest::server_config))
+        .route("/git-info", get(rest::get_workspace_git_info))
+        .route("/git-diffs", get(rest::get_workspace_git_diffs))
+        .route("/git-diff", get(rest::get_workspace_git_single_diff))
+        .route("/branches", get(rest::get_workspace_branches))
         .route(
             "/sessions",
             get(rest::list_sessions).post(rest::create_session),
@@ -292,6 +296,10 @@ pub fn create_app(state: Arc<AppState>) -> Router {
         .route("/sessions/{id}/status", get(rest::get_session_status))
         .route("/sessions/{id}/git-info", get(rest::get_session_git_info))
         .route("/sessions/{id}/git-diffs", get(rest::get_session_git_diffs))
+        .route(
+            "/sessions/{id}/git-diff",
+            get(rest::get_session_single_diff),
+        )
         .route("/sessions/{id}/branches", get(rest::get_session_branches))
         .route("/providers", get(rest::list_providers))
         .route("/events/{session_id}", get(sse::handle_sse))
