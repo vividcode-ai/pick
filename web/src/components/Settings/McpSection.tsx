@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Trash2, RotateCw } from "lucide-react";
+import { Plus, Trash2, RotateCw, ChevronRight } from "lucide-react";
 
 interface McpServer {
   name: string;
@@ -52,6 +52,7 @@ export function McpSection({ serverUrl }: McpSectionProps) {
   const [oauthTokenUrl, setOauthTokenUrl] = useState("");
 
   const [transportTab, setTransportTab] = useState<TransportTab>("stdio");
+  const [expandedServer, setExpandedServer] = useState<string | null>(null);
 
   const fetchServers = async () => {
     try {
@@ -204,45 +205,113 @@ export function McpSection({ serverUrl }: McpSectionProps) {
         ) : (
           <div className="space-y-2">
             {servers.map((srv) => (
-              <div
-                key={srv.name}
-                className="settings-card flex items-center justify-between gap-3"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <span
-                    className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                      srv.is_connected ? "bg-green-400" : "bg-neutral-500"
-                    }`}
-                  />
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium text-[var(--text-primary)] truncate">
-                      {srv.name}
-                    </div>
-                    <div className="text-[11px] text-[var(--text-muted)] mt-0.5">
-                      {srv.transport}
-                      {srv.tool_count > 0 && ` · ${srv.tool_count} tools`}
-                      {srv.is_connected ? " · Connected" : " · Disconnected"}
+              <div key={srv.name} className="settings-card">
+                <div
+                  className="flex items-center justify-between gap-3 cursor-pointer"
+                  onClick={() => setExpandedServer(expandedServer === srv.name ? null : srv.name)}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <ChevronRight
+                      className={`w-3.5 h-3.5 flex-shrink-0 text-[var(--text-muted)] transition-transform ${
+                        expandedServer === srv.name ? "rotate-90" : ""
+                      }`}
+                    />
+                    <span
+                      className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                        srv.is_connected ? "bg-green-400" : "bg-neutral-500"
+                      }`}
+                    />
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-[var(--text-primary)] truncate">
+                        {srv.name}
+                      </div>
+                      <div className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                        {srv.transport}
+                        {srv.tool_count > 0 && ` · ${srv.tool_count} tools`}
+                        {srv.is_connected ? " · Connected" : " · Disconnected"}
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  {!srv.is_connected && (
+                  <div className="flex items-center gap-1.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                    {!srv.is_connected && (
+                      <button
+                        onClick={() => handleReconnect(srv.name)}
+                        className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-[var(--surface-button)] text-[var(--text-secondary)] border border-[var(--border-base)] hover:opacity-80 transition-colors"
+                      >
+                        <RotateCw className="w-3 h-3" />
+                        Reconnect
+                      </button>
+                    )}
                     <button
-                      onClick={() => handleReconnect(srv.name)}
-                      className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-[var(--surface-button)] text-[var(--text-secondary)] border border-[var(--border-base)] hover:opacity-80 transition-colors"
+                      onClick={() => setDeleteConfirm(srv.name)}
+                      className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-red-400 bg-red-500/10 border border-red-500/20 hover:opacity-80 transition-colors"
                     >
-                      <RotateCw className="w-3 h-3" />
-                      Reconnect
+                      <Trash2 className="w-3 h-3" />
+                      Delete
                     </button>
-                  )}
-                  <button
-                    onClick={() => setDeleteConfirm(srv.name)}
-                    className="flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-red-400 bg-red-500/10 border border-red-500/20 hover:opacity-80 transition-colors"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                    Delete
-                  </button>
+                  </div>
                 </div>
+
+                {expandedServer === srv.name && (
+                  <div className="mt-3 pt-3 border-t border-[var(--border-base)] space-y-3">
+                    {srv.tool_names.length > 0 && (
+                      <div>
+                        <div className="text-xs font-medium text-[var(--text-secondary)] mb-1.5">
+                          Tools ({srv.tool_count})
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {srv.tool_names.map((tool) => (
+                            <span
+                              key={tool}
+                              className="px-2 py-0.5 rounded text-[11px] bg-blue-500/10 text-blue-400 border border-blue-500/20"
+                            >
+                              {tool}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {srv.prompt_names.length > 0 && (
+                      <div>
+                        <div className="text-xs font-medium text-[var(--text-secondary)] mb-1.5">
+                          Prompts ({srv.prompt_count})
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {srv.prompt_names.map((prompt) => (
+                            <span
+                              key={prompt}
+                              className="px-2 py-0.5 rounded text-[11px] bg-purple-500/10 text-purple-400 border border-purple-500/20"
+                            >
+                              {prompt}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {srv.resource_names.length > 0 && (
+                      <div>
+                        <div className="text-xs font-medium text-[var(--text-secondary)] mb-1.5">
+                          Resources ({srv.resource_count})
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {srv.resource_names.map((resource) => (
+                            <span
+                              key={resource}
+                              className="px-2 py-0.5 rounded text-[11px] bg-green-500/10 text-green-400 border border-green-500/20"
+                            >
+                              {resource}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {srv.tool_names.length === 0 && srv.prompt_names.length === 0 && srv.resource_names.length === 0 && (
+                      <div className="text-[11px] text-[var(--text-muted)] italic">
+                        No tools, prompts, or resources available.
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -251,7 +320,7 @@ export function McpSection({ serverUrl }: McpSectionProps) {
 
       {/* Delete Confirm Dialog */}
       {deleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 pt-[12vh]">
           <div className="bg-[var(--surface-secondary)] border border-[var(--border-base)] rounded-lg p-5 max-w-sm w-full mx-3 shadow-xl">
             <p className="text-sm text-[var(--text-primary)] mb-4">
               Delete MCP server <strong>{deleteConfirm}</strong>? This will also remove it from the settings file.
@@ -276,7 +345,7 @@ export function McpSection({ serverUrl }: McpSectionProps) {
 
       {/* Add Server Modal */}
       {showAddForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 pt-[12vh]">
           <div className="bg-[var(--surface-secondary)] border border-[var(--border-base)] rounded-lg p-5 max-w-lg w-full mx-3 shadow-xl max-h-[85vh] overflow-y-auto">
             <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Add MCP Server</h3>
 

@@ -165,12 +165,12 @@ export function FilePreview({ baseUrl, filePath, onAsk }: FilePreviewProps) {
         <div
           ref={containerRef}
           onClick={handleContainerClick}
-          className="absolute inset-0 overflow-auto
-            [&_pre]:!m-0 [&_pre]:!min-h-full [&_pre]:!rounded-none [&_pre]:!bg-transparent
+          className="absolute inset-0 overflow-auto leading-tight
+            [&_pre]:!m-0 [&_pre]:!min-h-full [&_pre]:!rounded-none [&_pre]:!bg-transparent [&_pre]:!p-0
             [&_.line-num]:inline-block [&_.line-num]:w-[3rem] [&_.line-num]:text-right [&_.line-num]:pr-3 [&_.line-num]:mr-3
             [&_.line-num]:text-[var(--text-muted)] [&_.line-num]:select-none
             [&_.line-num]:border-r [&_.line-num]:border-[var(--border-base)] [&_.line-num]:text-[11px]
-            [&_.line-wrapper]:relative [&_.line-wrapper]:hover:bg-[var(--surface-hover)]/30
+            [&_.line-wrapper]:relative [&_.line-wrapper]:leading-tight [&_.line-wrapper]:hover:bg-[var(--surface-hover)]/30
             [&_.line-add-btn]:hidden [&_.line-wrapper:hover_.line-add-btn]:inline-flex
             [&_.line-add-btn]:absolute [&_.line-add-btn]:left-[2px] [&_.line-add-btn]:top-0
             [&_.line-add-btn]:items-center [&_.line-add-btn]:justify-center

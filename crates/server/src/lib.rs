@@ -117,7 +117,7 @@ impl AppState {
                 .collect();
             if !active.is_empty() {
                 let tools = self.mcp_manager.connect_from_config(&active).await;
-                tracing::info!("Loaded {} MCP server(s) from settings", tools.len());
+                tracing::debug!("Loaded {} MCP server(s) from settings", tools.len());
                 let mut saved = self.mcp_configs.write().await;
                 *saved = active;
             }
