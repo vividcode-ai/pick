@@ -9,7 +9,8 @@ import { PermissionDialog } from "./components/Chat/PermissionDialog";
 import { QuestionDialog } from "./components/Chat/QuestionDialog";
 import { SettingsScreen } from "./components/Settings/SettingsScreen";
 import { useTheme } from "./lib/ThemeProvider";
-import { useSessionManager, fetchProviders } from "./hooks/useSessionManager";
+import { useSessionManager } from "./hooks/useSessionManager";
+import { useModelState } from "./hooks/useModelState";
 import { useCommandPalette } from "./hooks/useCommandPalette";
 import {
   registerDefaultCommands,
@@ -28,10 +29,9 @@ import {
   archiveSessionEntry,
   unarchiveSessionEntry,
   updateSessionEntry,
-  getSessionEntry,
   initSessions,
 } from "./stores/sessions";
-import type { ChatMessage, ProviderInfo } from "./types/events";
+import type { ChatMessage } from "./types/events";
 
 async function detectBaseUrl(): Promise<string> {
   const params = new URLSearchParams(window.location.search);
@@ -54,11 +54,18 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarPinned, setSidebarPinned] = useState(true);
   const [settingsUrl, setSettingsUrl] = useState("");
-  const [providers, setProviders] = useState<ProviderInfo[]>([]);
-  const [selectedModel, setSelectedModel] = useState(() => localStorage.getItem("pick_selected_model") ?? "");
-  const [selectedProvider, setSelectedProvider] = useState(() => localStorage.getItem("pick_selected_provider") ?? "");
-  const [thinkingLevel, setThinkingLevel] = useState(() => localStorage.getItem("pick_thinking_level") ?? "off");
   const { cycleThemeMode } = useTheme();
+
+  const {
+    providers,
+    selectedModel,
+    selectedProvider,
+    thinkingLevel,
+    setSelectedModel,
+    setSelectedProvider,
+    setThinkingLevel,
+    syncFromSession,
+  } = useModelState(baseUrl);
 
   useEffect(() => {
     detectBaseUrl().then((url) => {
@@ -70,27 +77,7 @@ export default function App() {
   useEffect(() => {
     if (!baseUrl) return;
     initAppSettings(baseUrl);
-    fetchProviders(baseUrl).then((list) => {
-      setProviders(list);
-    });
   }, [baseUrl]);
-
-  useEffect(() => {
-    if (providers.length === 0) return;
-    const currentProvider = providers.find(p => p.provider === selectedProvider);
-    if (currentProvider?.has_key) {
-      const modelExists = currentProvider.models.some(m => m.id === selectedModel);
-      if (modelExists) return;
-    }
-    const firstWithKey = providers.find(p => p.has_key);
-    if (firstWithKey && firstWithKey.models.length > 0) {
-      setSelectedModel(firstWithKey.models[0].id);
-      setSelectedProvider(firstWithKey.provider);
-    } else {
-      setSelectedModel("");
-      setSelectedProvider("");
-    }
-  }, [providers, selectedModel, selectedProvider]);
 
   useEffect(() => {
     if (!baseUrl) return;
@@ -249,18 +236,9 @@ export default function App() {
   const handleSelectSession = useCallback(
     (id: string) => {
       switchSession(id);
-      const session = getSessionEntry(id);
-      if (session) {
-        if (session.modelId && session.provider) {
-          setSelectedModel(session.modelId);
-          setSelectedProvider(session.provider);
-        }
-        if (session.thinkingLevel) {
-          setThinkingLevel(session.thinkingLevel);
-        }
-      }
+      syncFromSession(id);
     },
-    [switchSession]
+    [switchSession, syncFromSession]
   );
 
   const handleRenameSession = useCallback(

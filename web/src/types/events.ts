@@ -86,16 +86,38 @@ export interface SessionInfo {
   streaming: boolean;
 }
 
+export interface ModelCapabilities {
+  input?: string[];
+  reasoning?: boolean;
+}
+
 export interface ModelInfo {
   id: string;
   name: string;
   reasoning: boolean;
+  context?: number;
+  cost_input?: number;
+  cost_output?: number;
+  capabilities?: ModelCapabilities;
+  status?: "active" | "beta" | "alpha" | "deprecated";
+  release_date?: string;
+}
+
+export interface FlatModel extends ModelInfo {
+  provider: string;
+  providerDisplayName: string;
+  searchText: string;
 }
 
 export interface ProviderInfo {
   provider: string;
   has_key: boolean;
   models: ModelInfo[];
+}
+
+export interface GroupInfo<T> {
+  category: string;
+  items: T[];
 }
 
 export interface TodoItem {
