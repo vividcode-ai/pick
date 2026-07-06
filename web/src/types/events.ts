@@ -119,7 +119,31 @@ export interface LineComment {
   id: string;
   file: string;
   line: number;
+  line_end?: number;
+  side?: "additions" | "deletions";
   comment: string;
   time: number;
   resolved: boolean;
+}
+
+export interface GitDiffEntry {
+  path: string;
+  status: string;
+  additions: number;
+  deletions: number;
+  patch: string;
+  binary: boolean;
+}
+
+export interface GitDiffsResponse {
+  branch: string;
+  files: GitDiffEntry[];
+}
+
+export interface ReviewFileComment {
+  file: string;
+  line: number;
+  line_end?: number;
+  side?: "additions" | "deletions";
+  comment: string;
 }

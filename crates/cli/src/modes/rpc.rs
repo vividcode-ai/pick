@@ -213,6 +213,7 @@ pub async fn run_rpc_mode(
                         sandbox_enabled: Some(sandbox_enabled.clone()),
                         cancel_signal_tx: None,
                         skill_paths: Vec::new(),
+                        parent_goal_manager: None,
                         on_turn_complete: None,
                     };
 

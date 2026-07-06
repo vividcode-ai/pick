@@ -5,11 +5,43 @@
   overflow-x: auto;
 }
 
+.diff-viewer-placeholder {
+  background: var(--surface-base);
+  border-radius: 8px;
+  border: 1px solid var(--border-base);
+}
+
+.diff-viewer-split {
+  display: grid;
+  grid-template-columns: 1fr 1px 1fr;
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-x: auto;
+}
+
+.diff-split-left {
+  overflow-x: auto;
+}
+
+.diff-split-right {
+  overflow-x: auto;
+}
+
+.diff-split-divider {
+  background: var(--border-base);
+  height: 100%;
+}
+
 .diff-line {
   display: flex;
   padding: 0 0.5rem;
   min-height: 1.5em;
   white-space: pre;
+}
+
+.diff-line-empty {
+  background: var(--surface-base);
 }
 
 .diff-line-add {
@@ -47,4 +79,17 @@
 
 .diff-line-remove .diff-line-number {
   color: #ef4444;
+}
+
+/* Comment popup - positioned adjacent to diff line */
+.diff-comment-popup {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  z-index: 20;
+  background: var(--surface-base);
+  border: 1px solid var(--border-base);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }

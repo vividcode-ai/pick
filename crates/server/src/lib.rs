@@ -291,6 +291,8 @@ pub fn create_app(state: Arc<AppState>) -> Router {
         .route("/sessions/{id}/summarize", post(rest::summarize_session))
         .route("/sessions/{id}/status", get(rest::get_session_status))
         .route("/sessions/{id}/git-info", get(rest::get_session_git_info))
+        .route("/sessions/{id}/git-diffs", get(rest::get_session_git_diffs))
+        .route("/sessions/{id}/branches", get(rest::get_session_branches))
         .route("/providers", get(rest::list_providers))
         .route("/events/{session_id}", get(sse::handle_sse))
         .route("/ask", post(routes::ask))

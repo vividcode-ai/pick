@@ -341,13 +341,32 @@ pub async fn run_interactive_mode(
                                 _ => {
                                     if goal_manager.get().is_some() {
                                         println!("A goal already exists. Use /goal clear first.");
-                                    } else if let Err(e) =
-                                        goal_manager.create(args.to_string(), None)
-                                    {
-                                        eprintln!("Error: {}", e);
                                     } else {
-                                        session_manager.persist_goal().await.ok();
-                                        println!("\x1b[32mGoal set:\x1b[0m  {}", args);
+                                        let (objective, criterion) =
+                                            if let Some(pos) = args.find(" || ") {
+                                                (
+                                                    args[..pos].trim().to_string(),
+                                                    args[pos + 4..].trim().to_string(),
+                                                )
+                                            } else {
+                                                (args.to_string(), String::new())
+                                            };
+                                        if let Err(e) =
+                                            goal_manager.create(objective.clone(), criterion, None)
+                                        {
+                                            eprintln!("Error: {}", e);
+                                        } else {
+                                            session_manager.persist_goal().await.ok();
+                                            let tip = if args.contains(" || ") {
+                                                String::new()
+                                            } else {
+                                                " (no completion criterion)".to_string()
+                                            };
+                                            println!(
+                                                "\x1b[32mGoal set:\x1b[0m  {}{}",
+                                                objective, tip
+                                            );
+                                        }
                                     }
                                 }
                             }
@@ -829,6 +848,14 @@ pub async fn run_interactive_mode(
                             {
                                 let objective =
                                     crate::modes::tui::agent_exec::escape_xml_text(&goal.objective);
+                                let criterion = crate::modes::tui::agent_exec::escape_xml_text(
+                                    &goal.completion_criterion,
+                                );
+                                let criterion_display = if criterion.is_empty() {
+                                    "none".to_string()
+                                } else {
+                                    criterion
+                                };
                                 let token_budget_str = goal
                                     .token_budget
                                     .map(|b| b.to_string())
@@ -841,6 +868,7 @@ pub async fn run_interactive_mode(
                                     include_str!("../../templates/goals/steering_active.md"),
                                     &[
                                         ("objective", &objective),
+                                        ("completion_criterion", &criterion_display),
                                         ("tokens_used", &goal.tokens_used.to_string()),
                                         ("token_budget", &token_budget_str),
                                         ("remaining_tokens", &remaining_tokens),
@@ -1008,6 +1036,7 @@ pub async fn run_interactive_mode(
                         std::io::stdout().flush().ok();
                     })),
                     skill_paths,
+                    parent_goal_manager: None,
                 };
 
                 match crate::core::agent_session::run_agent_loop_with_retry(

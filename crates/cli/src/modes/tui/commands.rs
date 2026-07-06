@@ -16,10 +16,7 @@ pub(crate) fn apply_tui_command(tui: &mut TuiApp, cmd: TuiCommand) {
         } => {
             if tool_name != "question"
                 && tool_name != "todo_plan"
-                && !matches!(
-                    tool_name.as_str(),
-                    "get_goal" | "create_goal" | "update_goal"
-                )
+                && !matches!(tool_name.as_str(), "goal")
             {
                 tui.add_tool_execution(&tool_call_id, &tool_name, args);
             }
@@ -38,10 +35,7 @@ pub(crate) fn apply_tui_command(tui: &mut TuiApp, cmd: TuiCommand) {
         } => {
             if tool_name != "question"
                 && tool_name != "todo_plan"
-                && !matches!(
-                    tool_name.as_str(),
-                    "get_goal" | "create_goal" | "update_goal"
-                )
+                && !matches!(tool_name.as_str(), "goal")
             {
                 tui.update_tool_execution(&tool_call_id, &output, is_error);
             }
@@ -150,6 +144,9 @@ pub(crate) fn apply_tui_command(tui: &mut TuiApp, cmd: TuiCommand) {
         }
         // ShareResult is handled in runner.rs with TuiContext access
         TuiCommand::ShareResult { .. } => {}
+        TuiCommand::ToggleGoalPanel => {
+            // Placeholder: goal panel toggle — future enhancement
+        }
     }
 }
 
@@ -189,7 +186,11 @@ pub(crate) fn apply_goal_update(tui: &mut TuiApp, goal: &serde_json::Value) {
             "complete" => "✅",
             _ => "🎯",
         };
-        tui.set_goal_status(Some(&format!("{} {}", icon, short)));
+        let tokens_used = goal.get("tokensUsed").and_then(|v| v.as_i64()).unwrap_or(0);
+        tui.set_goal_status(Some(&format!(
+            "{} {}  [{} tokens]",
+            icon, short, tokens_used
+        )));
     }
 }
 

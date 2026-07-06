@@ -144,6 +144,9 @@ pub struct TodoUpdateEntry {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GoalEntry {
     pub objective: String,
+    /// Verifiable completion criterion; empty string means not set
+    #[serde(default)]
+    pub completion_criterion: String,
     pub status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub token_budget: Option<i64>,

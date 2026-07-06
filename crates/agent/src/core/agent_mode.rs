@@ -45,9 +45,7 @@ impl AgentMode {
         rules.push(Rule::new("bash", "*", Action::Allow));
         rules.push(Rule::new("webfetch", "*", Action::Allow));
         rules.push(Rule::new("todo_plan", "*", Action::Allow));
-        rules.push(Rule::new("create_goal", "*", Action::Allow));
-        rules.push(Rule::new("update_goal", "*", Action::Allow));
-        rules.push(Rule::new("get_goal", "*", Action::Allow));
+        rules.push(Rule::new("goal", "*", Action::Allow));
         rules.push(Rule::new("plan_enter", "*", Action::Allow));
         rules.push(Rule::new("plan_exit", "*", Action::Deny));
 

@@ -100,7 +100,11 @@ impl TuiApp {
             autocomplete_lines = 0;
         }
         let status_lines = if self.status_text.is_some() {
-            1_u16
+            if self.status_subtext.is_some() {
+                2_u16
+            } else {
+                1_u16
+            }
         } else {
             0_u16
         };
@@ -362,6 +366,18 @@ impl TuiApp {
                             frame.render_widget_ref(&status_line, chunks[i]);
                         }
                         i += 1;
+
+                        // Render subtext (e.g. goal tips) below the status line
+                        if let Some(ref subtext) = self.status_subtext {
+                            if i < chunks.len() {
+                                let sub_line = Line::from(Span::styled(
+                                    subtext,
+                                    Style::default().add_modifier(Modifier::DIM),
+                                ));
+                                frame.render_widget_ref(&sub_line, chunks[i]);
+                            }
+                            i += 1;
+                        }
 
                         render_at!(i, Line::from(""));
                         i += 1;
@@ -1306,6 +1322,13 @@ impl TuiApp {
     /// Set the status text without starting the spinner animation.
     pub fn set_goal_status(&mut self, status: Option<&str>) {
         self.status_text = status.map(|s| s.to_string());
+        self.status_subtext = None;
+    }
+
+    /// Set the goal status with an optional second line of detail text.
+    pub fn set_goal_status_detail(&mut self, status: Option<&str>, detail: Option<&str>) {
+        self.status_text = status.map(|s| s.to_string());
+        self.status_subtext = detail.map(|s| s.to_string());
     }
 
     /// Advance the spinner animation frame by one.

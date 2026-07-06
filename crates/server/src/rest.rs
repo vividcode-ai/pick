@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::AppState;
-use crate::git::get_git_info;
+use crate::git::{GitDiffsResponse, get_git_diffs, get_git_info, list_git_branches};
 use crate::session::SessionInfo;
 
 #[derive(Serialize, ToSchema)]
@@ -458,6 +458,67 @@ pub async fn get_session_git_info(
     };
     let git_info = get_git_info(&cwd);
     Json(git_info).into_response()
+}
+
+#[derive(Deserialize)]
+pub struct GitDiffsQuery {
+    pub base: Option<String>,
+}
+
+/// Get git diffs for a session's workspace
+#[utoipa::path(
+    get,
+    path = "/sessions/{id}/git-diffs",
+    tag = "sessions",
+    params(
+        ("id" = String, Path, description = "Session ID"),
+    ),
+    responses(
+        (status = 200, description = "Git diffs"),
+        (status = 404, description = "Session not found"),
+    )
+)]
+pub async fn get_session_git_diffs(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+    Query(query): Query<GitDiffsQuery>,
+) -> impl IntoResponse {
+    let session = match state.session_manager.get(&id).await {
+        Some(s) => s,
+        None => return (StatusCode::NOT_FOUND, "Session not found").into_response(),
+    };
+    let cwd = match session.cwd {
+        Some(ref c) => std::path::PathBuf::from(c),
+        None => return (StatusCode::NOT_FOUND, "No workspace directory").into_response(),
+    };
+    let diffs: GitDiffsResponse = get_git_diffs(&cwd, query.base.as_deref());
+    Json(diffs).into_response()
+}
+
+/// List git branches for a session's workspace
+#[utoipa::path(
+    get,
+    path = "/sessions/{id}/branches",
+    tag = "sessions",
+    responses(
+        (status = 200, description = "List of git branches"),
+        (status = 404, description = "Session not found"),
+    )
+)]
+pub async fn get_session_branches(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    let session = match state.session_manager.get(&id).await {
+        Some(s) => s,
+        None => return (StatusCode::NOT_FOUND, "Session not found").into_response(),
+    };
+    let cwd = match session.cwd {
+        Some(ref c) => std::path::PathBuf::from(c),
+        None => return (StatusCode::NOT_FOUND, "No workspace directory").into_response(),
+    };
+    let branches = list_git_branches(&cwd);
+    Json(branches).into_response()
 }
 
 #[derive(Serialize, ToSchema)]

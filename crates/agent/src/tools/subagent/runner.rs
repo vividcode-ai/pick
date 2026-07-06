@@ -40,6 +40,7 @@ fn build_subagent_loop_config(
     mode_rulesets: Option<Vec<Ruleset>>,
     sandbox: Option<Arc<dyn SandboxTrait>>,
     sandbox_enabled: Option<Arc<AtomicBool>>,
+    parent_goal_manager: Option<Arc<crate::session::goal::GoalManager>>,
 ) -> AgentLoopConfig {
     AgentLoopConfig {
         model,
@@ -75,6 +76,7 @@ fn build_subagent_loop_config(
         sandbox_enabled,
         cancel_signal_tx: None,
         skill_paths: Vec::new(),
+        parent_goal_manager,
     }
 }
 
@@ -133,6 +135,7 @@ async fn run_subagent_turn(
     permission_manager: Option<Arc<PermissionManager>>,
     mode_rulesets: Option<Vec<Ruleset>>,
     sandbox: Option<Arc<dyn SandboxTrait>>,
+    parent_goal_manager: Option<Arc<crate::session::goal::GoalManager>>,
 ) -> SingleResult {
     let mut result = SingleResult {
         agent: agent.name.clone(),
@@ -210,6 +213,7 @@ async fn run_subagent_turn(
         mode_rulesets,
         sandbox,
         None, // subagents inherit parent sandbox_enabled via ToolContext
+        parent_goal_manager,
     );
 
     let initial_messages = vec![Message::User(UserMessage::text(format!("Task: {}", task)))];
@@ -295,6 +299,7 @@ async fn run_single_agent(
     permission_manager: Option<Arc<PermissionManager>>,
     mode_rulesets: Option<Vec<Ruleset>>,
     sandbox: Option<Arc<dyn SandboxTrait>>,
+    parent_goal_manager: Option<Arc<crate::session::goal::GoalManager>>,
 ) -> SingleResult {
     let mut result = SingleResult {
         agent: agent.name.clone(),
@@ -320,6 +325,7 @@ async fn run_single_agent(
         permission_manager,
         mode_rulesets,
         sandbox,
+        parent_goal_manager,
     )
     .await
 }
@@ -341,6 +347,7 @@ async fn execute_subagent_with_events(
     }
 
     let parent_id = ctx.agent_id.as_deref().unwrap_or("root");
+    let parent_goal_manager = ctx.parent_goal_manager.clone();
     let result = run_single_agent(
         agent,
         task,
@@ -355,6 +362,7 @@ async fn execute_subagent_with_events(
         ctx.permission_manager.clone(),
         ctx.permission_manager.as_ref().map(|_| Vec::new()),
         ctx.sandbox.clone(),
+        parent_goal_manager,
     )
     .await;
 
@@ -479,6 +487,7 @@ async fn run_parallel_agents(
                     registry.as_deref(),
                     &parent_id,
                     model,
+                    None,
                     None,
                     None,
                     None,

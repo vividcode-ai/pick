@@ -145,6 +145,8 @@ pub struct TuiApp {
     pub(crate) last_render_width: u16,
     pub(crate) autocomplete_space_lines: u16,
     pub status_text: Option<String>,
+    /// Optional second line rendered below the status bar (e.g. goal tips).
+    pub status_subtext: Option<String>,
     pub status_frame: usize,
     pub agent_start_time: Option<std::time::Instant>,
     /// Set to true once streaming has ever started. Prevents the viewport

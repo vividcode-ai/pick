@@ -74,6 +74,8 @@ pub(crate) enum TuiCommand {
         url: Option<String>,
         error: Option<String>,
     },
+    /// Toggle the goal detail panel display
+    ToggleGoalPanel,
 }
 
 /// TUI approval hook that shows a permission dialog in the TUI viewport

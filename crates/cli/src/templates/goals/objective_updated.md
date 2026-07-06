@@ -9,5 +9,5 @@ Budget: {{ tokens_used }} tokens used · {{ token_budget }} budget · {{ remaini
 
 Redirect this turn toward the updated objective. Drop work that only served the previous goal unless it also advances the new one.
 
-Do not call update_goal unless the updated objective is audited and provably complete.
+Do not call goal(op:"complete") unless the updated objective is audited and provably complete.
 </goal_context>

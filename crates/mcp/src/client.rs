@@ -22,9 +22,7 @@ const BUILTIN_TOOL_NAMES: &[&str] = &[
     "webfetch",
     "todo_plan",
     "question",
-    "get_goal",
-    "create_goal",
-    "update_goal",
+    "goal",
 ];
 
 /// Type alias for the rmcp client handle

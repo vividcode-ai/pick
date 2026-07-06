@@ -493,6 +493,7 @@ async fn run_agent_loop_queue(
             sandbox_enabled: None,
             cancel_signal_tx: Some(Arc::new(cancel_tx)),
             skill_paths: Vec::new(),
+            parent_goal_manager: None,
             on_turn_complete: None,
         };
 

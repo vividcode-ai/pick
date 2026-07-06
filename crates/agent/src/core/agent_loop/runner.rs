@@ -621,6 +621,7 @@ async fn handle_tool_execution(
             sandbox: config.sandbox.clone(),
             sandbox_enabled: config.sandbox_enabled.clone(),
             tool_event_bus: config.tool_event_bus.clone(),
+            parent_goal_manager: config.parent_goal_manager.clone(),
         };
 
         // Spawn a task to forward progress events while the tool executes
@@ -895,6 +896,7 @@ async fn handle_tool_execution(
             let permission_manager = config.permission_manager.clone();
             let sandbox_enabled = sandbox_enabled.clone();
             let tool_event_bus = config.tool_event_bus.clone();
+            let parent_goal_manager = config.parent_goal_manager.clone();
             parallel_tool_infos.push((tc.name.clone(), tc.id.clone()));
             parallel_handles.push(tokio::spawn(async move {
                 let (progress_tx, _progress_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
@@ -912,6 +914,7 @@ async fn handle_tool_execution(
                     sandbox: None,
                     sandbox_enabled: sandbox_enabled.clone(),
                     tool_event_bus: tool_event_bus.clone(),
+                    parent_goal_manager: parent_goal_manager.clone(),
                 };
                 let validated_args =
                     match validate_tool_arguments(&tool, &tc.arguments, &tc.arguments) {

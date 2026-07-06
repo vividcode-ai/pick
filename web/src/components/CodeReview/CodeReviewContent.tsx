@@ -1,105 +1,161 @@
-import { useState, useCallback, useEffect, useRef } from "react";
-import { Loader2, Play, FileText, GitBranch, CheckCircle, AlertCircle } from "lucide-react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { Loader2, Play, CheckCircle, AlertCircle, FileText, GitBranch } from "lucide-react";
 import { DiffViewer } from "../Chat/DiffViewer";
-import type { GitInfo } from "../../types/events";
+import { ReviewAccordion, type AccordionItem } from "./ReviewAccordion";
+import { ReviewHeader } from "./ReviewHeader";
+import { createScrollSaver, getReviewScroll, createVisibilityTracker } from "./ReviewVirtualScroll";
+import { subscribeToComments, getCommentsByFile, addComment, loadCommentsFromServer } from "../../stores/comments";
+import type { GitDiffEntry, GitDiffsResponse, GitInfo } from "../../types/events";
+
+type DiffSource = "git" | "branch";
+type DiffStyle = "unified" | "split";
+type ReviewState = "idle" | "streaming" | "done" | "error";
 
 interface CodeReviewContentProps {
   baseUrl: string;
   sessionId: string | null;
+  onAsk?: ((prompt: string) => void) | null;
 }
 
-export function CodeReviewContent({ baseUrl, sessionId }: CodeReviewContentProps) {
+export function CodeReviewContent({ baseUrl, sessionId, onAsk }: CodeReviewContentProps) {
+  // ── Git diffs state ──
   const [gitInfo, setGitInfo] = useState<GitInfo | null>(null);
-  const [loadingGit, setLoadingGit] = useState(false);
-  const [gitError, setGitError] = useState<string | null>(null);
-  const [reviewState, setReviewState] = useState<"idle" | "streaming" | "done" | "error">("idle");
-  const [reviewText, setReviewText] = useState("");
-  const eventSourceRef = useRef<EventSource | null>(null);
-  const [reviewError, setReviewError] = useState<string | null>(null);
-  const [expandedDiffs, setExpandedDiffs] = useState<Record<string, boolean>>({});
-  const [fileDiffs, setFileDiffs] = useState<Record<string, string>>({});
-  const [loadingDiffs, setLoadingDiffs] = useState<Record<string, boolean>>({});
+  const [gitDiffs, setGitDiffs] = useState<GitDiffEntry[]>([]);
+  const [loadingDiffs, setLoadingDiffs] = useState(false);
+  const [diffError, setDiffError] = useState<string | null>(null);
 
+  // ── Settings ──
+  const [diffSource, setDiffSource] = useState<DiffSource>("git");
+  const [diffStyle, setDiffStyle] = useState<DiffStyle>("unified");
+  const [branchName, setBranchName] = useState("main");
+  const [branchSuggestions, setBranchSuggestions] = useState<string[]>([]);
+  const [expandedFiles, setExpandedFiles] = useState<string[]>([]);
+  const [commentPanelOpen, setCommentPanelOpen] = useState(false);
+
+  // ── AI Review state ──
+  const [reviewState, setReviewState] = useState<ReviewState>("idle");
+  const [reviewText, setReviewText] = useState("");
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
+
+  // ── Comments ──
+  const [allComments, setAllComments] = useState<number>(0);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const scrollSaverRef = useRef<((top: number) => void) | null>(null);
+  const visibilityRef = useRef<ReturnType<typeof createVisibilityTracker> | null>(null);
+  const visibilityReadyRef = useRef(false);
+
+  // ── Fetch git info ──
   useEffect(() => {
     if (!sessionId) return;
-    setLoadingGit(true);
-    setGitError(null);
     fetch(`${baseUrl}/sessions/${sessionId}/git-info`)
       .then(async (res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
       })
-      .then((data: GitInfo) => {
-        setGitInfo(data);
-        setLoadingGit(false);
-      })
-      .catch((e) => {
-        setGitError(e.message || "Failed to load git info");
-        setLoadingGit(false);
-      });
+      .then((data: GitInfo) => setGitInfo(data))
+      .catch(() => {});
   }, [baseUrl, sessionId]);
 
-  const handleToggleDiff = useCallback(async (filePath: string) => {
-    const isCurrentlyExpanded = expandedDiffs[filePath];
-    setExpandedDiffs(prev => ({ ...prev, [filePath]: !isCurrentlyExpanded }));
-    if (!isCurrentlyExpanded && !fileDiffs[filePath]) {
-      setLoadingDiffs(prev => ({ ...prev, [filePath]: true }));
-      try {
-        const res = await fetch(`${baseUrl}/files/content?path=${encodeURIComponent(filePath)}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (!data.binary) {
-            setFileDiffs(prev => ({ ...prev, [filePath]: data.content }));
-          } else {
-            setFileDiffs(prev => ({ ...prev, [filePath]: "[Binary file]" }));
-          }
-        }
-      } catch (e) {
-        console.error("Failed to load file:", e);
-      }
-      setLoadingDiffs(prev => ({ ...prev, [filePath]: false }));
-    }
-  }, [baseUrl, expandedDiffs, fileDiffs]);
+  // ── Fetch branch suggestions ──
+  useEffect(() => {
+    if (!sessionId) return;
+    fetch(`${baseUrl}/sessions/${sessionId}/branches`)
+      .then((r) => r.json())
+      .then((data: string[]) => setBranchSuggestions(data))
+      .catch(() => {});
+  }, [baseUrl, sessionId]);
 
+  // ── Fetch git diffs ──
+  useEffect(() => {
+    if (!sessionId) return;
+    setLoadingDiffs(true);
+    setDiffError(null);
+
+    let url = `${baseUrl}/sessions/${sessionId}/git-diffs`;
+    if (diffSource === "branch" && branchName) {
+      url += `?base=${encodeURIComponent(branchName)}`;
+    }
+
+    fetch(url)
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data: GitDiffsResponse) => {
+        setGitDiffs(data.files.filter((f) => !f.binary));
+        setLoadingDiffs(false);
+      })
+      .catch((e) => {
+        setDiffError(e.message || "Failed to load diffs");
+        setLoadingDiffs(false);
+      });
+  }, [baseUrl, sessionId, diffSource, branchName]);
+
+  // ── Load comments from server ──
+  useEffect(() => {
+    if (!sessionId || !baseUrl) return;
+    loadCommentsFromServer(baseUrl, sessionId).catch(() => {});
+    const unsub = subscribeToComments(() => {
+      let count = 0;
+      for (const f of gitDiffs) {
+        count += getCommentsByFile(f.path).length;
+      }
+      setAllComments(count);
+    });
+    return () => { unsub?.(); };
+  }, [baseUrl, sessionId, gitDiffs]);
+
+  // ── Scroll persistence ──
+  useEffect(() => {
+    if (!sessionId) return;
+    scrollSaverRef.current = createScrollSaver(sessionId);
+    // Restore scroll position after a short delay
+    const saved = getReviewScroll(sessionId);
+    if (saved && scrollContainerRef.current) {
+      requestAnimationFrame(() => {
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTop = saved;
+        }
+      });
+    }
+  }, [sessionId]);
+
+  // ── Visibility tracker for virtual rendering ──
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container || visibilityReadyRef.current) return;
+    visibilityRef.current = createVisibilityTracker(container, 300);
+    visibilityReadyRef.current = true;
+    return () => {
+      visibilityRef.current?.destroy();
+      visibilityReadyRef.current = false;
+    };
+  }, [gitDiffs]);
+
+  // ── Cleanup SSE on unmount ──
   useEffect(() => {
     return () => {
       eventSourceRef.current?.close();
     };
   }, []);
 
+  // ── Handle AI Review ──
   const handleStartReview = useCallback(async () => {
     if (!sessionId) return;
     setReviewState("streaming");
     setReviewText("");
-    setReviewError(null);
 
     try {
-      const res = await fetch(`${baseUrl}/sessions/${sessionId}/git-info`);
-      let gitContext = "";
-      if (res.ok) {
-        const info: GitInfo = await res.json();
-        gitContext = `\nCurrent branch: ${info.branch}\nChanged files:\n${
-          info.changes.map((c) => `  ${c.status} ${c.path}`).join("\n")
-        }`;
-      }
-
-      const prompt = `Please review the following code changes and provide a thorough code review. ${gitContext}\n\nPlease analyze the changes for:
-1. Potential bugs and logic errors
-2. Security issues and risks
-3. Code style and best practices
-4. Performance optimization suggestions
-5. Maintainability and readability improvements
-
-Provide specific suggestions with code examples where applicable.`;
+      const filesContext = gitDiffs.map((f) => `  ${f.status} ${f.path} (+${f.additions}/-${f.deletions})`).join("\n");
+      const prompt = `Please review the following code changes and provide a thorough code review.\n\nCurrent branch: ${gitInfo?.branch || "unknown"}\nChanged files:\n${filesContext}\n\nPlease analyze the changes for:\n1. Potential bugs and logic errors\n2. Security issues and risks\n3. Code style and best practices\n4. Performance optimization suggestions\n5. Maintainability and readability improvements\n\nFor each issue found, reference the specific file and line numbers where applicable. Use the format "FILE:LINE - description" so issues can be mapped to inline comments.\n\nProvide specific suggestions with code examples where applicable.`;
 
       const askRes = await fetch(`${baseUrl}/ask`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ session_id: sessionId, prompt }),
       });
-      if (!askRes.ok) {
-        throw new Error(`Failed to start review: HTTP ${askRes.status}`);
-      }
+      if (!askRes.ok) throw new Error(`HTTP ${askRes.status}`);
 
       const es = new EventSource(`${baseUrl}/events/${sessionId}`);
       eventSourceRef.current = es;
@@ -129,136 +185,255 @@ Provide specific suggestions with code examples where applicable.`;
       setReviewState("error");
       setReviewError(e.message || "Failed to start review");
     }
-  }, [baseUrl, sessionId]);
+  }, [baseUrl, sessionId, gitDiffs, gitInfo?.branch]);
+
+  // ── Apply AI review as inline comments ──
+  const handleApplyAsComments = useCallback(() => {
+    // Parse FILE:LINE pattern from review text
+    const pattern = /(\S+?):(\d+)\s*[-–—]\s*(.+?)(?=\n\S+?:\d+\s*[-–—]|\n\n|$)/gs;
+    let match;
+    let count = 0;
+    while ((match = pattern.exec(reviewText)) !== null) {
+      const [, filePath, lineStr, comment] = match;
+      const line = parseInt(lineStr, 10);
+      if (filePath && !isNaN(line) && comment) {
+        addComment({ file: filePath, line, comment: comment.trim(), resolved: false });
+        count++;
+      }
+    }
+    if (count > 0) {
+      // Expand files where comments were added
+      const filesWithComments = gitDiffs
+        .filter((f) => getCommentsByFile(f.path).length > 0)
+        .map((f) => f.path);
+      setExpandedFiles((prev) => [...new Set([...prev, ...filesWithComments])]);
+    }
+  }, [reviewText, gitDiffs]);
+
+  // ── Helper ──
+  const allFilePaths = useMemo(() => gitDiffs.map((f) => f.path), [gitDiffs]);
+  const statusMap: Record<string, string> = {
+    "M": "Modified", "A": "Added", "D": "Deleted", "R": "Renamed", "??": "Untracked",
+  };
+
+  const handleScroll = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (!el || !sessionId || !scrollSaverRef.current) return;
+    scrollSaverRef.current(el.scrollTop);
+  }, [sessionId]);
+
+  // ── Build accordion items ──
+  const accordionItems: AccordionItem[] = useMemo(() => gitDiffs.map((diff) => ({
+    value: diff.path,
+    disabled: diff.binary,
+    header: (
+      <div className="review-file-info" data-file={diff.path}>
+        <span className={`review-status-badge ${
+          diff.status === "A" ? "review-status-added" :
+          diff.status === "D" ? "review-status-deleted" :
+          diff.status === "R" ? "review-status-renamed" :
+          diff.status === "??" ? "review-status-untracked" :
+          "review-status-modified"
+        }`}>
+          {diff.status}
+        </span>
+        <FileText className="w-3.5 h-3.5 shrink-0 text-[var(--text-muted)]" />
+        <div className="min-w-0 flex-1 flex items-baseline gap-1 overflow-hidden">
+          {diff.path.includes("/") && (
+            <span className="review-file-directory">{diff.path.substring(0, diff.path.lastIndexOf("/") + 1)}</span>
+          )}
+          <span className="review-file-filename">{diff.path.split("/").pop() || diff.path}</span>
+        </div>
+        <span className="review-changes">
+          <span className="review-changes-additions">+{diff.additions}</span>
+          <span className="review-changes-separator">/</span>
+          <span className="review-changes-deletions">-{diff.deletions}</span>
+        </span>
+        <div className="review-header-actions">
+          <button
+            className="review-view-file-btn"
+            title="View file"
+            onClick={(e) => {
+              e.stopPropagation();
+              window.open(`${baseUrl}/files/content?path=${encodeURIComponent(diff.path)}`, "_blank");
+            }}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+            </svg>
+          </button>
+          {getCommentsByFile(diff.path).length > 0 && (
+            <span className="review-comment-count">{getCommentsByFile(diff.path).length}</span>
+          )}
+        </div>
+        <span className={`review-chevron ${expandedFiles.includes(diff.path) ? "review-chevron-open" : ""}`}>
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </span>
+      </div>
+    ),
+    children: (
+      <DiffViewer
+        diffText={diff.patch}
+        filePath={diff.path}
+        baseUrl={baseUrl}
+        onAsk={onAsk ?? null}
+        mode={diffStyle}
+        visible={true}
+      />
+    ),
+  })), [gitDiffs, baseUrl, onAsk, diffStyle, expandedFiles]);
+
+  // ── Loading state ──
+  if (loadingDiffs) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
+          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          Loading diffs...
+        </div>
+      </div>
+    );
+  }
+
+  if (diffError) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="flex items-center gap-2 text-xs text-red-400">
+          <AlertCircle className="w-3.5 h-3.5" />
+          {diffError}
+        </div>
+      </div>
+    );
+  }
+
+  if (!sessionId) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="text-xs text-[var(--text-muted)]">Select a session to review</div>
+      </div>
+    );
+  }
 
   return (
-    <div className="h-full overflow-auto flex flex-col">
-      {/* Git Info */}
-      <div className="px-3 py-2 border-b border-[var(--border-base)] shrink-0">
-        {loadingGit ? (
-          <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
-            <Loader2 className="w-3 h-3 animate-spin" />
-            Loading git info...
+    <div className="h-full flex flex-col">
+      {/* Header */}
+      <ReviewHeader
+        diffSource={diffSource}
+        onDiffSourceChange={setDiffSource}
+        diffStyle={diffStyle}
+        onDiffStyleChange={setDiffStyle}
+        branchName={branchName}
+        onBranchNameChange={setBranchName}
+        branchSuggestions={branchSuggestions}
+        expandedCount={expandedFiles.length}
+        totalFiles={gitDiffs.length}
+        onExpandAll={() => setExpandedFiles(allFilePaths)}
+        onCollapseAll={() => setExpandedFiles([])}
+        onStartReview={handleStartReview}
+        reviewState={reviewState}
+        commentCount={allComments}
+        onToggleComments={() => setCommentPanelOpen((v) => !v)}
+        commentPanelOpen={commentPanelOpen}
+      />
+
+      {/* Git Info Summary */}
+      {gitInfo && (
+        <div className="px-3 py-1.5 border-b border-[var(--border-base)] flex items-center gap-2 text-xs text-[var(--text-muted)] shrink-0">
+          <GitBranch className="w-3 h-3" />
+          <span className="font-medium text-[var(--text-primary)]">{gitInfo.branch}</span>
+          <span>&mdash; {gitDiffs.length} file{gitDiffs.length !== 1 ? "s" : ""} changed</span>
+        </div>
+      )}
+
+      {/* Scrollable Content */}
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 overflow-auto"
+        onScroll={handleScroll}
+      >
+        {/* Diffs */}
+        {accordionItems.length > 0 ? (
+          <ReviewAccordion
+            items={accordionItems}
+            open={expandedFiles}
+            onOpenChange={setExpandedFiles}
+          />
+        ) : (
+          <div className="px-3 py-4 text-xs text-[var(--text-muted)]">
+            No file changes detected
           </div>
-        ) : gitError ? (
-          <div className="flex items-center gap-2 text-xs text-red-400">
-            <AlertCircle className="w-3 h-3" />
-            {gitError}
-          </div>
-        ) : gitInfo ? (
-          <div>
-            <div className="flex items-center gap-2 text-xs text-[var(--text-primary)] mb-1">
-              <GitBranch className="w-3.5 h-3.5" />
-              <span className="font-medium">{gitInfo.branch}</span>
-              <span className="text-[var(--text-muted)]">
-                — {gitInfo.changes.length} file{gitInfo.changes.length !== 1 ? "s" : ""} changed
-              </span>
+        )}
+
+        {/* AI Review Section */}
+        <div className="review-ai-section">
+          {reviewState === "idle" && gitDiffs.length === 0 && (
+            <div className="text-xs text-[var(--text-muted)]">
+              Open a file in the workspace to see changes here.
             </div>
-            {gitInfo.changes.length > 0 && (
-              <div className="mt-1 space-y-0.5">
-                {gitInfo.changes.map((change) => {
-                  const statusMap: Record<string, string> = {
-                    "M": "Modified", "A": "Added", "D": "Deleted", "R": "Renamed", "??": "Untracked",
-                  };
-                  const isExpanded = expandedDiffs[change.path] ?? false;
-                  return (
-                    <div key={change.path}>
-                      <div
-                        className="flex items-center gap-2 px-2 py-0.5 rounded text-xs cursor-pointer hover:bg-[var(--surface-hover)] transition-colors"
-                        onClick={() => handleToggleDiff(change.path)}
-                      >
-                        <span className={`text-[10px] font-mono font-semibold w-6 ${
-                          change.status === "A" ? "text-green-400" :
-                          change.status === "D" ? "text-red-400" :
-                          change.status === "M" ? "text-amber-400" :
-                          change.status === "??" ? "text-blue-400" : "text-[var(--text-muted)]"
-                        }`}>
-                          {statusMap[change.status] || change.status}
-                        </span>
-                        <FileText className="w-3 h-3 shrink-0 text-[var(--text-muted)]" />
-                        <span className="truncate">{change.path}</span>
-                        {loadingDiffs[change.path] && (
-                          <Loader2 className="w-3 h-3 animate-spin text-[var(--text-muted)] ml-auto" />
-                        )}
-                      </div>
-                      {isExpanded && fileDiffs[change.path] && (
-                        <div className="ml-8 mr-2 mb-1 border border-[var(--border-base)] rounded overflow-hidden">
-                          <DiffViewer diffText={fileDiffs[change.path]} filePath={change.path} baseUrl={baseUrl} />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+          )}
+
+          {reviewState === "streaming" && (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2 text-xs text-[var(--accent-primary)]">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                Reviewing code changes...
               </div>
-            )}
-          </div>
-        ) : null}
-      </div>
-
-      {/* Review Actions & Results */}
-      <div className="px-3 py-2 flex-1 overflow-auto">
-        {reviewState === "idle" && (
-          <button
-            onClick={handleStartReview}
-            disabled={!gitInfo || !sessionId}
-            className="flex items-center gap-2 px-3 py-1.5 rounded text-xs font-medium bg-[var(--accent-primary)] text-white hover:opacity-90 transition-opacity disabled:opacity-40"
-          >
-            <Play className="w-3.5 h-3.5" />
-            Start AI Review
-          </button>
-        )}
-
-        {reviewState === "streaming" && (
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-2 text-xs text-[var(--accent-primary)]">
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              Reviewing code changes...
+              {reviewText && (
+                <div className="review-ai-text">
+                  {reviewText}
+                  <span className="review-ai-streaming-cursor">▊</span>
+                </div>
+              )}
             </div>
-            {reviewText && (
-              <div className="border border-[var(--border-base)] rounded p-3 text-xs leading-relaxed whitespace-pre-wrap font-sans">
-                {reviewText}
-                <span className="animate-pulse">▊</span>
+          )}
+
+          {reviewState === "done" && (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2 text-xs text-green-400">
+                <CheckCircle className="w-3.5 h-3.5" />
+                Review complete
               </div>
-            )}
-          </div>
-        )}
-
-        {reviewState === "done" && (
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-2 text-xs text-green-400">
-              <CheckCircle className="w-3.5 h-3.5" />
-              Review complete
+              {reviewText && (
+                <>
+                  <div className="review-ai-text">{reviewText}</div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleApplyAsComments}
+                      className="review-apply-comments-btn"
+                    >
+                      Apply as inline comments
+                    </button>
+                    <button
+                      onClick={handleStartReview}
+                      className="flex items-center gap-2 px-3 py-1.5 rounded text-xs font-medium bg-[var(--accent-primary)] text-white hover:opacity-90 transition-opacity self-start"
+                    >
+                      <Play className="w-3.5 h-3.5" />
+                      Re-review
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
-            {reviewText && (
-              <div className="border border-[var(--border-base)] rounded p-3 text-xs leading-relaxed whitespace-pre-wrap font-sans">
-                {reviewText}
+          )}
+
+          {reviewState === "error" && (
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2 text-xs text-red-400">
+                <AlertCircle className="w-3.5 h-3.5" />
+                {reviewError || "Review failed"}
               </div>
-            )}
-            <button
-              onClick={handleStartReview}
-              className="flex items-center gap-2 px-3 py-1.5 rounded text-xs font-medium bg-[var(--accent-primary)] text-white hover:opacity-90 transition-opacity self-start"
-            >
-              <Play className="w-3.5 h-3.5" />
-              Re-review
-            </button>
-          </div>
-        )}
-
-        {reviewState === "error" && (
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-2 text-xs text-red-400">
-              <AlertCircle className="w-3.5 h-3.5" />
-              {reviewError || "Review failed"}
+              <button
+                onClick={handleStartReview}
+                className="flex items-center gap-2 px-3 py-1.5 rounded text-xs font-medium bg-[var(--accent-primary)] text-white hover:opacity-90 transition-opacity self-start"
+              >
+                <Play className="w-3.5 h-3.5" />
+                Retry
+              </button>
             </div>
-            <button
-              onClick={handleStartReview}
-              className="flex items-center gap-2 px-3 py-1.5 rounded text-xs font-medium bg-[var(--accent-primary)] text-white hover:opacity-90 transition-opacity self-start"
-            >
-              <Play className="w-3.5 h-3.5" />
-              Retry
-            </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );

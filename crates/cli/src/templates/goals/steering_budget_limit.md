@@ -9,5 +9,5 @@ Usage: {{ tokens_used }} / {{ token_budget }} tokens · {{ time_used_seconds }}s
 
 Stop all new substantive work. Wrap up the current task, summarize what was accomplished and what remains, then hand off with clear next steps.
 
-Do not call update_goal("complete") unless the full objective is demonstrably finished despite the budget constraint.
+Do not call goal(op:"complete") unless the full objective is demonstrably finished despite the budget constraint.
 </goal_context>

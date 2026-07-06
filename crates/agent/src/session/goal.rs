@@ -6,10 +6,12 @@ use super::entries::GoalEntry;
 /// Maximum length of a goal objective string.
 pub const MAX_GOAL_OBJECTIVE_CHARS: usize = 1000;
 
+/// Maximum length of a goal completion criterion string.
+pub const MAX_GOAL_CRITERION_CHARS: usize = 2000;
+
 pub struct GoalManager {
     goal: RwLock<Option<GoalEntry>>,
     continuation_count: AtomicU32,
-    max_continuations: u32,
     objective_updated: AtomicBool,
 }
 
@@ -18,14 +20,8 @@ impl GoalManager {
         Self {
             goal: RwLock::new(None),
             continuation_count: AtomicU32::new(0),
-            max_continuations: 5,
             objective_updated: AtomicBool::new(false),
         }
-    }
-
-    pub fn with_max_continuations(mut self, max: u32) -> Self {
-        self.max_continuations = max;
-        self
     }
 
     pub fn load(&self, entry: GoalEntry) {
@@ -42,6 +38,7 @@ impl GoalManager {
     pub fn create(
         &self,
         objective: String,
+        completion_criterion: String,
         token_budget: Option<i64>,
     ) -> Result<GoalEntry, String> {
         if objective.chars().count() > MAX_GOAL_OBJECTIVE_CHARS {
@@ -51,13 +48,23 @@ impl GoalManager {
                 MAX_GOAL_OBJECTIVE_CHARS
             ));
         }
+        if completion_criterion.chars().count() > MAX_GOAL_CRITERION_CHARS {
+            return Err(format!(
+                "completion criterion too long ({} chars, max {})",
+                completion_criterion.chars().count(),
+                MAX_GOAL_CRITERION_CHARS
+            ));
+        }
         let mut guard = self.goal.write().map_err(|e| e.to_string())?;
         if guard.is_some() {
-            return Err("cannot create a new goal because this thread already has a goal; use update_goal only when the existing goal is complete".to_string());
+            return Err(
+                "cannot create a new goal because this thread already has a goal".to_string(),
+            );
         }
         let now = chrono::Utc::now().timestamp_millis();
         let entry = GoalEntry {
             objective,
+            completion_criterion,
             status: "active".to_string(),
             token_budget,
             tokens_used: 0,
@@ -80,7 +87,7 @@ impl GoalManager {
         };
         if !allowed {
             return Err(
-                "update_goal can only mark the existing goal complete, blocked, or budget_limited"
+                "goal(op:\"complete\") or goal(op:\"blocked\") can only mark the existing goal complete or blocked"
                     .to_string(),
             );
         }
@@ -180,11 +187,21 @@ impl GoalManager {
         self.objective_updated.swap(false, Ordering::Relaxed)
     }
 
-    pub fn can_continue(&self) -> bool {
-        let count = self.continuation_count.load(Ordering::Relaxed);
-        if count >= self.max_continuations {
-            return false;
+    pub fn pause_on_interrupt(&self) -> Result<GoalEntry, String> {
+        let mut guard = self.goal.write().map_err(|e| e.to_string())?;
+        let entry = guard
+            .as_mut()
+            .ok_or_else(|| "no goal to pause".to_string())?;
+        if entry.status != "active" && entry.status != "budget_limited" {
+            return Err(format!("cannot pause goal with status '{}'", entry.status));
         }
+        entry.status = "paused".to_string();
+        entry.updated_at = chrono::Utc::now().timestamp_millis();
+        self.continuation_count.store(0, Ordering::Relaxed);
+        Ok(entry.clone())
+    }
+
+    pub fn can_continue(&self) -> bool {
         self.goal
             .read()
             .ok()
@@ -192,9 +209,8 @@ impl GoalManager {
             .unwrap_or(false)
     }
 
-    pub fn register_continuation(&self) -> bool {
-        let prev = self.continuation_count.fetch_add(1, Ordering::Relaxed);
-        (prev + 1) <= self.max_continuations
+    pub fn register_continuation(&self) {
+        self.continuation_count.fetch_add(1, Ordering::Relaxed);
     }
 
     pub fn reset_continuation_count(&self) {
@@ -215,6 +231,10 @@ impl GoalManager {
     pub fn status(&self) -> Option<String> {
         self.goal.read().ok()?.as_ref().map(|e| e.status.clone())
     }
+
+    pub fn get_continuation_count(&self) -> u32 {
+        self.continuation_count.load(Ordering::Relaxed)
+    }
 }
 
 impl Default for GoalManager {
@@ -231,7 +251,6 @@ impl std::fmt::Debug for GoalManager {
                 "continuation_count",
                 &self.continuation_count.load(Ordering::Relaxed),
             )
-            .field("max_continuations", &self.max_continuations)
             .finish()
     }
 }
@@ -244,8 +263,11 @@ mod tests {
     fn test_create_and_get() {
         let gm = GoalManager::new();
         assert!(gm.get().is_none());
-        let goal = gm.create("test objective".into(), None).unwrap();
+        let goal = gm
+            .create("test objective".into(), "test criterion".into(), None)
+            .unwrap();
         assert_eq!(goal.objective, "test objective");
+        assert_eq!(goal.completion_criterion, "test criterion");
         assert_eq!(goal.status, "active");
         assert_eq!(goal.tokens_used, 0);
         assert!(gm.get().is_some());
@@ -254,15 +276,17 @@ mod tests {
     #[test]
     fn test_create_fails_if_exists() {
         let gm = GoalManager::new();
-        gm.create("first".into(), None).unwrap();
-        let err = gm.create("second".into(), None).unwrap_err();
+        gm.create("first".into(), "criterion".into(), None).unwrap();
+        let err = gm
+            .create("second".into(), "criterion".into(), None)
+            .unwrap_err();
         assert!(err.contains("already has a goal"));
     }
 
     #[test]
     fn test_update_status() {
         let gm = GoalManager::new();
-        gm.create("test".into(), None).unwrap();
+        gm.create("test".into(), "criterion".into(), None).unwrap();
         let g = gm.update_status("complete".into()).unwrap();
         assert_eq!(g.status, "complete");
         let err = gm.update_status("invalid".into()).unwrap_err();
@@ -272,7 +296,7 @@ mod tests {
     #[test]
     fn test_clear() {
         let gm = GoalManager::new();
-        gm.create("test".into(), None).unwrap();
+        gm.create("test".into(), "criterion".into(), None).unwrap();
         assert!(gm.get().is_some());
         gm.clear().unwrap();
         assert!(gm.get().is_none());
@@ -281,7 +305,7 @@ mod tests {
     #[test]
     fn test_pause_resume() {
         let gm = GoalManager::new();
-        gm.create("test".into(), None).unwrap();
+        gm.create("test".into(), "criterion".into(), None).unwrap();
         let g = gm.set_paused().unwrap();
         assert_eq!(g.status, "paused");
         let g = gm.set_active().unwrap();
@@ -291,7 +315,7 @@ mod tests {
     #[test]
     fn test_pause_fails_if_not_active() {
         let gm = GoalManager::new();
-        gm.create("test".into(), None).unwrap();
+        gm.create("test".into(), "criterion".into(), None).unwrap();
         gm.update_status("complete".into()).unwrap();
         let err = gm.set_paused().unwrap_err();
         assert!(err.contains("cannot pause"));
@@ -300,7 +324,7 @@ mod tests {
     #[test]
     fn test_set_objective() {
         let gm = GoalManager::new();
-        gm.create("old".into(), None).unwrap();
+        gm.create("old".into(), "criterion".into(), None).unwrap();
         let g = gm.set_objective("new".into()).unwrap();
         assert_eq!(g.objective, "new");
     }
@@ -308,7 +332,8 @@ mod tests {
     #[test]
     fn test_token_budget_exhausted() {
         let gm = GoalManager::new();
-        gm.create("test".into(), Some(100)).unwrap();
+        gm.create("test".into(), "criterion".into(), Some(100))
+            .unwrap();
         assert!(!gm.is_budget_exhausted());
         gm.add_token_usage(60);
         assert!(!gm.is_budget_exhausted());
@@ -321,7 +346,8 @@ mod tests {
     #[test]
     fn test_remaining_tokens() {
         let gm = GoalManager::new();
-        gm.create("test".into(), Some(100)).unwrap();
+        gm.create("test".into(), "criterion".into(), Some(100))
+            .unwrap();
         assert_eq!(gm.remaining_tokens(), Some(100));
         gm.add_token_usage(30);
         assert_eq!(gm.remaining_tokens(), Some(70));
@@ -332,17 +358,16 @@ mod tests {
     #[test]
     fn test_continuation() {
         let gm = GoalManager::new();
-        gm.create("test".into(), None).unwrap();
+        gm.create("test".into(), "criterion".into(), None).unwrap();
         assert!(gm.can_continue());
-        assert!(gm.register_continuation());
+        gm.register_continuation();
         assert!(gm.can_continue());
         gm.register_continuation();
         gm.register_continuation();
         gm.register_continuation();
         assert!(gm.can_continue());
-        gm.register_continuation(); // 5th — reaches max (default 5)
-        assert!(!gm.can_continue());
-        assert!(!gm.register_continuation());
+        gm.register_continuation();
+        assert!(gm.can_continue()); // unlimited
         gm.reset_continuation_count();
         assert!(gm.can_continue());
     }
@@ -350,7 +375,7 @@ mod tests {
     #[test]
     fn test_cannot_continue_if_paused() {
         let gm = GoalManager::new();
-        gm.create("test".into(), None).unwrap();
+        gm.create("test".into(), "criterion".into(), None).unwrap();
         gm.set_paused().unwrap();
         assert!(!gm.can_continue());
     }
@@ -358,7 +383,8 @@ mod tests {
     #[test]
     fn test_cannot_continue_if_budget_exhausted() {
         let gm = GoalManager::new();
-        gm.create("test".into(), Some(10)).unwrap();
+        gm.create("test".into(), "criterion".into(), Some(10))
+            .unwrap();
         gm.add_token_usage(10);
         assert!(!gm.can_continue());
     }
@@ -368,6 +394,7 @@ mod tests {
         let gm = GoalManager::new();
         let entry = GoalEntry {
             objective: "loaded".into(),
+            completion_criterion: "criterion".into(),
             status: "paused".into(),
             token_budget: Some(500),
             tokens_used: 100,
@@ -378,17 +405,19 @@ mod tests {
         gm.load(entry);
         let g = gm.get().unwrap();
         assert_eq!(g.objective, "loaded");
+        assert_eq!(g.completion_criterion, "criterion");
         assert_eq!(g.status, "paused");
         assert_eq!(g.token_budget, Some(500));
         assert_eq!(gm.remaining_tokens(), Some(400));
     }
 
     #[test]
-    fn test_with_max_continuations() {
-        let gm = GoalManager::with_max_continuations(GoalManager::new(), 2);
-        gm.create("test".into(), None).unwrap();
-        assert!(gm.register_continuation());
-        assert!(gm.register_continuation());
-        assert!(!gm.register_continuation());
+    fn test_pause_on_interrupt() {
+        let gm = GoalManager::new();
+        gm.create("test".into(), "criterion".into(), None).unwrap();
+        let g = gm.pause_on_interrupt().unwrap();
+        assert_eq!(g.status, "paused");
+        let err = gm.pause_on_interrupt().unwrap_err();
+        assert!(err.contains("cannot pause"));
     }
 }

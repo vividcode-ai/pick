@@ -541,6 +541,10 @@ async fn handle_submit(ctx: &mut TuiContext, user_text: String) {
         if !is_skill_expanded {
             ctx.tui.chat.add_user_message(&user_text);
         }
+        // Reset continuation count on user message
+        ctx.session_manager
+            .goal_manager()
+            .reset_continuation_count();
     }
 
     // Auto-title generation for first user message

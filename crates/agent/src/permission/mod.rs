@@ -117,9 +117,7 @@ pub const PERMISSION_KEYS: &[&str] = &[
     "external_directory",
     "webfetch",
     "todo_plan",
-    "create_goal",
-    "update_goal",
-    "get_goal",
+    "goal",
 ];
 
 pub fn tool_to_permission_key(tool_name: &str) -> &str {
@@ -134,9 +132,7 @@ pub fn tool_to_permission_key(tool_name: &str) -> &str {
         "question" => "question",
         "webfetch" => "webfetch",
         "todo_plan" => "todo_plan",
-        "create_goal" => "create_goal",
-        "update_goal" => "update_goal",
-        "get_goal" => "get_goal",
+        "goal" => "goal",
         "plan_enter" => "plan_enter",
         "plan_exit" => "plan_exit",
         "external_directory" => "external_directory",

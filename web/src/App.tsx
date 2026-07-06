@@ -182,6 +182,20 @@ export default function App() {
     [activeSessionId, createSession, selectedModel, selectedProvider, ask, thinkingLevel]
   );
 
+  const handleAsk = useCallback(
+    (text: string) => {
+      if (!activeSessionId) {
+        pendingSendRef.current = text;
+        createSession(selectedModel, selectedProvider).then((result) => {
+          if (!result) pendingSendRef.current = null;
+        });
+      } else {
+        ask(text);
+      }
+    },
+    [activeSessionId, createSession, selectedModel, selectedProvider, ask]
+  );
+
   const handleCommitRequest = useCallback(
     (message: string) => {
       if (activeSessionId) {
@@ -407,7 +421,7 @@ export default function App() {
         gitInfo={activeGitInfo}
         onCommitRequest={handleCommitRequest}
         baseUrl={baseUrl}
-        onAsk={ask}
+        onAsk={handleAsk}
         leftPanel={
           <LeftPanel
             onNewSession={handleNewSession}

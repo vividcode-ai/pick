@@ -11,6 +11,7 @@ use crate::agent_registry::AgentRegistry;
 use crate::permission::fs_policy::FileSystemPolicy;
 use crate::permission::manager::PermissionManager;
 use crate::permission::sandbox::Sandbox as SandboxTrait;
+use crate::session::goal::GoalManager;
 
 /// Thinking/reasoning level for models
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -116,6 +117,9 @@ pub struct ToolContext {
     pub sandbox: Option<Arc<dyn SandboxTrait>>,
     pub sandbox_enabled: Option<Arc<AtomicBool>>,
     pub tool_event_bus: Option<std::sync::Arc<super::hooks::ToolEventBus>>,
+    /// For sub-agents: the parent session's GoalManager.
+    /// Set when spawning a child agent; None for the main session.
+    pub parent_goal_manager: Option<Arc<GoalManager>>,
 }
 
 impl Clone for ToolContext {
@@ -134,6 +138,7 @@ impl Clone for ToolContext {
             sandbox: self.sandbox.clone(),
             sandbox_enabled: self.sandbox_enabled.clone(),
             tool_event_bus: self.tool_event_bus.clone(),
+            parent_goal_manager: self.parent_goal_manager.clone(),
         }
     }
 }

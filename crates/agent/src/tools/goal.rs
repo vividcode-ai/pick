@@ -5,148 +5,6 @@ use pick_ai::types::ContentBlock;
 use crate::core::state::{AgentTool, AgentToolResult, ToolContext, ToolExecutionMode};
 use crate::session::goal::GoalManager;
 
-// ── Stub versions (backward compat, no real GoalManager) ──────────
-
-pub fn create_get_goal_tool_with_mode() -> AgentTool {
-    AgentTool {
-        name: "get_goal".to_string(),
-        description: "Get the current goal for this thread, including status and token usage."
-            .to_string(),
-        prompt_snippet: Some("Get current thread goal".to_string()),
-        prompt_guidelines: vec![],
-        label: "get_goal".to_string(),
-        parameters: make_params(
-            "Get the current goal for this thread, including status, budget, and token usage.",
-            vec![],
-            vec![],
-        ),
-        execute: std::sync::Arc::new(move |_tool_call_id, _args, _ctx: ToolContext| {
-            Box::pin(async move {
-                Ok(AgentToolResult {
-                    content: vec![ContentBlock::text(
-                        "{\"goal\": null, \"message\": \"No active goal for this thread.\"}",
-                    )],
-                    is_error: false,
-                    terminate: false,
-                })
-            })
-        }),
-        execution_mode: ToolExecutionMode::Sequential,
-    }
-}
-
-pub fn create_create_goal_tool_with_mode() -> AgentTool {
-    AgentTool {
-        name: "create_goal".to_string(),
-        description: "Create a goal only when explicitly requested by the user or system/developer instructions; \
-                      do not infer goals from ordinary tasks."
-            .to_string(),
-        prompt_snippet: Some("Create a new thread goal".to_string()),
-        prompt_guidelines: vec![],
-        label: "create_goal".to_string(),
-        parameters: make_params(
-            "Create a new active goal. Fails if a goal already exists.",
-            vec![
-                (
-                    "objective",
-                    serde_json::json!({
-                        "type": "string",
-                        "description": "The concrete objective to start pursuing."
-                    }),
-                ),
-                (
-                    "token_budget",
-                    serde_json::json!({
-                        "type": "integer",
-                        "description": "Optional positive token budget for the new active goal."
-                    }),
-                ),
-            ],
-            vec!["objective"],
-        ),
-        execute: std::sync::Arc::new(move |_tool_call_id, args, _ctx: ToolContext| {
-            Box::pin(async move {
-                let objective = args.get("objective")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| "Missing 'objective' argument".to_string())?;
-
-                let token_budget = args.get("token_budget").and_then(|v| v.as_i64());
-
-                let result = serde_json::json!({
-                    "goal": {
-                        "objective": objective,
-                        "status": "active",
-                        "tokenBudget": token_budget,
-                        "tokensUsed": 0,
-                        "timeUsedSeconds": 0,
-                    },
-                    "message": "Goal created. Use get_goal to check current status."
-                });
-
-                Ok(AgentToolResult {
-                    content: vec![ContentBlock::text(serde_json::to_string_pretty(&result).unwrap_or_default())],
-                    is_error: false,
-                    terminate: false,
-                })
-            })
-        }),
-        execution_mode: ToolExecutionMode::Sequential,
-    }
-}
-
-pub fn create_update_goal_tool_with_mode() -> AgentTool {
-    AgentTool {
-        name: "update_goal".to_string(),
-        description: "Update the existing goal. Use this tool only to mark the goal achieved or genuinely blocked."
-            .to_string(),
-        prompt_snippet: Some("Update current thread goal".to_string()),
-        prompt_guidelines: vec![],
-        label: "update_goal".to_string(),
-        parameters: make_params(
-            "Update the existing goal. Only marks complete or blocked.",
-            vec![(
-                "status",
-                serde_json::json!({
-                    "type": "string",
-                    "enum": ["complete", "blocked"],
-                    "description": "Set to `complete` only when the objective is achieved. \
-                     Set to `blocked` only when genuinely stuck."
-                }),
-            )],
-            vec!["status"],
-        ),
-        execute: std::sync::Arc::new(move |_tool_call_id, args, _ctx: ToolContext| {
-            Box::pin(async move {
-                let status = args.get("status")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| "Missing 'status' argument".to_string())?;
-
-                if status != "complete" && status != "blocked" {
-                    return Err("update_goal can only mark the existing goal complete or blocked".to_string());
-                }
-
-                let result = serde_json::json!({
-                    "goal": {
-                        "status": status,
-                        "objective": null,
-                        "tokensUsed": 0,
-                    },
-                    "message": format!("Goal marked as {}.", status)
-                });
-
-                Ok(AgentToolResult {
-                    content: vec![ContentBlock::text(serde_json::to_string_pretty(&result).unwrap_or_default())],
-                    is_error: false,
-                    terminate: false,
-                })
-            })
-        }),
-        execution_mode: ToolExecutionMode::Sequential,
-    }
-}
-
-// ── Real versions (wired to GoalManager) ──────────────────────────
-
 fn make_params(
     desc: &str,
     props: Vec<(&str, serde_json::Value)>,
@@ -165,6 +23,7 @@ fn make_params(
 fn goal_entry_to_json(goal: &crate::session::entries::GoalEntry) -> serde_json::Value {
     serde_json::json!({
         "objective": goal.objective,
+        "completionCriterion": goal.completion_criterion,
         "status": goal.status,
         "tokenBudget": goal.token_budget,
         "tokensUsed": goal.tokens_used,
@@ -174,160 +33,307 @@ fn goal_entry_to_json(goal: &crate::session::entries::GoalEntry) -> serde_json::
     })
 }
 
-pub fn create_get_goal_tool(goal_manager: Arc<GoalManager>) -> AgentTool {
-    AgentTool {
-        name: "get_goal".to_string(),
-        description: "Get the current goal for this thread, including status and token usage."
-            .to_string(),
-        prompt_snippet: Some("Get current thread goal".to_string()),
-        prompt_guidelines: vec![],
-        label: "get_goal".to_string(),
-        parameters: make_params(
-            "Get the current goal for this thread, including status, budget, and token usage.",
-            vec![],
-            vec![],
-        ),
-        execute: Arc::new(move |_tool_call_id, _args, _ctx: ToolContext| {
-            let gm = goal_manager.clone();
-            Box::pin(async move {
-                match gm.get() {
-                    Some(goal) => {
-                        let remaining = gm.remaining_tokens();
-                        let mut resp = serde_json::json!({
-                            "goal": goal_entry_to_json(&goal),
-                        });
-                        if let Some(r) = remaining {
-                            resp["remainingTokens"] = serde_json::json!(r);
-                        }
-                        Ok(AgentToolResult {
-                            content: vec![ContentBlock::text(
-                                serde_json::to_string_pretty(&resp).unwrap_or_default(),
-                            )],
-                            is_error: false,
-                            terminate: false,
-                        })
-                    }
-                    None => Ok(AgentToolResult {
-                        content: vec![ContentBlock::text(
-                            "{\"goal\": null, \"message\": \"No active goal for this thread.\"}",
-                        )],
-                        is_error: false,
-                        terminate: false,
-                    }),
-                }
-            })
-        }),
-        execution_mode: ToolExecutionMode::Sequential,
-    }
+/// Determine whether the current execution context is a sub-agent.
+fn is_sub_agent(ctx: &ToolContext) -> bool {
+    ctx.agent_id.is_some()
 }
 
-pub fn create_create_goal_tool(goal_manager: Arc<GoalManager>) -> AgentTool {
+/// Resolve the correct GoalManager: sub-agents target the parent session's manager.
+fn resolve_goal_manager<'a>(
+    own: &'a Arc<GoalManager>,
+    parent: &'a Option<Arc<GoalManager>>,
+    is_sub: bool,
+) -> Option<&'a Arc<GoalManager>> {
+    if is_sub { parent.as_ref() } else { Some(own) }
+}
+
+/// Create a stub goal tool (no real GoalManager).
+/// Returns canned responses when no goal system is available.
+pub fn create_goal_tool_stub() -> AgentTool {
     AgentTool {
-        name: "create_goal".to_string(),
-        description: "Create a goal only when explicitly requested by the user or system/developer instructions; \
-                      do not infer goals from ordinary tasks."
+        name: "goal".to_string(),
+        description: "Manage the active goal. Use `op` parameter: \
+            create (requires objective + completion_criterion), get, \
+            complete, pause, resume, cancel."
             .to_string(),
-        prompt_snippet: Some("Create a new thread goal".to_string()),
+        prompt_snippet: Some("Manage the active goal".to_string()),
         prompt_guidelines: vec![],
-        label: "create_goal".to_string(),
+        label: "goal".to_string(),
         parameters: make_params(
-            "Create a new active goal. Fails if a goal already exists.",
+            "Manage the active goal-mode objective.",
             vec![
+                (
+                    "op",
+                    serde_json::json!({
+                        "type": "string",
+                        "enum": ["create", "get", "complete", "pause", "resume", "cancel"],
+                        "description": "Goal operation"
+                    }),
+                ),
                 (
                     "objective",
                     serde_json::json!({
                         "type": "string",
-                        "description": "The concrete objective to start pursuing."
+                        "description": "Goal objective (required for create)"
+                    }),
+                ),
+                (
+                    "completion_criterion",
+                    serde_json::json!({
+                        "type": "string",
+                        "description": "Concrete checkable completion conditions (required for create)"
                     }),
                 ),
                 (
                     "token_budget",
                     serde_json::json!({
                         "type": "integer",
-                        "description": "Optional positive token budget for the new active goal."
+                        "description": "Optional positive token budget for the goal"
                     }),
                 ),
             ],
-            vec!["objective"],
+            vec!["op"],
         ),
-        execute: Arc::new(move |_tool_call_id, args, _ctx: ToolContext| {
-            let gm = goal_manager.clone();
+        execute: Arc::new(move |_tool_call_id, _args, _ctx: ToolContext| {
             Box::pin(async move {
-                let objective = args.get("objective")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| "Missing 'objective' argument".to_string())?;
-
-                let token_budget = args.get("token_budget").and_then(|v| v.as_i64());
-
-                match gm.create(objective.to_string(), token_budget) {
-                    Ok(goal) => {
-                        let resp = serde_json::json!({
-                            "goal": goal_entry_to_json(&goal),
-                            "message": "Goal created. Use get_goal to check current status."
-                        });
-                        Ok(AgentToolResult {
-                            content: vec![ContentBlock::text(
-                                serde_json::to_string_pretty(&resp).unwrap_or_default()
-                            )],
-                            is_error: false,
-                            terminate: false,
-                        })
-                    }
-                    Err(e) => Err(e),
-                }
+                Ok(AgentToolResult {
+                    content: vec![ContentBlock::text(
+                        "{\"goal\": null, \"message\": \"No active goal for this thread.\"}",
+                    )],
+                    is_error: false,
+                    terminate: false,
+                })
             })
         }),
         execution_mode: ToolExecutionMode::Sequential,
     }
 }
 
-pub fn create_update_goal_tool(goal_manager: Arc<GoalManager>) -> AgentTool {
+/// Create the real goal tool wired to a GoalManager.
+/// Handles 6 operations with sub-agent permission isolation.
+pub fn create_goal_tool(goal_manager: Arc<GoalManager>) -> AgentTool {
     AgentTool {
-        name: "update_goal".to_string(),
-        description: "Update the existing goal. Use this tool only to mark the goal achieved or genuinely blocked."
+        name: "goal".to_string(),
+        description: "Manage the active goal. Use `op` parameter: \
+            create (requires objective + completion_criterion), get, \
+            complete, pause, resume, cancel."
             .to_string(),
-        prompt_snippet: Some("Update current thread goal".to_string()),
+        prompt_snippet: Some("Manage the active goal".to_string()),
         prompt_guidelines: vec![],
-        label: "update_goal".to_string(),
+        label: "goal".to_string(),
         parameters: make_params(
-            "Update the existing goal. Only marks complete, blocked, or budget_limited.",
-            vec![(
-                "status",
-                serde_json::json!({
-                    "type": "string",
-                    "enum": ["complete", "blocked"],
-                    "description": "Set to `complete` only when the objective is achieved. \
-                     Set to `blocked` only when genuinely stuck."
-                }),
-            )],
-            vec!["status"],
+            "Manage the active goal-mode objective.",
+            vec![
+                (
+                    "op",
+                    serde_json::json!({
+                        "type": "string",
+                        "enum": ["create", "get", "complete", "pause", "resume", "cancel"],
+                        "description": "Goal operation"
+                    }),
+                ),
+                (
+                    "objective",
+                    serde_json::json!({
+                        "type": "string",
+                        "description": "Goal objective (required for create)"
+                    }),
+                ),
+                (
+                    "completion_criterion",
+                    serde_json::json!({
+                        "type": "string",
+                        "description": "Concrete checkable completion conditions (required for create)"
+                    }),
+                ),
+                (
+                    "token_budget",
+                    serde_json::json!({
+                        "type": "integer",
+                        "description": "Optional positive token budget for the goal"
+                    }),
+                ),
+            ],
+            vec!["op"],
         ),
-        execute: Arc::new(move |_tool_call_id, args, _ctx: ToolContext| {
+        execute: Arc::new(move |_tool_call_id, args, ctx: ToolContext| {
             let gm = goal_manager.clone();
+            let parent_gm = ctx.parent_goal_manager.clone();
             Box::pin(async move {
-                let status = args.get("status")
+                let op = args
+                    .get("op")
                     .and_then(|v| v.as_str())
-                    .ok_or_else(|| "Missing 'status' argument".to_string())?;
+                    .ok_or_else(|| "Missing 'op' argument. Use one of: create, get, complete, pause, resume, cancel.".to_string())?;
 
-                if status != "complete" && status != "blocked" {
-                    return Err("update_goal can only mark the existing goal complete or blocked".to_string());
-                }
+                let sub = is_sub_agent(&ctx);
+                let target_gm = resolve_goal_manager(&gm, &parent_gm, sub);
 
-                match gm.update_status(status.to_string()) {
-                    Ok(goal) => {
-                        let resp = serde_json::json!({
-                            "goal": goal_entry_to_json(&goal),
-                            "message": format!("Goal marked as {}.", status),
-                        });
+                match op {
+                    "create" => {
+                        if sub {
+                            return Err("Sub-agents cannot create goals.".to_string());
+                        }
+                        let objective =
+                            args.get("objective")
+                                .and_then(|v| v.as_str())
+                                .ok_or_else(|| {
+                                    "Missing 'objective' argument (required for create)".to_string()
+                                })?;
+                        let criterion = args
+                            .get("completion_criterion")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("");
+                        let token_budget = args.get("token_budget").and_then(|v| v.as_i64());
+                        match gm.create(objective.to_string(), criterion.to_string(), token_budget)
+                        {
+                            Ok(goal) => {
+                                let resp = serde_json::json!({
+                                    "goal": goal_entry_to_json(&goal),
+                                    "message": "Goal created."
+                                });
+                                Ok(AgentToolResult {
+                                    content: vec![ContentBlock::text(
+                                        serde_json::to_string_pretty(&resp).unwrap_or_default(),
+                                    )],
+                                    is_error: false,
+                                    terminate: false,
+                                })
+                            }
+                            Err(e) => Err(e),
+                        }
+                    }
+
+                    "get" => {
+                        let target =
+                            target_gm.ok_or_else(|| "No goal manager available".to_string())?;
+                        match target.get() {
+                            Some(goal) => {
+                                let remaining = target.remaining_tokens();
+                                let mut resp = serde_json::json!({
+                                    "goal": goal_entry_to_json(&goal),
+                                });
+                                if let Some(r) = remaining {
+                                    resp["remainingTokens"] = serde_json::json!(r);
+                                }
+                                Ok(AgentToolResult {
+                                    content: vec![ContentBlock::text(
+                                        serde_json::to_string_pretty(&resp).unwrap_or_default(),
+                                    )],
+                                    is_error: false,
+                                    terminate: false,
+                                })
+                            }
+                            None => Ok(AgentToolResult {
+                                content: vec![ContentBlock::text(
+                                    "{\"goal\": null, \"message\": \"No active goal.\"}",
+                                )],
+                                is_error: false,
+                                terminate: false,
+                            }),
+                        }
+                    }
+
+                    "complete" => {
+                        if sub {
+                            // Sub-agent: allowed — complete the parent session's goal
+                            let target =
+                                target_gm.ok_or_else(|| "No parent goal manager".to_string())?;
+                            let goal = target
+                                .get()
+                                .ok_or_else(|| "No active goal to complete.".to_string())?;
+                            if goal.status != "active" {
+                                return Err(format!(
+                                    "Goal is not active (status: {}). Cannot complete.",
+                                    goal.status
+                                ));
+                            }
+                            let _ = target.update_status("complete".to_string())?;
+                            Ok(AgentToolResult {
+                                content: vec![ContentBlock::text(format!(
+                                    "Goal completed: \"{}\"",
+                                    goal.objective
+                                ))],
+                                is_error: false,
+                                terminate: true,
+                            })
+                        } else {
+                            // Main session: blocked → must use goal-verify sub-agent
+                            let goal = gm.get().ok_or_else(|| "No active goal.".to_string())?;
+                            if goal.status != "active" {
+                                return Err(format!(
+                                    "Goal is not active (status: {}).",
+                                    goal.status
+                                ));
+                            }
+                            return Err("BLOCKED: Direct completion is not allowed. \
+                                Use the `subagent` tool with agent `goal-verify` \
+                                and provide a task description of what to verify. \
+                                The goal-verify agent will independently inspect \
+                                the work and call goal(op:\"complete\") if satisfied."
+                                .to_string());
+                        }
+                    }
+
+                    "pause" => {
+                        if sub {
+                            return Err("Sub-agents cannot pause goals.".to_string());
+                        }
+                        match gm.set_paused() {
+                            Ok(goal) => {
+                                let resp = serde_json::json!({
+                                    "goal": goal_entry_to_json(&goal),
+                                    "message": "Goal paused."
+                                });
+                                Ok(AgentToolResult {
+                                    content: vec![ContentBlock::text(
+                                        serde_json::to_string_pretty(&resp).unwrap_or_default(),
+                                    )],
+                                    is_error: false,
+                                    terminate: false,
+                                })
+                            }
+                            Err(e) => Err(e),
+                        }
+                    }
+
+                    "resume" => {
+                        if sub {
+                            return Err("Sub-agents cannot resume goals.".to_string());
+                        }
+                        match gm.set_active() {
+                            Ok(goal) => {
+                                let resp = serde_json::json!({
+                                    "goal": goal_entry_to_json(&goal),
+                                    "message": "Goal resumed."
+                                });
+                                Ok(AgentToolResult {
+                                    content: vec![ContentBlock::text(
+                                        serde_json::to_string_pretty(&resp).unwrap_or_default(),
+                                    )],
+                                    is_error: false,
+                                    terminate: false,
+                                })
+                            }
+                            Err(e) => Err(e),
+                        }
+                    }
+
+                    "cancel" => {
+                        if sub {
+                            return Err("Sub-agents cannot cancel goals.".to_string());
+                        }
+                        gm.clear().map_err(|e| e.to_string())?;
                         Ok(AgentToolResult {
-                            content: vec![ContentBlock::text(
-                                serde_json::to_string_pretty(&resp).unwrap_or_default()
-                            )],
+                            content: vec![ContentBlock::text("Goal cancelled.")],
                             is_error: false,
                             terminate: false,
                         })
                     }
-                    Err(e) => Err(e),
+
+                    _ => Err(format!(
+                        "Unknown op '{}'. Use one of: create, get, complete, pause, resume, cancel.",
+                        op
+                    )),
                 }
             })
         }),

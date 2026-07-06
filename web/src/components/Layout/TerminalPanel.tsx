@@ -535,7 +535,7 @@ export function TerminalPanel({ baseUrl, visible, onClose, onFullscreenChange, s
                   className="h-full"
                 />
               ) : tab.kind === "codereview" ? (
-                <CodeReviewContent baseUrl={baseUrl} sessionId={sessionId} />
+                <CodeReviewContent baseUrl={baseUrl} sessionId={sessionId} onAsk={onAsk} />
               ) : (
                 <FileBrowserContent baseUrl={baseUrl} onAsk={onAsk} />
               )}

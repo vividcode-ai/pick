@@ -34,6 +34,12 @@ pub(crate) async fn handle_goal(ctx: &mut TuiContext, args: &[String]) -> bool {
                     "\x1b[1mGoal\x1b[0m  \x1b[36m{}\x1b[0m",
                     goal.objective
                 ));
+                if !goal.completion_criterion.is_empty() {
+                    ctx.tui.chat.add_system_message(&format!(
+                        "  \x1b[2mCriterion: {}\x1b[0m",
+                        goal.completion_criterion
+                    ));
+                }
                 ctx.tui.chat.add_system_message(&format!(
                     "  Status: {}  Tokens: {}  Time: {}{}",
                     label, goal.tokens_used, elapsed, remaining
@@ -96,19 +102,35 @@ pub(crate) async fn handle_goal(ctx: &mut TuiContext, args: &[String]) -> bool {
                      to modify it or \x1b[33m/goal clear\x1b[0m first.",
                 );
             } else {
-                match goal_manager.create(args_str.clone(), None) {
+                let (objective, criterion) = if let Some(pos) = args_str.find(" || ") {
+                    let obj = args_str[..pos].trim().to_string();
+                    let crit = args_str[pos + 4..].trim().to_string();
+                    (obj, crit)
+                } else {
+                    (args_str.clone(), String::new())
+                };
+                match goal_manager.create(objective.clone(), criterion.clone(), None) {
                     Ok(_) => {
                         ctx.session_manager.persist_goal().await.ok();
-                        ctx.tui
-                            .chat
-                            .add_system_message(&format!("\x1b[32mGoal set:\x1b[0m  {}", args_str));
-                        let short = if pick_tui::utils::visible_width(&args_str) > 40 {
-                            let truncated: String = args_str.chars().take(13).collect();
+                        ctx.tui.chat.add_system_message(&format!(
+                            "\x1b[32mGoal set:\x1b[0m  {}",
+                            objective
+                        ));
+                        let short = if pick_tui::utils::visible_width(&objective) > 40 {
+                            let truncated: String = objective.chars().take(13).collect();
                             format!("{}...", truncated)
                         } else {
-                            args_str.clone()
+                            objective
                         };
-                        ctx.tui.set_goal_status(Some(&format!("🎯 {}", short)));
+                        let tip = if criterion.is_empty() {
+                            Some("\x1b[33m⚠ Tip: Set a completion criterion with /goal edit\x1b[0m")
+                        } else {
+                            None
+                        };
+                        ctx.tui.set_goal_status_detail(
+                            Some(&format!("🎯 {}  [0 tokens]", short)),
+                            tip,
+                        );
                         return false; // Don't add user message
                     }
                     Err(e) => ctx.tui.show_error(&e),

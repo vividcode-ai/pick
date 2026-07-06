@@ -13,6 +13,8 @@ pub struct CommentEntry {
     pub id: String,
     pub file: String,
     pub line: i64,
+    pub line_end: Option<i64>,
+    pub side: Option<String>,
     pub comment: String,
     pub time: i64,
     pub resolved: bool,

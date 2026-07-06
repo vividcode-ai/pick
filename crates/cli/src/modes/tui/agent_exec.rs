@@ -98,6 +98,12 @@ pub(crate) fn build_agent_config(
                         .remaining_tokens()
                         .map(|r| r.to_string())
                         .unwrap_or_else(|| "unbounded".to_string());
+                    let criterion = escape_xml_text(&goal.completion_criterion);
+                    let _criterion_display = if criterion.is_empty() {
+                        "none".to_string()
+                    } else {
+                        criterion
+                    };
                     let msg_text = render_goal_template(
                         include_str!("../../templates/goals/objective_updated.md"),
                         &[
@@ -113,6 +119,12 @@ pub(crate) fn build_agent_config(
                 match goal.status.as_str() {
                     "active" => {
                         let objective = escape_xml_text(&goal.objective);
+                        let criterion = escape_xml_text(&goal.completion_criterion);
+                        let criterion_display = if criterion.is_empty() {
+                            "none".to_string()
+                        } else {
+                            criterion
+                        };
                         let token_budget_str = goal
                             .token_budget
                             .map(|b| b.to_string())
@@ -125,6 +137,7 @@ pub(crate) fn build_agent_config(
                             include_str!("../../templates/goals/steering_active.md"),
                             &[
                                 ("objective", &objective),
+                                ("completion_criterion", &criterion_display),
                                 ("tokens_used", &goal.tokens_used.to_string()),
                                 ("token_budget", &token_budget_str),
                                 ("remaining_tokens", &remaining_tokens),
@@ -188,12 +201,20 @@ pub(crate) fn build_agent_config(
 
     let get_follow_up_messages = {
         let goal_manager = ctx.session_manager.goal_manager();
+        let interrupted = ctx.was_interrupted.clone();
         // Capture follow-up queue for queue draining
         let follow_up_queue = ctx.follow_up_queue.clone();
         // Capture cmd_tx for real-time notification when queued messages are consumed
         let follow_up_cmd_tx = cmd_tx.clone();
         move |_result: &pick_agent::core::agent_loop::AgentRunResult| {
             let mut msgs = Vec::new();
+
+            // ESC interruption → auto-pause the goal
+            if interrupted.swap(false, Ordering::Relaxed) {
+                if let Err(e) = goal_manager.pause_on_interrupt() {
+                    tracing::warn!("Failed to auto-pause goal on interrupt: {}", e);
+                }
+            }
 
             // Goal-driven continuation — only when no pending user input
             // (user messages in follow_up_queue take priority)
@@ -205,9 +226,15 @@ pub(crate) fn build_agent_config(
             if !has_pending_user_input && goal_manager.can_continue() {
                 if let Some(goal) = goal_manager.get()
                     && goal.status == "active"
-                    && goal_manager.register_continuation()
                 {
+                    goal_manager.register_continuation();
                     let objective = escape_xml_text(&goal.objective);
+                    let criterion = escape_xml_text(&goal.completion_criterion);
+                    let criterion_display = if criterion.is_empty() {
+                        "none".to_string()
+                    } else {
+                        criterion
+                    };
                     let token_budget_str = goal
                         .token_budget
                         .map(|b| b.to_string())
@@ -220,6 +247,7 @@ pub(crate) fn build_agent_config(
                         include_str!("../../templates/goals/follow_up_continuation.md"),
                         &[
                             ("objective", &objective),
+                            ("completion_criterion", &criterion_display),
                             ("tokens_used", &goal.tokens_used.to_string()),
                             ("token_budget", &token_budget_str),
                             ("remaining_tokens", &remaining_tokens),
@@ -397,6 +425,7 @@ pub(crate) fn build_agent_config(
         provider_max_retry_delay_ms: None,
         approve,
         skill_paths,
+        parent_goal_manager: None,
     }
 }
 

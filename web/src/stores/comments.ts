@@ -78,3 +78,27 @@ export function syncCommentsFromServer(serverComments: LineComment[]) {
   save(comments);
   emit();
 }
+
+export async function loadCommentsFromServer(baseUrl: string, sessionId: string) {
+  try {
+    const res = await fetch(`${baseUrl}/comments/${sessionId}`);
+    if (res.ok) {
+      const data = await res.json();
+      syncCommentsFromServer(data.comments || []);
+    }
+  } catch (e) {
+    console.error("Failed to load comments from server:", e);
+  }
+}
+
+export async function saveCommentsToServer(baseUrl: string, sessionId: string) {
+  try {
+    await fetch(`${baseUrl}/comments/${sessionId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ comments }),
+    });
+  } catch (e) {
+    console.error("Failed to save comments to server:", e);
+  }
+}

@@ -56,9 +56,7 @@ pub fn create_coding_tools_with_mode(agent_mode: Option<String>) -> Vec<AgentToo
         super::webfetch::create_webfetch_tool(),
         super::todo_plan::create_todo_plan_tool(),
         super::question::create_question_tool(),
-        super::goal::create_get_goal_tool_with_mode(),
-        super::goal::create_create_goal_tool_with_mode(),
-        super::goal::create_update_goal_tool_with_mode(),
+        super::goal::create_goal_tool_stub(),
     ]
 }
 
@@ -81,10 +79,8 @@ pub fn create_coding_tools_with_goal_manager(
         super::todo_plan::create_todo_plan_tool(),
         super::question::create_question_tool(),
     ];
-    // Goal tools with real GoalManager
-    tools.push(super::goal::create_get_goal_tool(goal_manager.clone()));
-    tools.push(super::goal::create_create_goal_tool(goal_manager.clone()));
-    tools.push(super::goal::create_update_goal_tool(goal_manager.clone()));
+    // Goal tool with real GoalManager
+    tools.push(super::goal::create_goal_tool(goal_manager.clone()));
     tools
 }
 
@@ -178,8 +174,8 @@ fn tool_params_to_json_schema(params: &[ToolParameter]) -> JsonSchema {
     }
 }
 
-/// Filter out goal tools (get_goal, create_goal, update_goal) when no active goal exists.
-/// Goal tools should only be available to the LLM when a goal has been set via /goal.
+/// Filter out the goal tool when no active goal exists.
+/// The goal tool should only be visible to the LLM when a goal has been set via /goal.
 pub fn filter_goal_tools(
     tools: Vec<AgentTool>,
     goal_manager: std::sync::Arc<crate::session::goal::GoalManager>,
@@ -187,10 +183,7 @@ pub fn filter_goal_tools(
     if goal_manager.get().is_some() {
         return tools;
     }
-    tools
-        .into_iter()
-        .filter(|t| t.name != "get_goal" && t.name != "create_goal" && t.name != "update_goal")
-        .collect()
+    tools.into_iter().filter(|t| t.name != "goal").collect()
 }
 
 /// Extract content blocks and is_error flag from an extension tool result.

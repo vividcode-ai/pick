@@ -191,14 +191,14 @@ export function CommentEditor({
         <div className="flex items-center gap-2">
           <button
             onClick={onCancel}
-            className="px-2 py-1 text-[10px] rounded text-[var(--text-muted)] hover:bg-[var(--surface-hover)]"
+            className="px-2 py-2 text-[10px] rounded text-[var(--text-muted)] hover:bg-[var(--surface-hover)]"
           >
             Cancel
           </button>
           <button
             onClick={handleSubmit}
             disabled={!text.trim()}
-            className="px-3 py-1 text-[10px] font-medium rounded bg-[var(--accent-primary)] text-white hover:opacity-90 disabled:opacity-40"
+            className="px-3 py-2 text-[10px] font-medium rounded bg-[var(--accent-primary)] text-white hover:opacity-90 disabled:opacity-40"
           >
             Comment
           </button>

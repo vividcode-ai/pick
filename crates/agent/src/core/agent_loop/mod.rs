@@ -21,6 +21,7 @@ use crate::extensions::runner::ExtensionRunner;
 use crate::permission::Ruleset;
 use crate::permission::fs_policy::FileSystemPolicy;
 use crate::permission::manager::PermissionManager;
+use crate::session::goal::GoalManager;
 
 /// Maximum consecutive tool errors before forcing text-only mode.
 pub const MAX_CONSECUTIVE_TOOL_ERRORS: u32 = 10;
@@ -100,6 +101,9 @@ pub struct AgentLoopConfig {
     /// skills the LLM reads; if consecutive tool errors occur after reading a
     /// skill, a steering message suggests updating the skill file.
     pub skill_paths: Vec<std::path::PathBuf>,
+    /// For sub-agents: the parent session's GoalManager.
+    /// Set when spawning a child agent; None for the main session.
+    pub parent_goal_manager: Option<Arc<GoalManager>>,
 }
 
 /// Result from a single agent run
