@@ -24,6 +24,8 @@ use crate::approval::SseApprovalHook;
 use crate::events;
 use crate::git::get_git_info;
 use crate::session::SseSessionState;
+use axum::extract::Path;
+use pick_agent::command::review::REVIEW_SYSTEM_PROMPT;
 
 #[derive(Deserialize, ToSchema)]
 pub struct AskRequest {
@@ -252,6 +254,240 @@ pub async fn ask(
 
     debug!("Agent loop started for session {}", req.session_id);
     (StatusCode::ACCEPTED, "Agent started").into_response()
+}
+
+/// Start an AI code review for a session.
+/// Unlike /ask, this uses a specialized review system prompt that defines the
+/// reviewer role, tone guidance, pre-validation rules, and available tools.
+#[utoipa::path(
+    post,
+    path = "/review/{session_id}",
+    tag = "agent",
+    responses(
+        (status = 202, description = "Review started"),
+        (status = 404, description = "Session not found"),
+    )
+)]
+pub async fn start_review(
+    State(state): State<Arc<AppState>>,
+    Path(session_id): Path<String>,
+) -> impl IntoResponse {
+    let session = match state.session_manager.get(&session_id).await {
+        Some(s) => s,
+        None => {
+            return (
+                StatusCode::NOT_FOUND,
+                format!("Session {} not found", session_id),
+            )
+                .into_response();
+        }
+    };
+
+    let model = match pick_ai::models::get_model(&session.provider, &session.model_id) {
+        Some(m) => m,
+        None => {
+            return (
+                StatusCode::BAD_REQUEST,
+                format!("Model '{}' not found", session.model_id),
+            )
+                .into_response();
+        }
+    };
+
+    let sse_state = {
+        let sessions = state.sse_sessions.read().await;
+        sessions.get(&session_id).cloned()
+    };
+
+    let sse_state = match sse_state {
+        Some(s) => s,
+        None => {
+            return (
+                StatusCode::PRECONDITION_FAILED,
+                "No SSE connection for this session. Connect to /events/{session_id} first.",
+            )
+                .into_response();
+        }
+    };
+
+    let agent_mode = sse_state.agent_mode.read().unwrap().clone();
+
+    // Get workspace info for review context
+    let cwd = session
+        .cwd
+        .as_ref()
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| {
+            state
+                .config
+                .cwd
+                .as_ref()
+                .map(std::path::PathBuf::from)
+                .unwrap_or_else(|| std::env::current_dir().unwrap_or_default())
+        });
+    let git_info = tokio::task::spawn_blocking({
+        let cwd = cwd.clone();
+        move || get_git_info(&cwd)
+    })
+    .await
+    .unwrap_or_else(|_| crate::git::GitInfo {
+        branch: String::new(),
+        changes: Vec::new(),
+        cwd: String::new(),
+    });
+
+    let files_context: String = git_info
+        .changes
+        .iter()
+        .map(|c| format!("  {} {}", c.status, c.path))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    // Build the review system prompt
+    let review_prompt = format!(
+        "{}\n\n## Changes to Review\n\nCurrent branch: {}\nChanged files:\n{}\n\nReview these code changes.",
+        REVIEW_SYSTEM_PROMPT,
+        git_info.branch,
+        if files_context.is_empty() {
+            "  (no changes detected)"
+        } else {
+            &files_context
+        },
+    );
+
+    // Enqueue a simple user message to trigger the review
+    {
+        let msg = AiMessage::User(UserMessage::text(
+            "Please review the code changes in this workspace.",
+        ));
+        sse_state.message_queue.lock().unwrap().enqueue(msg);
+    }
+
+    // Try to claim the in_flight flag
+    let already_running = sse_state.in_flight.swap(true, Ordering::AcqRel);
+    if already_running {
+        debug!("Review queued for session {} (agent running)", session_id);
+        return (StatusCode::ACCEPTED, "Review queued").into_response();
+    }
+
+    // Store cancel_tx
+    let (cancel_tx, _cancel_rx) = watch::channel(false);
+    {
+        let mut sessions = state.sse_sessions.write().await;
+        if let Some(s) = sessions.get_mut(&session_id) {
+            s.cancel_tx = Some(cancel_tx.clone());
+        }
+    }
+
+    // Build shared closures (same as /ask)
+    let et = sse_state.event_tx.clone();
+    let et_question = sse_state.event_tx.clone();
+    let pa = sse_state.pending_approvals.clone();
+    let pq = sse_state.pending_questions.clone();
+
+    let approve: Option<pick_agent::core::state::ApproveFn> =
+        Some(Arc::new(move |title: String, msg_body: String| {
+            let pa = pa.clone();
+            let et = et.clone();
+            let approval_id = uuid::Uuid::now_v7().to_string();
+            Box::pin(async move {
+                let (tx, rx) = tokio::sync::oneshot::channel();
+                pa.lock().unwrap().insert(approval_id.clone(), tx);
+                let event = serde_json::json!({
+                    "approval_id": approval_id,
+                    "tool_name": title,
+                    "tool_args": msg_body,
+                    "source": "tool",
+                });
+                let _ = et.send(Ok(Event::default()
+                    .event("approval_required")
+                    .data(serde_json::to_string(&event).unwrap_or_default())));
+                rx.await.unwrap_or(false)
+            }) as std::pin::Pin<Box<dyn std::future::Future<Output = bool> + Send>>
+        }));
+
+    let question: Option<pick_agent::core::state::QuestionFn> = Some(Arc::new(
+        move |questions: Vec<pick_agent::core::state::QuestionPrompt>| {
+            let pq = pq.clone();
+            let et = et_question.clone();
+            let question_id = uuid::Uuid::now_v7().to_string();
+            Box::pin(async move {
+                let (tx, rx) = tokio::sync::oneshot::channel();
+                pq.lock().unwrap().insert(question_id.clone(), tx);
+                let prompts: Vec<serde_json::Value> = questions
+                    .iter()
+                    .map(|q| {
+                        serde_json::json!({
+                            "question": q.question,
+                            "header": q.header,
+                            "options": q.options,
+                            "multiple": q.multiple,
+                        })
+                    })
+                    .collect();
+                let payload = serde_json::json!({
+                    "question_id": question_id,
+                    "prompts": prompts,
+                });
+                let _ = et.send(Ok(Event::default()
+                    .event("question")
+                    .data(serde_json::to_string(&payload).unwrap_or_default())));
+                rx.await.unwrap_or(Err("No response".to_string()))
+            })
+                as std::pin::Pin<
+                    Box<dyn std::future::Future<Output = Result<Vec<Vec<String>>, String>> + Send>,
+                >
+        },
+    ));
+
+    let permission_manager = Arc::new(PermissionManager::new(
+        "danger-full-access",
+        &std::env::current_dir().unwrap_or_default(),
+        None,
+        &[],
+    ));
+    let sse_hook = Arc::new(crate::approval::SseApprovalHook {
+        event_tx: sse_state.event_tx.clone(),
+        pending_approvals: sse_state.pending_approvals.clone(),
+    });
+    permission_manager.register_permission_hook(sse_hook);
+
+    let api_key = state.api_keys.get(&session.provider).cloned();
+    let get_api_key = api_key.map(|key| {
+        std::sync::Arc::new(move || Some(key.clone()))
+            as std::sync::Arc<dyn Fn() -> Option<String> + Send + Sync>
+    });
+
+    let cwd_for_event = cwd.clone();
+    let tools = state.get_tools();
+
+    let thinking_level = ThinkingLevel::Off;
+
+    let sid = session_id.clone();
+    let state_agent = state.clone();
+
+    tokio::spawn(async move {
+        run_agent_loop_queue(
+            state_agent,
+            sid,
+            sse_state,
+            model,
+            review_prompt, // ← review-specific system prompt
+            tools,
+            thinking_level,
+            approve,
+            question,
+            get_api_key,
+            permission_manager,
+            cwd,
+            cwd_for_event,
+            agent_mode,
+        )
+        .await;
+    });
+
+    debug!("Review started for session {}", session_id);
+    (StatusCode::ACCEPTED, "Review started").into_response()
 }
 
 /// Sequential agent loop that drains the message queue between iterations.

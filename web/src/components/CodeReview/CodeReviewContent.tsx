@@ -190,15 +190,12 @@ export function CodeReviewContent({ baseUrl, sessionId, onAsk }: CodeReviewConte
     setReviewText("");
 
     try {
-      const filesContext = gitDiffs.map((f) => `  ${f.status} ${f.path}`).join("\n");
-      const prompt = `Please review the following code changes and provide a thorough code review.\n\nCurrent branch: ${gitInfo?.branch || "unknown"}\nChanged files:\n${filesContext}\n\nPlease analyze the changes for:\n1. Potential bugs and logic errors\n2. Security issues and risks\n3. Code style and best practices\n4. Performance optimization suggestions\n5. Maintainability and readability improvements\n\nFor each issue found, reference the specific file and line numbers where applicable. Use the format "FILE:LINE - description" so issues can be mapped to inline comments.\n\nProvide specific suggestions with code examples where applicable.`;
-
-      const askRes = await fetch(`${baseUrl}/ask`, {
+      const res = await fetch(`${baseUrl}/review/${sessionId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: sessionId, prompt }),
+        body: JSON.stringify({}),
       });
-      if (!askRes.ok) throw new Error(`HTTP ${askRes.status}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       const es = new EventSource(`${baseUrl}/events/${sessionId}`);
       eventSourceRef.current = es;
@@ -228,7 +225,7 @@ export function CodeReviewContent({ baseUrl, sessionId, onAsk }: CodeReviewConte
       setReviewState("error");
       setReviewError(e.message || "Failed to start review");
     }
-  }, [baseUrl, sessionId, gitDiffs, gitInfo?.branch]);
+  }, [baseUrl, sessionId]);
 
   // ── Apply AI review as inline comments ──
   const handleApplyAsComments = useCallback(() => {

@@ -304,6 +304,7 @@ pub fn create_app(state: Arc<AppState>) -> Router {
         .route("/providers", get(rest::list_providers))
         .route("/events/{session_id}", get(sse::handle_sse))
         .route("/ask", post(routes::ask))
+        .route("/review/{session_id}", post(routes::start_review))
         .route("/cancel", post(routes::cancel))
         .route("/approve", post(routes::approve))
         .route("/answer_question", post(routes::answer_question))
