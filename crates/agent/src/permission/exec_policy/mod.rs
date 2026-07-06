@@ -154,18 +154,34 @@ impl ExecPolicy {
         // prefix matching, but the shell executes BOTH commands.
         let has_shell_meta = contains_shell_meta(trimmed);
 
-        // Check rules (last match wins). Match the rule pattern as a prefix
-        // of the command (e.g. rule "git push" matches "git push origin main").
+        // First pass: match specific (non-catch-all) rules. Last match wins.
+        // Standalone `*` patterns are treated as catch-all defaults and only
+        // apply when no specific rule matches (avoiding the issue where a
+        // `* -> prompt` at the end overrides all preceding allow rules).
         let mut decision: Option<ExecDecision> = None;
+        let mut catch_all: Option<ExecDecision> = None;
         for rule in &self.rules {
+            if rule.pattern.trim() == "*" {
+                catch_all = Some(rule.decision);
+                continue;
+            }
             if command_starts_with_pattern(trimmed, &rule.pattern) {
                 decision = Some(rule.decision);
             }
         }
 
+        // If a specific rule matched, use it
         if let Some(d) = decision {
             // If the command has shell meta characters, upgrade Allow to Prompt
             // unless there's an explicit rule covering the full command.
+            if d == ExecDecision::Allow && has_shell_meta {
+                return ExecDecision::Prompt;
+            }
+            return d;
+        }
+
+        // Fallback to catch-all * rule if no specific rule matched
+        if let Some(d) = catch_all {
             if d == ExecDecision::Allow && has_shell_meta {
                 return ExecDecision::Prompt;
             }
@@ -436,7 +452,7 @@ git push -> allow
     }
 
     #[test]
-    fn test_wildcard_last_match_wins() {
+    fn test_wildcard_catch_all_is_fallback() {
         let mut policy = ExecPolicy::new();
         policy
             .load_rules_from_str(
@@ -447,8 +463,27 @@ npm * -> allow
             )
             .unwrap();
 
-        // * -> prompt comes last, so npm install gets Prompt
-        assert_eq!(policy.evaluate("npm install"), ExecDecision::Prompt);
+        // `npm *` is a specific pattern, so it matches first.
+        // `* -> prompt` is now a catch-all fallback, only applies if no other rule matched.
+        assert_eq!(policy.evaluate("npm install"), ExecDecision::Allow);
+    }
+
+    #[test]
+    fn test_catch_all_fallback_unknown_command() {
+        let mut policy = ExecPolicy::new();
+        policy
+            .load_rules_from_str(
+                "
+git log -> allow
+* -> prompt
+        ",
+            )
+            .unwrap();
+
+        // Known command with specific allow rule → Allow
+        assert_eq!(policy.evaluate("git log --oneline"), ExecDecision::Allow);
+        // Unknown command with no specific rule → falls back to * -> prompt
+        assert_eq!(policy.evaluate("some_random_tool"), ExecDecision::Prompt);
     }
 
     #[test]
