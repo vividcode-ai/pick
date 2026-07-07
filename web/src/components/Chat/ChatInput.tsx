@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, type KeyboardEvent } from "react";
 import { Loader2 } from "lucide-react";
+import fuzzysort from "fuzzysort";
 import type { ProviderInfo } from "../../types/events";
 import { ModelSelector } from "./ModelSelector";
 import { ThinkingSelector } from "./ThinkingSelector";
@@ -192,26 +193,23 @@ export function ChatInput({
       const spaceIdx = afterAt.indexOf(" ");
       const query = spaceIdx >= 0 ? afterAt.slice(0, spaceIdx) : afterAt;
       setMentionQuery(query);
-      if (query.length >= 2) {
-        setSearching(true);
-        fetch(`${baseUrl}/find/files?pattern=${encodeURIComponent(query)}&limit=10&prefix=true`)
-          .then((r) => r.ok ? r.json() : { files: [] })
-          .then((data) => {
-            const files: MentionItem[] = (data.files || []).map((f: any) => {
-              const path: string = f.path || "";
-              const parts = path.replace(/\\/g, "/").split("/");
-              return { path, name: parts[parts.length - 1] || path };
-            });
-            setMentionItems(files);
-            setMentionOpen(files.length > 0);
-            setMentionIdx(0);
-            setSearching(false);
-          })
-          .catch(() => setSearching(false));
-      } else {
-        setMentionOpen(false);
-        setMentionItems([]);
-      }
+      setSearching(true);
+      fetch(`${baseUrl}/files/list?path=.&limit=50`)
+        .then((r) => r.ok ? r.json() : { entries: [] })
+        .then((data) => {
+          const allEntries: MentionItem[] = (data.entries || []).map((e: any) => ({
+            path: e.name + (e["type"] === "dir" ? "/" : ""),
+            name: e.name,
+          }));
+          const matched = query.trim()
+            ? fuzzysort.go(query, allEntries, { key: "name", threshold: -1000 }).map((r) => r.obj)
+            : allEntries;
+          setMentionItems(matched);
+          setMentionOpen(matched.length > 0);
+          setMentionIdx(0);
+          setSearching(false);
+        })
+        .catch(() => setSearching(false));
     } else {
       setMentionOpen(false);
       setMentionItems([]);

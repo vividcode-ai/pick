@@ -522,7 +522,7 @@ pub async fn find_files_handler(Query(params): Query<FindFilesParams>) -> impl I
             let relative = full_path.strip_prefix(path).unwrap_or(full_path);
             let name = relative.to_string_lossy();
             let name_lower = name.to_lowercase();
-            if !name_lower.starts_with(&query) {
+            if !name_lower.contains(&query) {
                 continue;
             }
             let is_dir = entry.file_type().is_dir();

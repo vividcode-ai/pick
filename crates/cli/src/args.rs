@@ -20,7 +20,7 @@ pub struct CliDiagnostic {
 const VALID_THINKING_LEVELS: &[&str] = &["off", "minimal", "low", "medium", "high", "xhigh"];
 
 /// Parsed CLI arguments
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Args {
     pub mode: String,
     pub help: bool,
@@ -73,6 +73,59 @@ pub struct Args {
     pub unknown_flags: HashMap<String, ArgValue>,
     /// Diagnostics collected during parsing (warnings, errors)
     pub diagnostics: Vec<CliDiagnostic>,
+}
+
+impl Default for Args {
+    fn default() -> Self {
+        Self {
+            mode: String::new(),
+            help: false,
+            version: false,
+            model: None,
+            provider: None,
+            messages: Vec::new(),
+            session: None,
+            resume: false,
+            r#continue: None,
+            fork: None,
+            no_session: false,
+            no_tools: false,
+            no_builtin_tools: false,
+            tools: Vec::new(),
+            api_key: None,
+            thinking: None,
+            verbose: false,
+            extensions: Vec::new(),
+            skills: Vec::new(),
+            offline: false,
+            system_prompt: None,
+            append_system_prompt: Vec::new(),
+            session_dir: None,
+            models: Vec::new(),
+            print: false,
+            update: false,
+            export_html: None,
+            no_extensions: false,
+            no_skills: false,
+            no_themes: false,
+            no_context_files: false,
+            list_models: None,
+            themes: Vec::new(),
+            file_args: Vec::new(),
+            agent_mode: None,
+            audit: false,
+            audit_recent: None,
+            audit_tool: None,
+            audit_decision: None,
+            audit_layer: None,
+            audit_json: false,
+            port: None,
+            host: None,
+            open_browser: true,
+            unknown_flags: HashMap::new(),
+            diagnostics: Vec::new(),
+        }
+    }
 }
 
 /// Parse command-line arguments
@@ -279,6 +332,7 @@ pub fn parse_args(args: Vec<String>) -> Args {
                 }
             }
             "--open" => parsed.open_browser = true,
+            "--no-open" => parsed.open_browser = false,
             _ => {
                 if arg.starts_with("--") {
                     // Unknown flag (potentially extension-registered)
@@ -381,7 +435,8 @@ pub fn print_help() {
     println!("  server                  Start web server with SPA");
     println!("    --port <PORT>           Port (default: random available)");
     println!("    --host <HOST>           Host address (default: 127.0.0.1)");
-    println!("    --open                  Open browser automatically");
+    println!("    --open                  Open browser automatically (default)");
+    println!("    --no-open               Do not open browser automatically");
     println!();
     println!("AUDIT:");
     println!("  --audit                 View permission audit trail");
