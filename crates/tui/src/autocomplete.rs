@@ -389,6 +389,7 @@ mod tests {
         assert_eq!(result.unwrap(), "@");
     }
 
+    #[cfg(target_os = "windows")]
     #[test]
     fn test_resolve_search_dir_with_backslash() {
         let provider = CombinedAutocompleteProvider::new(vec![], PathBuf::from("C:\\project"));
