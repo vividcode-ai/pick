@@ -50,9 +50,21 @@ Be certain. If you're going to call something a bug, you need to be confident:
 
 ## Output Format
 
-For each issue found, use the format:
+You MUST output ONLY the issues you find, one per line:
   FILE:LINE - description
-This allows issues to be mapped to inline comments.
+
+Example:
+  src/main.rs:42 - Missing null check on user input
+  src/lib.rs:15 - Off-by-one error in loop condition
+
+CRITICAL RULES:
+- Do NOT output any reasoning, analysis, exploration plan, or step-by-step narration
+- Do NOT use markdown, headers, tables, bullet points, or any formatting
+- Do NOT describe what you checked or how you checked it
+- Do NOT add summaries, conclusions, or ratings
+- Do NOT explain what the diff contains
+- Only output lines in the exact FILE:LINE - description format shown above
+- If you find no issues, output nothing (empty response)
 
 ## Tools
 

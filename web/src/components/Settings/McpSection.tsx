@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Trash2, RotateCw, ChevronRight } from "lucide-react";
+import { Plus, Trash2, RotateCw, ChevronRight, Loader2 } from "lucide-react";
 
 interface McpServer {
   name: string;
@@ -56,6 +56,8 @@ export function McpSection({ serverUrl }: McpSectionProps) {
 
   const [transportTab, setTransportTab] = useState<TransportTab>("stdio");
   const [expandedServer, setExpandedServer] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
 
   const fetchServers = async () => {
     try {
@@ -95,6 +97,9 @@ export function McpSection({ serverUrl }: McpSectionProps) {
   };
 
   const handleAdd = async () => {
+    setSaveError("");
+    setSaving(true);
+
     const body: Record<string, unknown> = {
       name: formName,
       tool_name_prefix: formPrefix || undefined,
@@ -128,16 +133,25 @@ export function McpSection({ serverUrl }: McpSectionProps) {
       }
     }
 
-    const res = await fetch(`${serverUrl}/mcp`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    try {
+      const res = await fetch(`${serverUrl}/mcp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
 
-    if (res.ok) {
-      setShowAddForm(false);
-      resetForm();
-      fetchServers();
+      if (res.ok) {
+        setShowAddForm(false);
+        resetForm();
+        fetchServers();
+      } else {
+        const text = await res.text().catch(() => "");
+        setSaveError(text || `Request failed (${res.status})`);
+      }
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "Network error");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -580,7 +594,10 @@ export function McpSection({ serverUrl }: McpSectionProps) {
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 mt-5">
+            {saveError && (
+              <div className="text-xs text-red-400 break-words mt-5">{saveError}</div>
+            )}
+            <div className="flex justify-end gap-2 mt-3">
               <button
                 onClick={() => { setShowAddForm(false); resetForm(); }}
                 className="px-3 py-1.5 rounded text-xs font-medium bg-[var(--surface-button)] text-[var(--text-secondary)] border border-[var(--border-base)] hover:opacity-80 transition-colors"
@@ -589,10 +606,12 @@ export function McpSection({ serverUrl }: McpSectionProps) {
               </button>
               <button
                 onClick={handleAdd}
-                disabled={!formName}
-                className="px-3 py-1.5 rounded text-xs font-medium bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:opacity-80 transition-colors disabled:opacity-40"
+                disabled={!formName || saving}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:opacity-80 transition-colors disabled:opacity-40"
               >
-                Save
+                {saving ? (
+                  <><Loader2 className="w-3 h-3 animate-spin" /> Saving...</>
+                ) : "Save"}
               </button>
             </div>
           </div>

@@ -10,7 +10,7 @@ export function useLineHover(containerRef: React.RefObject<HTMLDivElement | null
     const container = containerRef.current;
     if (!container) return;
 
-    const lineNums = container.querySelectorAll<HTMLElement>(".line-num");
+    const lineNums = container.querySelectorAll<HTMLElement>(".diff-line-number");
     if (!lineNums.length) {
       if (currentLineRef.current !== null) {
         currentLineRef.current = null;

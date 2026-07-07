@@ -78,6 +78,7 @@ export function ModelSelector({
 }: ModelSelectorProps) {
   const [open, setOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
+  const [manageRefreshKey, setManageRefreshKey] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -90,9 +91,24 @@ export function ModelSelector({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  const prevManageOpen = useRef(manageOpen);
+  useEffect(() => {
+    if (prevManageOpen.current && !manageOpen) {
+      setManageRefreshKey((k) => k + 1);
+    }
+    prevManageOpen.current = manageOpen;
+  }, [manageOpen]);
+
   const displayNameCache = useMemo(() => PROVIDER_DISPLAY_NAMES, []);
 
   const allModels: FlatModel[] = useMemo(() => {
+    let hidden: Set<string>;
+    try {
+      const raw = localStorage.getItem("pick_hidden_models");
+      hidden = new Set(raw ? (JSON.parse(raw) as string[]) : []);
+    } catch {
+      hidden = new Set();
+    }
     return providers
       .filter((p) => p.has_key)
       .flatMap((p) =>
@@ -102,8 +118,9 @@ export function ModelSelector({
           providerDisplayName: displayNameCache[p.provider] || p.provider,
           searchText: `${m.name} ${displayNameCache[p.provider] || p.provider} ${m.id}`.toLowerCase(),
         }))
-      );
-  }, [providers, displayNameCache]);
+      )
+      .filter((m) => !hidden.has(`${m.provider}/${m.id}`));
+  }, [providers, displayNameCache, manageRefreshKey]);
 
   const [searchQuery, setSearchQuery] = useState("");
 

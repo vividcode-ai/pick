@@ -25,7 +25,32 @@ export function ModelManageDialog({
 }: ModelManageDialogProps) {
   const [query, setQuery] = useState("");
   const [keyRequestProvider, setKeyRequestProvider] = useState<string | null>(null);
+  const [hoveredKey, setHoveredKey] = useState<string | null>(null);
+  const [tick, setTick] = useState(0);
   const searchRef = useRef<HTMLInputElement>(null);
+
+  const HIDDEN_KEY = "pick_hidden_models";
+
+  function getHiddenSet(): Set<string> {
+    try {
+      const raw = localStorage.getItem(HIDDEN_KEY);
+      if (!raw) return new Set();
+      return new Set(JSON.parse(raw) as string[]);
+    } catch {
+      return new Set();
+    }
+  }
+
+  function toggleHidden(key: string) {
+    const set = getHiddenSet();
+    if (set.has(key)) set.delete(key);
+    else set.add(key);
+    localStorage.setItem(HIDDEN_KEY, JSON.stringify(Array.from(set)));
+    setTick((t) => t + 1);
+  }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const hiddenSet = useMemo(() => getHiddenSet(), [tick]);
 
   useEffect(() => {
     setTimeout(() => searchRef.current?.focus(), 80);
@@ -141,20 +166,40 @@ export function ModelManageDialog({
                     )}
                   </div>
                   {group.items.map((item) => {
+                    const itemKey = `${item.provider}/${item.id}`;
                     const selected = item.id === selectedModel && item.provider === selectedProvider;
+                    const hovered = hoveredKey === itemKey;
                     return (
                       <div
-                        key={`${item.provider}/${item.id}`}
-                        className="flex items-center gap-2 px-3 py-1.5 cursor-pointer text-xs rounded-md hover:bg-[var(--surface-hover)] transition-colors"
+                        key={itemKey}
+                        className="flex items-center gap-2 px-3 py-1.5 cursor-pointer text-xs rounded-md transition-colors"
                         style={{
                           backgroundColor: selected
                             ? "color-mix(in oklab, var(--accent-primary) 12%, var(--surface-base))"
-                            : "transparent",
+                            : hovered
+                              ? "var(--surface-hover)"
+                              : "transparent",
                           color: hasKey ? "var(--text-primary)" : "var(--text-muted)",
                         }}
                         onClick={() => hasKey ? handleSelect(item) : setKeyRequestProvider(item.provider)}
+                        onMouseEnter={() => setHoveredKey(itemKey)}
+                        onMouseLeave={() => setHoveredKey(null)}
                       >
                         <span className="truncate flex-1">{item.name}</span>
+                        {hasKey && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); toggleHidden(itemKey); }}
+                            disabled={selected}
+                            className={`shrink-0 w-4 h-4 rounded-full border-2 transition-colors ${
+                              selected ? "opacity-30 cursor-not-allowed" : "cursor-pointer"
+                            }`}
+                            style={{
+                              backgroundColor: hiddenSet.has(itemKey) ? "transparent" : "#22c55e",
+                              borderColor: hiddenSet.has(itemKey) ? "#64748b" : "#22c55e",
+                            }}
+                            title={hiddenSet.has(itemKey) ? "Show in quick selector" : "Hide from quick selector"}
+                          />
+                        )}
                         {selected && (
                           <Check className="w-3 h-3 shrink-0 text-[var(--accent-primary)]" />
                         )}

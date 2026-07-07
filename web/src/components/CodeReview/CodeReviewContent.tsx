@@ -50,6 +50,10 @@ export function CodeReviewContent({ baseUrl, sessionId, onAsk, provider, modelId
   const [reviewError, setReviewError] = useState<string | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
 
+  // ── Feedback ──
+  const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
+  const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // ── Comments ──
   const [allComments, setAllComments] = useState<number>(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -178,6 +182,13 @@ export function CodeReviewContent({ baseUrl, sessionId, onAsk, provider, modelId
     };
   }, [gitDiffs]);
 
+  // ── Auto-clear feedback ──
+  const showFeedback = useCallback((msg: string) => {
+    setFeedbackMsg(msg);
+    if (feedbackTimer.current) clearTimeout(feedbackTimer.current);
+    feedbackTimer.current = setTimeout(() => setFeedbackMsg(null), 4000);
+  }, []);
+
   // ── Cleanup SSE on unmount ──
   useEffect(() => {
     return () => {
@@ -269,24 +280,45 @@ export function CodeReviewContent({ baseUrl, sessionId, onAsk, provider, modelId
 
   // ── Apply AI review as inline comments ──
   const handleApplyAsComments = useCallback(() => {
-    const pattern = /(\S+?):(\d+)\s*[-–—]\s*(.+?)(?=\n\S+?:\d+\s*[-–—]|\n\n|$)/gs;
-    let match;
     let count = 0;
-    while ((match = pattern.exec(reviewText)) !== null) {
-      const [, filePath, lineStr, comment] = match;
+    let totalFiles = 0;
+
+    // Strategy 1: Precise FILE:LINE - description format
+    const exactPattern = /(\S+?):(\d+)\s*[-–—]\s*(.+?)(?=\n\S+?:\d+\s*[-–—]|\n\n|$)/gs;
+    let match;
+    while ((match = exactPattern.exec(reviewText)) !== null) {
+      const [, fPath, lineStr, comment] = match;
       const line = parseInt(lineStr, 10);
-      if (filePath && !isNaN(line) && comment) {
-        addComment({ file: filePath, line, comment: comment.trim(), resolved: false });
+      if (fPath && !isNaN(line) && comment) {
+        addComment({ file: fPath, line, comment: comment.trim(), resolved: false });
         count++;
       }
     }
+
+    // Strategy 2: Fallback — line-beginning `file:line` or file:line - desc
+    if (count === 0) {
+      const fallbackPattern = /(?:^|\n)\s*`?([\w./\\\-_]+)`?\s*:\s*(\d+)\s*[-–—]\s*(.+?)(?=\n|$)/gm;
+      while ((match = fallbackPattern.exec(reviewText)) !== null) {
+        const [, fPath, lineStr, comment] = match;
+        const line = parseInt(lineStr, 10);
+        if (fPath && !isNaN(line) && comment) {
+          addComment({ file: fPath, line, comment: comment.trim(), resolved: false });
+          count++;
+        }
+      }
+    }
+
     if (count > 0) {
       const filesWithComments = gitDiffs
         .filter((f) => getCommentsByFile(f.path).length > 0)
         .map((f) => f.path);
+      totalFiles = filesWithComments.length;
       setExpandedFiles((prev) => [...new Set([...prev, ...filesWithComments])]);
+      showFeedback(`Applied ${count} inline comment(s) across ${totalFiles} file(s)`);
+    } else {
+      showFeedback("No FILE:LINE entries found — AI may have output reasoning instead of structured findings.");
     }
-  }, [reviewText, gitDiffs]);
+  }, [reviewText, gitDiffs, showFeedback]);
 
   // ── Helper ──
   const allFilePaths = useMemo(() => gitDiffs.map((f) => f.path), [gitDiffs]);
@@ -501,6 +533,12 @@ export function CodeReviewContent({ baseUrl, sessionId, onAsk, provider, modelId
                 <Play className="w-3.5 h-3.5" />
                 Retry
               </button>
+            </div>
+          )}
+
+          {feedbackMsg && (
+            <div className="px-3 py-2 text-xs text-[var(--text-muted)] border-t border-[var(--border-base)]">
+              {feedbackMsg}
             </div>
           )}
         </div>
