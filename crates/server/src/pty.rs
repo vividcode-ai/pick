@@ -148,6 +148,7 @@ fn which(cmd: &str) -> Option<String> {
 }
 
 /// On Windows, detect Git-bundled bash.exe via git --exec-path.
+#[cfg(target_os = "windows")]
 fn git_bash_path() -> Option<String> {
     let git = which("git.exe")?;
     let git_dir = Path::new(&git).parent()?;
@@ -179,7 +180,7 @@ fn detect_shell() -> String {
                 return "/bin/zsh".to_string();
             }
         }
-        return "/bin/sh".to_string();
+        "/bin/sh".to_string()
     }
 
     // Windows fallback chain
