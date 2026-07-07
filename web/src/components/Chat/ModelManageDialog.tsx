@@ -32,9 +32,19 @@ export function ModelManageDialog({
   const [query, setQuery] = useState("");
   const [keyRequestProvider, setKeyRequestProvider] = useState<string | null>(null);
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const searchRef = useRef<HTMLInputElement>(null);
 
   const hiddenSet = useMemo(() => new Set(hiddenModels), [hiddenModels]);
+
+  const toggleCollapse = useCallback((cat: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat);
+      else next.add(cat);
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     setTimeout(() => searchRef.current?.focus(), 80);
@@ -141,21 +151,31 @@ export function ModelManageDialog({
                   key={group.category}
                   className="border border-[var(--border-base)] rounded-lg mb-2 min-w-0 overflow-hidden"
                 >
-                  <legend className="ml-3 px-1.5 text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
-                    <span
-                      className="w-2 h-2 rounded-full inline-block mr-1 align-middle"
-                      style={{
-                        backgroundColor: hasKey ? "#22c55e" : "#64748b",
-                        opacity: hasKey ? 1 : 0.3,
-                      }}
-                    />
-                    <span className="align-middle">{group.category}</span>
-                    {!hasKey && (
-                      <span className="ml-1 text-[10px] text-[var(--text-muted)] normal-case font-normal align-middle">
-                        (No API key)
-                      </span>
-                    )}
+                  <legend className="ml-3 px-1.5 flex items-center w-[calc(100%-12px)] gap-1 text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+                    <span className="flex items-center gap-1 min-w-0 flex-1">
+                      <span
+                        className="w-2 h-2 rounded-full shrink-0 align-middle"
+                        style={{
+                          backgroundColor: hasKey ? "#22c55e" : "#64748b",
+                          opacity: hasKey ? 1 : 0.3,
+                        }}
+                      />
+                      <span className="truncate align-middle">{group.category}</span>
+                      {!hasKey && (
+                        <span className="text-[10px] text-[var(--text-muted)] normal-case font-normal align-middle shrink-0">
+                          (No API key)
+                        </span>
+                      )}
+                    </span>
+                    <button
+                      onClick={() => toggleCollapse(group.category)}
+                      className="shrink-0 p-0.5 rounded hover:bg-[var(--surface-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                      title={collapsed.has(group.category) ? "Expand" : "Collapse"}
+                    >
+                      {collapsed.has(group.category) ? "▶" : "▼"}
+                    </button>
                   </legend>
+                  {!collapsed.has(group.category) && (
                   <div className="pb-1">
                     {group.items.map((item) => {
                       const itemKey = `${item.provider}/${item.id}`;
@@ -203,6 +223,7 @@ export function ModelManageDialog({
                       );
                     })}
                   </div>
+                  )}
                 </fieldset>
               );
             })

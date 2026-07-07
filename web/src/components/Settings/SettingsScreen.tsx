@@ -1,5 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { ArrowLeft, Palette, Cpu, Server, Bell, Archive, Activity, Bot } from "lucide-react";
+import { ArrowLeft, Palette, Server, Bell, Archive, Activity, Bot } from "lucide-react";
 import {
   closeSettings,
   setActiveSettingsSection,
@@ -9,18 +9,13 @@ import {
 } from "../../stores/settings";
 import { useArchivedSessions } from "../../stores/sessions";
 import { AppearanceSection } from "./AppearanceSection";
-import { ProvidersSection } from "./ProvidersSection";
 import { ServerSection } from "./ServerSection";
 import { NotificationsSection } from "./NotificationsSection";
 import { ArchivedSessionsSection } from "./ArchivedSectionsSection";
 import { McpSection } from "./McpSection";
 import { AgentSection } from "./AgentSection";
-import type { ProviderInfo } from "../../types/events";
 
 interface SettingsScreenProps {
-  providers: ProviderInfo[];
-  selectedModel: string;
-  onModelChange: (modelId: string, provider: string) => void;
   serverUrl: string;
   onSaveServerUrl: (url: string) => void;
   onUnarchiveSession: (id: string) => void;
@@ -29,7 +24,6 @@ interface SettingsScreenProps {
 
 const navItems: { id: SettingsSectionId; icon: typeof Palette; label: string }[] = [
   { id: "appearance", icon: Palette, label: "Appearance" },
-  { id: "providers", icon: Cpu, label: "Providers" },
   { id: "server", icon: Server, label: "Server" },
   { id: "notifications", icon: Bell, label: "Notifications" },
   { id: "archived", icon: Archive, label: "Archived" },
@@ -38,9 +32,6 @@ const navItems: { id: SettingsSectionId; icon: typeof Palette; label: string }[]
 ];
 
 export function SettingsScreen({
-  providers,
-  selectedModel,
-  onModelChange,
   serverUrl,
   onSaveServerUrl,
   onUnarchiveSession,
@@ -63,8 +54,6 @@ export function SettingsScreen({
     switch (state.activeSection) {
       case "appearance":
         return <AppearanceSection />;
-      case "providers":
-        return <ProvidersSection providers={providers} selectedModel={selectedModel} onModelChange={onModelChange} />;
       case "server":
         return <ServerSection currentUrl={serverUrl} onSave={onSaveServerUrl} />;
       case "notifications":

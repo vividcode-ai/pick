@@ -358,9 +358,6 @@ export default function App() {
   if (settingsState.open) {
     return (
       <SettingsScreen
-        providers={providers}
-        selectedModel={selectedModel}
-        onModelChange={handleModelChange}
         serverUrl={settingsUrl}
         onSaveServerUrl={handleSaveUrl}
         onUnarchiveSession={handleUnarchiveSession}

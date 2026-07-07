@@ -1250,8 +1250,14 @@ impl TuiApp {
         self.paste_burst_active = false;
         self.paste_burst_consecutive = 0;
         self.last_paste_time = Some(Instant::now());
-        let trimmed = self.editor.text().trim_start();
-        if trimmed.starts_with('/') && !trimmed[1..].contains(' ') {
+        let editor_text = self.editor.text();
+        let before_cursor = &editor_text[..self.editor.cursor];
+        let last_delim = before_cursor
+            .rfind([' ', '\t', '\n'])
+            .map(|i| i + 1)
+            .unwrap_or(0);
+        let token = &before_cursor[last_delim..];
+        if (token.starts_with('/') && !token[1..].contains(' ')) || token.starts_with('@') {
             self.editor.trigger_autocomplete();
         } else {
             self.editor.cancel_autocomplete();
@@ -1266,19 +1272,25 @@ impl TuiApp {
         if let Some(t) = self.last_paste_time
             && now.duration_since(t).as_millis() > 50
         {
-            let text = std::mem::take(&mut self.paste_accumulator);
+            let pasted = std::mem::take(&mut self.paste_accumulator);
             if self.paste_burst_active {
-                self.editor.insert_str_paste_burst(&text);
-            } else if text.contains('\n') || text.contains('\r') {
-                self.editor.insert_str(&text);
+                self.editor.insert_str_paste_burst(&pasted);
+            } else if pasted.contains('\n') || pasted.contains('\r') {
+                self.editor.insert_str(&pasted);
             } else {
-                self.editor.insert_str_no_merge(&text);
+                self.editor.insert_str_no_merge(&pasted);
             }
             self.paste_burst_active = false;
             self.paste_burst_consecutive = 0;
             self.last_paste_time = Some(now);
-            let trimmed = self.editor.text().trim_start();
-            if trimmed.starts_with('/') && !trimmed[1..].contains(' ') {
+            let editor_text = self.editor.text();
+            let before_cursor = &editor_text[..self.editor.cursor];
+            let last_delim = before_cursor
+                .rfind([' ', '\t', '\n'])
+                .map(|i| i + 1)
+                .unwrap_or(0);
+            let token = &before_cursor[last_delim..];
+            if (token.starts_with('/') && !token[1..].contains(' ')) || token.starts_with('@') {
                 self.editor.trigger_autocomplete();
             } else {
                 self.editor.cancel_autocomplete();
