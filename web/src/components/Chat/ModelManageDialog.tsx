@@ -137,65 +137,73 @@ export function ModelManageDialog({
               );
               const hasKey = rawProvider?.has_key ?? false;
               return (
-                <div key={group.category}>
-                  <div className="sticky top-0 z-[1] flex items-center gap-2 px-3 py-1.5 text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider bg-[var(--surface-base)] border-b border-[var(--border-base)]">
+                <fieldset
+                  key={group.category}
+                  className="border border-[var(--border-base)] rounded-lg mb-2 min-w-0 overflow-hidden"
+                >
+                  <legend className="ml-3 px-1.5 text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
                     <span
-                      className={`w-2 h-2 rounded-full shrink-0 ${hasKey ? "" : "opacity-30"}`}
-                      style={{ backgroundColor: hasKey ? "#22c55e" : "#64748b" }}
+                      className="w-2 h-2 rounded-full inline-block mr-1 align-middle"
+                      style={{
+                        backgroundColor: hasKey ? "#22c55e" : "#64748b",
+                        opacity: hasKey ? 1 : 0.3,
+                      }}
                     />
-                    <span>{group.category}</span>
+                    <span className="align-middle">{group.category}</span>
                     {!hasKey && (
-                      <span className="text-[10px] text-[var(--text-muted)] normal-case font-normal ml-1">
+                      <span className="ml-1 text-[10px] text-[var(--text-muted)] normal-case font-normal align-middle">
                         (No API key)
                       </span>
                     )}
+                  </legend>
+                  <div className="pb-1">
+                    {group.items.map((item) => {
+                      const itemKey = `${item.provider}/${item.id}`;
+                      const selected = item.id === selectedModel && item.provider === selectedProvider;
+                      const hovered = hoveredKey === itemKey;
+                      return (
+                        <div
+                          key={itemKey}
+                          className="flex items-center gap-2 px-3 py-1.5 cursor-pointer text-xs rounded-md transition-colors"
+                          style={{
+                            backgroundColor: selected
+                              ? "color-mix(in oklab, var(--accent-primary) 12%, var(--surface-base))"
+                              : hovered
+                                ? "var(--surface-hover)"
+                                : "transparent",
+                            color: hasKey ? "var(--text-primary)" : "var(--text-muted)",
+                          }}
+                          onClick={() => hasKey ? handleSelect(item) : setKeyRequestProvider(item.provider)}
+                          onMouseEnter={() => setHoveredKey(itemKey)}
+                          onMouseLeave={() => setHoveredKey(null)}
+                        >
+                          <span className="truncate flex-1">{item.name}</span>
+                          {hasKey && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); onToggleHidden(itemKey); }}
+                              disabled={selected && !hiddenSet.has(itemKey)}
+                              className={`shrink-0 p-1 rounded transition-colors ${
+                                selected ? "opacity-30 cursor-not-allowed" : "cursor-pointer hover:bg-[var(--surface-hover)]"
+                              }`}
+                              title={hiddenSet.has(itemKey) ? "Show in quick selector" : "Hide from quick selector"}
+                            >
+                              <span
+                                className="block w-5 h-5 rounded-full border-2 transition-colors"
+                                style={{
+                                  backgroundColor: hiddenSet.has(itemKey) ? "transparent" : "#22c55e",
+                                  borderColor: hiddenSet.has(itemKey) ? "#64748b" : "#22c55e",
+                                }}
+                              />
+                            </button>
+                          )}
+                          {selected && (
+                            <Check className="w-3 h-3 shrink-0 text-[var(--accent-primary)]" />
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                  {group.items.map((item) => {
-                    const itemKey = `${item.provider}/${item.id}`;
-                    const selected = item.id === selectedModel && item.provider === selectedProvider;
-                    const hovered = hoveredKey === itemKey;
-                    return (
-                      <div
-                        key={itemKey}
-                        className="flex items-center gap-2 px-3 py-1.5 cursor-pointer text-xs rounded-md transition-colors"
-                        style={{
-                          backgroundColor: selected
-                            ? "color-mix(in oklab, var(--accent-primary) 12%, var(--surface-base))"
-                            : hovered
-                              ? "var(--surface-hover)"
-                              : "transparent",
-                          color: hasKey ? "var(--text-primary)" : "var(--text-muted)",
-                        }}
-                        onClick={() => hasKey ? handleSelect(item) : setKeyRequestProvider(item.provider)}
-                        onMouseEnter={() => setHoveredKey(itemKey)}
-                        onMouseLeave={() => setHoveredKey(null)}
-                      >
-                        <span className="truncate flex-1">{item.name}</span>
-                        {hasKey && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); onToggleHidden(itemKey); }}
-                            disabled={selected && !hiddenSet.has(itemKey)}
-                            className={`shrink-0 p-1 rounded transition-colors ${
-                              selected ? "opacity-30 cursor-not-allowed" : "cursor-pointer hover:bg-[var(--surface-hover)]"
-                            }`}
-                            title={hiddenSet.has(itemKey) ? "Show in quick selector" : "Hide from quick selector"}
-                          >
-                            <span
-                              className="block w-5 h-5 rounded-full border-2 transition-colors"
-                              style={{
-                                backgroundColor: hiddenSet.has(itemKey) ? "transparent" : "#22c55e",
-                                borderColor: hiddenSet.has(itemKey) ? "#64748b" : "#22c55e",
-                              }}
-                            />
-                          </button>
-                        )}
-                        {selected && (
-                          <Check className="w-3 h-3 shrink-0 text-[var(--accent-primary)]" />
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                </fieldset>
               );
             })
           )}

@@ -198,10 +198,7 @@ impl CombinedAutocompleteProvider {
 
         for entry in dir.flatten() {
             let name = entry.file_name().to_string_lossy().to_string();
-            if !name
-                .to_lowercase()
-                .starts_with(&search_prefix.to_lowercase())
-            {
+            if !name.to_lowercase().contains(&search_prefix.to_lowercase()) {
                 continue;
             }
 
@@ -386,9 +383,9 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_path_prefix_at_alone_returns_none() {
+    fn test_extract_path_prefix_at_alone_returns_some() {
         let provider = CombinedAutocompleteProvider::new(vec![], PathBuf::from("/tmp"));
-        // Just @ alone should not trigger (too short, see insert_char guard)
+        // @ alone is recognized as a path prefix (contains matching handles empty query = all files)
         let result = provider.extract_path_prefix("@", false);
         assert!(result.is_some());
         assert_eq!(result.unwrap(), "@");

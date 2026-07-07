@@ -1025,7 +1025,7 @@ impl TuiApp {
                         .unwrap_or(0);
                     let token = &before_cursor[last_delim..];
                     if (token.starts_with('/') && !token[1..].contains(' '))
-                        || (token.starts_with('@') && token.len() >= 3)
+                        || (token.starts_with('@'))
                     {
                         self.editor.trigger_autocomplete();
                         if self.editor.is_autocomplete_active() {
@@ -1049,7 +1049,7 @@ impl TuiApp {
                 let token = &before_cursor[last_delim..];
                 if self.editor.is_autocomplete_active()
                     || token.starts_with('/')
-                    || (token.starts_with('@') && token.len() >= 3)
+                    || (token.starts_with('@'))
                 {
                     self.editor.trigger_autocomplete();
                 }

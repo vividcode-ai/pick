@@ -3,29 +3,11 @@ import { fetchProviders } from "./useSessionManager";
 import type { ProviderInfo } from "../types/events";
 import { getSessionEntry } from "../stores/sessions";
 
-const THINKING_KEY = "pick_thinking_level";
-
-function loadString(key: string, fallback = ""): string {
-  try {
-    return localStorage.getItem(key) ?? fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function saveString(key: string, value: string) {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    /* noop */
-  }
-}
-
 export function useModelState(baseUrl: string | null) {
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
   const [selectedModel, setSelectedModel] = useState("");
   const [selectedProvider, setSelectedProvider] = useState("");
-  const [thinkingLevel, setThinkingLevel] = useState(() => loadString(THINKING_KEY, "off"));
+  const [thinkingLevel, setThinkingLevel] = useState("off");
   const [hiddenModels, setHiddenModels] = useState<string[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [inited, setInited] = useState(false);
@@ -38,6 +20,9 @@ export function useModelState(baseUrl: string | null) {
         setSelectedModel(res.last_model);
         setSelectedProvider(res.last_provider);
         setInited(true);
+      }
+      if (res.thinking_level) {
+        setThinkingLevel(res.thinking_level);
       }
       setLoaded(true);
     });
@@ -99,7 +84,6 @@ export function useModelState(baseUrl: string | null) {
   const handleThinkingLevelChange = useCallback(
     (level: string) => {
       setThinkingLevel(level);
-      saveString(THINKING_KEY, level);
     },
     []
   );

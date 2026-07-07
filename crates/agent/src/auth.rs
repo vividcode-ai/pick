@@ -41,6 +41,8 @@ pub struct AuthFile {
     pub last_provider: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_model: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub thinking_level: Option<String>,
 }
 
 /// Path to the default auth.json file (~/.pick/agent/auth.json)

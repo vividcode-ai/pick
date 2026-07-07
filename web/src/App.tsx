@@ -221,7 +221,13 @@ export default function App() {
 
   const handleThinkingLevelChange = useCallback((level: string) => {
     setThinkingLevel(level);
-    localStorage.setItem("pick_thinking_level", level);
+    if (baseUrl) {
+      fetch(`${baseUrl}/thinking-level`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ thinking_level: level }),
+      }).catch(() => {});
+    }
     if (activeSessionId) {
       updateSessionEntry(activeSessionId, { thinkingLevel: level });
     }

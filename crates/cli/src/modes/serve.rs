@@ -43,12 +43,13 @@ pub async fn run_serve_mode(
     state.default_model = default_model;
     *state.api_keys.write().unwrap() = api_keys;
 
-    // Load last used model from auth.json
+    // Load last used model and thinking level from auth.json
     let auth_path = pick_agent::auth::default_auth_path();
     if auth_path.exists() {
         if let Ok(file) = pick_agent::auth::read_auth_file(&auth_path) {
             *state.last_provider.write().unwrap() = file.last_provider;
             *state.last_model.write().unwrap() = file.last_model;
+            *state.thinking_level.write().unwrap() = file.thinking_level;
         }
     }
 

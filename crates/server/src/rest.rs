@@ -414,6 +414,7 @@ pub struct ProvidersResponse {
     pub providers: Vec<ProviderInfo>,
     pub last_provider: Option<String>,
     pub last_model: Option<String>,
+    pub thinking_level: Option<String>,
 }
 
 /// List all configured AI providers and their models
@@ -452,10 +453,12 @@ pub async fn list_providers(State(state): State<Arc<AppState>>) -> impl IntoResp
         .collect();
     let last_provider = state.last_provider.read().unwrap().clone();
     let last_model = state.last_model.read().unwrap().clone();
+    let thinking_level = state.thinking_level.read().unwrap().clone();
     Json(ProvidersResponse {
         providers,
         last_provider,
         last_model,
+        thinking_level,
     })
 }
 
@@ -758,6 +761,7 @@ pub async fn set_provider_key(
             credentials: std::collections::HashMap::new(),
             last_provider: None,
             last_model: None,
+            thinking_level: None,
         });
         file.credentials.insert(
             provider.clone(),
@@ -797,6 +801,7 @@ pub async fn set_last_model(
             credentials: std::collections::HashMap::new(),
             last_provider: None,
             last_model: None,
+            thinking_level: None,
         });
         file.last_provider = Some(req.provider);
         file.last_model = Some(req.model);
@@ -805,6 +810,41 @@ pub async fn set_last_model(
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Failed to persist last model",
+            )
+                .into_response();
+        }
+    }
+
+    StatusCode::OK.into_response()
+}
+
+#[derive(Deserialize)]
+pub struct SetThinkingLevelRequest {
+    pub thinking_level: String,
+}
+
+/// Save the thinking level (persisted to auth.json).
+pub async fn set_thinking_level(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<SetThinkingLevelRequest>,
+) -> impl IntoResponse {
+    // Update in-memory
+    *state.thinking_level.write().unwrap() = Some(req.thinking_level.clone());
+
+    // Persist to auth.json
+    if let Some(auth_path) = &state.auth_storage_path {
+        let mut file = auth_storage::read_auth_file(auth_path).unwrap_or(auth_storage::AuthFile {
+            credentials: std::collections::HashMap::new(),
+            last_provider: None,
+            last_model: None,
+            thinking_level: None,
+        });
+        file.thinking_level = Some(req.thinking_level);
+        if let Err(e) = auth_storage::write_auth_file(auth_path, &file) {
+            tracing::error!("Failed to persist thinking level to auth.json: {e}");
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to persist thinking level",
             )
                 .into_response();
         }

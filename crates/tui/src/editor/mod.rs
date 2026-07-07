@@ -172,9 +172,7 @@ impl Editor {
                 .map(|i| i + 1)
                 .unwrap_or(0);
             let token = &text_before[last_delim..];
-            if (token.starts_with('/') && !token[1..].contains(' '))
-                || (token.starts_with('@') && token.len() >= 3)
-            {
+            if (token.starts_with('/') && !token[1..].contains(' ')) || (token.starts_with('@')) {
                 self.trigger_autocomplete();
             } else {
                 self.cancel_autocomplete();

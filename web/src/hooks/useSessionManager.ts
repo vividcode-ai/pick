@@ -678,6 +678,6 @@ export async function fetchProviders(baseUrl: string): Promise<ProvidersResponse
     const res = await fetch(`${baseUrl}/providers`);
     return await res.json();
   } catch {
-    return { providers: [], last_provider: null, last_model: null };
+    return { providers: [], last_provider: null, last_model: null, thinking_level: null };
   }
 }

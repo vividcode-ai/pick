@@ -46,6 +46,7 @@ pub struct AppState {
     pub auth_storage_path: Option<PathBuf>,
     pub last_provider: std::sync::RwLock<Option<String>>,
     pub last_model: std::sync::RwLock<Option<String>>,
+    pub thinking_level: std::sync::RwLock<Option<String>>,
     pub pty_manager: PtyManager,
     pub mcp_manager: McpManager,
     pub mcp_configs: RwLock<Vec<McpServerConfig>>,
@@ -78,6 +79,7 @@ impl AppState {
             auth_storage_path,
             last_provider: std::sync::RwLock::new(None),
             last_model: std::sync::RwLock::new(None),
+            thinking_level: std::sync::RwLock::new(None),
             pty_manager: PtyManager::new(Some(cwd)),
             mcp_manager: McpManager::new(),
             mcp_configs: RwLock::new(Vec::new()),
@@ -313,6 +315,7 @@ pub fn create_app(state: Arc<AppState>) -> Router {
         .route("/providers", get(rest::list_providers))
         .route("/providers/{provider}/key", post(rest::set_provider_key))
         .route("/last-model", put(rest::set_last_model))
+        .route("/thinking-level", put(rest::set_thinking_level))
         .route("/events/{session_id}", get(sse::handle_sse))
         .route("/ask", post(routes::ask))
         .route("/review/{session_id}", post(routes::start_review))
