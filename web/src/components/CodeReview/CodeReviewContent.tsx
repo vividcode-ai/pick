@@ -235,8 +235,16 @@ export function CodeReviewContent({ baseUrl, sessionId, onAsk, provider, modelId
       es.addEventListener("message_update", (e) => {
         try {
           const payload = JSON.parse(e.data);
+          let displayText = "";
+          if (payload.thinking) {
+            displayText += payload.thinking;
+          }
           if (payload.text) {
-            setReviewText((prev) => prev + payload.text);
+            if (displayText) displayText += "\n\n";
+            displayText += payload.text;
+          }
+          if (displayText) {
+            setReviewText(displayText);
           }
         } catch {}
       });

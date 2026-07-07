@@ -434,7 +434,7 @@ export function BottomPanel({ baseUrl, visible, onClose, onFullscreenChange, ses
             >
               <span className="py-1">
                 {tab.kind === "terminal"
-                  ? `T${tab.id + 1}: ${tab.shellName || "..."}`
+                  ? `${tab.shellName || "Terminal"}`
                   : tab.kind === "codereview"
                   ? "Code Review"
                   : "File Browser"}

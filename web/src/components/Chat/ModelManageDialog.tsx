@@ -1,6 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { Search, X, Check } from "lucide-react";
-import fuzzysort from "fuzzysort";
 import type { ProviderInfo, FlatModel } from "../../types/events";
 import { PROVIDER_DISPLAY_NAMES } from "./ModelSelector";
 import { ApiKeyDialog } from "./ApiKeyDialog";
@@ -46,7 +45,7 @@ export function ModelManageDialog({
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return flatAll;
-    return fuzzysort.go(q, flatAll, { keys: ["searchText"], threshold: -10000 }).map((r) => r.obj);
+    return flatAll.filter((m) => m.searchText.includes(q));
   }, [flatAll, query]);
 
   const providerMap = useMemo(() => {
@@ -83,7 +82,7 @@ export function ModelManageDialog({
       onClick={onClose}
     >
       <div
-        className="bg-[var(--surface-base)] border border-[var(--border-base)] rounded-xl shadow-xl w-[400px] max-h-[80vh] flex flex-col overflow-hidden"
+        className="bg-[var(--surface-base)] border border-[var(--border-base)] rounded-xl shadow-xl w-[400px] h-[50vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -166,16 +165,6 @@ export function ModelManageDialog({
               );
             })
           )}
-        </div>
-
-        {/* Footer */}
-        <div className="px-4 py-2.5 border-t border-[var(--border-base)] flex justify-end">
-          <button
-            onClick={onClose}
-            className="px-3 py-1.5 text-xs rounded-md bg-[var(--surface-button)] text-[var(--text-primary)] hover:opacity-80 transition-colors"
-          >
-            Close
-          </button>
         </div>
       </div>
 
