@@ -124,20 +124,9 @@ export function ModelSelector({
 
   const [searchQuery, setSearchQuery] = useState("");
 
-  const modelLookup: FlatModel[] = useMemo(() => {
-    return providers.flatMap((p) =>
-      p.models.map((m) => ({
-        ...m,
-        provider: p.provider,
-        providerDisplayName: displayNameCache[p.provider] || p.provider,
-        searchText: "",
-      }))
-    );
-  }, [providers, displayNameCache]);
-
   const selectedDetail = useMemo(
-    () => modelLookup.find((m) => m.id === selectedModel && m.provider === selectedProvider) || null,
-    [modelLookup, selectedModel, selectedProvider]
+    () => allModels.find((m) => m.id === selectedModel && m.provider === selectedProvider) || null,
+    [allModels, selectedModel, selectedProvider]
   );
 
   const handleSelect = useCallback(

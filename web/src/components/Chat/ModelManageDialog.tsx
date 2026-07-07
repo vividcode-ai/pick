@@ -198,7 +198,7 @@ export function ModelManageDialog({
                         {hasKey && (
                           <button
                             onClick={(e) => { e.stopPropagation(); toggleHidden(itemKey); }}
-                            disabled={selected}
+                            disabled={selected && !hiddenSet.has(itemKey)}
                             className={`shrink-0 p-1 rounded transition-colors ${
                               selected ? "opacity-30 cursor-not-allowed" : "cursor-pointer hover:bg-[var(--surface-hover)]"
                             }`}

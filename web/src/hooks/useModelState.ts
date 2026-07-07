@@ -49,16 +49,8 @@ export function useModelState(baseUrl: string | null) {
       const modelExists = currentProvider.models.some((m) => m.id === selectedModel);
       if (modelExists) return;
     }
-    // 当前 provider 无 key 时保留 localStorage 选择，不重置
     if (!currentProvider?.has_key) return;
-    const firstWithKey = providers.find((p) => p.has_key);
-    if (firstWithKey && firstWithKey.models.length > 0) {
-      setSelectedModel(firstWithKey.models[0].id);
-      setSelectedProvider(firstWithKey.provider);
-    } else {
-      setSelectedModel("");
-      setSelectedProvider("");
-    }
+    return;
   }, [providers, selectedModel, selectedProvider, loaded]);
 
   const handleModelChange = useCallback(
