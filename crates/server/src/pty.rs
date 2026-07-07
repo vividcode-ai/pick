@@ -165,7 +165,8 @@ fn detect_shell() -> String {
     #[cfg(not(target_os = "windows"))]
     {
         if let Ok(shell) = std::env::var("SHELL") {
-            if !shell.is_empty() && !SHELL_BLACKLIST.contains(&shell_name(&shell)) {
+            let name = shell_name(&shell);
+            if !shell.is_empty() && !SHELL_BLACKLIST.contains(&name.as_str()) {
                 return shell;
             }
         }
