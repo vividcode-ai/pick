@@ -121,6 +121,7 @@ pub fn create_find_tool() -> AgentTool {
         description: "Search for files by glob pattern. Returns matching file paths relative to the search directory. Skips hidden files and directories. Example: find(pattern: \"*.rs\", path: \"src/\")".to_string(),
         prompt_snippet: Some("Find files by glob pattern".to_string()),
         prompt_guidelines: vec![],
+        usage_example: Some(vec!["find(pattern: \"*.rs\", path: \"src/\")".to_string()]),
         label: "find".to_string(),
         parameters: params,
         execute: std::sync::Arc::new(|_tool_call_id, args, ctx| {
@@ -213,6 +214,6 @@ pub fn create_find_tool() -> AgentTool {
                 })
             })
         }),
-        execution_mode: ToolExecutionMode::Sequential,
+        execution_mode: ToolExecutionMode::Parallel,
     }
 }

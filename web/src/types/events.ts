@@ -115,6 +115,12 @@ export interface ProviderInfo {
   models: ModelInfo[];
 }
 
+export interface ProvidersResponse {
+  providers: ProviderInfo[];
+  last_provider: string | null;
+  last_model: string | null;
+}
+
 export interface GroupInfo<T> {
   category: string;
   items: T[];

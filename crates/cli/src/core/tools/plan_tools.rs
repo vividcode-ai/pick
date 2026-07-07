@@ -12,6 +12,7 @@ pub fn create_plan_enter_tool(on_switch: Arc<dyn Fn(AgentMode) + Send + Sync>) -
         description: AgentMode::plan_enter_description().to_string(),
         prompt_snippet: Some("Suggest switching to plan mode for complex tasks".to_string()),
         prompt_guidelines: vec![],
+        usage_example: Some(vec!["plan_enter()".to_string()]),
         label: "plan_enter".to_string(),
         parameters: JsonSchema {
             schema_type: "object".to_string(),
@@ -46,6 +47,7 @@ pub fn create_plan_exit_tool(on_switch: Arc<dyn Fn(AgentMode) + Send + Sync>) ->
         description: AgentMode::plan_exit_description().to_string(),
         prompt_snippet: Some("Exit plan mode and start implementing".to_string()),
         prompt_guidelines: vec![],
+        usage_example: Some(vec!["plan_exit()".to_string()]),
         label: "plan_exit".to_string(),
         parameters: JsonSchema {
             schema_type: "object".to_string(),

@@ -21,6 +21,7 @@ pub fn create_tool_definition_from_tool(
         parameters: tool.definition.parameters.clone(),
         prompt_snippet: tool.definition.prompt_snippet.clone(),
         prompt_guidelines: tool.definition.prompt_guidelines.clone(),
+        usage_example: tool.definition.usage_example.clone(),
         render_shell: tool.definition.render_shell.clone(),
         execution_mode: tool.definition.execution_mode.clone(),
     }

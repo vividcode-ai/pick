@@ -196,12 +196,17 @@ export default function App() {
   const handleModelChange = useCallback((modelId: string, provider: string) => {
     setSelectedModel(modelId);
     setSelectedProvider(provider);
-    localStorage.setItem("pick_selected_model", modelId);
-    localStorage.setItem("pick_selected_provider", provider);
     if (activeSessionId) {
       updateSessionEntry(activeSessionId, { modelId, provider });
     }
     cancel();
+    if (baseUrl) {
+      fetch(`${baseUrl}/last-model`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider, model: modelId }),
+      }).catch(() => {});
+    }
     if (activeSessionId && baseUrl) {
       fetch(`${baseUrl}/sessions/${activeSessionId}`, {
         method: "PATCH",

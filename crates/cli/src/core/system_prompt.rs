@@ -1,6 +1,6 @@
 //! CLI-specific system prompt construction — delegates to pick-agent for core logic
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::path::Path;
 
 use crate::config::{get_docs_path, get_examples_path, get_readme_path};
@@ -36,6 +36,7 @@ fn build_cli_default_prompt(
     selected_tools: Option<&[String]>,
     tool_snippets: Option<&HashMap<String, String>>,
     prompt_guidelines: Option<&[String]>,
+    tool_usage_examples: Option<&HashMap<String, Vec<String>>>,
     cwd: &Path,
     context_files: &[ContextFileRef],
     skills: &[Skill],
@@ -72,51 +73,30 @@ fn build_cli_default_prompt(
             .join("\n")
     };
 
-    // Build guidelines
-    let mut guidelines_list: Vec<String> = Vec::new();
-    let mut guidelines_set: HashSet<String> = HashSet::new();
-    let mut add_guideline = |guideline: &str| {
-        if guidelines_set.insert(guideline.to_string()) {
-            guidelines_list.push(guideline.to_string());
-        }
-    };
-
     let has_bash = tools.iter().any(|t| t == "bash");
     let has_grep = tools.iter().any(|t| t == "grep");
     let has_find = tools.iter().any(|t| t == "find");
     let has_ls = tools.iter().any(|t| t == "ls");
     let has_read = tools.iter().any(|t| t == "read");
 
-    // File exploration guidelines
-    if has_bash && !has_grep && !has_find && !has_ls {
-        add_guideline("Use bash for file operations like ls, rg, find");
-    } else if has_bash && (has_grep || has_find || has_ls) {
-        add_guideline(
-            "Prefer grep/find/ls tools over bash for file exploration (faster, respects .gitignore)",
-        );
-    }
-
-    if let Some(extra_guidelines) = prompt_guidelines {
-        for g in extra_guidelines {
-            let normalized = g.trim();
-            if !normalized.is_empty() {
-                add_guideline(normalized);
-            }
-        }
-    }
-
-    add_guideline("Be concise in your responses");
-    add_guideline("Show file paths clearly when working with files");
-
-    let guidelines = guidelines_list
-        .iter()
-        .map(|g| format!("- {}", g))
-        .collect::<Vec<_>>()
-        .join("\n");
-
     let readme_path = get_readme_path().to_string_lossy().to_string();
     let docs_path = get_docs_path().to_string_lossy().to_string();
     let examples_path = get_examples_path().to_string_lossy().to_string();
+
+    // Compute file exploration hints
+    let mut extra_guidelines: Vec<String> = Vec::new();
+    if has_bash && !has_grep && !has_find && !has_ls {
+        extra_guidelines.push("Use bash for file operations like ls, rg, find".to_string());
+    } else if has_bash && (has_grep || has_find || has_ls) {
+        extra_guidelines.push(
+            "Prefer grep/find/ls tools over bash for file exploration (faster, respects .gitignore)"
+                .to_string(),
+        );
+    }
+    // Add parallelization hint
+    extra_guidelines.push(
+        "Parallelize independent tool calls when possible (e.g., read multiple files simultaneously)".to_string(),
+    );
 
     let mut prompt = format!(
         r#"You are an expert-level programming assistant Pick, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.
@@ -124,10 +104,15 @@ fn build_cli_default_prompt(
 Available tools:
 {}
 
-In addition to the tools above, you may have access to other custom tools depending on the project.
+In addition to the tools above, you may have access to other custom tools depending on the project."#,
+        tools_list,
+    );
 
-Guidelines:
-{}
+    // Output Format section
+    prompt.push_str(
+        r#"
+
+# Output Format
 
 **Bullets**
 - Use `-` followed by a space for every bullet.
@@ -137,13 +122,13 @@ Guidelines:
 - Use consistent keyword phrasing and formatting across sections.
 
 **Monospace**
-- Wrap commands, file paths, env vars, and code identifiers in backticks (\`...\`).
-- Never mix monospace and bold markers; choose one based on whether it's a keyword (**) or inline code/path (\`).
+- Wrap commands, file paths, env vars, and code identifiers in backticks (`...`).
+- Never mix monospace and bold markers; choose one based on whether it's a keyword (**) or inline code/path (`).
 - Multi-line code samples should be wrapped in fenced code blocks with a language identifier.
 
 **File References**
-- Use \`path/to/file\` to make file paths clickable.
-- Format: \`path/file:line\` or \`path/file#Lline\` (1-based, column defaults to 1).
+- Use `path/to/file` to make file paths clickable.
+- Format: `path/file:line` or `path/file#Lline` (1-based, column defaults to 1).
 - Do not use URIs like file:// or vscode://. Do not provide range of lines.
 
 **Style**
@@ -162,13 +147,12 @@ Guidelines:
 - Tiny/small change (<= ~10 lines): 2-5 sentences or <=3 bullets. No headings.
 - Medium change (single area or a few files): <=6 bullets or 6-10 sentences.
 - Large/multi-file change: Summarize per file with 1-2 bullets.
-- Never include before/after pairs or full method bodies in the final message.
+- Never include before/after pairs or full method bodies in the final message."#,
+    );
 
-**Tool Calls**
-- Each tool has required and optional parameters. Always provide all required parameters when calling a tool.
-- If a tool returns an error, read the error message carefully. It tells you exactly which parameter is missing or what went wrong.
-- Fix the issue before retrying. Do not call the same tool repeatedly with the same incorrect parameters.
-- If you cannot resolve a tool error after fixing parameters, provide your best answer directly without using tools.
+    // Pick documentation section
+    prompt.push_str(&format!(
+        r#"
 
 Pick documentation (read only when the user asks about Pick itself, its SDK, extensions, themes, skills, or TUI):
 - Main documentation: {}
@@ -178,7 +162,60 @@ Pick documentation (read only when the user asks about Pick itself, its SDK, ext
 - When asked about: extensions (docs/extensions.md), themes (docs/themes.md), skills (docs/skills.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), Pick packages (docs/packages.md)
 - When working on Pick topics, read the docs and examples, and follow .md cross-references before implementing
 - Always read Pick .md files completely and follow links to related docs (e.g., tui.md for TUI API details)"#,
-        tools_list, guidelines, readme_path, docs_path, examples_path,
+        readme_path, docs_path, examples_path,
+    ));
+
+    // ===== Tool Guidelines section =====
+    prompt.push_str("\n\n# Tool Guidelines\n\n## Tool Selection\n");
+    prompt.push_str("- **Read files**: `read` for specific files; `grep` for content search; `find`/`ls` for directory listing\n");
+    prompt.push_str("- **Modify files**: `edit` for targeted changes; `write` for new files or complete rewrites\n");
+    prompt.push_str("- **Search**: `grep` for text patterns; `find` for filename patterns\n");
+    prompt.push_str("- **Run commands**: `bash` for shell execution\n");
+    prompt.push_str("- **Plan**: `todo_plan` for multi-step task tracking\n");
+    prompt.push_str("- **Delegate**: `subagent` for specialized subtasks\n");
+    prompt.push_str("- **Web**: `webfetch` for URL content\n");
+    prompt.push_str("- **Ask**: `question` to ask the user for input\n");
+
+    // General guidelines
+    if !extra_guidelines.is_empty() {
+        prompt.push_str("\n## General\n");
+        for g in &extra_guidelines {
+            prompt.push_str(&format!("- {}\n", g));
+        }
+    }
+
+    // Per-tool guidelines + usage examples
+    if let Some(ref examples) = tool_usage_examples {
+        let mut tool_names: Vec<&String> = examples.keys().collect();
+        tool_names.sort();
+        for name in &tool_names {
+            if let Some(examples_list) = examples.get(*name) {
+                if !examples_list.is_empty() {
+                    prompt.push_str(&format!("\n## {}\n", name));
+                    for ex in examples_list.iter() {
+                        prompt.push_str(&format!("- Usage: `{}`\n", ex));
+                    }
+                }
+            }
+        }
+    }
+
+    // Unknown/other tool guidelines: show collected guidelines as General
+    if let Some(extra) = prompt_guidelines {
+        if !extra.is_empty() {
+            prompt.push_str("\n## General Guidelines\n");
+            for g in extra {
+                prompt.push_str(&format!("- {}\n", g));
+            }
+        }
+    }
+
+    // General tool call tips
+    prompt.push_str(
+        "\n## Tool Calls\n- Each tool has required and optional parameters. Always provide all required parameters when calling a tool.\n\
+         - If a tool returns an error, read the error message carefully. It tells you exactly which parameter is missing or what went wrong.\n\
+         - Fix the issue before retrying. Do not call the same tool repeatedly with the same incorrect parameters.\n\
+         - If you cannot resolve a tool error after fixing parameters, provide your best answer directly without using tools.\n",
     );
 
     // Append project context files
@@ -252,15 +289,15 @@ pub fn build_system_prompt(options: BuildSystemPromptOptions) -> String {
     }
 
     // CLI default prompt path
-    let agent_mode_str = agent_mode.map(|m| m.as_str());
     let default_prompt = build_cli_default_prompt(
         selected_tools,
         tool_snippets,
         prompt_guidelines,
+        None,
         cwd,
         context_files,
         skills,
-        agent_mode_str,
+        agent_mode.map(|m| m.as_str()),
     );
 
     let mut result = default_prompt;
@@ -305,8 +342,9 @@ pub fn build_system_prompt_with_defaults_and_mode(
     let tool_snippets = build_tool_snippets(tools);
     let context_refs: Vec<ContextFileRef> = build_context_file_refs(context_files);
 
-    // Collect per-tool prompt_guidelines from active tools
+    // Collect per-tool prompt_guidelines and usage_examples from active tools
     let mut prompt_guidelines: Vec<String> = Vec::new();
+    let mut tool_usage_examples: HashMap<String, Vec<String>> = HashMap::new();
     let has_bash = selected_tools.iter().any(|t| t == "bash");
     let has_grep = selected_tools.iter().any(|t| t == "grep");
     let has_find = selected_tools.iter().any(|t| t == "find");
@@ -322,6 +360,9 @@ pub fn build_system_prompt_with_defaults_and_mode(
             if !prompt_guidelines.iter().any(|existing| existing == g) {
                 prompt_guidelines.push(g.clone());
             }
+        }
+        if let Some(ref examples) = tool.usage_example {
+            tool_usage_examples.insert(tool.name.clone(), examples.clone());
         }
     }
 
@@ -350,6 +391,7 @@ pub fn build_system_prompt_with_defaults_and_mode(
         Some(&selected_tools),
         Some(&tool_snippets),
         Some(&prompt_guidelines),
+        Some(&tool_usage_examples),
         cwd,
         &context_refs,
         skills,

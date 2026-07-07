@@ -77,6 +77,7 @@ async fn summarize_and_navigate(ctx: &mut TuiContext, target_id: &str) {
             let system_prompt = "Summarize the following conversation branch concisely. Focus on key decisions, tool usage, and outcomes.";
             let context = pick_ai::Context {
                 system_prompt: Some(system_prompt.to_string()),
+                developer_messages: vec![],
                 messages: vec![Message::User(UserMessage::text(&conversation))],
                 tools: None,
             };

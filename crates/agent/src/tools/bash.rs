@@ -5,6 +5,7 @@ use std::sync::atomic::Ordering;
 use pick_ai::types::ContentBlock;
 use tokio::io::{AsyncRead, AsyncReadExt};
 
+use crate::core::hooks::{ToolEvent, WaitingKind};
 use crate::core::state::{AgentTool, AgentToolResult, ToolContext, ToolExecutionMode};
 use crate::utils::get_shell_config;
 
@@ -86,9 +87,10 @@ pub fn create_bash_tool() -> AgentTool {
         ),
         prompt_snippet: Some("Execute bash commands (ls, grep, find, etc.)".to_string()),
         prompt_guidelines: vec![],
+        usage_example: Some(vec!["bash(command: \"ls -la\", timeout: 30)".to_string()]),
         label: "bash".to_string(),
         parameters: params,
-        execute: std::sync::Arc::new(move |_tool_call_id, args, ctx: ToolContext| {
+        execute: std::sync::Arc::new(move |tool_call_id, args, ctx: ToolContext| {
             let plat = plat.clone();
             Box::pin(async move {
                 let command = args
@@ -113,6 +115,19 @@ pub fn create_bash_tool() -> AgentTool {
                         )
                         && let Some(ref approve) = ctx.approve
                     {
+                        // Publish WaitingForUser event before prompting
+                        if let Some(ref bus) = ctx.tool_event_bus {
+                            bus.publish(&ToolEvent::WaitingForUser {
+                                tool_name: "bash".to_string(),
+                                tool_call_id: tool_call_id.to_string(),
+                                input: args.clone(),
+                                kind: WaitingKind::Permission {
+                                    permission: "bash".to_string(),
+                                },
+                                summary: format!("Command '{}' may be dangerous.", command),
+                            })
+                            .await;
+                        }
                         let approved = approve(
                             "Exec Policy".to_string(),
                             format!("Command '{}' may be dangerous.", command),

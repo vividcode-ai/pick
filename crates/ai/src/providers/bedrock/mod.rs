@@ -150,7 +150,10 @@ fn build_bedrock_request(model: &Model, context: &Context, region: &str) -> (Str
         "inferenceConfig": {},
     });
 
-    if let Some(system) = &context.system_prompt {
+    if let Some(system) = crate::providers::flatten::flatten_developer_messages(
+        context.system_prompt.clone(),
+        &context.developer_messages,
+    ) {
         body["system"] = serde_json::json!([{"text": system}]);
     }
     if let Some(tools) = &context.tools {

@@ -43,6 +43,8 @@ pub struct FindFilesParams {
     pub pattern: String,
     pub path: Option<String>,
     pub limit: Option<u64>,
+    #[serde(rename = "prefix")]
+    pub prefix_mode: Option<bool>,
 }
 
 /// File entry for directory listing
@@ -501,40 +503,70 @@ pub async fn find_files_handler(Query(params): Query<FindFilesParams>) -> impl I
     }
 
     let limit = params.limit.unwrap_or(1000) as usize;
-    let regex_str = glob_to_regex(&params.pattern);
-
-    let re = match regex::Regex::new(&regex_str) {
-        Ok(r) => r,
-        Err(e) => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(serde_json::json!({"error": format!("Invalid glob pattern: {}", e)})),
-            )
-                .into_response();
-        }
-    };
+    let use_prefix = params.prefix_mode.unwrap_or(false);
 
     let mut files = Vec::new();
 
-    let walker = walkdir::WalkDir::new(path)
-        .follow_links(false)
-        .into_iter()
-        .filter_entry(|e| !e.file_name().to_string_lossy().starts_with('.'));
+    if use_prefix {
+        let query = params.pattern.trim().to_lowercase();
+        let walker = walkdir::WalkDir::new(path)
+            .follow_links(false)
+            .into_iter()
+            .filter_entry(|e| !e.file_name().to_string_lossy().starts_with('.'));
 
-    for entry in walker.filter_map(|e| e.ok()) {
-        if files.len() >= limit {
-            break;
+        for entry in walker.filter_map(|e| e.ok()) {
+            if files.len() >= limit {
+                break;
+            }
+            let full_path = entry.path();
+            let relative = full_path.strip_prefix(path).unwrap_or(full_path);
+            let name = relative.to_string_lossy();
+            let name_lower = name.to_lowercase();
+            if !name_lower.starts_with(&query) {
+                continue;
+            }
+            let is_dir = entry.file_type().is_dir();
+            let path_str = if is_dir {
+                format!("./{}/", name)
+            } else {
+                format!("./{}", name)
+            };
+            files.push(FileSearchResult { path: path_str });
         }
-        if !entry.file_type().is_file() {
-            continue;
-        }
-        let full_path = entry.path();
-        let relative = full_path.strip_prefix(path).unwrap_or(full_path);
-        let name = relative.to_string_lossy();
-        if re.is_match(&name) {
-            files.push(FileSearchResult {
-                path: format!("./{}", name),
-            });
+    } else {
+        let regex_str = glob_to_regex(&params.pattern);
+
+        let re = match regex::Regex::new(&regex_str) {
+            Ok(r) => r,
+            Err(e) => {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    Json(serde_json::json!({"error": format!("Invalid glob pattern: {}", e)})),
+                )
+                    .into_response();
+            }
+        };
+
+        let walker = walkdir::WalkDir::new(path)
+            .follow_links(false)
+            .into_iter()
+            .filter_entry(|e| !e.file_name().to_string_lossy().starts_with('.'));
+
+        for entry in walker.filter_map(|e| e.ok()) {
+            if files.len() >= limit {
+                break;
+            }
+            if !entry.file_type().is_file() {
+                continue;
+            }
+            let full_path = entry.path();
+            let relative = full_path.strip_prefix(path).unwrap_or(full_path);
+            let name = relative.to_string_lossy();
+            if re.is_match(&name) {
+                files.push(FileSearchResult {
+                    path: format!("./{}", name),
+                });
+            }
         }
     }
 

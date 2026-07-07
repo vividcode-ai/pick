@@ -396,6 +396,7 @@ pub(crate) fn build_agent_config(
     AgentLoopConfig {
         model: ctx.model.clone(),
         system_prompt: ctx.system_prompt.clone(),
+        developer_sections: vec![],
         tools: ctx.tools.clone(),
         thinking_level: ctx.thinking_level,
         max_tokens: None,

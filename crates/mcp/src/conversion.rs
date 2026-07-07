@@ -41,6 +41,44 @@ pub fn json_schema_from_mcp(
     }
 }
 
+/// Generate tool guidelines from MCP tool schema.
+/// Extracts required parameters and enum constraints.
+pub fn generate_tool_guidelines(
+    _tool_name: &str,
+    input_schema: &serde_json::Map<String, serde_json::Value>,
+) -> Vec<String> {
+    let mut guidelines = Vec::new();
+
+    // Extract required parameters info
+    if let Some(required) = input_schema.get("required").and_then(|v| v.as_array()) {
+        if !required.is_empty() {
+            let req_names: Vec<&str> = required.iter().filter_map(|v| v.as_str()).collect();
+            guidelines.push(format!("Required parameters: {}", req_names.join(", ")));
+        }
+    }
+
+    // Extract enum constraints for string properties
+    if let Some(properties) = input_schema.get("properties").and_then(|v| v.as_object()) {
+        for (prop_name, prop_schema) in properties {
+            if let Some(enum_vals) = prop_schema.get("enum").and_then(|v| v.as_array()) {
+                if !enum_vals.is_empty() {
+                    let enum_strs: Vec<&str> =
+                        enum_vals.iter().filter_map(|v| v.as_str()).collect();
+                    if !enum_strs.is_empty() {
+                        guidelines.push(format!(
+                            "`{}` accepts: {}",
+                            prop_name,
+                            enum_strs.join(" | ")
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
+    guidelines
+}
+
 /// Generate a one-line prompt snippet from tool name and schema
 pub fn generate_prompt_snippet(
     tool_name: &str,

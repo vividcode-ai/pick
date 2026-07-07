@@ -150,7 +150,10 @@ pub fn stream_google(
             "contents": contents,
         });
 
-        if let Some(system) = &context.system_prompt {
+        if let Some(system) = crate::providers::flatten::flatten_developer_messages(
+            context.system_prompt.clone(),
+            &context.developer_messages,
+        ) {
             body["systemInstruction"] = serde_json::json!({"parts": [{"text": system}]});
         }
         if let Some(tools) = &context.tools {

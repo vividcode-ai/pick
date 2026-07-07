@@ -73,6 +73,15 @@ pub fn stream_openai_responses(
 
         // Build the input array from messages
         let mut input_items: Vec<serde_json::Value> = Vec::new();
+
+        // Prepend developer messages as developer-role items
+        for dev_msg in &context.developer_messages {
+            input_items.push(serde_json::json!({
+                "role": "developer",
+                "content": [{"type": "input_text", "text": dev_msg}],
+            }));
+        }
+
         for msg in &context.messages {
             match msg {
                 crate::types::Message::User(u) => {

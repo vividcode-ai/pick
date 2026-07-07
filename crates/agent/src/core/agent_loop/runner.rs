@@ -45,6 +45,7 @@ fn setup_initial_state(
     let tools = config.tools.clone();
     let state = AgentState {
         system_prompt: config.system_prompt.clone(),
+        developer_sections: config.developer_sections.clone(),
         model: config.model.clone(),
         thinking_level: config.thinking_level,
         tools,
@@ -90,6 +91,7 @@ fn prepare_continue_state(
     let tools = config.tools.clone();
     let state = AgentState {
         system_prompt: config.system_prompt.clone(),
+        developer_sections: config.developer_sections.clone(),
         model: config.model.clone(),
         thinking_level: config.thinking_level,
         tools,
@@ -133,6 +135,7 @@ async fn process_llm_stream(
 
     let mut context = Context {
         system_prompt: Some(state.system_prompt.clone()),
+        developer_messages: state.developer_sections.clone(),
         messages: state.messages.clone(),
         tools: Some(tools_defs),
     };

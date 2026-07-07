@@ -111,6 +111,7 @@ pub fn create_grep_tool() -> AgentTool {
         description: "Search file contents for a pattern. Returns matching lines with file paths and line numbers. Skips hidden files and directories. Example: grep(pattern: \"TODO\", path: \"src/\")".to_string(),
         prompt_snippet: Some("Search file contents for patterns".to_string()),
         prompt_guidelines: vec![],
+        usage_example: Some(vec!["grep(pattern: \"TODO\", path: \"src/\")".to_string()]),
         label: "grep".to_string(),
         parameters: params,
         execute: std::sync::Arc::new(|_tool_call_id, args, ctx| {
@@ -256,6 +257,6 @@ pub fn create_grep_tool() -> AgentTool {
                 })
             })
         }),
-        execution_mode: ToolExecutionMode::Sequential,
+        execution_mode: ToolExecutionMode::Parallel,
     }
 }

@@ -374,6 +374,7 @@ pub async fn summarize_session(
 
     let context = pick_ai::Context {
         system_prompt: Some("You are a concise summarizer.".into()),
+        developer_messages: vec![],
         messages: vec![pick_ai::Message::User(pick_ai::UserMessage::text(&prompt))],
         tools: None,
     };
@@ -408,13 +409,20 @@ pub struct ProviderInfo {
     pub models: Vec<ModelInfo>,
 }
 
+#[derive(Serialize, ToSchema)]
+pub struct ProvidersResponse {
+    pub providers: Vec<ProviderInfo>,
+    pub last_provider: Option<String>,
+    pub last_model: Option<String>,
+}
+
 /// List all configured AI providers and their models
 #[utoipa::path(
     get,
     path = "/providers",
     tag = "providers",
     responses(
-        (status = 200, description = "List of providers with models", body = Vec<ProviderInfo>),
+        (status = 200, description = "List of providers with models", body = ProvidersResponse),
     )
 )]
 pub async fn list_providers(State(state): State<Arc<AppState>>) -> impl IntoResponse {
@@ -442,7 +450,13 @@ pub async fn list_providers(State(state): State<Arc<AppState>>) -> impl IntoResp
             }
         })
         .collect();
-    Json(providers)
+    let last_provider = state.last_provider.read().unwrap().clone();
+    let last_model = state.last_model.read().unwrap().clone();
+    Json(ProvidersResponse {
+        providers,
+        last_provider,
+        last_model,
+    })
 }
 
 /// Get git info for a session's workspace
@@ -738,18 +752,59 @@ pub async fn set_provider_key(
         .unwrap()
         .insert(provider.clone(), req.key.clone());
 
-    // Persist to auth.json
+    // Persist to auth.json (using AuthFile to preserve last_* fields)
     if let Some(auth_path) = &state.auth_storage_path {
-        let mut auth = auth_storage::read_auth(auth_path).unwrap_or_default();
-        auth.insert(
+        let mut file = auth_storage::read_auth_file(auth_path).unwrap_or(auth_storage::AuthFile {
+            credentials: std::collections::HashMap::new(),
+            last_provider: None,
+            last_model: None,
+        });
+        file.credentials.insert(
             provider.clone(),
             pick_agent::auth::AuthCredential::ApiKey { key: req.key },
         );
-        if let Err(e) = auth_storage::write_auth(auth_path, &auth) {
+        if let Err(e) = auth_storage::write_auth_file(auth_path, &file) {
             tracing::error!("Failed to persist API key to auth.json: {e}");
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Failed to persist API key",
+            )
+                .into_response();
+        }
+    }
+
+    StatusCode::OK.into_response()
+}
+
+#[derive(Deserialize)]
+pub struct SetLastModelRequest {
+    pub provider: String,
+    pub model: String,
+}
+
+/// Save the last used model (persisted to auth.json).
+pub async fn set_last_model(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<SetLastModelRequest>,
+) -> impl IntoResponse {
+    // Update in-memory
+    *state.last_provider.write().unwrap() = Some(req.provider.clone());
+    *state.last_model.write().unwrap() = Some(req.model.clone());
+
+    // Persist to auth.json
+    if let Some(auth_path) = &state.auth_storage_path {
+        let mut file = auth_storage::read_auth_file(auth_path).unwrap_or(auth_storage::AuthFile {
+            credentials: std::collections::HashMap::new(),
+            last_provider: None,
+            last_model: None,
+        });
+        file.last_provider = Some(req.provider);
+        file.last_model = Some(req.model);
+        if let Err(e) = auth_storage::write_auth_file(auth_path, &file) {
+            tracing::error!("Failed to persist last model to auth.json: {e}");
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to persist last model",
             )
                 .into_response();
         }

@@ -644,6 +644,7 @@ pub async fn generate_summary(
 
     let context = pick_ai::Context {
         system_prompt: Some(SUMMARIZATION_SYSTEM_PROMPT.to_string()),
+        developer_messages: vec![],
         messages: summarization_messages,
         tools: None,
     };
@@ -725,6 +726,7 @@ async fn generate_turn_prefix_summary(
 
     let context = pick_ai::Context {
         system_prompt: Some(SUMMARIZATION_SYSTEM_PROMPT.to_string()),
+        developer_messages: vec![],
         messages: summarization_messages,
         tools: None,
     };

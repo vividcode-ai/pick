@@ -1,7 +1,13 @@
-import { useState, useRef, useEffect, type KeyboardEvent } from "react";
+import { useState, useRef, useEffect, useCallback, type KeyboardEvent } from "react";
+import { Loader2 } from "lucide-react";
 import type { ProviderInfo } from "../../types/events";
 import { ModelSelector } from "./ModelSelector";
 import { ThinkingSelector } from "./ThinkingSelector";
+
+interface MentionItem {
+  path: string;
+  name: string;
+}
 
 interface ChatInputProps {
   onSend: (text: string) => void;
@@ -42,6 +48,11 @@ export function ChatInput({
   const [currentCommand, setCurrentCommand] = useState<"build" | "plan">("build");
   const [commandOpen, setCommandOpen] = useState(false);
   const [browsingHistory, setBrowsingHistory] = useState(false);
+  const [mentionOpen, setMentionOpen] = useState(false);
+  const [mentionQuery, setMentionQuery] = useState("");
+  const [mentionItems, setMentionItems] = useState<MentionItem[]>([]);
+  const [mentionIdx, setMentionIdx] = useState(0);
+  const [searching, setSearching] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const commandRef = useRef<HTMLDivElement>(null);
 
@@ -89,12 +100,36 @@ export function ChatInput({
     pushHistory(trimmed);
     setInput("");
     setBrowsingHistory(false);
+    setMentionOpen(false);
+    setMentionItems([]);
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
   };
 
   const handleKeyDown = async (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (mentionOpen && mentionItems.length > 0) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setMentionIdx((i) => Math.min(i + 1, mentionItems.length - 1));
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setMentionIdx((i) => Math.max(i - 1, 0));
+        return;
+      }
+      if (e.key === "Tab" || (e.key === "Enter" && mentionItems.length > 0)) {
+        e.preventDefault();
+        insertMention(mentionItems[mentionIdx]);
+        return;
+      }
+      if (e.key === "Escape") {
+        setMentionOpen(false);
+        setMentionItems([]);
+        return;
+      }
+    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -130,13 +165,70 @@ export function ChatInput({
     }
   };
 
-  const handleInput = () => {
+  const handleAutoResize = useCallback(() => {
     const el = textareaRef.current;
     if (el) {
       el.style.height = "auto";
       el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
     }
-  };
+  }, []);
+
+  const handleInputChange = useCallback((value: string) => {
+    setInput(value);
+    handleAutoResize();
+    const el = textareaRef.current;
+    if (!el) return;
+    const cursor = el.selectionStart;
+    const beforeCursor = value.slice(0, cursor);
+    const atIdx = beforeCursor.lastIndexOf("@");
+    if (atIdx >= 0 && (atIdx === 0 || beforeCursor[atIdx - 1] === " ")) {
+      const afterAt = beforeCursor.slice(atIdx + 1);
+      const spaceIdx = afterAt.indexOf(" ");
+      const query = spaceIdx >= 0 ? afterAt.slice(0, spaceIdx) : afterAt;
+      setMentionQuery(query);
+      if (query.length >= 2) {
+        setSearching(true);
+        fetch(`${baseUrl}/find/files?pattern=${encodeURIComponent(query)}&limit=10&prefix=true`)
+          .then((r) => r.ok ? r.json() : { files: [] })
+          .then((data) => {
+            const files: MentionItem[] = (data.files || []).map((f: any) => {
+              const path: string = f.path || "";
+              const parts = path.replace(/\\/g, "/").split("/");
+              return { path, name: parts[parts.length - 1] || path };
+            });
+            setMentionItems(files);
+            setMentionOpen(files.length > 0);
+            setMentionIdx(0);
+            setSearching(false);
+          })
+          .catch(() => setSearching(false));
+      } else {
+        setMentionOpen(false);
+        setMentionItems([]);
+      }
+    } else {
+      setMentionOpen(false);
+      setMentionItems([]);
+    }
+  }, [baseUrl, handleAutoResize]);
+
+  const insertMention = useCallback((item: MentionItem) => {
+    const el = textareaRef.current;
+    if (!el) return;
+    const cursor = el.selectionStart;
+    const beforeCursor = input.slice(0, cursor);
+    const atIdx = beforeCursor.lastIndexOf("@");
+    if (atIdx < 0) return;
+    const queryEnd = atIdx + 1 + mentionQuery.length;
+    const before = input.slice(0, atIdx);
+    const after = input.slice(queryEnd).replace(/^\s+/, "");
+    const newInput = `${before}@${item.path} ${after}`;
+    setInput(newInput);
+    setMentionOpen(false);
+    setMentionItems([]);
+    textareaRef.current?.focus();
+    setTimeout(() => handleAutoResize(), 0);
+  }, [input, mentionQuery, handleAutoResize]);
 
   const insertCommand = (cmd: string) => {
     const newVal = cmd + " ";
@@ -146,7 +238,7 @@ export function ChatInput({
       textareaRef.current.focus();
       const len = newVal.length;
       textareaRef.current.setSelectionRange(len, len);
-      handleInput();
+      handleAutoResize();
     }
   };
 
@@ -187,18 +279,53 @@ export function ChatInput({
         )}
         <div className="rounded-2xl border border-[var(--border-base)] bg-[var(--surface-base)]">
         {/* Top: textarea */}
+        <div className="relative">
         <textarea
           ref={textareaRef}
           autoFocus
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => handleInputChange(e.target.value)}
           onKeyDown={handleKeyDown}
-          onInput={handleInput}
+          onInput={handleAutoResize}
           placeholder={connected ? "Type a message..." : "Connecting..."}
           rows={1}
           disabled={!connected}
           className="w-full bg-transparent text-[var(--text-primary)] px-4 pt-3 pb-3 text-sm resize-none outline-none placeholder-[var(--text-muted)] disabled:opacity-50 min-h-[44px]"
         />
+        {mentionOpen && mentionItems.length > 0 && (
+          <div className="absolute bottom-full left-2 right-2 mb-1 bg-[var(--surface-elevated)] border border-[var(--border-base)] rounded-md shadow-lg max-h-[160px] overflow-auto z-10">
+            {searching && (
+              <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-[var(--text-muted)]">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Searching...
+              </div>
+            )}
+            {!searching && mentionItems.map((item, i) => (
+              <div
+                key={item.path}
+                className={`flex items-center gap-2 px-3 py-1 text-xs cursor-pointer ${
+                  i === mentionIdx
+                    ? "bg-[var(--surface-hover)] text-[var(--text-primary)]"
+                    : "text-[var(--text-muted)] hover:bg-[var(--surface-hover)]"
+                }`}
+                onMouseDown={(e) => { e.preventDefault(); insertMention(item); }}
+                onMouseEnter={() => setMentionIdx(i)}
+              >
+                <span className="text-[var(--text-muted)] shrink-0">
+                  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                    <polyline points="10 9 9 9 8 9" />
+                  </svg>
+                </span>
+                <span className="truncate">{item.path}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        </div>
 
         {/* Bottom: controls */}
         <div className="flex items-center justify-between px-3 pb-3 pt-1.5 border-t border-[var(--border-base)]/50">

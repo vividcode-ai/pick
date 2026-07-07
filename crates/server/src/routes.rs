@@ -646,6 +646,7 @@ async fn run_agent_loop_queue(
         let config = AgentLoopConfig {
             model: model.clone(),
             system_prompt: system_prompt.clone(),
+            developer_sections: vec![],
             tools: tools.clone(),
             thinking_level,
             max_tokens: None,

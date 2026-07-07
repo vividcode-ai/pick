@@ -51,6 +51,9 @@ pub struct AgentTool {
     pub description: String,
     pub prompt_snippet: Option<String>,
     pub prompt_guidelines: Vec<String>,
+    /// Usage examples to include in Tool Guidelines section of system prompt.
+    /// Each entry is rendered as a code block under the tool's section.
+    pub usage_example: Option<Vec<String>>,
     pub label: String,
     pub parameters: pick_ai::types::JsonSchema,
     pub execute: std::sync::Arc<
@@ -182,6 +185,9 @@ pub struct AgentToolResult {
 /// Agent state
 pub struct AgentState {
     pub system_prompt: String,
+    /// Layered developer sections (injected as developer role messages
+    /// or flattened into system_prompt depending on provider capability).
+    pub developer_sections: Vec<String>,
     pub model: Model,
     pub thinking_level: ThinkingLevel,
     pub tools: Vec<AgentTool>,
@@ -200,6 +206,7 @@ pub struct AgentState {
 #[derive(Clone)]
 pub struct AgentContext {
     pub system_prompt: String,
+    pub developer_sections: Vec<String>,
     pub messages: Vec<Message>,
     pub tools: Vec<AgentTool>,
 }

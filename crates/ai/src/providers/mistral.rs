@@ -62,7 +62,10 @@ pub fn stream_mistral(
         if let Some(tools) = &context.tools {
             body["tools"] = serde_json::to_value(tools).unwrap_or_default();
         }
-        if let Some(system) = &context.system_prompt {
+        if let Some(system) = crate::providers::flatten::flatten_developer_messages(
+            context.system_prompt.clone(),
+            &context.developer_messages,
+        ) {
             let mut all_messages = vec![serde_json::json!({"role": "system", "content": system})];
             if let Some(arr) = body["messages"].as_array() {
                 all_messages.extend(arr.clone());

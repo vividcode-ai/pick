@@ -1018,7 +1018,15 @@ impl TuiApp {
                 } else {
                     let text = self.editor.text().to_string();
                     let trimmed = text.trim_start();
-                    if trimmed.starts_with('/') {
+                    let before_cursor = &text[..self.editor.cursor];
+                    let last_delim = before_cursor
+                        .rfind([' ', '\t', '\n'])
+                        .map(|i| i + 1)
+                        .unwrap_or(0);
+                    let token = &before_cursor[last_delim..];
+                    if (token.starts_with('/') && !token[1..].contains(' '))
+                        || (token.starts_with('@') && token.len() >= 3)
+                    {
                         self.editor.trigger_autocomplete();
                         if self.editor.is_autocomplete_active() {
                             return None;
@@ -1032,8 +1040,16 @@ impl TuiApp {
             }
             KeyCode::Backspace => {
                 self.editor.delete_before();
+                let text = self.editor.text();
+                let before_cursor = &text[..self.editor.cursor];
+                let last_delim = before_cursor
+                    .rfind([' ', '\t', '\n'])
+                    .map(|i| i + 1)
+                    .unwrap_or(0);
+                let token = &before_cursor[last_delim..];
                 if self.editor.is_autocomplete_active()
-                    || self.editor.text().trim_start().starts_with('/')
+                    || token.starts_with('/')
+                    || (token.starts_with('@') && token.len() >= 3)
                 {
                     self.editor.trigger_autocomplete();
                 }

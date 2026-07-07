@@ -5,6 +5,7 @@ use std::time::Duration;
 use pick_ai::types::ContentBlock;
 use scraper::Element;
 
+use crate::core::hooks::{ToolEvent, WaitingKind};
 use crate::core::state::{AgentTool, AgentToolResult, ToolContext, ToolExecutionMode};
 
 const MAX_RESPONSE_SIZE: usize = 5 * 1024 * 1024;
@@ -199,9 +200,10 @@ pub fn create_webfetch_tool() -> AgentTool {
         description: "Fetch content from a URL and return it in markdown, text, or html format. Use this tool when you need to retrieve and analyze web content.".to_string(),
         prompt_snippet: Some("Fetch web content from URLs".to_string()),
         prompt_guidelines: vec![],
+        usage_example: Some(vec!["webfetch(url: \"https://example.com\")".to_string()]),
         label: "webfetch".to_string(),
         parameters: params,
-        execute: std::sync::Arc::new(move |_tool_call_id, args, ctx: ToolContext| {
+        execute: std::sync::Arc::new(move |tool_call_id, args, ctx: ToolContext| {
             Box::pin(async move {
                 let url = args
                     .get("url")
@@ -218,13 +220,28 @@ pub fn create_webfetch_tool() -> AgentTool {
                 } else {
                     // No network policy configured — ask user for permission
                     if let Some(ref approve) = ctx.approve
-                        && !approve("webfetch".to_string(), url.to_string()).await {
+                    {
+                        // Publish WaitingForUser event before prompting
+                        if let Some(ref bus) = ctx.tool_event_bus {
+                            bus.publish(&ToolEvent::WaitingForUser {
+                                tool_name: "webfetch".to_string(),
+                                tool_call_id: tool_call_id.to_string(),
+                                input: args.clone(),
+                                kind: WaitingKind::Permission {
+                                    permission: "webfetch".to_string(),
+                                },
+                                summary: format!("Fetch URL '{}'", url),
+                            })
+                            .await;
+                        }
+                        if !approve("webfetch".to_string(), url.to_string()).await {
                             return Ok(AgentToolResult {
                                 content: vec![ContentBlock::text("Permission denied for webfetch")],
                                 is_error: true,
                                 terminate: false,
                             });
                         }
+                    }
                 }
 
                 let format = args

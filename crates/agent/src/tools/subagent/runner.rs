@@ -10,6 +10,7 @@ use crate::agent_config::{AgentConfig, AgentSource, discover_agents, format_agen
 use crate::agent_registry::AgentRegistry;
 use crate::core::agent_loop::AgentLoopConfig;
 use crate::core::events::{AgentEvent, AgentEventHandler};
+use crate::core::hooks::{ToolEvent, WaitingKind};
 use crate::core::state::{AgentTool, AgentToolResult, ToolContext, ToolExecutionMode};
 use crate::inter_agent::AgentStatus;
 use crate::permission::Ruleset;
@@ -45,6 +46,7 @@ fn build_subagent_loop_config(
     AgentLoopConfig {
         model,
         system_prompt: agent.system_prompt.clone(),
+        developer_sections: vec![],
         tools,
         thinking_level: crate::core::state::ThinkingLevel::Off,
         max_tokens: None,
@@ -626,14 +628,17 @@ pub fn create_subagent_tool_with_mode(agent_mode: Option<String>) -> AgentTool {
             "Available agents and their descriptions will be listed in the response.".to_string(),
             "When you need to execute tasks in parallel or handle multiple independent subtasks simultaneously, you MUST use the subagent tool with the tasks array (parallel mode) rather than processing them sequentially yourself.".to_string(),
         ],
+        usage_example: Some(vec![
+            r#"subagent(agent: "scout", task: "find auth implementation")"#.to_string(),
+        ]),
         label: "Subagent".to_string(),
         parameters: params,
         execute: Arc::new({
             let mode = mode.clone();
-            move |_tool_call_id, args, ctx| {
+            move |tool_call_id, args, ctx| {
                 let mode = mode.clone();
                 Box::pin(async move {
-                    execute_subagent(args, ctx, mode.as_deref()).await
+                    execute_subagent(args, ctx, tool_call_id, mode.as_deref()).await
                 })
             }
         }),
@@ -644,6 +649,7 @@ pub fn create_subagent_tool_with_mode(agent_mode: Option<String>) -> AgentTool {
 async fn execute_subagent(
     args: serde_json::Value,
     ctx: ToolContext,
+    tool_call_id: String,
     agent_mode: Option<&str>,
 ) -> Result<AgentToolResult, String> {
     let agent_scope = args
@@ -686,6 +692,19 @@ async fn execute_subagent(
             if !project_agents.is_empty()
                 && let Some(ref approve) = ctx.approve
             {
+                // Publish WaitingForUser event before prompting
+                if let Some(ref bus) = ctx.tool_event_bus {
+                    bus.publish(&ToolEvent::WaitingForUser {
+                        tool_name: "subagent".to_string(),
+                        tool_call_id: tool_call_id.clone(),
+                        input: args.clone(),
+                        kind: WaitingKind::Permission {
+                            permission: "subagent".to_string(),
+                        },
+                        summary: "Run project-local agents".to_string(),
+                    })
+                    .await;
+                }
                 let names: Vec<&str> = project_agents.iter().map(|a| a.name.as_str()).collect();
                 let dir = discovery
                     .project_agents_dir

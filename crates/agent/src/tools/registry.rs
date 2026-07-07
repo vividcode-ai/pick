@@ -99,6 +99,7 @@ pub fn create_extension_tools(runner: Arc<ExtensionRunner>) -> Vec<AgentTool> {
             description: rt.definition.description.clone(),
             prompt_snippet: rt.definition.prompt_snippet.clone(),
             prompt_guidelines: rt.definition.prompt_guidelines.clone().unwrap_or_default(),
+            usage_example: rt.definition.usage_example.clone(),
             label: rt.definition.label.clone(),
             parameters: tool_params_to_json_schema(&rt.definition.parameters),
             execute: std::sync::Arc::new(move |tool_call_id, args, _ctx| {

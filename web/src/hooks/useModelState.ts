@@ -1,10 +1,8 @@
 import { useState, useCallback, useEffect } from "react";
 import { fetchProviders } from "./useSessionManager";
 import type { ProviderInfo } from "../types/events";
-import { updateSessionEntry, getSessionEntry } from "../stores/sessions";
+import { getSessionEntry } from "../stores/sessions";
 
-const MODEL_KEY = "pick_selected_model";
-const PROVIDER_KEY = "pick_selected_provider";
 const THINKING_KEY = "pick_thinking_level";
 
 function loadString(key: string, fallback = ""): string {
@@ -25,40 +23,38 @@ function saveString(key: string, value: string) {
 
 export function useModelState(baseUrl: string | null) {
   const [providers, setProviders] = useState<ProviderInfo[]>([]);
-  const [selectedModel, setSelectedModel] = useState(() => loadString(MODEL_KEY));
-  const [selectedProvider, setSelectedProvider] = useState(() => loadString(PROVIDER_KEY));
+  const [selectedModel, setSelectedModel] = useState("");
+  const [selectedProvider, setSelectedProvider] = useState("");
   const [thinkingLevel, setThinkingLevel] = useState(() => loadString(THINKING_KEY, "off"));
   const [loaded, setLoaded] = useState(false);
+  const [inited, setInited] = useState(false);
 
   const refreshProviders = useCallback(() => {
     if (!baseUrl) return;
-    fetchProviders(baseUrl).then((list) => {
-      setProviders(list);
+    fetchProviders(baseUrl).then((res) => {
+      setProviders(res.providers);
+      if (!inited && res.last_model && res.last_provider) {
+        setSelectedModel(res.last_model);
+        setSelectedProvider(res.last_provider);
+        setInited(true);
+      }
       setLoaded(true);
     });
-  }, [baseUrl]);
+  }, [baseUrl, inited]);
 
   useEffect(() => {
     refreshProviders();
   }, [refreshProviders]);
 
   useEffect(() => {
-    if (!loaded || providers.length === 0) return;
-    const currentProvider = providers.find((p) => p.provider === selectedProvider);
-    if (currentProvider?.has_key) {
-      const modelExists = currentProvider.models.some((m) => m.id === selectedModel);
-      if (modelExists) return;
-    }
-    if (!currentProvider?.has_key) return;
-    return;
-  }, [providers, selectedModel, selectedProvider, loaded]);
+    if (!loaded || !inited) return;
+  }, [providers, selectedModel, selectedProvider, loaded, inited]);
 
   const handleModelChange = useCallback(
     (modelId: string, provider: string, onCancel?: () => void) => {
       setSelectedModel(modelId);
       setSelectedProvider(provider);
-      saveString(MODEL_KEY, modelId);
-      saveString(PROVIDER_KEY, provider);
+      setInited(true);
       onCancel?.();
     },
     []

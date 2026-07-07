@@ -164,10 +164,17 @@ impl Editor {
         self.mark = None;
         self.kill_accumulating = false;
         self.shift_elements_after(self.cursor - c.len_utf8(), c.len_utf8() as isize);
-        // Auto-trigger autocomplete when buffer starts with "/" (no space yet)
+        // Auto-trigger autocomplete for / commands or @ file mentions
         if self.autocomplete_provider.is_some() {
-            let trimmed = self.buffer.trim_start();
-            if trimmed.starts_with('/') && !trimmed[1..].contains(' ') {
+            let text_before = &self.buffer[..self.cursor];
+            let last_delim = text_before
+                .rfind([' ', '\t', '\n'])
+                .map(|i| i + 1)
+                .unwrap_or(0);
+            let token = &text_before[last_delim..];
+            if (token.starts_with('/') && !token[1..].contains(' '))
+                || (token.starts_with('@') && token.len() >= 3)
+            {
                 self.trigger_autocomplete();
             } else {
                 self.cancel_autocomplete();

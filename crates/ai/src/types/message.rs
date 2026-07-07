@@ -206,6 +206,11 @@ impl From<ToolResultMessage> for Message {
 pub struct Context {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub system_prompt: Option<String>,
+    /// Layered developer messages (e.g. permissions, project context, skills).
+    /// Providers that support developer role send these separately;
+    /// others flatten them into system_prompt.
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub developer_messages: Vec<String>,
     pub messages: Vec<Message>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tools: Option<Vec<ToolDefinition>>,

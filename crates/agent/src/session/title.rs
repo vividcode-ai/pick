@@ -118,6 +118,7 @@ pub async fn generate_title(
 
     let ctx1 = pick_ai::Context {
         system_prompt: Some(TITLE_PROMPT.to_string()),
+        developer_messages: vec![],
         messages: vec![Message::User(pick_ai::UserMessage::text(format!(
             "Generate a title in the SAME LANGUAGE as the user message below. \
              Only output the title, nothing else.\n\n{}",
@@ -131,6 +132,7 @@ pub async fn generate_title(
     if title.is_none() {
         let ctx2 = pick_ai::Context {
             system_prompt: None,
+            developer_messages: vec![],
             messages: vec![Message::User(pick_ai::UserMessage::text(format!(
                 "Generate a very short title in the SAME LANGUAGE as the user message. \
                  Max 40 characters, no quotes, no explanation.\n\n{}",

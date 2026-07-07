@@ -77,7 +77,12 @@ impl CombinedAutocompleteProvider {
             token.contains('/') || token.starts_with('.') || token.starts_with("~/");
         let after_at = token.strip_prefix('@').unwrap_or(token);
 
-        if force || has_path_like || after_at.contains('/') || after_at.starts_with('.') {
+        if force
+            || has_path_like
+            || after_at.contains('/')
+            || after_at.starts_with('.')
+            || token.starts_with('@')
+        {
             Some(token.to_string())
         } else if !force {
             None

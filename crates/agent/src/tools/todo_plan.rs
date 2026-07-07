@@ -2,6 +2,7 @@
 
 use pick_ai::types::ContentBlock;
 
+use crate::core::hooks::{ToolEvent, WaitingKind};
 use crate::core::state::{AgentTool, AgentToolResult, ToolContext, ToolExecutionMode};
 use crate::session::entries::TodoItem;
 
@@ -48,9 +49,10 @@ pub fn create_todo_plan_tool() -> AgentTool {
         description: "Create and manage a structured task list. Use this to track progress on complex multi-step tasks.".to_string(),
         prompt_snippet: Some("Manage task list with todo_plan tool".to_string()),
         prompt_guidelines: vec![],
+        usage_example: Some(vec![r#"todo_plan(todos: [{content: "Implement feature X", status: "pending", priority: "high"}])"#.to_string()]),
         label: "todo_plan".to_string(),
         parameters: params,
-        execute: std::sync::Arc::new(move |_tool_call_id, args, ctx: ToolContext| {
+        execute: std::sync::Arc::new(move |tool_call_id, args, ctx: ToolContext| {
             Box::pin(async move {
                 let todos_val = args.get("todos")
                     .ok_or_else(|| "Missing 'todos' argument".to_string())?;
@@ -67,13 +69,28 @@ pub fn create_todo_plan_tool() -> AgentTool {
 
                 // Permission check
                 if let Some(ref approve) = ctx.approve
-                    && !approve("todo_plan".to_string(), title.clone()).await {
+                {
+                    // Publish WaitingForUser event before prompting
+                    if let Some(ref bus) = ctx.tool_event_bus {
+                        bus.publish(&ToolEvent::WaitingForUser {
+                            tool_name: "todo_plan".to_string(),
+                            tool_call_id: tool_call_id.to_string(),
+                            input: args.clone(),
+                            kind: WaitingKind::Permission {
+                                permission: "todo_plan".to_string(),
+                            },
+                            summary: format!("Update todo list: {}", title),
+                        })
+                        .await;
+                    }
+                    if !approve("todo_plan".to_string(), title.clone()).await {
                         return Ok(AgentToolResult {
                             content: vec![ContentBlock::text("Permission denied for todo_plan")],
                             is_error: true,
                             terminate: false,
                         });
                     }
+                }
 
                 Ok(AgentToolResult {
                     content: vec![ContentBlock::text(serde_json::to_string_pretty(&todos).unwrap_or_default())],

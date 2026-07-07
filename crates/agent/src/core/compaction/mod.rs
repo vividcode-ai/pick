@@ -504,6 +504,7 @@ impl Summarizer for LlmSummarizer {
     ) -> Result<String, String> {
         let context = pick_ai::Context {
             system_prompt: Some(system_prompt.to_string()),
+            developer_messages: vec![],
             messages: vec![pick_ai::Message::User(pick_ai::UserMessage::text(
                 conversation_text,
             ))],

@@ -46,6 +46,7 @@ pub fn create_write_tool() -> AgentTool {
         description: "Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.".to_string(),
         prompt_snippet: Some("Create or overwrite files".to_string()),
         prompt_guidelines: vec!["Use write only for new files or complete rewrites.".to_string()],
+        usage_example: Some(vec!["write(path: \"new_file.rs\", content: \"...\")".to_string()]),
         label: "write".to_string(),
         parameters: params,
         execute: std::sync::Arc::new(|_tool_call_id, args, ctx| {

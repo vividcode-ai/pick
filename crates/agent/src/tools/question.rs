@@ -61,6 +61,7 @@ pub fn create_question_tool() -> AgentTool {
         description: "Ask the user questions and wait for their response.".to_string(),
         prompt_snippet: Some("Ask the user questions with question tool".to_string()),
         prompt_guidelines: vec![],
+        usage_example: None,
         label: "question".to_string(),
         parameters: params,
         execute: std::sync::Arc::new(move |_tool_call_id, args, ctx: ToolContext| {

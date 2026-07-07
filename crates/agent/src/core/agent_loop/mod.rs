@@ -36,6 +36,9 @@ pub const PLAN_RECOVERY_THRESHOLD: u32 = 3;
 pub struct AgentLoopConfig {
     pub model: Model,
     pub system_prompt: String,
+    /// Layered developer sections injected as developer role messages
+    /// (for providers that support it) or flattened into system_prompt.
+    pub developer_sections: Vec<String>,
     pub tools: Vec<AgentTool>,
     pub thinking_level: ThinkingLevel,
     pub max_tokens: Option<u64>,

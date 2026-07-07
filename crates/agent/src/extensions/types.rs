@@ -405,6 +405,8 @@ pub struct ToolDefinition {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prompt_guidelines: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub usage_example: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub render_shell: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub execution_mode: Option<String>,

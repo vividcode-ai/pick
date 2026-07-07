@@ -22,7 +22,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use axum::Router;
-use axum::routing::{delete, get, post};
+use axum::routing::{delete, get, post, put};
 use pick_agent::prompt_history::PromptHistoryManager;
 use pick_agent::session::manager::SessionManager as AgentSessionManager;
 use pick_ai::types::Message;
@@ -44,6 +44,8 @@ pub struct AppState {
     pub default_model: Option<String>,
     pub api_keys: std::sync::RwLock<HashMap<String, String>>,
     pub auth_storage_path: Option<PathBuf>,
+    pub last_provider: std::sync::RwLock<Option<String>>,
+    pub last_model: std::sync::RwLock<Option<String>>,
     pub pty_manager: PtyManager,
     pub mcp_manager: McpManager,
     pub mcp_configs: RwLock<Vec<McpServerConfig>>,
@@ -74,6 +76,8 @@ impl AppState {
             default_model: None,
             api_keys: std::sync::RwLock::new(HashMap::new()),
             auth_storage_path,
+            last_provider: std::sync::RwLock::new(None),
+            last_model: std::sync::RwLock::new(None),
             pty_manager: PtyManager::new(Some(cwd)),
             mcp_manager: McpManager::new(),
             mcp_configs: RwLock::new(Vec::new()),
@@ -308,6 +312,7 @@ pub fn create_app(state: Arc<AppState>) -> Router {
         .route("/sessions/{id}/branches", get(rest::get_session_branches))
         .route("/providers", get(rest::list_providers))
         .route("/providers/{provider}/key", post(rest::set_provider_key))
+        .route("/last-model", put(rest::set_last_model))
         .route("/events/{session_id}", get(sse::handle_sse))
         .route("/ask", post(routes::ask))
         .route("/review/{session_id}", post(routes::start_review))

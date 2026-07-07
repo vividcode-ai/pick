@@ -154,7 +154,10 @@ pub fn stream_anthropic(
             });
         }
 
-        if let Some(system) = &context.system_prompt {
+        if let Some(system) = crate::providers::flatten::flatten_developer_messages(
+            context.system_prompt.clone(),
+            &context.developer_messages,
+        ) {
             body["system"] = serde_json::json!(system);
         }
         if let Some(tools) = &context.tools {

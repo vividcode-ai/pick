@@ -58,6 +58,7 @@ pub fn create_goal_tool_stub() -> AgentTool {
             .to_string(),
         prompt_snippet: Some("Manage the active goal".to_string()),
         prompt_guidelines: vec![],
+        usage_example: None,
         label: "goal".to_string(),
         parameters: make_params(
             "Manage the active goal-mode objective.",
@@ -120,6 +121,7 @@ pub fn create_goal_tool(goal_manager: Arc<GoalManager>) -> AgentTool {
             .to_string(),
         prompt_snippet: Some("Manage the active goal".to_string()),
         prompt_guidelines: vec![],
+        usage_example: None,
         label: "goal".to_string(),
         parameters: make_params(
             "Manage the active goal-mode objective.",

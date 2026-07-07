@@ -4,6 +4,7 @@ import type {
   ChatMessage,
   GitInfo,
   ProviderInfo,
+  ProvidersResponse,
   QuestionPayload,
   TodoItem,
   ToolStartPayload,
@@ -672,11 +673,11 @@ export function useSessionManager(baseUrl: string) {
   };
 }
 
-export async function fetchProviders(baseUrl: string): Promise<ProviderInfo[]> {
+export async function fetchProviders(baseUrl: string): Promise<ProvidersResponse> {
   try {
     const res = await fetch(`${baseUrl}/providers`);
     return await res.json();
   } catch {
-    return [];
+    return { providers: [], last_provider: null, last_model: null };
   }
 }

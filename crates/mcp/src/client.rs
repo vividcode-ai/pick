@@ -178,11 +178,15 @@ pub fn build_agent_tools(
             let ex = executor_ref.clone();
             let name_for_closure = prefixed_name.clone();
 
+            let mcp_guidelines =
+                conversion::generate_tool_guidelines(&prefixed_name, &entry.input_schema);
+
             AgentTool {
                 name: prefixed_name,
                 description,
                 prompt_snippet: Some(prompt_snippet),
-                prompt_guidelines: Vec::new(),
+                prompt_guidelines: mcp_guidelines,
+                usage_example: None,
                 label: name_for_closure.clone(),
                 parameters,
                 execute: Arc::new(move |_tool_call_id, args, _ctx: ToolContext| {

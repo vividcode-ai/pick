@@ -127,6 +127,7 @@ pub async fn run_print_mode(
     let config = AgentLoopConfig {
         model: model.clone(),
         system_prompt: system_prompt.clone(),
+        developer_sections: vec![],
         tools,
         thinking_level: ThinkingLevel::Off,
         max_tokens: None,

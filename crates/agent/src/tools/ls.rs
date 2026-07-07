@@ -41,6 +41,7 @@ pub fn create_ls_tool() -> AgentTool {
         description: "List directory contents. Returns entries sorted alphabetically, with '/' suffix for directories. Includes dotfiles. Example: ls(path: \"src/\")".to_string(),
         prompt_snippet: Some("List directory contents".to_string()),
         prompt_guidelines: vec![],
+        usage_example: Some(vec!["ls(path: \"src/\")".to_string()]),
         label: "ls".to_string(),
         parameters: params,
         execute: std::sync::Arc::new(|_tool_call_id, args, ctx| {
@@ -132,6 +133,6 @@ pub fn create_ls_tool() -> AgentTool {
                 })
             })
         }),
-        execution_mode: ToolExecutionMode::Sequential,
+        execution_mode: ToolExecutionMode::Parallel,
     }
 }

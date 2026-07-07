@@ -227,7 +227,21 @@ impl AuthStorage {
 
     fn parse_storage_data(&self, content: Option<&str>) -> AuthStorageData {
         content
-            .and_then(|c| serde_json::from_str(c).ok())
+            .and_then(|c| {
+                // Accept both old format (pure HashMap) and new format (with last_* fields)
+                if let Ok(map) = serde_json::from_str::<HashMap<String, AuthCredential>>(c) {
+                    return Some(map);
+                }
+                // New format: extract only credential entries (those with a "type" field)
+                let raw: HashMap<String, serde_json::Value> = serde_json::from_str(c).ok()?;
+                let mut data = AuthStorageData::new();
+                for (k, v) in raw {
+                    if let Ok(cred) = serde_json::from_value::<AuthCredential>(v) {
+                        data.insert(k, cred);
+                    }
+                }
+                Some(data)
+            })
             .unwrap_or_default()
     }
 
@@ -246,7 +260,19 @@ impl AuthStorage {
             return;
         }
         self.storage.with_lock(|current| {
-            let mut current_data = self.parse_storage_data(current);
+            // Parse all fields from the file (credentials + metadata like last_*)
+            let raw: HashMap<String, serde_json::Value> = current
+                .and_then(|c| serde_json::from_str(c).ok())
+                .unwrap_or_default();
+            let mut extra = HashMap::new();
+            let mut current_data = AuthStorageData::new();
+            for (k, v) in &raw {
+                if let Ok(cred) = serde_json::from_value::<AuthCredential>(v.clone()) {
+                    current_data.insert(k.clone(), cred);
+                } else {
+                    extra.insert(k.clone(), v.clone());
+                }
+            }
             match credential {
                 Some(cred) => {
                     current_data.insert(provider.to_string(), cred.clone());
@@ -255,7 +281,17 @@ impl AuthStorage {
                     current_data.remove(provider);
                 }
             }
-            let json = serde_json::to_string_pretty(&current_data).unwrap_or_default();
+            // Rebuild full JSON object preserving extra fields
+            let mut out = serde_json::Map::new();
+            for (k, v) in &current_data {
+                if let Ok(val) = serde_json::to_value(v) {
+                    out.insert(k.clone(), val);
+                }
+            }
+            for (k, v) in &extra {
+                out.insert(k.clone(), v.clone());
+            }
+            let json = serde_json::to_string_pretty(&out).unwrap_or_default();
             LockResult {
                 result: (),
                 next: Some(json),

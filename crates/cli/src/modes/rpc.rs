@@ -165,6 +165,7 @@ pub async fn run_rpc_mode(
                     let config = AgentLoopConfig {
                         model: model.clone(),
                         system_prompt: ctx.system_prompt.clone(),
+                        developer_sections: vec![],
                         tools: ctx.tools.clone(),
                         thinking_level: ThinkingLevel::Off,
                         max_tokens: None,

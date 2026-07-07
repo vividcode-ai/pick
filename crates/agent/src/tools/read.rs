@@ -145,6 +145,7 @@ pub fn create_read_tool() -> AgentTool {
         description: "Read the contents of a file from a given path. Example: read(path: \"src/main.rs\", limit: 50)".to_string(),
         prompt_snippet: Some("Read file contents".to_string()),
         prompt_guidelines: vec!["Use read to examine files instead of cat or sed.".to_string()],
+        usage_example: Some(vec!["read(path: \"src/main.rs\", limit: 50)".to_string()]),
         label: "read".to_string(),
         parameters: params,
         execute: std::sync::Arc::new(|_tool_call_id, args, ctx| {
@@ -213,6 +214,6 @@ pub fn create_read_tool() -> AgentTool {
                 })
             })
         }),
-        execution_mode: ToolExecutionMode::Sequential,
+        execution_mode: ToolExecutionMode::Parallel,
     }
 }

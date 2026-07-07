@@ -649,6 +649,7 @@ mod tests {
         let model = test_model();
         let context = Context {
             system_prompt: None,
+            developer_messages: vec![],
             messages: vec![Message::User(UserMessage::text("Hello"))],
             tools: None,
         };
@@ -674,6 +675,7 @@ mod tests {
         );
         let context = Context {
             system_prompt: None,
+            developer_messages: vec![],
             messages: vec![Message::Assistant(msg)],
             tools: None,
         };
@@ -697,6 +699,7 @@ mod tests {
         );
         let context = Context {
             system_prompt: None,
+            developer_messages: vec![],
             messages: vec![Message::ToolResult(tool_result)],
             tools: None,
         };

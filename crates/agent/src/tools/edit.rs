@@ -300,6 +300,9 @@ pub fn create_edit_tool() -> AgentTool {
             "Each edits[].oldText is matched against the original file, not after earlier edits are applied. Do not emit overlapping or nested edits. Merge nearby changes into one edit.".to_string(),
             "Keep edits[].oldText as small as possible while still being unique in the file. Do not pad with large unchanged regions.".to_string(),
         ],
+        usage_example: Some(vec![
+            r#"edit(filePath: "src/main.rs", edits: [{oldText: "fn old() {}", newText: "fn new() {}"}])"#.to_string(),
+        ]),
         label: "edit".to_string(),
         parameters: params,
         execute: std::sync::Arc::new(|_tool_call_id, args, ctx| {
