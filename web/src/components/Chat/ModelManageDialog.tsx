@@ -49,6 +49,14 @@ export function ModelManageDialog({
     setTick((t) => t + 1);
   }
 
+  function ensureVisible(key: string) {
+    const set = getHiddenSet();
+    if (!set.has(key)) return;
+    set.delete(key);
+    localStorage.setItem(HIDDEN_KEY, JSON.stringify(Array.from(set)));
+    setTick((t) => t + 1);
+  }
+
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const hiddenSet = useMemo(() => getHiddenSet(), [tick]);
 
@@ -95,6 +103,7 @@ export function ModelManageDialog({
 
   const handleSelect = useCallback(
     (item: FlatModel) => {
+      ensureVisible(`${item.provider}/${item.id}`);
       onModelSelect(item.id, item.provider);
       onClose();
     },
@@ -190,15 +199,19 @@ export function ModelManageDialog({
                           <button
                             onClick={(e) => { e.stopPropagation(); toggleHidden(itemKey); }}
                             disabled={selected}
-                            className={`shrink-0 w-4 h-4 rounded-full border-2 transition-colors ${
-                              selected ? "opacity-30 cursor-not-allowed" : "cursor-pointer"
+                            className={`shrink-0 p-1 rounded transition-colors ${
+                              selected ? "opacity-30 cursor-not-allowed" : "cursor-pointer hover:bg-[var(--surface-hover)]"
                             }`}
-                            style={{
-                              backgroundColor: hiddenSet.has(itemKey) ? "transparent" : "#22c55e",
-                              borderColor: hiddenSet.has(itemKey) ? "#64748b" : "#22c55e",
-                            }}
                             title={hiddenSet.has(itemKey) ? "Show in quick selector" : "Hide from quick selector"}
-                          />
+                          >
+                            <span
+                              className="block w-5 h-5 rounded-full border-2 transition-colors"
+                              style={{
+                                backgroundColor: hiddenSet.has(itemKey) ? "transparent" : "#22c55e",
+                                borderColor: hiddenSet.has(itemKey) ? "#64748b" : "#22c55e",
+                              }}
+                            />
+                          </button>
                         )}
                         {selected && (
                           <Check className="w-3 h-3 shrink-0 text-[var(--accent-primary)]" />

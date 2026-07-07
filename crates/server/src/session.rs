@@ -6,7 +6,9 @@ use std::sync::{Arc, Mutex};
 
 use pick_agent::core::message_queue::PendingMessageQueue;
 use pick_agent::core::state::AgentTool;
-use pick_agent::session::entries::{SessionEntry, SessionEntryKind, SessionInfoEntry};
+use pick_agent::session::entries::{
+    SessionEntry, SessionEntryKind, SessionHeader, SessionInfoEntry,
+};
 use pick_agent::session::manager::SessionManager as AgentSessionManager;
 use pick_agent::session::storage::{JsonlStorage, SessionStorage};
 use pick_ai::types::Message;
@@ -157,64 +159,32 @@ impl SessionManager {
         system_prompt: String,
         tools: Vec<AgentTool>,
     ) -> (String, String) {
+        let id = uuid::Uuid::now_v7().to_string();
+        let title = format!(
+            "New session - {}",
+            chrono::Utc::now().format("%Y-%m-%d %H:%M")
+        );
         let cwd_str = self.cwd.to_string_lossy().to_string();
-        match AgentSessionManager::create(
-            self.cwd.clone(),
-            Some(self.session_dir.clone()),
-            Some(model_id.clone()),
-            Some(provider.clone()),
-        )
-        .await
-        {
-            Ok(agent) => {
-                let id = agent
-                    .header()
-                    .map(|h| h.id.clone())
-                    .unwrap_or_else(|| uuid::Uuid::now_v7().to_string());
-                let title = agent.get_session_name().unwrap_or("Session").to_string();
-                let path = agent
-                    .session_path()
-                    .map(|p| p.to_string_lossy().to_string());
-                let session = AgentSession {
-                    id: id.clone(),
-                    title: title.clone(),
-                    model_id,
-                    provider,
-                    thinking_level,
-                    system_prompt,
-                    tools,
-                    messages: Vec::new(),
-                    created_at: agent.header().map(|h| h.created_at).unwrap_or_default(),
-                    updated_at: agent.header().map(|h| h.updated_at).unwrap_or_default(),
-                    status: "idle".to_string(),
-                    fork_parent_id: None,
-                    session_path: path,
-                    persisted_messages_count: 0,
-                    cwd: Some(cwd_str),
-                    archived: false,
-                };
-                self.sessions.write().await.insert(id.clone(), session);
-                (id, title)
-            }
-            Err(e) => {
-                error!("Failed to create session: {}", e);
-                let id = uuid::Uuid::now_v7().to_string();
-                let title = format!("Session - {}", chrono::Utc::now().format("%Y-%m-%d %H:%M"));
-                let mut session = AgentSession::new(
-                    id.clone(),
-                    title.clone(),
-                    model_id,
-                    provider,
-                    thinking_level,
-                    system_prompt,
-                    tools,
-                    Some(cwd_str),
-                );
-                session.archived = false;
-                self.sessions.write().await.insert(id.clone(), session);
-                (id, title)
-            }
-        }
+        let session = AgentSession {
+            id: id.clone(),
+            title: title.clone(),
+            model_id,
+            provider,
+            thinking_level,
+            system_prompt,
+            tools,
+            messages: Vec::new(),
+            created_at: chrono::Utc::now().timestamp_millis(),
+            updated_at: chrono::Utc::now().timestamp_millis(),
+            status: "idle".to_string(),
+            fork_parent_id: None,
+            session_path: None,
+            persisted_messages_count: 0,
+            cwd: Some(cwd_str),
+            archived: false,
+        };
+        self.sessions.write().await.insert(id.clone(), session);
+        (id, title)
     }
 
     pub async fn get(&self, id: &str) -> Option<AgentSession> {
@@ -223,28 +193,90 @@ impl SessionManager {
     }
 
     pub async fn update_messages(&self, id: &str, messages: Vec<Message>) {
+        let (prev_count, has_path) = {
+            let mut sessions = self.sessions.write().await;
+            if let Some(s) = sessions.get_mut(id) {
+                let prev_count = s.persisted_messages_count;
+                s.messages = messages;
+                s.updated_at = chrono::Utc::now().timestamp_millis();
+                (prev_count, s.session_path.is_some())
+            } else {
+                return;
+            }
+        };
+
+        if !has_path {
+            self.persist_session_to_disk(id).await;
+        }
+
+        let (path, new_msgs) = {
+            let sessions = self.sessions.read().await;
+            if let Some(s) = sessions.get(id) {
+                let new_msgs: Vec<Message> = s.messages[prev_count..].to_vec();
+                (s.session_path.clone(), new_msgs)
+            } else {
+                return;
+            }
+        };
+
+        if new_msgs.is_empty() {
+            return;
+        }
+
+        if let Some(path) = path {
+            self.append_messages_to_jsonl(&path, &new_msgs).await;
+            let mut sessions = self.sessions.write().await;
+            if let Some(s) = sessions.get_mut(id) {
+                s.persisted_messages_count = s.messages.len();
+            }
+        }
+    }
+
+    async fn persist_session_to_disk(&self, id: &str) -> Option<String> {
+        let sessions = self.sessions.read().await;
+        let session = sessions.get(id)?;
+        if session.session_path.is_some() {
+            return session.session_path.clone();
+        }
+
+        let dir = &self.session_dir;
+        std::fs::create_dir_all(dir).ok()?;
+        let path = dir.join(format!("{}.jsonl", id));
+
+        let header = SessionHeader {
+            id: id.to_string(),
+            version: 1,
+            created_at: session.created_at,
+            updated_at: session.updated_at,
+            cwd: session.cwd.clone(),
+            model: Some(session.model_id.clone()),
+            provider: Some(session.provider.clone()),
+            thinking_level: Some(session.thinking_level.clone()),
+            archived: session.archived,
+        };
+
+        let storage = JsonlStorage::new(path.clone());
+        storage.save_header(header).await.ok()?;
+
+        let title_entry = SessionEntry {
+            id: uuid::Uuid::now_v7().to_string(),
+            parent_id: None,
+            timestamp: session.created_at,
+            kind: SessionEntryKind::SessionInfo(SessionInfoEntry {
+                name: session.title.clone(),
+            }),
+        };
+        storage.append(title_entry).await.ok()?;
+
+        let path_str = path.to_string_lossy().to_string();
+        drop(sessions);
+
         let mut sessions = self.sessions.write().await;
         if let Some(s) = sessions.get_mut(id) {
-            let prev_count = s.persisted_messages_count;
-            s.messages = messages;
-            s.updated_at = chrono::Utc::now().timestamp_millis();
-
-            // Persist new messages via agent if we have a path
-            if let Some(path) = s.session_path.clone() {
-                let new_msgs: Vec<Message> = s.messages[prev_count..].to_vec();
-                if !new_msgs.is_empty() {
-                    drop(sessions);
-                    self.append_messages_to_jsonl(&path, &new_msgs).await;
-                    let mut sessions = self.sessions.write().await;
-                    if let Some(s) = sessions.get_mut(id) {
-                        s.persisted_messages_count = s.messages.len();
-                    }
-                    return;
-                }
-            }
-            // No path or no new messages, just update count
-            s.persisted_messages_count = s.messages.len();
+            s.session_path = Some(path_str.clone());
+            s.persisted_messages_count = 0;
         }
+        Some(path_str)
     }
 
     async fn append_messages_to_jsonl(&self, path: &str, messages: &[Message]) {
