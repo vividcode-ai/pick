@@ -25,6 +25,9 @@ interface ChatInputProps {
   pendingMessages: string[];
   baseUrl: string;
   onProvidersChange?: () => void;
+  hiddenModels: string[];
+  onToggleHidden: (key: string) => void;
+  onEnsureVisible: (key: string) => void;
 }
 
 export function ChatInput({
@@ -43,6 +46,9 @@ export function ChatInput({
   pendingMessages,
   baseUrl,
   onProvidersChange,
+  hiddenModels,
+  onToggleHidden,
+  onEnsureVisible,
 }: ChatInputProps) {
   const [input, setInput] = useState("");
   const [currentCommand, setCurrentCommand] = useState<"build" | "plan">("build");
@@ -378,6 +384,9 @@ export function ChatInput({
               disabled={disabled || !connected}
               baseUrl={baseUrl}
               onProvidersChange={onProvidersChange}
+              hiddenModels={hiddenModels}
+              onToggleHidden={onToggleHidden}
+              onEnsureVisible={onEnsureVisible}
             />
 
             <ThinkingSelector

@@ -12,6 +12,9 @@ interface ModelSelectorProps {
   disabled?: boolean;
   baseUrl: string;
   onProvidersChange?: () => void;
+  hiddenModels: string[];
+  onToggleHidden: (key: string) => void;
+  onEnsureVisible: (key: string) => void;
 }
 
 export const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
@@ -75,6 +78,9 @@ export function ModelSelector({
   disabled,
   baseUrl,
   onProvidersChange,
+  hiddenModels,
+  onToggleHidden,
+  onEnsureVisible,
 }: ModelSelectorProps) {
   const [open, setOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
@@ -102,13 +108,7 @@ export function ModelSelector({
   const displayNameCache = useMemo(() => PROVIDER_DISPLAY_NAMES, []);
 
   const allModels: FlatModel[] = useMemo(() => {
-    let hidden: Set<string>;
-    try {
-      const raw = localStorage.getItem("pick_hidden_models");
-      hidden = new Set(raw ? (JSON.parse(raw) as string[]) : []);
-    } catch {
-      hidden = new Set();
-    }
+    const hidden = new Set(hiddenModels);
     return providers
       .filter((p) => p.has_key)
       .flatMap((p) =>
@@ -120,7 +120,7 @@ export function ModelSelector({
         }))
       )
       .filter((m) => !hidden.has(`${m.provider}/${m.id}`));
-  }, [providers, displayNameCache, manageRefreshKey]);
+  }, [providers, displayNameCache, manageRefreshKey, hiddenModels]);
 
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -214,6 +214,9 @@ export function ModelSelector({
           onClose={() => setManageOpen(false)}
           baseUrl={baseUrl}
           onProvidersChange={onProvidersChange}
+          hiddenModels={hiddenModels}
+          onToggleHidden={onToggleHidden}
+          onEnsureVisible={onEnsureVisible}
         />
       )}
     </div>

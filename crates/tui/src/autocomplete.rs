@@ -73,13 +73,16 @@ impl CombinedAutocompleteProvider {
             return Some(String::new());
         }
 
-        let has_path_like =
-            token.contains('/') || token.starts_with('.') || token.starts_with("~/");
+        let has_path_like = token.contains('/')
+            || token.contains('\\')
+            || token.starts_with('.')
+            || token.starts_with("~/");
         let after_at = token.strip_prefix('@').unwrap_or(token);
 
         if force
             || has_path_like
             || after_at.contains('/')
+            || after_at.contains('\\')
             || after_at.starts_with('.')
             || token.starts_with('@')
         {
@@ -92,26 +95,26 @@ impl CombinedAutocompleteProvider {
     }
 
     /// Resolve a path prefix into (search_directory, search_prefix).
-    /// Handles ~/, absolute paths, and relative paths.
+    /// Handles ~/, ~\, absolute paths, and relative paths.
     fn resolve_search_dir(&self, raw: &str) -> (PathBuf, String) {
-        if raw.starts_with("~/") || raw == "~" {
+        if (raw.starts_with("~/") || raw.starts_with("~\\")) || raw == "~" {
             let home = dirs::home_dir().unwrap_or_default();
-            let remainder = raw.strip_prefix("~/").unwrap_or("");
+            let remainder = if raw.len() > 2 { &raw[2..] } else { "" };
             (home.join(remainder), String::new())
         } else if raw.starts_with('/') {
-            // Absolute path: split at last /
-            if let Some(last_slash) = raw.rfind('/') {
-                let dir = PathBuf::from(&raw[..=last_slash]);
-                let prefix = raw[last_slash + 1..].to_string();
+            // Absolute path: split at last separator
+            if let Some(last_sep) = raw.rfind(['/', '\\']) {
+                let dir = PathBuf::from(&raw[..=last_sep]);
+                let prefix = raw[last_sep + 1..].to_string();
                 (dir, prefix)
             } else {
                 (PathBuf::from("/"), raw.to_string())
             }
         } else {
             // Relative path
-            if let Some(last_slash) = raw.rfind('/') {
-                let dir = self.base_path.join(&raw[..=last_slash]);
-                let prefix = raw[last_slash + 1..].to_string();
+            if let Some(last_sep) = raw.rfind(['/', '\\']) {
+                let dir = self.base_path.join(&raw[..=last_sep]);
+                let prefix = raw[last_sep + 1..].to_string();
                 (dir, prefix)
             } else {
                 (self.base_path.clone(), raw.to_string())
@@ -120,51 +123,63 @@ impl CombinedAutocompleteProvider {
     }
 
     /// Build the completion path for a file/directory entry.
+    /// `raw` is the user's typed token (without @), `name` is the selected entry name.
     fn build_completion_path(&self, raw: &str, name: &str, is_dir: bool) -> String {
+        let sep = if raw.contains('\\') { "\\" } else { "/" };
+
+        // Helper: extract base directory (without trailing separator), and whether it's empty
+        let extract_base = |s: &str| -> (String, bool) {
+            if s.is_empty() {
+                (String::new(), true)
+            } else if s.ends_with('/') || s.ends_with('\\') {
+                (s[..s.len() - 1].to_string(), false)
+            } else if let Some(pos) = s.rfind(['/', '\\']) {
+                (s[..pos].to_string(), false)
+            } else {
+                (String::new(), true)
+            }
+        };
+
         if raw.starts_with('/') {
             // Absolute path
-            let base = if raw.ends_with('/') || raw.is_empty() {
-                raw.to_string()
-            } else if let Some(last_slash) = raw.rfind('/') {
-                raw[..=last_slash].to_string()
+            let (base, is_root) = extract_base(raw);
+            let prefix = if is_root {
+                sep.to_string()
             } else {
-                String::new()
+                format!("{}{}", base, sep)
             };
             if is_dir {
-                format!("{}{}/", base, name)
+                format!("{}{}{}", prefix, name, sep)
             } else {
-                format!("{}{}", base, name)
+                format!("{}{}", prefix, name)
             }
-        } else if raw.starts_with("~/") || raw == "~" {
+        } else if (raw.starts_with("~/") || raw.starts_with("~\\")) || raw == "~" {
             // Home-relative path
-            let base = if raw.ends_with('/') || raw.is_empty() || raw == "~" {
+            let (base, _) = extract_base(raw);
+            let prefix_str = if raw == "~" {
+                format!("~{}", sep)
+            } else if base.is_empty() && (raw.ends_with('/') || raw.ends_with('\\')) {
                 raw.to_string()
-            } else if let Some(last_slash) = raw.rfind('/') {
-                raw[..=last_slash].to_string()
+            } else if base.is_empty() {
+                raw.to_string()
             } else {
-                String::new()
+                format!("{}{}", base, sep)
             };
             if is_dir {
-                format!("{}{}/", base, name)
+                format!("{}{}{}", prefix_str, name, sep)
             } else {
-                format!("{}{}", base, name)
+                format!("{}{}", prefix_str, name)
             }
         } else {
             // Relative path
-            let base = if raw.ends_with('/') || raw.is_empty() {
-                String::new()
-            } else if let Some(last_slash) = raw.rfind('/') {
-                raw[..=last_slash].to_string()
-            } else {
-                String::new()
-            };
-            let prefix_str = if base.is_empty() {
+            let (base, is_root) = extract_base(raw);
+            let prefix_str = if is_root {
                 String::new()
             } else {
-                format!("{}/", base)
+                format!("{}{}", base, sep)
             };
             if is_dir {
-                format!("{}{}/", prefix_str, name)
+                format!("{}{}{}", prefix_str, name, sep)
             } else {
                 format!("{}{}", prefix_str, name)
             }
@@ -349,5 +364,74 @@ mod tests {
         let result = provider.extract_path_prefix("open /usr/loc", false);
         assert!(result.is_some());
         assert_eq!(result.unwrap(), "/usr/loc");
+    }
+
+    #[test]
+    fn test_at_mention_triggers_completion() {
+        let commands = Vec::new();
+        let provider = CombinedAutocompleteProvider::new(commands, PathBuf::from("/tmp"));
+        // @ mention should be recognized
+        let result = provider.extract_path_prefix("hello @src", false);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), "@src");
+    }
+
+    #[test]
+    fn test_backslash_triggers_completion() {
+        let provider = CombinedAutocompleteProvider::new(vec![], PathBuf::from("/tmp"));
+        // Backslash should be recognized as path-like (Windows support)
+        let result = provider.extract_path_prefix("hello @src\\main", false);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), "@src\\main");
+    }
+
+    #[test]
+    fn test_extract_path_prefix_at_alone_returns_none() {
+        let provider = CombinedAutocompleteProvider::new(vec![], PathBuf::from("/tmp"));
+        // Just @ alone should not trigger (too short, see insert_char guard)
+        let result = provider.extract_path_prefix("@", false);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), "@");
+    }
+
+    #[test]
+    fn test_resolve_search_dir_with_backslash() {
+        let provider = CombinedAutocompleteProvider::new(vec![], PathBuf::from("C:\\project"));
+        let (dir, prefix) = provider.resolve_search_dir("src\\main");
+        // Should split at backslash
+        assert_eq!(dir, PathBuf::from("C:\\project\\src\\"));
+        assert_eq!(prefix, "main");
+    }
+
+    #[test]
+    fn test_build_completion_path_preserves_backslash_base() {
+        let provider = CombinedAutocompleteProvider::new(vec![], PathBuf::from("C:\\project"));
+        // When raw ends with backslash, base should be the directory with separator
+        let result = provider.build_completion_path("src\\", "main.rs", false);
+        assert_eq!(result, "src\\main.rs");
+    }
+
+    #[test]
+    fn test_build_completion_path_with_backslash_prefix() {
+        let provider = CombinedAutocompleteProvider::new(vec![], PathBuf::from("C:\\project"));
+        // Partial path with backslash should work
+        let result = provider.build_completion_path("src\\ma", "main.rs", false);
+        assert_eq!(result, "src\\main.rs");
+    }
+
+    #[test]
+    fn test_build_completion_path_forward_slash() {
+        let provider = CombinedAutocompleteProvider::new(vec![], PathBuf::from("/project"));
+        // Forward slash always works
+        let result = provider.build_completion_path("src/", "main.rs", false);
+        assert_eq!(result, "src/main.rs");
+    }
+
+    #[test]
+    fn test_build_completion_path_dir_with_backslash() {
+        let provider = CombinedAutocompleteProvider::new(vec![], PathBuf::from("C:\\project"));
+        // Directory completion with backslash
+        let result = provider.build_completion_path("src\\", "subdir", true);
+        assert_eq!(result, "src\\subdir\\");
     }
 }

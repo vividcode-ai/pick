@@ -26,6 +26,7 @@ export function useModelState(baseUrl: string | null) {
   const [selectedModel, setSelectedModel] = useState("");
   const [selectedProvider, setSelectedProvider] = useState("");
   const [thinkingLevel, setThinkingLevel] = useState(() => loadString(THINKING_KEY, "off"));
+  const [hiddenModels, setHiddenModels] = useState<string[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [inited, setInited] = useState(false);
 
@@ -40,15 +41,50 @@ export function useModelState(baseUrl: string | null) {
       }
       setLoaded(true);
     });
+    fetch(`${baseUrl}/settings`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data && Array.isArray(data.hidden_models)) {
+          setHiddenModels(data.hidden_models);
+        }
+      })
+      .catch(() => {});
   }, [baseUrl, inited]);
 
   useEffect(() => {
     refreshProviders();
   }, [refreshProviders]);
 
-  useEffect(() => {
-    if (!loaded || !inited) return;
-  }, [providers, selectedModel, selectedProvider, loaded, inited]);
+  const toggleHiddenModel = useCallback((key: string) => {
+    setHiddenModels((prev) => {
+      const next = prev.includes(key)
+        ? prev.filter((k) => k !== key)
+        : [...prev, key];
+      if (baseUrl) {
+        fetch(`${baseUrl}/settings`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ hidden_models: next }),
+        }).catch(() => {});
+      }
+      return next;
+    });
+  }, [baseUrl]);
+
+  const ensureVisible = useCallback((key: string) => {
+    setHiddenModels((prev) => {
+      if (!prev.includes(key)) return prev;
+      const next = prev.filter((k) => k !== key);
+      if (baseUrl) {
+        fetch(`${baseUrl}/settings`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ hidden_models: next }),
+        }).catch(() => {});
+      }
+      return next;
+    });
+  }, [baseUrl]);
 
   const handleModelChange = useCallback(
     (modelId: string, provider: string, onCancel?: () => void) => {
@@ -89,6 +125,7 @@ export function useModelState(baseUrl: string | null) {
     selectedModel,
     selectedProvider,
     thinkingLevel,
+    hiddenModels,
     setSelectedModel,
     setSelectedProvider,
     setThinkingLevel,
@@ -96,5 +133,7 @@ export function useModelState(baseUrl: string | null) {
     handleThinkingLevelChange,
     syncFromSession,
     refreshProviders,
+    toggleHiddenModel,
+    ensureVisible,
   };
 }

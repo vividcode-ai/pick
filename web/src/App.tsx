@@ -61,11 +61,14 @@ export default function App() {
     selectedModel,
     selectedProvider,
     thinkingLevel,
+    hiddenModels,
     setSelectedModel,
     setSelectedProvider,
     setThinkingLevel,
     syncFromSession,
     refreshProviders,
+    toggleHiddenModel,
+    ensureVisible,
   } = useModelState(baseUrl);
 
   useEffect(() => {
@@ -390,6 +393,9 @@ export default function App() {
       pendingMessages={activePendingMessages}
       baseUrl={baseUrl ?? ""}
       onProvidersChange={refreshProviders}
+      hiddenModels={hiddenModels}
+      onToggleHidden={toggleHiddenModel}
+      onEnsureVisible={ensureVisible}
     />
   );
 

@@ -12,6 +12,9 @@ interface ModelManageDialogProps {
   onClose: () => void;
   baseUrl: string;
   onProvidersChange?: () => void;
+  hiddenModels: string[];
+  onToggleHidden: (key: string) => void;
+  onEnsureVisible: (key: string) => void;
 }
 
 export function ModelManageDialog({
@@ -22,43 +25,16 @@ export function ModelManageDialog({
   onClose,
   baseUrl,
   onProvidersChange,
+  hiddenModels,
+  onToggleHidden,
+  onEnsureVisible,
 }: ModelManageDialogProps) {
   const [query, setQuery] = useState("");
   const [keyRequestProvider, setKeyRequestProvider] = useState<string | null>(null);
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
-  const [tick, setTick] = useState(0);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  const HIDDEN_KEY = "pick_hidden_models";
-
-  function getHiddenSet(): Set<string> {
-    try {
-      const raw = localStorage.getItem(HIDDEN_KEY);
-      if (!raw) return new Set();
-      return new Set(JSON.parse(raw) as string[]);
-    } catch {
-      return new Set();
-    }
-  }
-
-  function toggleHidden(key: string) {
-    const set = getHiddenSet();
-    if (set.has(key)) set.delete(key);
-    else set.add(key);
-    localStorage.setItem(HIDDEN_KEY, JSON.stringify(Array.from(set)));
-    setTick((t) => t + 1);
-  }
-
-  function ensureVisible(key: string) {
-    const set = getHiddenSet();
-    if (!set.has(key)) return;
-    set.delete(key);
-    localStorage.setItem(HIDDEN_KEY, JSON.stringify(Array.from(set)));
-    setTick((t) => t + 1);
-  }
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const hiddenSet = useMemo(() => getHiddenSet(), [tick]);
+  const hiddenSet = useMemo(() => new Set(hiddenModels), [hiddenModels]);
 
   useEffect(() => {
     setTimeout(() => searchRef.current?.focus(), 80);
@@ -103,11 +79,11 @@ export function ModelManageDialog({
 
   const handleSelect = useCallback(
     (item: FlatModel) => {
-      ensureVisible(`${item.provider}/${item.id}`);
+      onEnsureVisible(`${item.provider}/${item.id}`);
       onModelSelect(item.id, item.provider);
       onClose();
     },
-    [onModelSelect, onClose]
+    [onModelSelect, onClose, onEnsureVisible]
   );
 
   return (
@@ -197,7 +173,7 @@ export function ModelManageDialog({
                         <span className="truncate flex-1">{item.name}</span>
                         {hasKey && (
                           <button
-                            onClick={(e) => { e.stopPropagation(); toggleHidden(itemKey); }}
+                            onClick={(e) => { e.stopPropagation(); onToggleHidden(itemKey); }}
                             disabled={selected && !hiddenSet.has(itemKey)}
                             className={`shrink-0 p-1 rounded transition-colors ${
                               selected ? "opacity-30 cursor-not-allowed" : "cursor-pointer hover:bg-[var(--surface-hover)]"
