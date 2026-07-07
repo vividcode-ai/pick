@@ -20,6 +20,11 @@ fn get_os_info() -> String {
 
 #[cfg(desktop)]
 fn run_desktop() {
+    tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .with_ansi(false)
+        .init();
+
     tauri::Builder::default()
         .setup(|app| {
             let rt = Runtime::new().expect("Failed to create tokio runtime");

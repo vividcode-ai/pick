@@ -11,10 +11,7 @@ pub fn flatten_developer_messages(
     system_prompt: Option<String>,
     developer_messages: &[String],
 ) -> Option<String> {
-    let base = match system_prompt {
-        Some(s) => s,
-        None => return None,
-    };
+    let base = system_prompt?;
 
     if developer_messages.is_empty() {
         return Some(base);

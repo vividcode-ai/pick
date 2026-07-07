@@ -166,11 +166,11 @@ fn split_combined_diff(combined: &str) -> HashMap<String, String> {
                 }
             }
             // Extract filename from "diff --git a/<path> b/<path>"
-            if let Some(rest) = line.strip_prefix("diff --git a/") {
-                if let Some(path) = rest.split(" b/").next() {
-                    current_file = Some(path.to_string());
-                    current_start = i;
-                }
+            if let Some(rest) = line.strip_prefix("diff --git a/")
+                && let Some(path) = rest.split(" b/").next()
+            {
+                current_file = Some(path.to_string());
+                current_start = i;
             }
         }
     }

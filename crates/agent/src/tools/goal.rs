@@ -267,12 +267,12 @@ pub fn create_goal_tool(goal_manager: Arc<GoalManager>) -> AgentTool {
                                     goal.status
                                 ));
                             }
-                            return Err("BLOCKED: Direct completion is not allowed. \
+                            Err("BLOCKED: Direct completion is not allowed. \
                                 Use the `subagent` tool with agent `goal-verify` \
                                 and provide a task description of what to verify. \
                                 The goal-verify agent will independently inspect \
                                 the work and call goal(op:\"complete\") if satisfied."
-                                .to_string());
+                                .to_string())
                         }
                     }
 

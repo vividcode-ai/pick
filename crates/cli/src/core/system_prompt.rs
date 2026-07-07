@@ -260,7 +260,7 @@ Pick documentation (read only when the user asks about Pick itself, its SDK, ext
     }
 
     // Per-tool guidelines + usage examples
-    if let Some(ref examples) = tool_usage_examples {
+    if let Some(examples) = tool_usage_examples {
         let mut tool_names: Vec<&String> = examples.keys().collect();
         tool_names.sort();
         for name in &tool_names {

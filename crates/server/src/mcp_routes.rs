@@ -245,6 +245,7 @@ fn get_cwd(state: &Arc<AppState>) -> &std::path::Path {
         .unwrap_or_else(|| std::path::Path::new("."))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn persist_mcp_server_to_settings(
     state: &Arc<AppState>,
     name: &str,
@@ -275,8 +276,10 @@ fn persist_mcp_server_to_settings(
     let mut mcp_servers = current.mcp_servers.unwrap_or_default();
     mcp_servers.insert(name.to_string(), server_entry);
 
-    let mut patch = pick_agent::settings::Settings::default();
-    patch.mcp_servers = Some(mcp_servers);
+    let patch = pick_agent::settings::Settings {
+        mcp_servers: Some(mcp_servers),
+        ..Default::default()
+    };
 
     match scope {
         Some("project") => {
@@ -300,14 +303,16 @@ fn remove_mcp_server_from_settings(state: &Arc<AppState>, name: &str) {
         .get_global()
         .mcp_servers
         .as_ref()
-        .map_or(false, |s| s.contains_key(name))
+        .is_some_and(|s| s.contains_key(name))
     {
         let mut global = sm.get_global().clone();
         if let Some(ref mut servers) = global.mcp_servers {
             servers.remove(name);
         }
-        let mut patch = pick_agent::settings::Settings::default();
-        patch.mcp_servers = global.mcp_servers;
+        let patch = pick_agent::settings::Settings {
+            mcp_servers: global.mcp_servers,
+            ..Default::default()
+        };
         let _ = sm.set_global(patch);
     }
 
@@ -316,14 +321,16 @@ fn remove_mcp_server_from_settings(state: &Arc<AppState>, name: &str) {
         .get_project()
         .mcp_servers
         .as_ref()
-        .map_or(false, |s| s.contains_key(name))
+        .is_some_and(|s| s.contains_key(name))
     {
         let mut project = sm.get_project().clone();
         if let Some(ref mut servers) = project.mcp_servers {
             servers.remove(name);
         }
-        let mut patch = pick_agent::settings::Settings::default();
-        patch.mcp_servers = project.mcp_servers;
+        let patch = pick_agent::settings::Settings {
+            mcp_servers: project.mcp_servers,
+            ..Default::default()
+        };
         let _ = sm.set_project(patch);
     }
 }

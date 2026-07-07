@@ -249,14 +249,10 @@ async fn handle_pty_connection(
     let (master_pty, _child_pty) = match pair_result {
         Ok(Ok(pair)) => pair,
         Ok(Err(e)) => {
-            return Err(
-                std::io::Error::new(std::io::ErrorKind::Other, format!("PTY: {}", e)).into(),
-            );
+            return Err(std::io::Error::other(format!("PTY: {}", e)).into());
         }
         Err(e) => {
-            return Err(
-                std::io::Error::new(std::io::ErrorKind::Other, format!("PTY join: {}", e)).into(),
-            );
+            return Err(std::io::Error::other(format!("PTY join: {}", e)).into());
         }
     };
 
