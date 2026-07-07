@@ -304,7 +304,7 @@ async fn connect_stdio(config: &McpServerConfig) -> Result<McpClient, String> {
         #[cfg(windows)]
         {
             use std::os::windows::process::CommandExt;
-            cmd.as_std_mut().creation_flags(0x00000008);
+            cmd.as_std_mut().creation_flags(0x08000000);
         }
         cmd
     };
