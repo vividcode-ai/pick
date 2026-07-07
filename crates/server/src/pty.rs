@@ -102,6 +102,11 @@ fn spawn_shell_piped(
     if let Some(cwd) = cwd {
         cmd.current_dir(cwd);
     }
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
     cmd.spawn()
 }
 

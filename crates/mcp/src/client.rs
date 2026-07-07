@@ -301,6 +301,11 @@ async fn connect_stdio(config: &McpServerConfig) -> Result<McpClient, String> {
                 cmd.env(k, v);
             }
         }
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            cmd.as_std_mut().creation_flags(0x00000008);
+        }
         cmd
     };
 

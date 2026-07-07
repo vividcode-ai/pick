@@ -62,6 +62,7 @@ export function ChatInput({
   const [searching, setSearching] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const commandRef = useRef<HTMLDivElement>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     textareaRef.current?.focus();
@@ -76,6 +77,14 @@ export function ChatInput({
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  useEffect(() => {
+    if (!popupRef.current || mentionIdx < 0) return;
+    const child = popupRef.current.children[mentionIdx] as HTMLElement;
+    if (child) {
+      child.scrollIntoView({ block: "nearest" });
+    }
+  }, [mentionIdx]);
 
   async function navigateHistory(direction: "up" | "down"): Promise<{ text: string | null; browsing: boolean }> {
     try {
@@ -128,7 +137,7 @@ export function ChatInput({
       }
       if (e.key === "Tab" || (e.key === "Enter" && mentionItems.length > 0)) {
         e.preventDefault();
-        insertMention(mentionItems[mentionIdx]);
+        selectMention(mentionItems[mentionIdx]);
         return;
       }
       if (e.key === "Escape") {
@@ -194,18 +203,33 @@ export function ChatInput({
       const query = spaceIdx >= 0 ? afterAt.slice(0, spaceIdx) : afterAt;
       setMentionQuery(query);
       setSearching(true);
-      fetch(`${baseUrl}/files/list?path=.&limit=50`)
+      const lastSep = query.lastIndexOf("/");
+      const dirPath = lastSep >= 0 ? query.slice(0, lastSep) || "." : ".";
+      const fileFilter = lastSep >= 0 ? query.slice(lastSep + 1) : query;
+      const listPath = dirPath === "." ? "." : dirPath;
+      fetch(`${baseUrl}/files/list?path=${encodeURIComponent(listPath)}&limit=50`)
         .then((r) => r.ok ? r.json() : { entries: [] })
         .then((data) => {
-          const allEntries: MentionItem[] = (data.entries || []).map((e: any) => ({
-            path: e.name + (e["type"] === "dir" ? "/" : ""),
-            name: e.name,
-          }));
-          const matched = query.trim()
-            ? fuzzysort.go(query, allEntries, { key: "name", threshold: -1000 }).map((r) => r.obj)
-            : allEntries;
-          setMentionItems(matched);
-          setMentionOpen(matched.length > 0);
+          let entries: MentionItem[] = (data.entries || []).map((e: any) => {
+            const prefix = dirPath === "." ? "" : dirPath + "/";
+            return {
+              path: prefix + e.name + (e["type"] === "directory" ? "/" : ""),
+              name: e.name,
+            };
+          });
+          if (fileFilter) {
+            entries = fuzzysort
+              .go(fileFilter, entries, { key: "name", threshold: -1000 })
+              .map((r) => r.obj);
+          }
+          if (fileFilter && entries.some((e) => e.path === query)) {
+            setMentionItems([]);
+            setMentionOpen(false);
+            setSearching(false);
+            return;
+          }
+          setMentionItems(entries);
+          setMentionOpen(entries.length > 0);
           setMentionIdx(0);
           setSearching(false);
         })
@@ -216,23 +240,55 @@ export function ChatInput({
     }
   }, [baseUrl, handleAutoResize]);
 
-  const insertMention = useCallback((item: MentionItem) => {
-    const el = textareaRef.current;
-    if (!el) return;
-    const cursor = el.selectionStart;
-    const beforeCursor = input.slice(0, cursor);
-    const atIdx = beforeCursor.lastIndexOf("@");
-    if (atIdx < 0) return;
-    const queryEnd = atIdx + 1 + mentionQuery.length;
-    const before = input.slice(0, atIdx);
-    const after = input.slice(queryEnd).replace(/^\s+/, "");
-    const newInput = `${before}@${item.path} ${after}`;
-    setInput(newInput);
-    setMentionOpen(false);
-    setMentionItems([]);
-    textareaRef.current?.focus();
-    setTimeout(() => handleAutoResize(), 0);
-  }, [input, mentionQuery, handleAutoResize]);
+  const selectMention = useCallback((item: MentionItem) => {
+    if (item.path.endsWith("/")) {
+      const el = textareaRef.current;
+      if (!el) return;
+      const cursor = el.selectionStart;
+      const beforeCursor = input.slice(0, cursor);
+      const atIdx = beforeCursor.lastIndexOf("@");
+      if (atIdx < 0) return;
+      const queryEnd = atIdx + 1 + mentionQuery.length;
+      const before = input.slice(0, atIdx);
+      const after = input.slice(queryEnd).replace(/^\s+/, "");
+      const newInput = `${before}@${item.path}${after}`;
+      setInput(newInput);
+      setMentionQuery(item.path);
+      setSearching(true);
+      const dir = item.path.replace(/\/$/, "");
+      fetch(`${baseUrl}/files/list?path=${encodeURIComponent(dir)}&limit=50`)
+        .then((r) => r.ok ? r.json() : { entries: [] })
+        .then((data) => {
+          const entries: MentionItem[] = (data.entries || []).map((e: any) => ({
+            path: item.path + e.name + (e["type"] === "directory" ? "/" : ""),
+            name: e.name,
+          }));
+          setMentionItems(entries);
+          setMentionOpen(entries.length > 0);
+          setMentionIdx(0);
+          setSearching(false);
+        })
+        .catch(() => setSearching(false));
+      textareaRef.current?.focus();
+      setTimeout(() => handleAutoResize(), 0);
+    } else {
+      const el = textareaRef.current;
+      if (!el) return;
+      const cursor = el.selectionStart;
+      const beforeCursor = input.slice(0, cursor);
+      const atIdx = beforeCursor.lastIndexOf("@");
+      if (atIdx < 0) return;
+      const queryEnd = atIdx + 1 + mentionQuery.length;
+      const before = input.slice(0, atIdx);
+      const after = input.slice(queryEnd).replace(/^\s+/, "");
+      const newInput = `${before}@${item.path} ${after}`;
+      setInput(newInput);
+      setMentionOpen(false);
+      setMentionItems([]);
+      textareaRef.current?.focus();
+      setTimeout(() => handleAutoResize(), 0);
+    }
+  }, [input, mentionQuery, handleAutoResize, baseUrl]);
 
   const insertCommand = (cmd: string) => {
     const newVal = cmd + " ";
@@ -297,7 +353,7 @@ export function ChatInput({
           className="w-full bg-transparent text-[var(--text-primary)] px-4 pt-3 pb-3 text-sm resize-none outline-none placeholder-[var(--text-muted)] disabled:opacity-50 min-h-[44px]"
         />
         {mentionOpen && mentionItems.length > 0 && (
-          <div className="absolute bottom-full left-2 right-2 mb-1 bg-[var(--surface-elevated)] border border-[var(--border-base)] rounded-md shadow-lg max-h-[160px] overflow-auto z-10">
+          <div ref={popupRef} className="absolute bottom-full left-2 right-2 mb-1 bg-[var(--surface-elevated)] border border-[var(--border-base)] rounded-md shadow-lg max-h-[160px] overflow-auto z-10">
             {searching && (
               <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-[var(--text-muted)]">
                 <Loader2 className="w-3 h-3 animate-spin" />
@@ -312,7 +368,7 @@ export function ChatInput({
                     ? "bg-[var(--surface-hover)] text-[var(--text-primary)]"
                     : "text-[var(--text-muted)] hover:bg-[var(--surface-hover)]"
                 }`}
-                onMouseDown={(e) => { e.preventDefault(); insertMention(item); }}
+                onMouseDown={(e) => { e.preventDefault(); selectMention(item); }}
                 onMouseEnter={() => setMentionIdx(i)}
               >
                 <span className="text-[var(--text-muted)] shrink-0">

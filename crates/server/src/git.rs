@@ -262,10 +262,14 @@ fn run_git_vec(cwd: &Path, args: &[String]) -> String {
 }
 
 fn run_git(cwd: &Path, args: &[&str]) -> String {
-    std::process::Command::new("git")
-        .args(args)
-        .current_dir(cwd)
-        .output()
+    let mut cmd = std::process::Command::new("git");
+    cmd.args(args).current_dir(cwd);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+    cmd.output()
         .ok()
         .and_then(|o| {
             if o.status.success() {

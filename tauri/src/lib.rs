@@ -34,6 +34,7 @@ fn run_desktop() {
                     host: "127.0.0.1".to_string(),
                     port,
                     cwd: None,
+                    auth_storage_path: None,
                 };
 
                 tokio::spawn(async move {
