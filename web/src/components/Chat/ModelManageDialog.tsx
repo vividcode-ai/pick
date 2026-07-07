@@ -151,29 +151,27 @@ export function ModelManageDialog({
                   key={group.category}
                   className="border border-[var(--border-base)] rounded-lg mb-2 min-w-0 overflow-hidden"
                 >
-                  <legend className="ml-3 px-1.5 flex items-center w-[calc(100%-12px)] gap-1 text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
-                    <span className="flex items-center gap-1 min-w-0 flex-1">
-                      <span
-                        className="w-2 h-2 rounded-full shrink-0 align-middle"
-                        style={{
-                          backgroundColor: hasKey ? "#22c55e" : "#64748b",
-                          opacity: hasKey ? 1 : 0.3,
-                        }}
-                      />
-                      <span className="truncate align-middle">{group.category}</span>
-                      {!hasKey && (
-                        <span className="text-[10px] text-[var(--text-muted)] normal-case font-normal align-middle shrink-0">
-                          (No API key)
-                        </span>
-                      )}
-                    </span>
+                  <legend className="ml-3 px-1.5 flex items-center gap-1 max-w-[calc(100%-12px)] text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+                    <span
+                      className="w-2 h-2 rounded-full shrink-0 align-middle"
+                      style={{
+                        backgroundColor: hasKey ? "#22c55e" : "#64748b",
+                        opacity: hasKey ? 1 : 0.3,
+                      }}
+                    />
+                    <span className="truncate align-middle">{group.category}</span>
                     <button
                       onClick={() => toggleCollapse(group.category)}
-                      className="shrink-0 p-0.5 rounded hover:bg-[var(--surface-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+                      className="shrink-0 p-0.5 rounded hover:bg-[var(--surface-hover)] text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors leading-none"
                       title={collapsed.has(group.category) ? "Expand" : "Collapse"}
                     >
                       {collapsed.has(group.category) ? "▶" : "▼"}
                     </button>
+                    {!hasKey && (
+                      <span className="text-[10px] text-[var(--text-muted)] normal-case font-normal align-middle shrink-0">
+                        (No API key)
+                      </span>
+                    )}
                   </legend>
                   {!collapsed.has(group.category) && (
                   <div className="pb-1">

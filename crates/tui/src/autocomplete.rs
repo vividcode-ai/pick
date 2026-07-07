@@ -326,10 +326,8 @@ impl AutocompleteProvider for CombinedAutocompleteProvider {
         }
 
         // File completion
-        let is_dir = item.label.ends_with('/');
-        let suffix = if is_dir { "" } else { " " };
         let result = format!("{}{}{}", before_prefix, item.value, text_after_cursor);
-        let cursor = before_prefix.len() + item.value.len() + suffix.len();
+        let cursor = before_prefix.len() + item.value.len();
         (result, cursor)
     }
 }
