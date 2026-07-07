@@ -22,7 +22,7 @@ declare module "lucide-react" {
   export const Puzzle: Icon;
   export const Settings: Icon;
   export const Activity: Icon;
-  export const Monitor: Icon;
+  export const PanelBottom: Icon;
   export const Laptop: Icon;
   export const Moon: Icon;
   export const Sun: Icon;

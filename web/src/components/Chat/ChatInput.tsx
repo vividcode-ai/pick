@@ -18,6 +18,7 @@ interface ChatInputProps {
   sessionId?: string | null;
   pendingMessages: string[];
   baseUrl: string;
+  onProvidersChange?: () => void;
 }
 
 export function ChatInput({
@@ -35,6 +36,7 @@ export function ChatInput({
   sessionId,
   pendingMessages,
   baseUrl,
+  onProvidersChange,
 }: ChatInputProps) {
   const [input, setInput] = useState("");
   const [currentCommand, setCurrentCommand] = useState<"build" | "plan">("build");
@@ -247,6 +249,8 @@ export function ChatInput({
               selectedProvider={selectedProvider}
               onModelChange={onModelChange}
               disabled={disabled || !connected}
+              baseUrl={baseUrl}
+              onProvidersChange={onProvidersChange}
             />
 
             <ThinkingSelector

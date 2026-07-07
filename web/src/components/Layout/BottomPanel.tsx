@@ -18,7 +18,7 @@ interface TabItem {
   shellName?: string;
 }
 
-interface TerminalPanelProps {
+interface BottomPanelProps {
   baseUrl: string;
   visible: boolean;
   onClose: () => void;
@@ -29,10 +29,10 @@ interface TerminalPanelProps {
   modelId?: string;
 }
 
-export function TerminalPanel({ baseUrl, visible, onClose, onFullscreenChange, sessionId, onAsk, provider, modelId }: TerminalPanelProps) {
+export function BottomPanel({ baseUrl, visible, onClose, onFullscreenChange, sessionId, onAsk, provider, modelId }: BottomPanelProps) {
   const [tabs, setTabs] = useState<TabItem[]>([{ id: 0, kind: "terminal" }]);
   const [activeIdx, setActiveIdx] = useState(0);
-  const [panelHeight, setPanelHeight] = useState(200);
+  const [panelHeight, setPanelHeight] = useState(() => Math.floor(window.innerHeight * 0.4));
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const prevHeightRef = useRef(200);

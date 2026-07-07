@@ -419,7 +419,7 @@ export function McpSection({ serverUrl }: McpSectionProps) {
                       {envVars.map((ev, i) => (
                         <div key={i} className="flex items-center gap-1.5">
                           <input
-                            className={`${inputCls} w-[120px]`}
+                            className={`${inputCls} w-[60px]`}
                             placeholder="KEY"
                             value={ev.key}
                             onChange={(e) => {

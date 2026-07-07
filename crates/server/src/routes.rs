@@ -209,7 +209,12 @@ pub async fn ask(
     });
     permission_manager.register_permission_hook(sse_hook);
 
-    let api_key = state.api_keys.get(&session.provider).cloned();
+    let api_key = state
+        .api_keys
+        .read()
+        .unwrap()
+        .get(&session.provider)
+        .cloned();
     let get_api_key = api_key.map(|key| {
         std::sync::Arc::new(move || Some(key.clone()))
             as std::sync::Arc<dyn Fn() -> Option<String> + Send + Sync>
@@ -452,7 +457,12 @@ pub async fn start_review(
     });
     permission_manager.register_permission_hook(sse_hook);
 
-    let api_key = state.api_keys.get(&session.provider).cloned();
+    let api_key = state
+        .api_keys
+        .read()
+        .unwrap()
+        .get(&session.provider)
+        .cloned();
     let get_api_key = api_key.map(|key| {
         std::sync::Arc::new(move || Some(key.clone()))
             as std::sync::Arc<dyn Fn() -> Option<String> + Send + Sync>
@@ -780,7 +790,12 @@ async fn run_agent_loop_queue(
                             && let Some(model) =
                                 pick_ai::models::get_model(&session.provider, &session.model_id)
                         {
-                            let api_key = state.api_keys.get(&session.provider).cloned();
+                            let api_key = state
+                                .api_keys
+                                .read()
+                                .unwrap()
+                                .get(&session.provider)
+                                .cloned();
                             let title = pick_agent::session::title::generate_title(
                                 &first_text,
                                 &model,

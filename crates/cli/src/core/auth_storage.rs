@@ -5,37 +5,8 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-use serde::{Deserialize, Serialize};
-
-use crate::config::get_auth_path;
 use crate::core::resolve_config_value::resolve_config_value;
-
-// ============================================================================
-// Types
-// ============================================================================
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type")]
-pub enum AuthCredential {
-    #[serde(rename = "api_key")]
-    ApiKey { key: String },
-    #[serde(rename = "oauth")]
-    Oauth {
-        #[serde(flatten)]
-        inner: OAuthCredentials,
-    },
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OAuthCredentials {
-    pub access_token: String,
-    pub refresh_token: Option<String>,
-    pub expires: i64,
-    pub token_type: String,
-    pub scope: Option<Vec<String>>,
-}
-
-pub type AuthStorageData = HashMap<String, AuthCredential>;
+pub use pick_agent::auth::{AuthCredential, AuthStorageData, OAuthCredentials, default_auth_path};
 
 #[derive(Debug, Clone)]
 pub struct AuthStatus {
@@ -70,7 +41,7 @@ pub(crate) struct FileBackend {
 impl FileBackend {
     fn new(auth_path: Option<PathBuf>) -> Self {
         Self {
-            auth_path: auth_path.unwrap_or_else(get_auth_path),
+            auth_path: auth_path.unwrap_or_else(default_auth_path),
             lock: Mutex::new(()),
         }
     }

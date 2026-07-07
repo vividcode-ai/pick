@@ -18,7 +18,7 @@ pub mod sse;
 
 use std::collections::HashMap;
 use std::ffi::OsStr;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use axum::Router;
@@ -42,7 +42,8 @@ pub struct AppState {
     pub config: ServerConfig,
     pub default_provider: Option<String>,
     pub default_model: Option<String>,
-    pub api_keys: HashMap<String, String>,
+    pub api_keys: std::sync::RwLock<HashMap<String, String>>,
+    pub auth_storage_path: Option<PathBuf>,
     pub pty_manager: PtyManager,
     pub mcp_manager: McpManager,
     pub mcp_configs: RwLock<Vec<McpServerConfig>>,
@@ -61,6 +62,7 @@ impl AppState {
         let cwd_path = Path::new(&cwd);
         let session_dir = cwd_path.join(".pick").join("sessions");
         let history_cwd = cwd_path.to_path_buf();
+        let auth_storage_path = config.auth_storage_path.as_ref().map(PathBuf::from);
         Self {
             session_manager: session::SessionManager::new_with_cwd(
                 session_dir,
@@ -70,7 +72,8 @@ impl AppState {
             config,
             default_provider: None,
             default_model: None,
-            api_keys: HashMap::new(),
+            api_keys: std::sync::RwLock::new(HashMap::new()),
+            auth_storage_path,
             pty_manager: PtyManager::new(Some(cwd)),
             mcp_manager: McpManager::new(),
             mcp_configs: RwLock::new(Vec::new()),
@@ -260,6 +263,7 @@ pub struct ServerConfig {
     pub host: String,
     pub port: u16,
     pub cwd: Option<String>,
+    pub auth_storage_path: Option<String>,
 }
 
 impl Default for ServerConfig {
@@ -268,6 +272,7 @@ impl Default for ServerConfig {
             host: "127.0.0.1".to_string(),
             port: 8080,
             cwd: None,
+            auth_storage_path: None,
         }
     }
 }
@@ -302,6 +307,7 @@ pub fn create_app(state: Arc<AppState>) -> Router {
         )
         .route("/sessions/{id}/branches", get(rest::get_session_branches))
         .route("/providers", get(rest::list_providers))
+        .route("/providers/{provider}/key", post(rest::set_provider_key))
         .route("/events/{session_id}", get(sse::handle_sse))
         .route("/ask", post(routes::ask))
         .route("/review/{session_id}", post(routes::start_review))

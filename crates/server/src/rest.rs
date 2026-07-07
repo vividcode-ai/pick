@@ -15,6 +15,7 @@ use crate::git::{
     list_git_branches,
 };
 use crate::session::SessionInfo;
+use pick_agent::auth as auth_storage;
 
 #[derive(Serialize, ToSchema)]
 pub struct HealthResponse {
@@ -364,7 +365,12 @@ pub async fn summarize_session(
         conversation
     );
 
-    let api_key = state.api_keys.get(&session.provider).cloned();
+    let api_key = state
+        .api_keys
+        .read()
+        .unwrap()
+        .get(&session.provider)
+        .cloned();
 
     let context = pick_ai::Context {
         system_prompt: Some("You are a concise summarizer.".into()),
@@ -415,7 +421,12 @@ pub async fn list_providers(State(state): State<Arc<AppState>>) -> impl IntoResp
     let providers: Vec<ProviderInfo> = pick_ai::models::get_providers()
         .iter()
         .map(|p| {
-            let has_key = state.api_keys.get(p).is_some_and(|k| !k.is_empty());
+            let has_key = state
+                .api_keys
+                .read()
+                .unwrap()
+                .get(p)
+                .is_some_and(|k| !k.is_empty());
             let models = pick_ai::models::get_models(p)
                 .iter()
                 .map(|m| ModelInfo {
@@ -707,4 +718,42 @@ pub async fn server_config(State(state): State<Arc<AppState>>) -> impl IntoRespo
         host: state.config.host.clone(),
         port: state.config.port,
     })
+}
+
+#[derive(Deserialize)]
+pub struct SetApiKeyRequest {
+    pub key: String,
+}
+
+/// Set an API key for a provider (persisted to auth.json).
+pub async fn set_provider_key(
+    State(state): State<Arc<AppState>>,
+    Path(provider): Path<String>,
+    Json(req): Json<SetApiKeyRequest>,
+) -> impl IntoResponse {
+    // Update in-memory map
+    state
+        .api_keys
+        .write()
+        .unwrap()
+        .insert(provider.clone(), req.key.clone());
+
+    // Persist to auth.json
+    if let Some(auth_path) = &state.auth_storage_path {
+        let mut auth = auth_storage::read_auth(auth_path).unwrap_or_default();
+        auth.insert(
+            provider.clone(),
+            pick_agent::auth::AuthCredential::ApiKey { key: req.key },
+        );
+        if let Err(e) = auth_storage::write_auth(auth_path, &auth) {
+            tracing::error!("Failed to persist API key to auth.json: {e}");
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to persist API key",
+            )
+                .into_response();
+        }
+    }
+
+    StatusCode::OK.into_response()
 }

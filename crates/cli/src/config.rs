@@ -31,7 +31,7 @@ pub fn get_settings_path() -> PathBuf {
 
 /// Get path to auth.json
 pub fn get_auth_path() -> PathBuf {
-    get_agent_dir().join("auth.json")
+    pick_agent::auth::default_auth_path()
 }
 
 /// Get path to docs directory

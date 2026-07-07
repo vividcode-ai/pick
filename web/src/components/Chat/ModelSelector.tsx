@@ -10,6 +10,8 @@ interface ModelSelectorProps {
   selectedProvider?: string;
   onModelChange: (modelId: string, provider: string) => void;
   disabled?: boolean;
+  baseUrl: string;
+  onProvidersChange?: () => void;
 }
 
 export const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
@@ -71,6 +73,8 @@ export function ModelSelector({
   selectedProvider,
   onModelChange,
   disabled,
+  baseUrl,
+  onProvidersChange,
 }: ModelSelectorProps) {
   const [open, setOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
@@ -191,6 +195,8 @@ export function ModelSelector({
           selectedProvider={selectedProvider}
           onModelSelect={onModelChange}
           onClose={() => setManageOpen(false)}
+          baseUrl={baseUrl}
+          onProvidersChange={onProvidersChange}
         />
       )}
     </div>

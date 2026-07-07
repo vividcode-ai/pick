@@ -30,13 +30,17 @@ export function useModelState(baseUrl: string | null) {
   const [thinkingLevel, setThinkingLevel] = useState(() => loadString(THINKING_KEY, "off"));
   const [loaded, setLoaded] = useState(false);
 
-  useEffect(() => {
+  const refreshProviders = useCallback(() => {
     if (!baseUrl) return;
     fetchProviders(baseUrl).then((list) => {
       setProviders(list);
       setLoaded(true);
     });
   }, [baseUrl]);
+
+  useEffect(() => {
+    refreshProviders();
+  }, [refreshProviders]);
 
   useEffect(() => {
     if (!loaded || providers.length === 0) return;
@@ -101,5 +105,6 @@ export function useModelState(baseUrl: string | null) {
     handleModelChange,
     handleThinkingLevelChange,
     syncFromSession,
+    refreshProviders,
   };
 }

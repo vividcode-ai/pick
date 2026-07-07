@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, type ReactNode } from "react";
-import { Activity, Monitor } from "lucide-react";
+import { Activity, PanelBottom } from "lucide-react";
 import { RightPanel } from "./RightPanel";
-import { TerminalPanel } from "./TerminalPanel";
+import { BottomPanel } from "./BottomPanel";
 import type { GitInfo, TodoItem } from "../../types/events";
 
 interface LayoutProps {
@@ -48,9 +48,9 @@ export function Layout({
   const [rightPanelOpenLocal, setRightPanelOpenLocal] = useState(false);
   const rightPanelOpen = rightPanelOpenProp ?? rightPanelOpenLocal;
   const toggleRightPanel = onToggleRightPanel ?? (() => setRightPanelOpenLocal((v) => !v));
-  const [terminalOpen, setTerminalOpen] = useState(false);
-  const [terminalFullscreen, setTerminalFullscreen] = useState(false);
-  const toggleTerminal = () => setTerminalOpen((v) => !v);
+  const [bottomPanelOpen, setBottomPanelOpen] = useState(false);
+  const [bottomPanelFullscreen, setBottomPanelFullscreen] = useState(false);
+  const toggleBottomPanel = () => setBottomPanelOpen((v) => !v);
 
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -169,16 +169,16 @@ export function Layout({
       )}
 
       <main className="flex-1 flex flex-col min-w-0">
-        <div className={terminalFullscreen ? "hidden" : "flex-1 flex flex-col min-h-0"}>
+        <div className={bottomPanelFullscreen ? "hidden" : "flex-1 flex flex-col min-h-0"}>
           {children}
         </div>
 
-        {baseUrl && terminalOpen && (
-          <TerminalPanel
+        {baseUrl && bottomPanelOpen && (
+          <BottomPanel
             baseUrl={baseUrl}
             visible={true}
-            onClose={() => setTerminalOpen(false)}
-            onFullscreenChange={setTerminalFullscreen}
+            onClose={() => setBottomPanelOpen(false)}
+            onFullscreenChange={setBottomPanelFullscreen}
             sessionId={sessionId ?? null}
             onAsk={onAsk}
             provider={provider}
@@ -186,7 +186,7 @@ export function Layout({
           />
         )}
 
-        {!terminalFullscreen && (
+        {!bottomPanelFullscreen && (
           <div className="hidden md:block fixed top-3 right-3 z-20">
             <div className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-xl border border-[var(--border-base)] bg-[var(--surface-secondary)] shadow-sm w-fit">
               <button
@@ -196,15 +196,15 @@ export function Layout({
                 <Activity className="w-4 h-4" />
               </button>
               <button
-                onClick={toggleTerminal}
+                onClick={toggleBottomPanel}
                 className={`p-1 rounded-md hover:bg-[var(--surface-hover)] transition-colors ${
-                  terminalOpen
+                  bottomPanelOpen
                     ? "text-[var(--accent-primary)] bg-[var(--surface-hover)]"
                     : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                 }`}
-                title="Open Terminal"
+                title="Toggle Bottom Panel"
               >
-                <Monitor className="w-4 h-4" />
+                <PanelBottom className="w-4 h-4" />
               </button>
             </div>
           </div>
@@ -231,15 +231,15 @@ export function Layout({
                 <Activity className="w-4 h-4" />
               </button>
               <button
-                onClick={toggleTerminal}
+                onClick={toggleBottomPanel}
                 className={`p-1 rounded-md hover:bg-[var(--surface-hover)] transition-colors ${
-                  terminalOpen
+                  bottomPanelOpen
                     ? "text-[var(--accent-primary)] bg-[var(--surface-hover)]"
                     : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                 }`}
-                title="Open Terminal"
+                title="Toggle Bottom Panel"
               >
-                <Monitor className="w-4 h-4" />
+                <PanelBottom className="w-4 h-4" />
               </button>
             </div>
             {rightPanelContent}

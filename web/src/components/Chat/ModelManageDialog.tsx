@@ -3,6 +3,7 @@ import { Search, X, Check } from "lucide-react";
 import fuzzysort from "fuzzysort";
 import type { ProviderInfo, FlatModel } from "../../types/events";
 import { PROVIDER_DISPLAY_NAMES } from "./ModelSelector";
+import { ApiKeyDialog } from "./ApiKeyDialog";
 
 interface ModelManageDialogProps {
   providers: ProviderInfo[];
@@ -10,6 +11,8 @@ interface ModelManageDialogProps {
   selectedProvider?: string;
   onModelSelect: (modelId: string, provider: string) => void;
   onClose: () => void;
+  baseUrl: string;
+  onProvidersChange?: () => void;
 }
 
 export function ModelManageDialog({
@@ -18,8 +21,11 @@ export function ModelManageDialog({
   selectedProvider,
   onModelSelect,
   onClose,
+  baseUrl,
+  onProvidersChange,
 }: ModelManageDialogProps) {
   const [query, setQuery] = useState("");
+  const [keyRequestProvider, setKeyRequestProvider] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -147,7 +153,7 @@ export function ModelManageDialog({
                             : "transparent",
                           color: hasKey ? "var(--text-primary)" : "var(--text-muted)",
                         }}
-                        onClick={() => hasKey && handleSelect(item)}
+                        onClick={() => hasKey ? handleSelect(item) : setKeyRequestProvider(item.provider)}
                       >
                         <span className="truncate flex-1">{item.name}</span>
                         {selected && (
@@ -172,6 +178,17 @@ export function ModelManageDialog({
           </button>
         </div>
       </div>
+
+      {keyRequestProvider && (
+        <ApiKeyDialog
+          provider={keyRequestProvider}
+          baseUrl={baseUrl}
+          onClose={() => setKeyRequestProvider(null)}
+          onSuccess={() => {
+            onProvidersChange?.();
+          }}
+        />
+      )}
     </div>
   );
 }

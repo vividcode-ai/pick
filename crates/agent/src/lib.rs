@@ -15,6 +15,7 @@
 
 pub mod agent_config;
 pub mod agent_registry;
+pub mod auth;
 pub mod command;
 pub mod core;
 pub mod extensions;

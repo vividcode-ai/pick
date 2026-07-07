@@ -33,10 +33,15 @@ pub async fn run_serve_mode(
         host: host.clone(),
         port: actual_port,
         cwd: None,
+        auth_storage_path: Some(
+            pick_agent::auth::default_auth_path()
+                .to_string_lossy()
+                .to_string(),
+        ),
     });
     state.default_provider = default_provider;
     state.default_model = default_model;
-    state.api_keys = api_keys;
+    *state.api_keys.write().unwrap() = api_keys;
 
     // Load persisted sessions from disk
     let cwd = std::env::current_dir().unwrap_or_default();

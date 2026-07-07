@@ -65,6 +65,7 @@ export default function App() {
     setSelectedProvider,
     setThinkingLevel,
     syncFromSession,
+    refreshProviders,
   } = useModelState(baseUrl);
 
   useEffect(() => {
@@ -383,6 +384,7 @@ export default function App() {
       sessionId={activeSessionId}
       pendingMessages={activePendingMessages}
       baseUrl={baseUrl ?? ""}
+      onProvidersChange={refreshProviders}
     />
   );
 
