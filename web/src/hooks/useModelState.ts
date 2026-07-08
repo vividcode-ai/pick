@@ -36,9 +36,45 @@ export function useModelState(baseUrl: string | null) {
       .catch(() => {});
   }, [baseUrl, inited]);
 
+  // On mount, poll /health with exponential backoff until the server is ready,
+  // then fetch providers. This handles the Tauri startup race condition where
+  // the backend HTTP server is spawned as a background task and may not be
+  // serving yet when React first mounts.
+  // `loaded` is a dep so that once providers are fetched successfully, the
+  // effect bails out even if `refreshProviders` reference changes (e.g. via
+  // `inited` flipping) and stops polling — avoiding redundant fetches.
   useEffect(() => {
-    refreshProviders();
-  }, [refreshProviders]);
+    if (!baseUrl || loaded) return;
+    let cancelled = false;
+    let attempts = 0;
+
+    const poll = () => {
+      if (cancelled) return;
+      fetch(`${baseUrl}/health`)
+        .then((res) => {
+          if (cancelled) return;
+          if (res.ok) {
+            refreshProviders();
+          } else if (attempts < 10) {
+            scheduleNext();
+          }
+        })
+        .catch(() => {
+          if (!cancelled && attempts < 10) scheduleNext();
+        });
+    };
+
+    const scheduleNext = () => {
+      attempts++;
+      const delay = Math.min(1000 * Math.pow(1.5, attempts - 1), 10000);
+      setTimeout(poll, delay);
+    };
+
+    poll();
+    return () => {
+      cancelled = true;
+    };
+  }, [baseUrl, loaded, refreshProviders]);
 
   const toggleHiddenModel = useCallback((key: string) => {
     setHiddenModels((prev) => {

@@ -351,9 +351,12 @@ pub async fn run_interactive_mode(
                                             } else {
                                                 (args.to_string(), String::new())
                                             };
-                                        if let Err(e) =
-                                            goal_manager.create(objective.clone(), criterion, None)
-                                        {
+                                        if let Err(e) = goal_manager.create(
+                                            objective.clone(),
+                                            criterion,
+                                            None,
+                                            None,
+                                        ) {
                                             eprintln!("Error: {}", e);
                                         } else {
                                             session_manager.persist_goal().await.ok();

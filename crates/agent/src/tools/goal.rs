@@ -92,6 +92,13 @@ pub fn create_goal_tool_stub() -> AgentTool {
                         "description": "Optional positive token budget for the goal"
                     }),
                 ),
+                (
+                    "max_turns",
+                    serde_json::json!({
+                        "type": "integer",
+                        "description": "Optional max automatic continuation turns before usage_limited. Prevents infinite loops."
+                    }),
+                ),
             ],
             vec!["op"],
         ),
@@ -155,6 +162,13 @@ pub fn create_goal_tool(goal_manager: Arc<GoalManager>) -> AgentTool {
                         "description": "Optional positive token budget for the goal"
                     }),
                 ),
+                (
+                    "max_turns",
+                    serde_json::json!({
+                        "type": "integer",
+                        "description": "Optional max automatic continuation turns before usage_limited. Prevents infinite loops."
+                    }),
+                ),
             ],
             vec!["op"],
         ),
@@ -186,8 +200,16 @@ pub fn create_goal_tool(goal_manager: Arc<GoalManager>) -> AgentTool {
                             .and_then(|v| v.as_str())
                             .unwrap_or("");
                         let token_budget = args.get("token_budget").and_then(|v| v.as_i64());
-                        match gm.create(objective.to_string(), criterion.to_string(), token_budget)
-                        {
+                        let max_turns = args
+                            .get("max_turns")
+                            .and_then(|v| v.as_u64())
+                            .map(|v| v as u32);
+                        match gm.create(
+                            objective.to_string(),
+                            criterion.to_string(),
+                            token_budget,
+                            max_turns,
+                        ) {
                             Ok(goal) => {
                                 let resp = serde_json::json!({
                                     "goal": goal_entry_to_json(&goal),

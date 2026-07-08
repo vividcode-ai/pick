@@ -36,6 +36,8 @@ interface ChatInputProps {
   hiddenModels: string[];
   onToggleHidden: (key: string) => void;
   onEnsureVisible: (key: string) => void;
+  activeGoal: { objective: string; startTime: number } | null;
+  onClearGoal: () => void;
 }
 
 export function ChatInput({
@@ -57,6 +59,8 @@ export function ChatInput({
   hiddenModels,
   onToggleHidden,
   onEnsureVisible,
+  activeGoal,
+  onClearGoal,
 }: ChatInputProps) {
   const [input, setInput] = useState("");
   const [currentCommand, setCurrentCommand] = useState<"build" | "plan">(
@@ -64,7 +68,6 @@ export function ChatInput({
   );
   const [commandOpen, setCommandOpen] = useState(false);
   const [extraMode, setExtraMode] = useState<"goal" | "loop" | null>(null);
-  const [activeGoal, setActiveGoal] = useState<{ objective: string; startTime: number } | null>(null);
   const [browsingHistory, setBrowsingHistory] = useState(false);
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionQuery, setMentionQuery] = useState("");
@@ -135,9 +138,6 @@ export function ChatInput({
     onSend(trimmed, { mode: currentCommand, extraMode });
     pushHistory(trimmed);
     setInput("");
-    if (extraMode === "goal") {
-      setActiveGoal({ objective: trimmed, startTime: Date.now() });
-    }
     setExtraMode(null);
     setBrowsingHistory(false);
     setMentionOpen(false);
@@ -343,13 +343,39 @@ export function ChatInput({
   return (
     <div className="w-full px-4 py-3">
       <div className="max-w-[90%] md:max-w-[70%] lg:max-w-[40%] mx-auto">
-        {streaming && (
-          <div className="flex items-center gap-2 text-[var(--text-muted)] px-1 pb-3">
-            <span className="w-2 h-2 bg-[var(--text-muted)] rounded-full animate-pulse" />
-            <span className="text-sm">Working...</span>
+        {/* Top bar: working status + goal on the same line */}
+        {(streaming || activeGoal) && (
+          <div className="flex items-center gap-3 pb-3 px-1">
+            {streaming && (
+              <div className="flex items-center gap-2 text-[var(--text-muted)] shrink-0 whitespace-nowrap">
+                <span className="w-2 h-2 bg-[var(--text-muted)] rounded-full animate-pulse" />
+                <span className="text-sm">Working...</span>
+              </div>
+            )}
+            {activeGoal && (
+              <div className={streaming ? "min-w-0 flex-1" : "w-full"}>
+                <GoalDrawer
+                  goal={activeGoal}
+                  onEdit={(newObjective) => {}}
+                  onPause={() => {}}
+                  onDelete={onClearGoal}
+                  noWrapper={!!streaming}
+                />
+              </div>
+            )}
+            {/* Invisible spacer: mirrors Working width so Goal is centered */}
+            {streaming && (
+              <div
+                className="flex items-center gap-2 text-[var(--text-muted)] shrink-0 whitespace-nowrap invisible"
+                aria-hidden="true"
+              >
+                <span className="w-2 h-2 bg-[var(--text-muted)] rounded-full" />
+                <span className="text-sm">Working...</span>
+              </div>
+            )}
           </div>
         )}
-        {pendingMessages.length > 0 && (
+        {!streaming && pendingMessages.length > 0 && (
           <div className="flex flex-col gap-1 px-1 pb-3">
             {pendingMessages.map((msg, i) => (
               <div
@@ -362,12 +388,6 @@ export function ChatInput({
             ))}
           </div>
         )}
-        <GoalDrawer
-          goal={activeGoal}
-          onEdit={(newObjective) => setActiveGoal((prev) => prev ? { ...prev, objective: newObjective } : null)}
-          onPause={() => {}}
-          onDelete={() => setActiveGoal(null)}
-        />
         <div className="rounded-2xl border border-[var(--border-base)] bg-[var(--surface-base)]">
           {/* Top: textarea */}
           <div className="relative">

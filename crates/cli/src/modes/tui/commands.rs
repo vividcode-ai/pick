@@ -183,17 +183,36 @@ pub(crate) fn apply_goal_update(tui: &mut TuiApp, goal: &serde_json::Value) {
             "active" => "🎯",
             "paused" => "⏸",
             "budget_limited" => "💰",
+            "usage_limited" => "🔁",
             "complete" => "✅",
+            "blocked" => "🚧",
             _ => "🎯",
         };
         let tokens_used = goal
             .get("tokens_used")
             .and_then(|v| v.as_i64())
             .unwrap_or(0);
-        tui.set_goal_status(Some(&format!(
-            "{} {}  [{} tokens]",
-            icon, short, tokens_used
-        )));
+        let time_used = goal
+            .get("time_used_seconds")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(0);
+
+        let mut parts = vec![format!("{} {}  [{} tokens]", icon, short, tokens_used)];
+        if time_used > 0 {
+            let time_str = if time_used < 60 {
+                format!("{}s", time_used)
+            } else if time_used < 3600 {
+                format!("{}m", time_used / 60)
+            } else {
+                format!("{}h {}m", time_used / 3600, (time_used % 3600) / 60)
+            };
+            parts.push(time_str);
+        }
+        if status == "usage_limited" {
+            parts.push("(turns exhausted)".to_string());
+        }
+
+        tui.set_goal_status(Some(&parts.join("  ")));
     }
 }
 

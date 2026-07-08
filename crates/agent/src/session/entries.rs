@@ -152,6 +152,10 @@ pub struct GoalEntry {
     pub token_budget: Option<i64>,
     pub tokens_used: i64,
     pub time_used_seconds: i64,
+    /// Maximum number of automatic continuation turns before the goal enters `usage_limited` status.
+    /// `None` means unlimited continuations.
+    #[serde(default)]
+    pub max_turns: Option<u32>,
     pub created_at: i64,
     pub updated_at: i64,
 }

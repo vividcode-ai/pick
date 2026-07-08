@@ -66,7 +66,26 @@ impl AppState {
         let session_dir = cwd_path.join(".pick").join("sessions");
         let history_cwd = cwd_path.to_path_buf();
         let auth_storage_path = config.auth_storage_path.as_ref().map(PathBuf::from);
-        let api_keys = config.api_keys.clone();
+        // Priority for API keys (highest to lowest):
+        //   1. Environment variables (override everything)
+        //   2. Explicitly passed config.api_keys (from CLI's AuthStorage or Tauri startup)
+        //   3. Default auth.json (~/.pick/agent/auth.json) — auto-load for all servers
+        let mut api_keys = config.api_keys.clone();
+        let auth_path = pick_agent::auth::default_auth_path();
+        if auth_path.exists() {
+            if let Ok(data) = pick_agent::auth::read_auth(&auth_path) {
+                for (provider, cred) in data {
+                    if let pick_agent::auth::AuthCredential::ApiKey { key } = cred {
+                        api_keys.entry(provider).or_insert(key);
+                    }
+                }
+            }
+        }
+        for provider in pick_ai::models::get_providers() {
+            if let Some(key) = find_api_key_from_env(&provider) {
+                api_keys.insert(provider, key);
+            }
+        }
         let last_provider = config.last_provider.clone();
         let last_model = config.last_model.clone();
         let thinking_level = config.thinking_level.clone();
@@ -266,6 +285,22 @@ impl AppState {
             }
         }
     }
+}
+
+/// Check common environment variable patterns for a provider's API key.
+/// Patterns checked: `<PROVIDER>_API_KEY`, `<PROVIDER>_APIKEY`, `<PROVIDER>_KEY`, `<PROVIDER>_TOKEN`
+/// where `<PROVIDER>` is the provider name uppercased with hyphens replaced by underscores.
+fn find_api_key_from_env(provider: &str) -> Option<String> {
+    let upper = provider.to_uppercase().replace('-', "_");
+    for suffix in ["_API_KEY", "_APIKEY", "_KEY", "_TOKEN"] {
+        let key = format!("{}{}", upper, suffix);
+        if let Ok(val) = std::env::var(&key) {
+            if !val.is_empty() {
+                return Some(val);
+            }
+        }
+    }
+    None
 }
 
 #[derive(Clone)]

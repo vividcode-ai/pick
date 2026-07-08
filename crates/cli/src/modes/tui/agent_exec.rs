@@ -1,5 +1,6 @@
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::Ordering;
+use std::time::Instant;
 
 use pick_agent::core::agent_loop::AgentLoopConfig;
 use pick_agent::core::hooks::ToolEventBus;
@@ -50,9 +51,8 @@ pub(crate) fn build_agent_config(
 
     let should_stop_after_turn = {
         let goal_manager = ctx.session_manager.goal_manager();
-        let budget_injected = Arc::new(AtomicBool::new(false));
         Arc::new(move |_msg: &pick_ai::types::AssistantMessage| {
-            budget_injected.load(Ordering::Relaxed)
+            goal_manager.budget_limit_reported()
                 && goal_manager
                     .get()
                     .map(|g| g.status == "budget_limited")
@@ -64,7 +64,6 @@ pub(crate) fn build_agent_config(
         let mode = ctx.agent_mode;
         let interrupted = was_interrupted.clone();
         let goal_manager = ctx.session_manager.goal_manager();
-        let budget_injected = Arc::new(AtomicBool::new(false));
         // Capture steer queue for queue draining
         let steer_queue = ctx.steer_queue.clone();
         // Capture cmd_tx for real-time notification when queued messages are consumed
@@ -100,7 +99,7 @@ pub(crate) fn build_agent_config(
                             pick_agent::templates::render_steering_active(&goal, &goal_manager);
                         msgs.push(Message::User(UserMessage::text(msg_text)));
                     }
-                    "budget_limited" if !budget_injected.swap(true, Ordering::Relaxed) => {
+                    "budget_limited" if !goal_manager.mark_budget_limit_reported() => {
                         let msg_text = pick_agent::templates::render_steering_budget_limit(&goal);
                         msgs.push(Message::User(UserMessage::text(msg_text)));
                     }
@@ -168,7 +167,7 @@ pub(crate) fn build_agent_config(
                 if let Some(goal) = goal_manager.get()
                     && goal.status == "active"
                 {
-                    goal_manager.register_continuation();
+                    let _ = goal_manager.register_continuation();
                     let msg_text =
                         pick_agent::templates::render_follow_up_continuation(&goal, &goal_manager);
                     msgs.push(Message::User(UserMessage::text(msg_text)));
@@ -273,6 +272,7 @@ pub(crate) fn build_agent_config(
     > = Arc::new({
         let goal_manager = ctx.session_manager.goal_manager();
         let cmd_tx_clone = cmd_tx.clone();
+        let last_goal_accounting = Arc::new(std::sync::Mutex::new(Instant::now()));
         move |messages: &[Message]| {
             let tokens: i64 = messages
                 .iter()
@@ -286,7 +286,19 @@ pub(crate) fn build_agent_config(
                 .sum();
             let gm = goal_manager.clone();
             let tx = cmd_tx_clone.clone();
+            let accounting = last_goal_accounting.clone();
             Box::pin(async move {
+                // Wall-clock time accounting: compute delta since last accounting
+                let now = Instant::now();
+                let elapsed_secs = {
+                    let mut last = accounting.lock().unwrap_or_else(|e| e.into_inner());
+                    let delta = now.duration_since(*last).as_secs() as i64;
+                    *last = now;
+                    delta
+                };
+                if elapsed_secs > 0 {
+                    gm.add_time_usage(elapsed_secs);
+                }
                 if tokens > 0
                     && let Some(goal) = gm.add_token_usage(tokens)
                 {

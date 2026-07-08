@@ -132,7 +132,7 @@ pub async fn ask(
                 );
                 let _ = goal_manager.clear();
             }
-            if let Err(e) = goal_manager.create(objective, criterion, None) {
+            if let Err(e) = goal_manager.create(objective, criterion, None, None) {
                 error!("Failed to create goal: {}", e);
             } else {
                 info!("Goal created for session {}", req.session_id);
@@ -748,7 +748,7 @@ async fn run_agent_loop_queue(
                             if let Some(goal) = goal_manager.get()
                                 && goal.status == "active"
                             {
-                                goal_manager.register_continuation();
+                                let _ = goal_manager.register_continuation();
                                 let msg_text = pick_agent::templates::render_follow_up_continuation(
                                     &goal,
                                     goal_manager,

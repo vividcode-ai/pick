@@ -53,6 +53,7 @@ export default function App() {
   const [baseUrl, setBaseUrl] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarPinned, setSidebarPinned] = useState(true);
+  const [activeGoal, setActiveGoal] = useState<{ objective: string; startTime: number } | null>(null);
   const [settingsUrl, setSettingsUrl] = useState("");
   const { cycleThemeMode } = useTheme();
 
@@ -124,13 +125,13 @@ export default function App() {
     forkSession,
   } = useSessionManager(baseUrl ?? "");
 
-  const pendingSendRef = useRef<string | null>(null);
+  const pendingSendRef = useRef<{ text: string; extraMode: string | null } | null>(null);
 
   useEffect(() => {
     if (activeSessionId && pendingSendRef.current !== null) {
-      const text = pendingSendRef.current;
+      const { text, extraMode } = pendingSendRef.current;
       pendingSendRef.current = null;
-      ask(text, thinkingLevel === "off" ? undefined : thinkingLevel);
+      ask(text, thinkingLevel === "off" ? undefined : thinkingLevel, extraMode ?? undefined);
     }
   }, [activeSessionId, ask, thinkingLevel]);
 
@@ -158,7 +159,7 @@ export default function App() {
   const handleSend = useCallback(
     (text: string, opts?: { mode?: string; extraMode?: string | null }) => {
       if (!activeSessionId) {
-        pendingSendRef.current = text;
+        pendingSendRef.current = { text, extraMode: opts?.extraMode ?? null };
         createSession(selectedModel, selectedProvider).then((result) => {
           if (result) {
             addSessionEntry(result.id, result.title, selectedModel, selectedProvider, thinkingLevel);
@@ -169,6 +170,9 @@ export default function App() {
       } else {
         ask(text, thinkingLevel === "off" ? undefined : thinkingLevel, opts?.extraMode ?? undefined);
       }
+      if (opts?.extraMode === "goal") {
+        setActiveGoal({ objective: text, startTime: Date.now() });
+      }
     },
     [activeSessionId, createSession, selectedModel, selectedProvider, ask, thinkingLevel]
   );
@@ -176,7 +180,7 @@ export default function App() {
   const handleAsk = useCallback(
     (text: string) => {
       if (!activeSessionId) {
-        pendingSendRef.current = text;
+        pendingSendRef.current = { text, extraMode: null };
         createSession(selectedModel, selectedProvider).then((result) => {
           if (!result) pendingSendRef.current = null;
         });
@@ -399,6 +403,8 @@ export default function App() {
       hiddenModels={hiddenModels}
       onToggleHidden={toggleHiddenModel}
       onEnsureVisible={ensureVisible}
+      activeGoal={activeGoal}
+      onClearGoal={() => setActiveGoal(null)}
     />
   );
 

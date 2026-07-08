@@ -16,6 +16,7 @@ pub(crate) async fn handle_goal(ctx: &mut TuiContext, args: &[String]) -> bool {
                     "active" => "\x1b[32mactive\x1b[0m",
                     "paused" => "\x1b[33mpaused\x1b[0m",
                     "budget_limited" => "\x1b[31mbudget limited\x1b[0m",
+                    "usage_limited" => "\x1b[33musage limited\x1b[0m",
                     "complete" => "\x1b[32mcomplete\x1b[0m",
                     "blocked" => "\x1b[31mblocked\x1b[0m",
                     s => s,
@@ -91,6 +92,8 @@ pub(crate) async fn handle_goal(ctx: &mut TuiContext, args: &[String]) -> bool {
             if let Some(goal) = goal_manager.get() {
                 ctx.tui.editor.set_text(&goal.objective);
                 ctx.tui.state = pick_tui::app::AppState::Input;
+                // Set pending command so handle_submit knows to update the goal
+                ctx.pending_command = Some("goal-edit".to_string());
             } else {
                 ctx.tui.chat.add_system_message("No goal to edit.");
             }
@@ -109,7 +112,7 @@ pub(crate) async fn handle_goal(ctx: &mut TuiContext, args: &[String]) -> bool {
                 } else {
                     (args_str.clone(), String::new())
                 };
-                match goal_manager.create(objective.clone(), criterion.clone(), None) {
+                match goal_manager.create(objective.clone(), criterion.clone(), None, None) {
                     Ok(_) => {
                         ctx.session_manager.persist_goal().await.ok();
                         ctx.tui.chat.add_system_message(&format!(

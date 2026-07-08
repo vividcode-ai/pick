@@ -509,6 +509,29 @@ async fn handle_submit(ctx: &mut TuiContext, user_text: String) {
         }
     }
 
+    // Handle pending goal edit: update goal objective when user submits edited text
+    if ctx.pending_command.as_deref() == Some("goal-edit") {
+        ctx.pending_command = None;
+        let goal_manager = ctx.session_manager.goal_manager();
+        match goal_manager.set_objective(trimmed.clone()) {
+            Ok(_) => {
+                ctx.session_manager.persist_goal().await.ok();
+                ctx.tui
+                    .chat
+                    .add_system_message(&format!("\x1b[32mGoal updated:\x1b[0m  {}", trimmed));
+                // Update status bar
+                let short = if trimmed.len() > 40 {
+                    format!("{}...", trimmed.chars().take(13).collect::<String>())
+                } else {
+                    trimmed.clone()
+                };
+                ctx.tui
+                    .set_goal_status_detail(Some(&format!("🎯 {}", short)), None);
+            }
+            Err(e) => ctx.tui.show_error(&e),
+        }
+    }
+
     // ---- Run the agent (flat EventStream model) ----
     // Commands that start with '/' (like /skill:name, /goal <text>) keep
     // state as Input in submit_input() — correct for sync slash commands
