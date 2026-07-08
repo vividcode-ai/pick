@@ -77,6 +77,7 @@ export interface ChatMessage {
     isStreaming?: boolean;
   };
   timestamp: number;
+  extraMode?: "goal" | "loop";
 }
 
 export interface SessionInfo {

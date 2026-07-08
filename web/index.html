@@ -6,6 +6,35 @@
     <meta name="description" content="Pick - AI-powered coding assistant" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>Pick</title>
+    <script>
+      (function() {
+        try {
+          var theme = 'dark';
+          var bgColor = '#0a0a0a';
+          if (window.matchMedia && !window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            theme = 'light';
+            bgColor = '#ffffff';
+          }
+          document.documentElement.setAttribute('data-theme', theme);
+          document.documentElement.style.backgroundColor = bgColor;
+          var s = document.createElement('style');
+          s.textContent = 'body { background-color: ' + bgColor + '; }';
+          document.head.appendChild(s);
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+          document.documentElement.style.backgroundColor = '#0a0a0a';
+        }
+      })()
+    </script>
+    <style>
+      html, body, #root { margin: 0; }
+      html[data-theme="dark"], html[data-theme="dark"] body, html[data-theme="dark"] #root {
+        background-color: #0a0a0a;
+      }
+      html[data-theme="light"], html[data-theme="light"] body, html[data-theme="light"] #root {
+        background-color: #ffffff;
+      }
+    </style>
   </head>
   <body class="bg-neutral-950 text-neutral-100">
     <div id="root"></div>

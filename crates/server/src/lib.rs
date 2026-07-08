@@ -66,6 +66,10 @@ impl AppState {
         let session_dir = cwd_path.join(".pick").join("sessions");
         let history_cwd = cwd_path.to_path_buf();
         let auth_storage_path = config.auth_storage_path.as_ref().map(PathBuf::from);
+        let api_keys = config.api_keys.clone();
+        let last_provider = config.last_provider.clone();
+        let last_model = config.last_model.clone();
+        let thinking_level = config.thinking_level.clone();
         Self {
             session_manager: session::SessionManager::new_with_cwd(
                 session_dir,
@@ -75,11 +79,11 @@ impl AppState {
             config,
             default_provider: None,
             default_model: None,
-            api_keys: std::sync::RwLock::new(HashMap::new()),
+            api_keys: std::sync::RwLock::new(api_keys),
             auth_storage_path,
-            last_provider: std::sync::RwLock::new(None),
-            last_model: std::sync::RwLock::new(None),
-            thinking_level: std::sync::RwLock::new(None),
+            last_provider: std::sync::RwLock::new(last_provider),
+            last_model: std::sync::RwLock::new(last_model),
+            thinking_level: std::sync::RwLock::new(thinking_level),
             pty_manager: PtyManager::new(Some(cwd)),
             mcp_manager: McpManager::new(),
             mcp_configs: RwLock::new(Vec::new()),
@@ -270,6 +274,10 @@ pub struct ServerConfig {
     pub port: u16,
     pub cwd: Option<String>,
     pub auth_storage_path: Option<String>,
+    pub api_keys: HashMap<String, String>,
+    pub last_provider: Option<String>,
+    pub last_model: Option<String>,
+    pub thinking_level: Option<String>,
 }
 
 impl Default for ServerConfig {
@@ -279,6 +287,10 @@ impl Default for ServerConfig {
             port: 8080,
             cwd: None,
             auth_storage_path: None,
+            api_keys: HashMap::new(),
+            last_provider: None,
+            last_model: None,
+            thinking_level: None,
         }
     }
 }

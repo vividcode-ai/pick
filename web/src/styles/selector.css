@@ -158,6 +158,21 @@
   align-items: center;
 }
 
+/* Thinking level sub-popover (appears to the right of model list) */
+.thinking-sub-popover {
+  background-color: var(--surface-base);
+  border: 1px solid var(--border-base);
+  border-radius: 0.5rem;
+  box-shadow: var(--popover-shadow);
+  overflow: hidden;
+  min-width: 90px;
+}
+.thinking-sub-popover .selector-listbox {
+  padding: 0.25rem;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
 /* Empty state */
 .selector-empty-state {
   padding: 1rem;

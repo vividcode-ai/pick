@@ -671,4 +671,6 @@ pub struct SseSessionState {
     pub in_flight: Arc<AtomicBool>,
     /// Agent mode: "build" or "plan"
     pub agent_mode: Arc<std::sync::RwLock<String>>,
+    /// Goal manager for goal-driven agent execution
+    pub goal_manager: Arc<std::sync::RwLock<Option<Arc<pick_agent::session::GoalManager>>>>,
 }

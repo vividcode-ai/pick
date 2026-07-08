@@ -89,78 +89,19 @@ pub(crate) fn build_agent_config(
             if let Some(goal) = goal_manager.get() {
                 // Check if objective was updated since last turn
                 if goal_manager.take_objective_updated() {
-                    let objective = escape_xml_text(&goal.objective);
-                    let token_budget_str = goal
-                        .token_budget
-                        .map(|b| b.to_string())
-                        .unwrap_or_else(|| "none".to_string());
-                    let remaining_tokens = goal_manager
-                        .remaining_tokens()
-                        .map(|r| r.to_string())
-                        .unwrap_or_else(|| "unbounded".to_string());
-                    let criterion = escape_xml_text(&goal.completion_criterion);
-                    let _criterion_display = if criterion.is_empty() {
-                        "none".to_string()
-                    } else {
-                        criterion
-                    };
-                    let msg_text = render_goal_template(
-                        include_str!("../../templates/goals/objective_updated.md"),
-                        &[
-                            ("objective", &objective),
-                            ("tokens_used", &goal.tokens_used.to_string()),
-                            ("token_budget", &token_budget_str),
-                            ("remaining_tokens", &remaining_tokens),
-                        ],
-                    );
+                    let msg_text =
+                        pick_agent::templates::render_objective_updated(&goal, &goal_manager);
                     msgs.push(Message::User(UserMessage::text(msg_text)));
                 }
 
                 match goal.status.as_str() {
                     "active" => {
-                        let objective = escape_xml_text(&goal.objective);
-                        let criterion = escape_xml_text(&goal.completion_criterion);
-                        let criterion_display = if criterion.is_empty() {
-                            "none".to_string()
-                        } else {
-                            criterion
-                        };
-                        let token_budget_str = goal
-                            .token_budget
-                            .map(|b| b.to_string())
-                            .unwrap_or_else(|| "none".to_string());
-                        let remaining_tokens = goal_manager
-                            .remaining_tokens()
-                            .map(|r| r.to_string())
-                            .unwrap_or_else(|| "unbounded".to_string());
-                        let msg_text = render_goal_template(
-                            include_str!("../../templates/goals/steering_active.md"),
-                            &[
-                                ("objective", &objective),
-                                ("completion_criterion", &criterion_display),
-                                ("tokens_used", &goal.tokens_used.to_string()),
-                                ("token_budget", &token_budget_str),
-                                ("remaining_tokens", &remaining_tokens),
-                                ("time_used_seconds", &goal.time_used_seconds.to_string()),
-                            ],
-                        );
+                        let msg_text =
+                            pick_agent::templates::render_steering_active(&goal, &goal_manager);
                         msgs.push(Message::User(UserMessage::text(msg_text)));
                     }
                     "budget_limited" if !budget_injected.swap(true, Ordering::Relaxed) => {
-                        let objective = escape_xml_text(&goal.objective);
-                        let token_budget_str = goal
-                            .token_budget
-                            .map(|b| b.to_string())
-                            .unwrap_or_else(|| "none".to_string());
-                        let msg_text = render_goal_template(
-                            include_str!("../../templates/goals/steering_budget_limit.md"),
-                            &[
-                                ("objective", &objective),
-                                ("tokens_used", &goal.tokens_used.to_string()),
-                                ("token_budget", &token_budget_str),
-                                ("time_used_seconds", &goal.time_used_seconds.to_string()),
-                            ],
-                        );
+                        let msg_text = pick_agent::templates::render_steering_budget_limit(&goal);
                         msgs.push(Message::User(UserMessage::text(msg_text)));
                     }
                     _ => {}
@@ -228,31 +169,8 @@ pub(crate) fn build_agent_config(
                     && goal.status == "active"
                 {
                     goal_manager.register_continuation();
-                    let objective = escape_xml_text(&goal.objective);
-                    let criterion = escape_xml_text(&goal.completion_criterion);
-                    let criterion_display = if criterion.is_empty() {
-                        "none".to_string()
-                    } else {
-                        criterion
-                    };
-                    let token_budget_str = goal
-                        .token_budget
-                        .map(|b| b.to_string())
-                        .unwrap_or_else(|| "none".to_string());
-                    let remaining_tokens = goal_manager
-                        .remaining_tokens()
-                        .map(|r| r.to_string())
-                        .unwrap_or_else(|| "unbounded".to_string());
-                    let msg_text = render_goal_template(
-                        include_str!("../../templates/goals/follow_up_continuation.md"),
-                        &[
-                            ("objective", &objective),
-                            ("completion_criterion", &criterion_display),
-                            ("tokens_used", &goal.tokens_used.to_string()),
-                            ("token_budget", &token_budget_str),
-                            ("remaining_tokens", &remaining_tokens),
-                        ],
-                    );
+                    let msg_text =
+                        pick_agent::templates::render_follow_up_continuation(&goal, &goal_manager);
                     msgs.push(Message::User(UserMessage::text(msg_text)));
                 }
             }
@@ -570,27 +488,4 @@ pub(crate) async fn auto_compact_session(ctx: &mut TuiContext) {
             }
         }
     }
-}
-
-/// Render a goal template by replacing `{{ var }}` placeholders with values.
-pub(crate) fn render_goal_template(template: &str, vars: &[(&str, &str)]) -> String {
-    use std::collections::HashMap;
-    let vars: HashMap<&str, &str> = vars.iter().copied().collect();
-    let mut result = template.to_string();
-    for (key, value) in &vars {
-        let padded = format!("{{{{ {} }}}}", key);
-        result = result.replace(&padded, value);
-        let tight = format!("{{{{{}}}}}", key);
-        result = result.replace(&tight, value);
-    }
-    result
-}
-
-/// Escape text for safe inclusion in XML-like tags (e.g. `<goal_context>`).
-pub(crate) fn escape_xml_text(text: &str) -> String {
-    text.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
 }

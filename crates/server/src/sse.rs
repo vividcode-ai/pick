@@ -3,6 +3,7 @@ use std::convert::Infallible;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::sync::RwLock;
 use std::sync::atomic::AtomicBool;
 use std::task::{Context, Poll};
 use std::time::Duration;
@@ -78,6 +79,7 @@ pub async fn handle_sse(
                 ))),
                 in_flight: Arc::new(AtomicBool::new(false)),
                 agent_mode: Arc::new(std::sync::RwLock::new(mode)),
+                goal_manager: Arc::new(RwLock::new(None)),
             },
         );
     }

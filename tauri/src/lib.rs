@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use tauri::Manager;
 use tokio::runtime::Runtime;
 
@@ -29,6 +31,9 @@ fn run_desktop() {
         .setup(|app| {
             let rt = Runtime::new().expect("Failed to create tokio runtime");
 
+            // Load API keys and last used model from auth.json
+            let (api_keys, last_provider, last_model, thinking_level) = load_auth_credentials();
+
             let port = rt.block_on(async {
                 let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
                     .await
@@ -40,6 +45,10 @@ fn run_desktop() {
                     port,
                     cwd: None,
                     auth_storage_path: None,
+                    api_keys,
+                    last_provider,
+                    last_model,
+                    thinking_level,
                 };
 
                 tokio::spawn(async move {
@@ -53,6 +62,11 @@ fn run_desktop() {
 
             app.manage(ServerState { port });
             app.manage(ServerRuntime(rt));
+
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
 
             Ok(())
         })
@@ -73,6 +87,35 @@ fn run_mobile() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+/// Load API credentials and last used model info from ~/.pick/agent/auth.json.
+fn load_auth_credentials() -> (
+    HashMap<String, String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+) {
+    let auth_path = pick_agent::auth::default_auth_path();
+    if auth_path.exists() {
+        if let Ok(file) = pick_agent::auth::read_auth_file(&auth_path) {
+            let keys = file
+                .credentials
+                .into_iter()
+                .filter_map(|(provider, cred)| match cred {
+                    pick_agent::auth::AuthCredential::ApiKey { key } => Some((provider, key)),
+                    _ => None,
+                })
+                .collect();
+            return (
+                keys,
+                file.last_provider,
+                file.last_model,
+                file.thinking_level,
+            );
+        }
+    }
+    (HashMap::new(), None, None, None)
 }
 
 pub fn run() {

@@ -38,10 +38,13 @@ pub async fn run_serve_mode(
                 .to_string_lossy()
                 .to_string(),
         ),
+        api_keys,
+        last_provider: None,
+        last_model: None,
+        thinking_level: None,
     });
     state.default_provider = default_provider;
     state.default_model = default_model;
-    *state.api_keys.write().unwrap() = api_keys;
 
     // Load last used model and thinking level from auth.json
     let auth_path = pick_agent::auth::default_auth_path();

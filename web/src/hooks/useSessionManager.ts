@@ -232,7 +232,7 @@ export function useSessionManager(baseUrl: string) {
   }, [switchActiveSession]);
 
   /** Send a prompt via POST to the server (used when EventSource is already open). */
-  const sendPrompt = useCallback((sessionId: string, prompt: string, thinkingLevel?: string) => {
+  const sendPrompt = useCallback((sessionId: string, prompt: string, thinkingLevel?: string, extraMode?: string) => {
     fetch(`${baseUrl}/ask`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -240,22 +240,24 @@ export function useSessionManager(baseUrl: string) {
         session_id: sessionId,
         prompt,
         thinking_level: thinkingLevel,
+        extra_mode: extraMode,
       }),
     }).catch(() => {});
   }, [baseUrl]);
 
-  const ask = useCallback((prompt: string, thinkingLevel?: string) => {
+  const ask = useCallback((prompt: string, thinkingLevel?: string, extraMode?: string | null) => {
     const sessionId = activeSessionIdRef.current;
     if (!sessionId) return;
 
     cancelEvictionTimer(sessionId);
 
     // Add user message to local display immediately
+    const userExtraMode = extraMode === "goal" ? "goal" as const : extraMode === "loop" ? "loop" as const : undefined;
     updateSession(sessionId, (prev) => ({
       ...prev,
       messages: [
         ...prev.messages,
-        { id: crypto.randomUUID(), role: "user", content: prompt, timestamp: Date.now() },
+        { id: crypto.randomUUID(), role: "user", content: prompt, timestamp: Date.now(), extraMode: userExtraMode },
       ],
     }));
 
@@ -267,7 +269,7 @@ export function useSessionManager(baseUrl: string) {
         ...prev,
         pendingMessages: [...(prev.pendingMessages ?? []), prompt],
       }));
-      sendPrompt(sessionId, prompt, thinkingLevel);
+      sendPrompt(sessionId, prompt, thinkingLevel, extraMode ?? undefined);
       return;
     }
 
@@ -277,7 +279,7 @@ export function useSessionManager(baseUrl: string) {
     const existing = sessionResourcesRef.current[sessionId];
     if (existing?.eventSource && existing.eventSource.readyState === EventSource.OPEN) {
       // EventSource already open and ready — POST immediately
-      sendPrompt(sessionId, prompt, thinkingLevel);
+      sendPrompt(sessionId, prompt, thinkingLevel, extraMode ?? undefined);
       return;
     }
 
@@ -304,6 +306,7 @@ export function useSessionManager(baseUrl: string) {
           session_id: sessionId,
           prompt,
           thinking_level: thinkingLevel,
+          extra_mode: extraMode,
         }),
       }).catch(() => {});
     });

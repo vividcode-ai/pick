@@ -847,34 +847,9 @@ pub async fn run_interactive_mode(
                             if let Some(goal) = goal_manager.get()
                                 && goal.status == "active"
                             {
-                                let objective =
-                                    crate::modes::tui::agent_exec::escape_xml_text(&goal.objective);
-                                let criterion = crate::modes::tui::agent_exec::escape_xml_text(
-                                    &goal.completion_criterion,
-                                );
-                                let criterion_display = if criterion.is_empty() {
-                                    "none".to_string()
-                                } else {
-                                    criterion
-                                };
-                                let token_budget_str = goal
-                                    .token_budget
-                                    .map(|b| b.to_string())
-                                    .unwrap_or_else(|| "none".to_string());
-                                let remaining_tokens = goal_manager
-                                    .remaining_tokens()
-                                    .map(|r| r.to_string())
-                                    .unwrap_or_else(|| "unbounded".to_string());
-                                let msg_text = crate::modes::tui::agent_exec::render_goal_template(
-                                    include_str!("../../templates/goals/steering_active.md"),
-                                    &[
-                                        ("objective", &objective),
-                                        ("completion_criterion", &criterion_display),
-                                        ("tokens_used", &goal.tokens_used.to_string()),
-                                        ("token_budget", &token_budget_str),
-                                        ("remaining_tokens", &remaining_tokens),
-                                        ("time_used_seconds", &goal.time_used_seconds.to_string()),
-                                    ],
+                                let msg_text = pick_agent::templates::render_steering_active(
+                                    &goal,
+                                    &goal_manager,
                                 );
                                 msgs.push(Message::User(UserMessage::text(msg_text)));
                             }

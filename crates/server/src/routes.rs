@@ -16,7 +16,7 @@ use pick_ai::types::Message as AiMessage;
 use pick_ai::types::UserMessage;
 use serde::Deserialize;
 use tokio::sync::watch;
-use tracing::{debug, error};
+use tracing::{debug, error, info, warn};
 use utoipa::ToSchema;
 
 use crate::AppState;
@@ -32,6 +32,7 @@ pub struct AskRequest {
     pub session_id: String,
     pub prompt: String,
     pub thinking_level: Option<String>,
+    pub extra_mode: Option<String>,
 }
 
 #[derive(Deserialize, ToSchema)]
@@ -110,6 +111,34 @@ pub async fn ask(
     };
 
     let agent_mode = sse_state.agent_mode.read().unwrap().clone();
+
+    // Handle extra mode: if "goal", parse the prompt and create a goal
+    if let Some(extra_mode) = &req.extra_mode {
+        if extra_mode == "goal" {
+            let (objective, criterion) = if let Some(pos) = req.prompt.find("||") {
+                let obj = req.prompt[..pos].trim().to_string();
+                let crit = req.prompt[pos + 2..].trim().to_string();
+                (obj, crit)
+            } else {
+                (req.prompt.clone(), String::new())
+            };
+            let mut gm = sse_state.goal_manager.write().unwrap();
+            let goal_manager =
+                gm.get_or_insert_with(|| Arc::new(pick_agent::session::GoalManager::new()));
+            if goal_manager.get().is_some() {
+                warn!(
+                    "Goal already exists for session {}, clearing first",
+                    req.session_id
+                );
+                let _ = goal_manager.clear();
+            }
+            if let Err(e) = goal_manager.create(objective, criterion, None) {
+                error!("Failed to create goal: {}", e);
+            } else {
+                info!("Goal created for session {}", req.session_id);
+            }
+        }
+    }
 
     // Enqueue the user message
     {
@@ -577,6 +606,8 @@ async fn run_agent_loop_queue(
         let et_follow = sse_state.event_tx.clone();
         let et_for_git = et_on_event.clone();
         let cwd_for_git = cwd_for_event.clone();
+        let gm_steer = sse_state.goal_manager.clone();
+        let gm_follow = sse_state.goal_manager.clone();
 
         // Build mode-specific ruleset
         let ruleset = match agent_mode.as_str() {
@@ -657,7 +688,7 @@ async fn run_agent_loop_queue(
             before_tool_call: None,
             should_stop_after_turn: None,
             get_steering_messages: Some(Arc::new(move || {
-                let msgs = mq_steer.lock().unwrap().drain();
+                let mut msgs = mq_steer.lock().unwrap().drain();
                 for msg in &msgs {
                     if let AiMessage::User(user_msg) = msg {
                         let text: String = user_msg
@@ -678,10 +709,19 @@ async fn run_agent_loop_queue(
                         }
                     }
                 }
+                if let Some(goal_manager) = gm_steer.read().unwrap().as_ref() {
+                    if let Some(goal) = goal_manager.get()
+                        && goal.status == "active"
+                    {
+                        let msg_text =
+                            pick_agent::templates::render_steering_active(&goal, goal_manager);
+                        msgs.push(AiMessage::User(UserMessage::text(msg_text)));
+                    }
+                }
                 msgs
             })),
             get_follow_up_messages: Some(Arc::new(move |_result| {
-                let msgs = mq_follow.lock().unwrap().drain();
+                let mut msgs = mq_follow.lock().unwrap().drain();
                 for msg in &msgs {
                     if let AiMessage::User(user_msg) = msg {
                         let text: String = user_msg
@@ -699,6 +739,22 @@ async fn run_agent_loop_queue(
                             let _ = et_follow.send(Ok(Event::default()
                                 .event("message_dequeued")
                                 .data(serde_json::json!({"text": text}).to_string())));
+                        }
+                    }
+                }
+                if msgs.is_empty() {
+                    if let Some(goal_manager) = gm_follow.read().unwrap().as_ref() {
+                        if goal_manager.can_continue() {
+                            if let Some(goal) = goal_manager.get()
+                                && goal.status == "active"
+                            {
+                                goal_manager.register_continuation();
+                                let msg_text = pick_agent::templates::render_follow_up_continuation(
+                                    &goal,
+                                    goal_manager,
+                                );
+                                msgs.push(AiMessage::User(UserMessage::text(msg_text)));
+                            }
                         }
                     }
                 }
@@ -740,7 +796,7 @@ async fn run_agent_loop_queue(
             sandbox_enabled: None,
             cancel_signal_tx: Some(Arc::new(cancel_tx)),
             skill_paths: Vec::new(),
-            parent_goal_manager: None,
+            parent_goal_manager: sse_state.goal_manager.read().unwrap().clone(),
             on_turn_complete: None,
         };
 

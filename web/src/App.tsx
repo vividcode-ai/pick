@@ -156,7 +156,7 @@ export default function App() {
   }, [sidebarPinned]);
 
   const handleSend = useCallback(
-    (text: string) => {
+    (text: string, opts?: { mode?: string; extraMode?: string | null }) => {
       if (!activeSessionId) {
         pendingSendRef.current = text;
         createSession(selectedModel, selectedProvider).then((result) => {
@@ -167,7 +167,7 @@ export default function App() {
           }
         });
       } else {
-        ask(text, thinkingLevel === "off" ? undefined : thinkingLevel);
+        ask(text, thinkingLevel === "off" ? undefined : thinkingLevel, opts?.extraMode ?? undefined);
       }
     },
     [activeSessionId, createSession, selectedModel, selectedProvider, ask, thinkingLevel]

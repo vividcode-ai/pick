@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Copy, GitFork, ChevronRight, ChevronDown, Undo, Trash2 } from "lucide-react";
+import { Copy, GitFork, ChevronRight, ChevronDown, Undo, Trash2, Target } from "lucide-react";
 import type { ChatMessage } from "../../types/events";
 import { Markdown } from "./Markdown";
 import { ToolCall } from "./ToolCall";
@@ -43,6 +43,12 @@ function UserBubble({ message, onCopy }: { message: ChatMessage; onCopy: () => v
         <div className="text-sm leading-relaxed whitespace-pre-wrap text-[var(--text-primary)]">
           {message.content}
         </div>
+        {message.extraMode === "goal" && (
+          <div className="flex items-center gap-1 mt-1.5 justify-end">
+            <Target className="w-3 h-3 text-[var(--text-muted)]" />
+            <span className="text-xs text-[var(--text-muted)]">Goal</span>
+          </div>
+        )}
       </div>
       <div className="message-actions justify-end pr-1">
         <button className="message-action-button" onClick={onCopy} title="Copy">
