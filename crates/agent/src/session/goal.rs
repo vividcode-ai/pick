@@ -476,7 +476,7 @@ mod tests {
         assert!(gm.can_continue());
         assert!(gm.register_continuation().is_ok());
         assert!(gm.can_continue());
-        assert!(gm.register_continuation().is_ok()); // 3rd = limit hit
+        assert!(gm.register_continuation().is_err()); // 3rd: count=3 >= 3 → limit hit
         assert!(!gm.can_continue());
         assert_eq!(gm.get().unwrap().status, "usage_limited");
     }
