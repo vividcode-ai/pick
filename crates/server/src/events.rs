@@ -97,26 +97,23 @@ pub fn serialize_event(event: &AgentEvent) -> Vec<WsEvent> {
                     }
                 }
 
-                let mut events = Vec::new();
-                if !text.is_empty() {
-                    events.push(WsEvent {
+                // Send text and thinking as ONE message_update event to avoid
+                // doubling SSE events (causes 2× React re-renders on the web
+                // frontend for every streaming chunk — a significant perf hit
+                // with thinking-heavy models like DeepSeek V4 Flash).
+                if !text.is_empty() || thinking.is_some() {
+                    vec![WsEvent {
                         event_type: "message_update".to_string(),
                         payload: serde_json::to_value(MessageUpdatePayload {
                             text,
-                            thinking: None,
+                            thinking,
                             delta: false,
                         })
                         .unwrap_or_default(),
-                    });
+                    }]
+                } else {
+                    Vec::new()
                 }
-                if let Some(t) = thinking {
-                    events.push(WsEvent {
-                        event_type: "thinking".to_string(),
-                        payload: serde_json::to_value(ThinkingPayload { text: t })
-                            .unwrap_or_default(),
-                    });
-                }
-                events
             } else {
                 Vec::new()
             }

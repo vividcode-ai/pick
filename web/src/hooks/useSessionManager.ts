@@ -345,12 +345,23 @@ export function useSessionManager(
     eventSource.addEventListener("message_update", (e) => {
       try {
         const payload = JSON.parse(e.data);
-        if (payload.text) {
-          updateSession(sessionId, (prev) => updateOrCreate(prev, "assistant", payload.text));
-        }
+        // Update both assistant text AND thinking in ONE state update
+        // so React only re-renders once per streaming chunk.
+        updateSession(sessionId, (prev) => {
+          let next = prev;
+          if (payload.text) {
+            next = updateOrCreate(next, "assistant", payload.text);
+          }
+          if (payload.thinking) {
+            next = updateOrCreate(next, "thinking", payload.thinking);
+          }
+          return next;
+        });
       } catch {}
     });
 
+    // Fallback: handle thinking arriving as a separate SSE event
+    // (from legacy clients or servers still sending it independently).
     eventSource.addEventListener("thinking", (e) => {
       try {
         const payload = JSON.parse(e.data);

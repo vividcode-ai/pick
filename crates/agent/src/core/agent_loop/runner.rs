@@ -883,6 +883,17 @@ async fn handle_tool_execution(
         let agent_registry = config.agent_registry.clone();
         let default_model = config.model.clone();
         let sandbox_enabled = config.sandbox_enabled.clone();
+        for (tc, _tool) in &parallel_calls {
+            // Fire ToolExecutionStart BEFORE spawning (like sequential tools do).
+            if let Some(ref handler) = config.on_event {
+                handler(AgentEvent::ToolExecutionStart {
+                    tool_call_id: tc.id.clone(),
+                    tool_name: tc.name.clone(),
+                    args: tc.arguments.clone(),
+                });
+            }
+        }
+
         for (tc, tool) in parallel_calls {
             // Fire BeforeExecute event
             if let Some(ref bus) = config.tool_event_bus {

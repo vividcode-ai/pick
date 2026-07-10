@@ -357,7 +357,7 @@ pub(crate) fn build_agent_config(
         provider_max_retry_delay_ms: None,
         approve,
         skill_paths,
-        parent_goal_manager: None,
+        parent_goal_manager: Some(ctx.session_manager.goal_manager()),
         tool_execution_permission,
     }
 }

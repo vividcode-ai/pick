@@ -172,25 +172,26 @@ async fn run_subagent_turn(
     let on_event_output = output.clone();
     let on_event_stats = stats.clone();
     let on_event_progress = progress.cloned();
-    // Accumulate a tool trace (formatted text) that gets prepended to each
-    // progress update so the user sees what tools the subagent is using.
-    let tool_trace: Arc<Mutex<String>> = Arc::new(Mutex::new(String::new()));
 
     let child_event_handler: AgentEventHandler = Arc::new(move |event| {
         match &event {
             AgentEvent::MessageEnd { message } => {
                 if let Message::Assistant(msg) = message {
-                    // Capture text content for final output
+                    // Extract final text content and send it as one update
                     let mut out = on_event_output.lock().unwrap();
+                    let mut final_text = String::new();
                     for block in &msg.content {
                         if let ContentBlock::Text(t) = block {
                             out.push_str(&t.text);
                             out.push('\n');
+                            final_text.push_str(&t.text);
+                            final_text.push('\n');
                         }
                     }
-                    // Do NOT send progress from MessageEnd — MessageUpdate already
-                    // sent the latest accumulated text. Sending again here causes
-                    // duplicate content in the frontend (append vs replace mismatch).
+                    // Send final text once (will display in tool_end output)
+                    if let Some(ref tx) = on_event_progress {
+                        let _ = tx.send(final_text.trim().to_string());
+                    }
                     // Track usage
                     let s = &mut *on_event_stats.lock().unwrap();
                     s.input += msg.usage.input;
@@ -203,84 +204,9 @@ async fn run_subagent_turn(
                     s.turns += 1;
                 }
             }
-            AgentEvent::MessageUpdate { message, .. } => {
-                if let Some(ref tx) = on_event_progress
-                    && let Message::Assistant(msg) = message
-                {
-                    for block in &msg.content {
-                        match block {
-                            ContentBlock::Text(t) => {
-                                // Prepend tool trace so tool calls appear above
-                                // the current thinking/analysis text.
-                                let trace = tool_trace.lock().unwrap();
-                                let full = if trace.is_empty() {
-                                    t.text.clone()
-                                } else {
-                                    format!("{}\n\n{}", trace, t.text)
-                                };
-                                let _ = tx.send(full);
-                            }
-                            ContentBlock::Thinking(t) if !t.thinking.is_empty() => {
-                                let _ = tx.send(format!("[thinking] {}", t.thinking));
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-            }
-            AgentEvent::ToolExecutionStart {
-                tool_name, args, ..
-            } => {
-                // Format tool start into the tool trace
-                let args_str = serde_json::to_string_pretty(args)
-                    .unwrap_or_default()
-                    .lines()
-                    .map(|l| l.trim().trim_matches('"'))
-                    .filter(|l| !l.is_empty() && *l != "{")
-                    .collect::<Vec<_>>()
-                    .join(" ");
-                let header = format!("### 🔧 Tool: {}\n```", tool_name);
-                let args_line = if args_str.is_empty() || args_str == "}" {
-                    String::new()
-                } else {
-                    format!("\n{}", args_str)
-                };
-                let mut trace = tool_trace.lock().unwrap();
-                trace.push_str(&header);
-                if !args_line.is_empty() {
-                    trace.push_str(&args_line);
-                }
-                trace.push_str("\n```\n");
-            }
-            AgentEvent::ToolExecutionEnd {
-                result, is_error, ..
-            } => {
-                // Append tool result summary to the trace
-                let preview = result
-                    .get("content")
-                    .and_then(|c| c.as_array())
-                    .and_then(|arr| arr.first())
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("");
-                let lines: Vec<&str> = preview.lines().collect();
-                let truncated = if lines.len() > 5 {
-                    let mut v: Vec<&str> = lines.iter().take(5).copied().collect();
-                    v.push("...");
-                    v.join("\n")
-                } else {
-                    lines.join("\n")
-                };
-                let mut trace = tool_trace.lock().unwrap();
-                if !truncated.is_empty() {
-                    if *is_error {
-                        trace.push_str(&format!("❌ *Error:* {}\n\n", truncated));
-                    } else {
-                        trace.push_str(&format!("```\n{}\n```\n\n", truncated));
-                    }
-                } else {
-                    trace.push_str("\n");
-                }
-            }
+            // Only send progress from MessageEnd. Ignore all intermediate
+            // updates (MessageUpdate, ToolExecutionStart/End) — only the
+            // final reply text is shown to the user.
             _ => {}
         }
     });

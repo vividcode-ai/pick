@@ -1015,7 +1015,7 @@ pub async fn run_interactive_mode(
                         std::io::stdout().flush().ok();
                     })),
                     skill_paths,
-                    parent_goal_manager: None,
+                    parent_goal_manager: Some(session_manager.goal_manager()),
                     tool_execution_permission: None,
                 };
 
