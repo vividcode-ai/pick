@@ -21,10 +21,10 @@ fn get_os_info() -> String {
 /// Load last used provider/model/thinking from ~/.pick/agent/auth.json.
 fn load_last_used() -> (Option<String>, Option<String>, Option<String>) {
     let auth_path = pick_agent::auth::default_auth_path();
-    if auth_path.exists() {
-        if let Ok(file) = pick_agent::auth::read_auth_file(&auth_path) {
-            return (file.last_provider, file.last_model, file.thinking_level);
-        }
+    if auth_path.exists()
+        && let Ok(file) = pick_agent::auth::read_auth_file(&auth_path)
+    {
+        return (file.last_provider, file.last_model, file.thinking_level);
     }
     (None, None, None)
 }

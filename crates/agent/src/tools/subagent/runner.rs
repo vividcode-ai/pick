@@ -174,40 +174,37 @@ async fn run_subagent_turn(
     let on_event_progress = progress.cloned();
 
     let child_event_handler: AgentEventHandler = Arc::new(move |event| {
-        match &event {
-            AgentEvent::MessageEnd { message } => {
-                if let Message::Assistant(msg) = message {
-                    // Extract final text content and send it as one update
-                    let mut out = on_event_output.lock().unwrap();
-                    let mut final_text = String::new();
-                    for block in &msg.content {
-                        if let ContentBlock::Text(t) = block {
-                            out.push_str(&t.text);
-                            out.push('\n');
-                            final_text.push_str(&t.text);
-                            final_text.push('\n');
-                        }
-                    }
-                    // Send final text once (will display in tool_end output)
-                    if let Some(ref tx) = on_event_progress {
-                        let _ = tx.send(final_text.trim().to_string());
-                    }
-                    // Track usage
-                    let s = &mut *on_event_stats.lock().unwrap();
-                    s.input += msg.usage.input;
-                    s.output += msg.usage.output;
-                    s.cache_read += msg.usage.cache_read;
-                    s.cache_write += msg.usage.cache_write;
-                    s.model = Some(msg.model.clone());
-                    s.stop_reason = Some(format!("{:?}", msg.stop_reason));
-                    s.error_message = msg.error_message.clone();
-                    s.turns += 1;
+        // Only send progress from MessageEnd. Ignore all intermediate
+        // updates (MessageUpdate, ToolExecutionStart/End) — only the
+        // final reply text is shown to the user.
+        if let AgentEvent::MessageEnd { message } = &event
+            && let Message::Assistant(msg) = message
+        {
+            // Extract final text content and send it as one update
+            let mut out = on_event_output.lock().unwrap();
+            let mut final_text = String::new();
+            for block in &msg.content {
+                if let ContentBlock::Text(t) = block {
+                    out.push_str(&t.text);
+                    out.push('\n');
+                    final_text.push_str(&t.text);
+                    final_text.push('\n');
                 }
             }
-            // Only send progress from MessageEnd. Ignore all intermediate
-            // updates (MessageUpdate, ToolExecutionStart/End) — only the
-            // final reply text is shown to the user.
-            _ => {}
+            // Send final text once (will display in tool_end output)
+            if let Some(ref tx) = on_event_progress {
+                let _ = tx.send(final_text.trim().to_string());
+            }
+            // Track usage
+            let s = &mut *on_event_stats.lock().unwrap();
+            s.input += msg.usage.input;
+            s.output += msg.usage.output;
+            s.cache_read += msg.usage.cache_read;
+            s.cache_write += msg.usage.cache_write;
+            s.model = Some(msg.model.clone());
+            s.stop_reason = Some(format!("{:?}", msg.stop_reason));
+            s.error_message = msg.error_message.clone();
+            s.turns += 1;
         }
     });
 

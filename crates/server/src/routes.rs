@@ -114,30 +114,30 @@ pub async fn ask(
     let agent_mode = sse_state.agent_mode.read().unwrap().clone();
 
     // Handle extra mode: if "goal", parse the prompt and create a goal
-    if let Some(extra_mode) = &req.extra_mode {
-        if extra_mode == "goal" {
-            let (objective, criterion) = if let Some(pos) = req.prompt.find("||") {
-                let obj = req.prompt[..pos].trim().to_string();
-                let crit = req.prompt[pos + 2..].trim().to_string();
-                (obj, crit)
-            } else {
-                (req.prompt.clone(), String::new())
-            };
-            let mut gm = sse_state.goal_manager.write().unwrap();
-            let goal_manager =
-                gm.get_or_insert_with(|| Arc::new(pick_agent::session::GoalManager::new()));
-            if goal_manager.get().is_some() {
-                warn!(
-                    "Goal already exists for session {}, clearing first",
-                    req.session_id
-                );
-                let _ = goal_manager.clear();
-            }
-            if let Err(e) = goal_manager.create(objective, criterion, None, None) {
-                error!("Failed to create goal: {}", e);
-            } else {
-                info!("Goal created for session {}", req.session_id);
-            }
+    if let Some(extra_mode) = &req.extra_mode
+        && extra_mode == "goal"
+    {
+        let (objective, criterion) = if let Some(pos) = req.prompt.find("||") {
+            let obj = req.prompt[..pos].trim().to_string();
+            let crit = req.prompt[pos + 2..].trim().to_string();
+            (obj, crit)
+        } else {
+            (req.prompt.clone(), String::new())
+        };
+        let mut gm = sse_state.goal_manager.write().unwrap();
+        let goal_manager =
+            gm.get_or_insert_with(|| Arc::new(pick_agent::session::GoalManager::new()));
+        if goal_manager.get().is_some() {
+            warn!(
+                "Goal already exists for session {}, clearing first",
+                req.session_id
+            );
+            let _ = goal_manager.clear();
+        }
+        if let Err(e) = goal_manager.create(objective, criterion, None, None) {
+            error!("Failed to create goal: {}", e);
+        } else {
+            info!("Goal created for session {}", req.session_id);
         }
     }
 
@@ -725,14 +725,13 @@ async fn run_agent_loop_queue(
                         }
                     }
                 }
-                if let Some(goal_manager) = gm_steer.read().unwrap().as_ref() {
-                    if let Some(goal) = goal_manager.get()
-                        && goal.status == "active"
-                    {
-                        let msg_text =
-                            pick_agent::templates::render_steering_active(&goal, goal_manager);
-                        msgs.push(AiMessage::User(UserMessage::text(msg_text)));
-                    }
+                if let Some(goal_manager) = gm_steer.read().unwrap().as_ref()
+                    && let Some(goal) = goal_manager.get()
+                    && goal.status == "active"
+                {
+                    let msg_text =
+                        pick_agent::templates::render_steering_active(&goal, goal_manager);
+                    msgs.push(AiMessage::User(UserMessage::text(msg_text)));
                 }
                 msgs
             })),
@@ -758,21 +757,16 @@ async fn run_agent_loop_queue(
                         }
                     }
                 }
-                if msgs.is_empty() {
-                    if let Some(goal_manager) = gm_follow.read().unwrap().as_ref() {
-                        if goal_manager.can_continue() {
-                            if let Some(goal) = goal_manager.get()
-                                && goal.status == "active"
-                            {
-                                let _ = goal_manager.register_continuation();
-                                let msg_text = pick_agent::templates::render_follow_up_continuation(
-                                    &goal,
-                                    goal_manager,
-                                );
-                                msgs.push(AiMessage::User(UserMessage::text(msg_text)));
-                            }
-                        }
-                    }
+                if msgs.is_empty()
+                    && let Some(goal_manager) = gm_follow.read().unwrap().as_ref()
+                    && goal_manager.can_continue()
+                    && let Some(goal) = goal_manager.get()
+                    && goal.status == "active"
+                {
+                    let _ = goal_manager.register_continuation();
+                    let msg_text =
+                        pick_agent::templates::render_follow_up_continuation(&goal, goal_manager);
+                    msgs.push(AiMessage::User(UserMessage::text(msg_text)));
                 }
                 msgs
             })),

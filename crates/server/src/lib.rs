@@ -72,12 +72,12 @@ impl AppState {
         //   3. Default auth.json (~/.pick/agent/auth.json) — auto-load for all servers
         let mut api_keys = config.api_keys.clone();
         let auth_path = pick_agent::auth::default_auth_path();
-        if auth_path.exists() {
-            if let Ok(data) = pick_agent::auth::read_auth(&auth_path) {
-                for (provider, cred) in data {
-                    if let pick_agent::auth::AuthCredential::ApiKey { key } = cred {
-                        api_keys.entry(provider).or_insert(key);
-                    }
+        if auth_path.exists()
+            && let Ok(data) = pick_agent::auth::read_auth(&auth_path)
+        {
+            for (provider, cred) in data {
+                if let pick_agent::auth::AuthCredential::ApiKey { key } = cred {
+                    api_keys.entry(provider).or_insert(key);
                 }
             }
         }
@@ -294,10 +294,10 @@ fn find_api_key_from_env(provider: &str) -> Option<String> {
     let upper = provider.to_uppercase().replace('-', "_");
     for suffix in ["_API_KEY", "_APIKEY", "_KEY", "_TOKEN"] {
         let key = format!("{}{}", upper, suffix);
-        if let Ok(val) = std::env::var(&key) {
-            if !val.is_empty() {
-                return Some(val);
-            }
+        if let Ok(val) = std::env::var(&key)
+            && !val.is_empty()
+        {
+            return Some(val);
         }
     }
     None
