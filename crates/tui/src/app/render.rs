@@ -107,6 +107,10 @@ impl TuiApp {
             }
         } else {
             0_u16
+        } + if self.loop_status_text.is_some() {
+            1_u16
+        } else {
+            0_u16
         };
         let has_selection = matches!(
             self.state,
@@ -375,6 +379,18 @@ impl TuiApp {
                                     Style::default().add_modifier(Modifier::DIM),
                                 ));
                                 frame.render_widget_ref(&sub_line, chunks[i]);
+                            }
+                            i += 1;
+                        }
+
+                        // Render loop status (e.g. 🔄 2/5) below status/subtext
+                        if let Some(ref loop_status) = self.loop_status_text {
+                            if i < chunks.len() {
+                                let ls_line = Line::from(Span::styled(
+                                    loop_status,
+                                    Style::default().add_modifier(Modifier::DIM),
+                                ));
+                                frame.render_widget_ref(&ls_line, chunks[i]);
                             }
                             i += 1;
                         }
@@ -1329,6 +1345,11 @@ impl TuiApp {
     pub fn set_goal_status_detail(&mut self, status: Option<&str>, detail: Option<&str>) {
         self.status_text = status.map(|s| s.to_string());
         self.status_subtext = detail.map(|s| s.to_string());
+    }
+
+    /// Set the loop job status line (separate from goal/status text).
+    pub fn set_loop_status(&mut self, status: Option<&str>) {
+        self.loop_status_text = status.map(|s| s.to_string());
     }
 
     /// Advance the spinner animation frame by one.

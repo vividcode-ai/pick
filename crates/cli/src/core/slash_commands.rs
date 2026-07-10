@@ -148,6 +148,47 @@ pub const BUILTIN_SLASH_COMMANDS: &[BuiltinSlashCommand] = &[
         name: "init",
         description: "Guided AGENTS.md setup — analyze project and generate AGENTS.md",
     },
+    // Loop commands
+    BuiltinSlashCommand {
+        name: "loop",
+        description: "Run a prompt on interval: /loop <interval> <prompt>",
+    },
+    BuiltinSlashCommand {
+        name: "loop-goal",
+        description: "Run a goal-driven loop: /loop-goal <interval> <objective>",
+    },
+    BuiltinSlashCommand {
+        name: "loop-status",
+        description: "Show loop job status",
+    },
+    BuiltinSlashCommand {
+        name: "loop-pause",
+        description: "Pause a loop job",
+    },
+    BuiltinSlashCommand {
+        name: "loop-resume",
+        description: "Resume a paused loop job",
+    },
+    BuiltinSlashCommand {
+        name: "loop-remove",
+        description: "Remove a loop job",
+    },
+    BuiltinSlashCommand {
+        name: "loop-clear",
+        description: "Clear all loop jobs",
+    },
+    BuiltinSlashCommand {
+        name: "loop-now",
+        description: "Trigger a loop job immediately",
+    },
+    BuiltinSlashCommand {
+        name: "loop-stop",
+        description: "Stop the currently running loop",
+    },
+    BuiltinSlashCommand {
+        name: "loop-help",
+        description: "Show loop help",
+    },
 ];
 
 /// New commands added beyond the original built-in list
@@ -184,6 +225,16 @@ mod tests {
         "plan_exit",
         "skill",
         "mcp",
+        "loop",
+        "loop-goal",
+        "loop-status",
+        "loop-pause",
+        "loop-resume",
+        "loop-remove",
+        "loop-clear",
+        "loop-now",
+        "loop-stop",
+        "loop-help",
     ];
 
     #[test]
@@ -207,11 +258,11 @@ mod tests {
     }
 
     #[test]
-    fn test_exactly_28_commands() {
+    fn test_exactly_38_commands() {
         assert_eq!(
             BUILTIN_SLASH_COMMANDS.len(),
-            28,
-            "must have exactly 28 built-in slash commands"
+            38,
+            "must have exactly 38 built-in slash commands"
         );
     }
 

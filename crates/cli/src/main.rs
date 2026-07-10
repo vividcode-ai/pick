@@ -461,10 +461,7 @@ async fn main() {
             }
             tools.extend(ext_tools);
         }
-        // Apply --tools allowlist filter
-        if !args.tools.is_empty() {
-            tools.retain(|t| args.tools.contains(&t.name));
-        }
+        // Loop goal tools are added in init.rs where loop_manager is available
         tools
     };
 

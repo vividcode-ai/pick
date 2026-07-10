@@ -2,6 +2,7 @@ use super::cmd_core;
 use super::cmd_goal;
 use super::cmd_init;
 use super::cmd_io;
+use super::cmd_loop;
 use super::cmd_mcp;
 use super::cmd_mgmt;
 use super::cmd_model_login;
@@ -133,6 +134,11 @@ pub(crate) async fn handle_slash_command(
         }
         "unconnect" => {
             cmd_model_login::handle_logout_command(ctx);
+            SlashCommandResult::Consumed
+        }
+        "loop" | "loop-goal" | "loop-status" | "loop-pause" | "loop-resume" | "loop-remove"
+        | "loop-clear" | "loop-now" | "loop-stop" | "loop-help" => {
+            cmd_loop::handle_loop(ctx, cmd_name, args).await;
             SlashCommandResult::Consumed
         }
         _ => {

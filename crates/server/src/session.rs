@@ -673,4 +673,8 @@ pub struct SseSessionState {
     pub agent_mode: Arc<std::sync::RwLock<String>>,
     /// Goal manager for goal-driven agent execution
     pub goal_manager: Arc<std::sync::RwLock<Option<Arc<pick_agent::session::GoalManager>>>>,
+    /// Loop manager for scheduled loop jobs
+    pub loop_manager: Arc<tokio::sync::RwLock<pick_loop::LoopManager>>,
+    /// Loop scheduler
+    pub loop_scheduler: Arc<pick_loop::LoopScheduler>,
 }

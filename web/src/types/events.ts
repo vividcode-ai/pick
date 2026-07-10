@@ -139,6 +139,33 @@ export interface GitChange {
   status: string;
 }
 
+export interface LoopJobResponse {
+  id: string;
+  name: string;
+  kind: string;
+  status: "idle" | "running" | "paused" | "done" | "failed";
+  action: string;
+  interval_ms: number;
+  run_count: number;
+  max_runs: number | null;
+  failure_count: number;
+  max_failures: number | null;
+  next_due_ms: number;
+  last_run_at: number | null;
+  created_at: number;
+}
+
+export interface LoopUpdatedPayload {
+  jobs: LoopJobResponse[];
+}
+
+export interface LoopExecutionPayload {
+  job_id: string;
+  job_name: string;
+  run_count: number;
+  max_runs: number | null;
+}
+
 export interface GoalUpdatedPayload {
   objective: string;
   completionCriterion: string;

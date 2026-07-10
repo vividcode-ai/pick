@@ -31,7 +31,7 @@ import {
   updateSessionEntry,
   initSessions,
 } from "./stores/sessions";
-import type { ChatMessage, GoalUpdatedPayload } from "./types/events";
+import type { ChatMessage, GoalUpdatedPayload, LoopJobResponse, LoopUpdatedPayload } from "./types/events";
 
 async function detectBaseUrl(): Promise<string> {
   const params = new URLSearchParams(window.location.search);
@@ -54,6 +54,7 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarPinned, setSidebarPinned] = useState(true);
   const [activeGoal, setActiveGoal] = useState<{ objective: string; startTime: number; status?: string; timeUsedSeconds?: number } | null>(null);
+  const [loopJobs, setLoopJobs] = useState<LoopJobResponse[]>([]);
   const [settingsUrl, setSettingsUrl] = useState("");
   const { cycleThemeMode } = useTheme();
 
@@ -114,6 +115,13 @@ export default function App() {
     []
   );
 
+  const handleLoopUpdated = useCallback(
+    (payload: LoopUpdatedPayload) => {
+      setLoopJobs(payload.jobs);
+    },
+    []
+  );
+
   const {
     activeSessionId,
     activeMessages,
@@ -133,7 +141,10 @@ export default function App() {
     answerQuestion,
     deleteSession,
     forkSession,
-  } = useSessionManager(baseUrl ?? "", { onGoalUpdated: handleGoalUpdated });
+  } = useSessionManager(baseUrl ?? "", {
+    onGoalUpdated: handleGoalUpdated,
+    onLoopUpdated: handleLoopUpdated,
+  });
 
   const pendingSendRef = useRef<{ text: string; extraMode: string | null } | null>(null);
 
@@ -415,6 +426,7 @@ export default function App() {
       onEnsureVisible={ensureVisible}
       activeGoal={activeGoal}
       onClearGoal={() => setActiveGoal(null)}
+      loopJobs={loopJobs}
     />
   );
 

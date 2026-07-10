@@ -65,6 +65,61 @@ pub async fn handle_sse(
 
     let (tx, rx) = mpsc::unbounded_channel::<Result<Event, Infallible>>();
 
+    let message_queue: Arc<Mutex<PendingMessageQueue>> =
+        Arc::new(Mutex::new(PendingMessageQueue::new(QueueMode::OneAtATime)));
+
+    // Initialize loop components
+    let cwd_path = {
+        let s = state.session_manager.get(&session_id).await;
+        s.and_then(|s| s.cwd.map(std::path::PathBuf::from))
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_default())
+    };
+    let loops_path = pick_loop::manager::loops_path_for_session(&cwd_path, &session_id);
+    let loop_manager = Arc::new(tokio::sync::RwLock::new(pick_loop::LoopManager::load(
+        &loops_path,
+    )));
+
+    // Build trigger callback
+    let loop_mq = message_queue.clone();
+    let loop_event_tx = tx.clone();
+    let loop_mgr_cb = loop_manager.clone();
+    let trigger_cb: pick_loop::scheduler::TriggerCallback = Arc::new(move |job| {
+        let mq = loop_mq.clone();
+        let et = loop_event_tx.clone();
+        let mgr = loop_mgr_cb.clone();
+        Box::pin(async move {
+            let msg = pick_loop::integration::build_loop_message(&job);
+            if let Ok(mut q) = mq.lock() {
+                q.enqueue(msg);
+            }
+            // Send full loop state
+            let all_info: Vec<pick_loop::types::LoopJobStatusInfo> = {
+                let m = mgr.read().await;
+                m.list()
+                    .iter()
+                    .map(pick_loop::types::LoopJobStatusInfo::from)
+                    .collect()
+            };
+            let payload = serde_json::json!({"jobs": all_info});
+            let _ = et.send(Ok(Event::default()
+                .event("loop_updated")
+                .data(serde_json::to_string(&payload).unwrap_or_default())));
+            // Send execution start event
+            let exec = serde_json::json!({
+                "job_id": job.id, "job_name": job.name,
+                "run_count": job.run_count + 1, "max_runs": job.max_runs,
+            });
+            let _ = et.send(Ok(Event::default()
+                .event("loop_execution_start")
+                .data(serde_json::to_string(&exec).unwrap_or_default())));
+        })
+    });
+
+    let mut loop_scheduler = pick_loop::LoopScheduler::new(loop_manager.clone());
+    loop_scheduler.set_trigger_cb(trigger_cb);
+    loop_scheduler.start_watchdog();
+    let loop_scheduler = Arc::new(loop_scheduler);
+
     {
         let mut sessions = state.sse_sessions.write().await;
         sessions.insert(
@@ -74,12 +129,12 @@ pub async fn handle_sse(
                 cancel_tx: None,
                 pending_approvals: Arc::new(Mutex::new(HashMap::new())),
                 pending_questions: Arc::new(Mutex::new(HashMap::new())),
-                message_queue: Arc::new(Mutex::new(PendingMessageQueue::new(
-                    QueueMode::OneAtATime,
-                ))),
+                message_queue,
                 in_flight: Arc::new(AtomicBool::new(false)),
                 agent_mode: Arc::new(std::sync::RwLock::new(mode)),
                 goal_manager: Arc::new(RwLock::new(None)),
+                loop_manager,
+                loop_scheduler,
             },
         );
     }

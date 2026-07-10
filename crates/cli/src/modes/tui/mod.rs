@@ -11,6 +11,7 @@ mod cmd_dispatch;
 mod cmd_goal;
 mod cmd_init;
 mod cmd_io;
+mod cmd_loop;
 mod cmd_mcp;
 mod cmd_mgmt;
 mod cmd_model_login;
@@ -65,6 +66,16 @@ mod tests {
             "mcp",
             "goal",
             "init",
+            "loop",
+            "loop-goal",
+            "loop-status",
+            "loop-pause",
+            "loop-resume",
+            "loop-remove",
+            "loop-clear",
+            "loop-now",
+            "loop-stop",
+            "loop-help",
         ]
         .into_iter()
         .collect();

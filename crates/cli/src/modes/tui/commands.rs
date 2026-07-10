@@ -150,6 +150,18 @@ pub(crate) fn apply_tui_command(tui: &mut TuiApp, cmd: TuiCommand) {
         TuiCommand::ToggleGoalPanel => {
             // Placeholder: goal panel toggle — future enhancement
         }
+        TuiCommand::LoopStatusUpdated(jobs) => {
+            let total = jobs.len();
+            let active = jobs
+                .iter()
+                .filter(|j| j.status == "idle" || j.status == "running")
+                .count();
+            if total > 0 {
+                tui.set_loop_status(Some(&format!("🔄 {}/{}", active, total)));
+            } else {
+                tui.set_loop_status(None);
+            }
+        }
     }
 }
 

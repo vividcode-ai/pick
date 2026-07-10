@@ -3948,6 +3948,7 @@ dependencies = [
  "pathdiff",
  "pick-agent",
  "pick-ai",
+ "pick-loop",
  "pick-mcp",
  "pick-sandbox",
  "pick-server",
@@ -3990,6 +3991,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "pick-loop"
+version = "0.1.18"
+dependencies = [
+ "chrono",
+ "pick-agent",
+ "pick-ai",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "pick-mcp"
 version = "0.1.18"
 dependencies = [
@@ -4025,6 +4042,7 @@ dependencies = [
  "mime_guess",
  "pick-agent",
  "pick-ai",
+ "pick-loop",
  "pick-mcp",
  "portable-pty",
  "regex",

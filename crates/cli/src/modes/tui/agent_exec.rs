@@ -49,18 +49,23 @@ pub(crate) fn build_agent_config(
         })
     };
 
-    let should_stop_after_turn = {
+    // ── Build existing hooks ──────────────────────────────────────────────
+    // These are stored as Arcs first so they can be wrapped by loop hooks.
+
+    let existing_should_stop: Option<
+        Arc<dyn Fn(&pick_ai::types::AssistantMessage) -> bool + Send + Sync>,
+    > = {
         let goal_manager = ctx.session_manager.goal_manager();
-        Arc::new(move |_msg: &pick_ai::types::AssistantMessage| {
+        Some(Arc::new(move |_msg: &pick_ai::types::AssistantMessage| {
             goal_manager.budget_limit_reported()
                 && goal_manager
                     .get()
                     .map(|g| g.status == "budget_limited")
                     .unwrap_or(false)
-        })
+        }))
     };
 
-    let get_steering_messages = {
+    let existing_steer: Arc<dyn Fn() -> Vec<Message> + Send + Sync> = {
         let mode = ctx.agent_mode;
         let interrupted = was_interrupted.clone();
         let goal_manager = ctx.session_manager.goal_manager();
@@ -68,7 +73,7 @@ pub(crate) fn build_agent_config(
         let steer_queue = ctx.steer_queue.clone();
         // Capture cmd_tx for real-time notification when queued messages are consumed
         let steer_cmd_tx = cmd_tx.clone();
-        move || {
+        Arc::new(move || {
             let mut msgs = Vec::new();
 
             // Dynamic messages (interruption, plan mode, goal context)
@@ -136,75 +141,94 @@ pub(crate) fn build_agent_config(
             }
 
             msgs
-        }
+        })
     };
 
-    let get_follow_up_messages = {
+    // ── Wrap with loop hooks ──────────────────────────────────────────────
+    let loop_manager = ctx.loop_manager.clone();
+    let should_stop_after_turn =
+        pick_loop::integration::build_should_stop_hook(existing_should_stop, loop_manager.clone());
+    let get_steering_messages =
+        pick_loop::integration::build_steering_hook(Some(existing_steer), loop_manager.clone());
+
+    let existing_follow_up: Arc<
+        dyn Fn(&pick_agent::core::agent_loop::AgentRunResult) -> Vec<Message> + Send + Sync,
+    > = {
         let goal_manager = ctx.session_manager.goal_manager();
         let interrupted = ctx.was_interrupted.clone();
         // Capture follow-up queue for queue draining
         let follow_up_queue = ctx.follow_up_queue.clone();
         // Capture cmd_tx for real-time notification when queued messages are consumed
         let follow_up_cmd_tx = cmd_tx.clone();
-        move |_result: &pick_agent::core::agent_loop::AgentRunResult| {
-            let mut msgs = Vec::new();
+        Arc::new(
+            move |_result: &pick_agent::core::agent_loop::AgentRunResult| {
+                let mut msgs = Vec::new();
 
-            // ESC interruption → auto-pause the goal
-            if interrupted.swap(false, Ordering::Relaxed) {
-                if let Err(e) = goal_manager.pause_on_interrupt() {
-                    tracing::warn!("Failed to auto-pause goal on interrupt: {}", e);
+                // ESC interruption → auto-pause the goal
+                if interrupted.swap(false, Ordering::Relaxed) {
+                    if let Err(e) = goal_manager.pause_on_interrupt() {
+                        tracing::warn!("Failed to auto-pause goal on interrupt: {}", e);
+                    }
                 }
-            }
 
-            // Goal-driven continuation — only when no pending user input
-            // (user messages in follow_up_queue take priority)
-            let has_pending_user_input = follow_up_queue
-                .lock()
-                .map(|q| !q.is_empty())
-                .unwrap_or(false);
+                // Goal-driven continuation — only when no pending user input
+                // (user messages in follow_up_queue take priority)
+                let has_pending_user_input = follow_up_queue
+                    .lock()
+                    .map(|q| !q.is_empty())
+                    .unwrap_or(false);
 
-            if !has_pending_user_input && goal_manager.can_continue() {
-                if let Some(goal) = goal_manager.get()
-                    && goal.status == "active"
-                {
-                    let _ = goal_manager.register_continuation();
-                    let msg_text =
-                        pick_agent::templates::render_follow_up_continuation(&goal, &goal_manager);
-                    msgs.push(Message::User(UserMessage::text(msg_text)));
+                if !has_pending_user_input && goal_manager.can_continue() {
+                    if let Some(goal) = goal_manager.get()
+                        && goal.status == "active"
+                    {
+                        let _ = goal_manager.register_continuation();
+                        let msg_text = pick_agent::templates::render_follow_up_continuation(
+                            &goal,
+                            &goal_manager,
+                        );
+                        msgs.push(Message::User(UserMessage::text(msg_text)));
+                    }
                 }
-            }
 
-            // Drain from follow-up queue and notify TUI about consumed messages
-            if let Ok(mut queue) = follow_up_queue.lock() {
-                let queued = queue.drain();
-                if !queued.is_empty() {
-                    // Notify TUI about each consumed message for real-time rendering
-                    for msg in &queued {
-                        if let Message::User(u) = msg {
-                            let text: String = u
-                                .content
-                                .iter()
-                                .filter_map(|b| {
-                                    if let ContentBlock::Text(t) = b {
-                                        Some(t.text.clone())
-                                    } else {
-                                        None
-                                    }
-                                })
-                                .collect();
-                            if !text.is_empty() {
-                                let _ = follow_up_cmd_tx
-                                    .send(super::types::TuiCommand::FollowUpMessageConsumed(text));
+                // Drain from follow-up queue and notify TUI about consumed messages
+                if let Ok(mut queue) = follow_up_queue.lock() {
+                    let queued = queue.drain();
+                    if !queued.is_empty() {
+                        // Notify TUI about each consumed message for real-time rendering
+                        for msg in &queued {
+                            if let Message::User(u) = msg {
+                                let text: String = u
+                                    .content
+                                    .iter()
+                                    .filter_map(|b| {
+                                        if let ContentBlock::Text(t) = b {
+                                            Some(t.text.clone())
+                                        } else {
+                                            None
+                                        }
+                                    })
+                                    .collect();
+                                if !text.is_empty() {
+                                    let _ = follow_up_cmd_tx.send(
+                                        super::types::TuiCommand::FollowUpMessageConsumed(text),
+                                    );
+                                }
                             }
                         }
+                        msgs.extend(queued);
                     }
-                    msgs.extend(queued);
                 }
-            }
 
-            msgs
-        }
+                msgs
+            },
+        )
     };
+
+    let get_follow_up_messages = pick_loop::integration::build_follow_up_hook(
+        Some(existing_follow_up),
+        loop_manager.clone(),
+    );
 
     let question: Arc<
         dyn Fn(
@@ -311,6 +335,10 @@ pub(crate) fn build_agent_config(
         }
     });
 
+    // Wrap on_turn_complete with loop hooks
+    let on_turn_complete =
+        pick_loop::integration::build_turn_complete_hook(Some(on_turn_complete), loop_manager);
+
     let sm = crate::core::settings::SettingsManager::load(&ctx.cwd);
     let tool_execution_permission = sm.get().tool_execution_permission.clone();
     let enable_skills = sm.get_enable_skill_commands();
@@ -338,8 +366,8 @@ pub(crate) fn build_agent_config(
         mode_rulesets: Some(vec![mode_rules.clone()]),
         before_tool_call: Some(before_tool_call),
         should_stop_after_turn: Some(should_stop_after_turn),
-        get_steering_messages: Some(Arc::new(get_steering_messages)),
-        get_follow_up_messages: Some(Arc::new(get_follow_up_messages)),
+        get_steering_messages: Some(get_steering_messages),
+        get_follow_up_messages: Some(get_follow_up_messages),
         question: Some(question),
         agent_id: None,
         agent_registry: Some(ctx.agent_registry.clone()),

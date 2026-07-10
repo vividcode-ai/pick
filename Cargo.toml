@@ -5,6 +5,7 @@ members = [
     "crates/agent",
     "crates/tui",
     "crates/cli",
+    "crates/loop",
     "crates/mcp",
     "crates/sandbox",
     "crates/server",

@@ -56,7 +56,7 @@ pub struct AnswerQuestionRequest {
 }
 
 /// Submit a prompt to an agent session.
-/// The message is enqueued and processed sequentially — if an agent loop is
+/// The message is enqueued and processed sequentially ¡ª if an agent loop is
 /// already running, it will be picked up between turns. If not, a new loop starts.
 #[utoipa::path(
     post,
@@ -518,7 +518,7 @@ pub async fn start_review(
             sid,
             sse_state,
             model,
-            review_prompt, // ← review-specific system prompt
+            review_prompt, // ¡û review-specific system prompt
             tools,
             thinking_level,
             approve,
@@ -592,7 +592,7 @@ async fn run_agent_loop_queue(
         all_msgs.extend(queued_msgs);
 
         if all_msgs.is_empty() {
-            // Nothing to process — mark done and exit
+            // Nothing to process ¡ª mark done and exit
             cleanup_loop(&state, &session_id, &sse_state, false).await;
             break;
         }
@@ -702,74 +702,104 @@ async fn run_agent_loop_queue(
             transform_context: None,
             get_api_key: get_api_key.clone(),
             before_tool_call: None,
-            should_stop_after_turn: None,
-            get_steering_messages: Some(Arc::new(move || {
-                let mut msgs = mq_steer.lock().unwrap().drain();
-                for msg in &msgs {
-                    if let AiMessage::User(user_msg) = msg {
-                        let text: String = user_msg
-                            .content
-                            .iter()
-                            .filter_map(|b| {
-                                if let pick_ai::types::ContentBlock::Text(t) = b {
-                                    Some(t.text.clone())
-                                } else {
-                                    None
+            should_stop_after_turn: Some({
+                let lm = sse_state.loop_manager.clone();
+                pick_loop::integration::build_should_stop_hook(None, lm)
+            }),
+            get_steering_messages: {
+                let mq = mq_steer.clone();
+                let et = et_steer.clone();
+                let gm = gm_steer.clone();
+                let steer_inner: Arc<dyn Fn() -> Vec<pick_ai::types::Message> + Send + Sync> =
+                    Arc::new(move || {
+                        let mut msgs = mq.lock().unwrap().drain();
+                        for msg in &msgs {
+                            if let AiMessage::User(user_msg) = msg {
+                                let text: String = user_msg
+                                    .content
+                                    .iter()
+                                    .filter_map(|b| {
+                                        if let pick_ai::types::ContentBlock::Text(t) = b {
+                                            Some(t.text.clone())
+                                        } else {
+                                            None
+                                        }
+                                    })
+                                    .collect();
+                                if !text.is_empty() {
+                                    let _ = et.send(Ok(Event::default()
+                                        .event("message_dequeued")
+                                        .data(serde_json::json!({"text": text}).to_string())));
                                 }
-                            })
-                            .collect();
-                        if !text.is_empty() {
-                            let _ = et_steer.send(Ok(Event::default()
-                                .event("message_dequeued")
-                                .data(serde_json::json!({"text": text}).to_string())));
+                            }
+                        }
+                        if let Some(goal_manager) = gm.read().unwrap().as_ref()
+                            && let Some(goal) = goal_manager.get()
+                            && goal.status == "active"
+                        {
+                            let msg_text =
+                                pick_agent::templates::render_steering_active(&goal, goal_manager);
+                            msgs.push(AiMessage::User(UserMessage::text(msg_text)));
+                        }
+                        msgs
+                    });
+                Some(pick_loop::integration::build_steering_hook(
+                    Some(steer_inner),
+                    sse_state.loop_manager.clone(),
+                ))
+            },
+            get_follow_up_messages: {
+                let mq = mq_follow.clone();
+                let et = et_follow.clone();
+                let gm = gm_follow.clone();
+                let follow_inner: Arc<
+                    dyn Fn(
+                            &pick_agent::core::agent_loop::AgentRunResult,
+                        ) -> Vec<pick_ai::types::Message>
+                        + Send
+                        + Sync,
+                > = Arc::new(move |_result| {
+                    let mut msgs = mq.lock().unwrap().drain();
+                    for msg in &msgs {
+                        if let AiMessage::User(user_msg) = msg {
+                            let text: String = user_msg
+                                .content
+                                .iter()
+                                .filter_map(|b| {
+                                    if let pick_ai::types::ContentBlock::Text(t) = b {
+                                        Some(t.text.clone())
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .collect();
+                            if !text.is_empty() {
+                                let _ = et.send(Ok(Event::default()
+                                    .event("message_dequeued")
+                                    .data(serde_json::json!({"text": text}).to_string())));
+                            }
                         }
                     }
-                }
-                if let Some(goal_manager) = gm_steer.read().unwrap().as_ref()
-                    && let Some(goal) = goal_manager.get()
-                    && goal.status == "active"
-                {
-                    let msg_text =
-                        pick_agent::templates::render_steering_active(&goal, goal_manager);
-                    msgs.push(AiMessage::User(UserMessage::text(msg_text)));
-                }
-                msgs
-            })),
-            get_follow_up_messages: Some(Arc::new(move |_result| {
-                let mut msgs = mq_follow.lock().unwrap().drain();
-                for msg in &msgs {
-                    if let AiMessage::User(user_msg) = msg {
-                        let text: String = user_msg
-                            .content
-                            .iter()
-                            .filter_map(|b| {
-                                if let pick_ai::types::ContentBlock::Text(t) = b {
-                                    Some(t.text.clone())
-                                } else {
-                                    None
-                                }
-                            })
-                            .collect();
-                        if !text.is_empty() {
-                            let _ = et_follow.send(Ok(Event::default()
-                                .event("message_dequeued")
-                                .data(serde_json::json!({"text": text}).to_string())));
-                        }
+                    if msgs.is_empty()
+                        && let Some(goal_manager) = gm.read().unwrap().as_ref()
+                        && goal_manager.can_continue()
+                        && let Some(goal) = goal_manager.get()
+                        && goal.status == "active"
+                    {
+                        let _ = goal_manager.register_continuation();
+                        let msg_text = pick_agent::templates::render_follow_up_continuation(
+                            &goal,
+                            goal_manager,
+                        );
+                        msgs.push(AiMessage::User(UserMessage::text(msg_text)));
                     }
-                }
-                if msgs.is_empty()
-                    && let Some(goal_manager) = gm_follow.read().unwrap().as_ref()
-                    && goal_manager.can_continue()
-                    && let Some(goal) = goal_manager.get()
-                    && goal.status == "active"
-                {
-                    let _ = goal_manager.register_continuation();
-                    let msg_text =
-                        pick_agent::templates::render_follow_up_continuation(&goal, goal_manager);
-                    msgs.push(AiMessage::User(UserMessage::text(msg_text)));
-                }
-                msgs
-            })),
+                    msgs
+                });
+                Some(pick_loop::integration::build_follow_up_hook(
+                    Some(follow_inner),
+                    sse_state.loop_manager.clone(),
+                ))
+            },
             provider_max_retries: None,
             provider_max_retry_delay_ms: None,
             approve: approve.clone(),
@@ -807,7 +837,10 @@ async fn run_agent_loop_queue(
             cancel_signal_tx: Some(Arc::new(cancel_tx)),
             skill_paths: Vec::new(),
             parent_goal_manager: sse_state.goal_manager.read().unwrap().clone(),
-            on_turn_complete: None,
+            on_turn_complete: Some({
+                let lm = sse_state.loop_manager.clone();
+                pick_loop::integration::build_turn_complete_hook(None, lm)
+            }),
             tool_execution_permission,
         };
 

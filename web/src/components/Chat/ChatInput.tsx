@@ -12,6 +12,7 @@ import { ModelThinkingSelector } from "./ModelThinkingSelector";
 import { CommandMode } from "./CommandMode";
 import { ToolExecPermission } from "./ToolExecPermission";
 import { GoalDrawer } from "./GoalDrawer";
+import { LoopPanel } from "../Loop/LoopPanel";
 
 interface MentionItem {
   path: string;
@@ -39,6 +40,7 @@ interface ChatInputProps {
   onEnsureVisible: (key: string) => void;
   activeGoal: { objective: string; startTime: number } | null;
   onClearGoal: () => void;
+  loopJobs?: import("../../types/events").LoopJobResponse[];
 }
 
 export function ChatInput({
@@ -62,6 +64,7 @@ export function ChatInput({
   onEnsureVisible,
   activeGoal,
   onClearGoal,
+  loopJobs,
 }: ChatInputProps) {
   const [input, setInput] = useState("");
   const [currentCommand, setCurrentCommand] = useState<"build" | "plan">(
@@ -361,6 +364,15 @@ export function ChatInput({
                   onPause={() => {}}
                   onDelete={onClearGoal}
                   noWrapper={!!streaming}
+                />
+              </div>
+            )}
+            {loopJobs && loopJobs.length > 0 && (
+              <div className="w-full">
+                <LoopPanel
+                  jobs={loopJobs}
+                  baseUrl={baseUrl}
+                  sessionId={sessionId ?? null}
                 />
               </div>
             )}

@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "jobs": [
+    {
+      "id": "g1",
+      "name": "goal",
+      "kind": "goal",
+      "action": "test goal",
+      "interval_ms": 0,
+      "immediate": true,
+      "max_runs": null,
+      "max_runtime_ms": null,
+      "max_failures": null,
+      "timeout_ms": null,
+      "stop_file": null,
+      "until": null,
+      "progress_file": null,
+      "preflight_command": null,
+      "verify_command": null,
+      "postrun_command": null,
+      "branch": null,
+      "git_checkpoint": false,
+      "checkpoint_only": false,
+      "safe": true,
+      "quiet": false,
+      "ask_never": true,
+      "no_overlap": true,
+      "batch": null,
+      "watch_paths": [],
+      "watch_snapshot": {},
+      "goal_status": "blocked",
+      "goal_acceptance": [],
+      "goal_checks": [],
+      "goal_progress": [
+        "BLOCKED: Need user input"
+      ],
+      "status": "Paused",
+      "run_count": 0,
+      "failure_count": 0,
+      "last_run_at": null,
+      "last_verify_failure": null,
+      "created_at": 1783658880184,
+      "updated_at": 1783658880184
+    }
+  ]
+}880184
+    }
+  ]
+}

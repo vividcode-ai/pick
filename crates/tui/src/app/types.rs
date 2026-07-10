@@ -147,6 +147,8 @@ pub struct TuiApp {
     pub status_text: Option<String>,
     /// Optional second line rendered below the status bar (e.g. goal tips).
     pub status_subtext: Option<String>,
+    /// Loop job status line (rendered separately from goal status)
+    pub loop_status_text: Option<String>,
     pub status_frame: usize,
     pub agent_start_time: Option<std::time::Instant>,
     /// Set to true once streaming has ever started. Prevents the viewport

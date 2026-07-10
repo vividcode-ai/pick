@@ -343,6 +343,63 @@ pub(crate) async fn init_tui_mode(
         block_images.load(Ordering::Relaxed),
     );
 
+    // Extract session ID before session_manager is moved into the struct
+    let session_id = session_manager
+        .header()
+        .map(|h| h.id.clone())
+        .unwrap_or_else(|| "default".to_string());
+
+    // ── Create queues (needed before loop scheduler) ─────────────────────
+    let steer_queue = Arc::new(Mutex::new(PendingMessageQueue::new(steer_mode)));
+    let follow_up_queue = Arc::new(Mutex::new(PendingMessageQueue::new(follow_up_mode)));
+
+    // ── Loop scheduler setup ──────────────────────────────────────────────
+    let loop_manager: Arc<tokio::sync::RwLock<pick_loop::LoopManager>> = {
+        let loops_path = pick_loop::manager::loops_path_for_session(&cwd, &session_id);
+        Arc::new(tokio::sync::RwLock::new(pick_loop::LoopManager::load(
+            &loops_path,
+        )))
+    };
+
+    // Build trigger callback: pushes a loop message into steer_queue and signals TUI
+    let loop_steer_queue = steer_queue.clone();
+    let loop_cmd_tx = cmd_tx.clone();
+    let loop_mgr_for_cb = loop_manager.clone();
+    let trigger_cb: pick_loop::scheduler::TriggerCallback = Arc::new(move |job| {
+        let steer = loop_steer_queue.clone();
+        let tx = loop_cmd_tx.clone();
+        let mgr = loop_mgr_for_cb.clone();
+        Box::pin(async move {
+            let msg = pick_loop::integration::build_loop_message(&job);
+            if let Ok(mut q) = steer.lock() {
+                q.enqueue(msg);
+            }
+            // Send full job list so status bar shows correct counts
+            let all_info: Vec<pick_loop::types::LoopJobStatusInfo> = {
+                let m = mgr.read().await;
+                m.list()
+                    .iter()
+                    .map(pick_loop::types::LoopJobStatusInfo::from)
+                    .collect()
+            };
+            let _ = tx.send(TuiCommand::LoopStatusUpdated(all_info));
+        })
+    });
+
+    let mut loop_scheduler = pick_loop::LoopScheduler::new(loop_manager.clone());
+    loop_scheduler.set_trigger_cb(trigger_cb);
+    loop_scheduler.start_watchdog();
+    let loop_scheduler = Some(Arc::new(loop_scheduler));
+
+    // Extend tools with loop goal tools (complete, blocked, progress)
+    let loop_tools = pick_loop::tools::create_loop_goal_tools(loop_manager.clone());
+    {
+        let mut all = all_tools.write().unwrap();
+        all.extend(loop_tools.clone());
+    }
+    let mut tools = tools;
+    tools.extend(loop_tools);
+
     let ctx = TuiContext {
         tui,
         terminal_manager,
@@ -379,8 +436,8 @@ pub(crate) async fn init_tui_mode(
         ctrl_c_rx,
         scoped_models: Vec::new(),
         was_interrupted: Arc::new(AtomicBool::new(false)),
-        steer_queue: Arc::new(Mutex::new(PendingMessageQueue::new(steer_mode))),
-        follow_up_queue: Arc::new(Mutex::new(PendingMessageQueue::new(follow_up_mode))),
+        steer_queue,
+        follow_up_queue,
         next_turn_queue: Arc::new(Mutex::new(PendingMessageQueue::new(QueueMode::All))),
         steer_queue_mode: steer_mode,
         follow_up_queue_mode: follow_up_mode,
@@ -391,12 +448,14 @@ pub(crate) async fn init_tui_mode(
         agent_start_message_count: 0,
         args,
         all_tools,
-        cwd,
+        cwd: cwd.clone(),
         version,
         app_name,
         pending_update: None,
         share_cancel_tx: None,
         share_saved_editor_text: String::new(),
+        loop_manager,
+        loop_scheduler,
     };
 
     (ctx, cmd_rx, evt_rx)

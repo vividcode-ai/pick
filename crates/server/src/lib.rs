@@ -5,6 +5,7 @@ pub mod docs;
 pub mod events;
 pub mod files;
 pub mod git;
+pub mod loop_routes;
 pub mod mcp_routes;
 pub mod plugins;
 pub mod prompt_history_routes;
@@ -369,6 +370,28 @@ pub fn create_app(state: Arc<AppState>) -> Router {
         .route("/cancel", post(routes::cancel))
         .route("/approve", post(routes::approve))
         .route("/answer_question", post(routes::answer_question))
+        // Loop management
+        .route(
+            "/sessions/{id}/loops",
+            get(loop_routes::list_loops).post(loop_routes::create_loop),
+        )
+        .route(
+            "/sessions/{id}/loops/{job_id}",
+            delete(loop_routes::delete_loop),
+        )
+        .route("/sessions/{id}/loops/clear", post(loop_routes::clear_loops))
+        .route(
+            "/sessions/{id}/loops/{job_id}/pause",
+            post(loop_routes::pause_loop),
+        )
+        .route(
+            "/sessions/{id}/loops/{job_id}/resume",
+            post(loop_routes::resume_loop),
+        )
+        .route(
+            "/sessions/{id}/loops/{job_id}/trigger",
+            post(loop_routes::trigger_loop),
+        )
         .route("/files/content", get(files::read_file_handler))
         .route("/files/list", get(files::list_dir_handler))
         .route("/find/text", get(files::find_text_handler))

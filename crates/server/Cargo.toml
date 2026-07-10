@@ -7,6 +7,7 @@ license.workspace = true
 [dependencies]
 pick-agent = { path = "../agent" }
 pick-ai = { path = "../ai" }
+pick-loop = { path = "../loop" }
 pick-mcp = { path = "../mcp" }
 async-trait = { workspace = true }
 axum = { workspace = true }

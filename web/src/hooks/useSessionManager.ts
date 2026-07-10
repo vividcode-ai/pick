@@ -4,6 +4,8 @@ import type {
   ChatMessage,
   GitInfo,
   GoalUpdatedPayload,
+  LoopUpdatedPayload,
+  LoopExecutionPayload,
   ProviderInfo,
   ProvidersResponse,
   QuestionPayload,
@@ -108,6 +110,8 @@ export function useSessionManager(
   baseUrl: string,
   callbacks?: {
     onGoalUpdated?: (goal: GoalUpdatedPayload) => void;
+    onLoopUpdated?: (payload: LoopUpdatedPayload) => void;
+    onLoopExecutionStart?: (payload: LoopExecutionPayload) => void;
   }
 ) {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -487,6 +491,33 @@ export function useSessionManager(
       try {
         const payload: GoalUpdatedPayload = JSON.parse(e.data);
         callbacks?.onGoalUpdated?.(payload);
+      } catch {}
+    });
+
+    eventSource.addEventListener("loop_updated", (e) => {
+      try {
+        const payload: LoopUpdatedPayload = JSON.parse(e.data);
+        callbacks?.onLoopUpdated?.(payload);
+      } catch {}
+    });
+
+    eventSource.addEventListener("loop_execution_start", (e) => {
+      try {
+        const payload: LoopExecutionPayload = JSON.parse(e.data);
+        callbacks?.onLoopExecutionStart?.(payload);
+      } catch {}
+    });
+
+    eventSource.addEventListener("loop_execution_end", (e) => {
+      try {
+        const payload: LoopExecutionPayload = JSON.parse(e.data);
+        // Optional: flash/highlight the completed job
+      } catch {}
+    });
+
+    eventSource.addEventListener("loop_created", (e) => {
+      try {
+        // Refresh by triggering loop_updated — the SSE stream will send loop_updated
       } catch {}
     });
 
