@@ -3,6 +3,7 @@ import type {
   ApprovalRequiredPayload,
   ChatMessage,
   GitInfo,
+  GoalUpdatedPayload,
   ProviderInfo,
   ProvidersResponse,
   QuestionPayload,
@@ -103,7 +104,12 @@ interface SessionData {
   pendingQuestion?: QuestionPayload | null;
 }
 
-export function useSessionManager(baseUrl: string) {
+export function useSessionManager(
+  baseUrl: string,
+  callbacks?: {
+    onGoalUpdated?: (goal: GoalUpdatedPayload) => void;
+  }
+) {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [sessionData, setSessionData] = useState<Record<string, SessionData>>({});
 
@@ -311,121 +317,44 @@ export function useSessionManager(baseUrl: string) {
       }).catch(() => {});
     });
 
+    /// Find the last message with `role` after turnEndMessageCount and update its
+    /// content.  If none exists, create a new one.  Used by both the `message_update`
+    /// (text, role="assistant") and `thinking` (role="thinking") handlers.
+    function updateOrCreate(
+      prev: SessionData,
+      role: "assistant" | "thinking",
+      content: string,
+    ): SessionData {
+      const searchStart = turnEndMessageCount >= 0 ? turnEndMessageCount : 0;
+      for (let i = prev.messages.length - 1; i >= searchStart; i--) {
+        if (prev.messages[i].role === role) {
+          const updated = [...prev.messages];
+          updated[i] = { ...updated[i], content };
+          return { ...prev, messages: updated };
+        }
+      }
+      return {
+        ...prev,
+        messages: [
+          ...prev.messages,
+          { id: crypto.randomUUID(), role, content, timestamp: Date.now() },
+        ],
+      };
+    }
+
     eventSource.addEventListener("message_update", (e) => {
       try {
         const payload = JSON.parse(e.data);
-        updateSession(sessionId, (prev) => {
-          let updated = [...prev.messages];
-          if (payload.thinking) {
-            const last = updated[updated.length - 1];
-            if (turnEndMessageCount >= 0) {
-              let found = false;
-              for (let i = updated.length - 1; i > turnEndMessageCount; i--) {
-                if (updated[i].role === "thinking") {
-                  updated[i] = { ...updated[i], content: payload.thinking };
-                  found = true;
-                  break;
-                }
-              }
-              if (!found) {
-                updated = [...updated, {
-                  id: crypto.randomUUID(),
-                  role: "thinking",
-                  content: payload.thinking,
-                  timestamp: Date.now(),
-                }];
-              }
-            } else if (last?.role === "thinking") {
-              updated[updated.length - 1] = { ...last, content: payload.thinking };
-            } else if (last?.role === "assistant") {
-              for (let i = updated.length - 1; i >= 0; i--) {
-                if (updated[i].role === "thinking") {
-                  updated[i] = { ...updated[i], content: payload.thinking };
-                  break;
-                }
-              }
-            } else {
-              updated = [...updated, {
-                id: crypto.randomUUID(),
-                role: "thinking",
-                content: payload.thinking,
-                timestamp: Date.now(),
-              }];
-            }
-          }
-          if (payload.text) {
-            const last = updated[updated.length - 1];
-            if (turnEndMessageCount >= 0) {
-              let found = false;
-              for (let i = updated.length - 1; i > turnEndMessageCount; i--) {
-                if (updated[i].role === "assistant") {
-                  updated[i] = { ...updated[i], content: payload.text };
-                  found = true;
-                  break;
-                }
-              }
-              if (!found) {
-                updated = [...updated, {
-                  id: crypto.randomUUID(),
-                  role: "assistant",
-                  content: payload.text,
-                  timestamp: Date.now(),
-                }];
-              }
-            } else if (last?.role === "assistant") {
-              updated[updated.length - 1] = { ...last, content: payload.text };
-            } else {
-              updated = [...updated, {
-                id: crypto.randomUUID(),
-                role: "assistant",
-                content: payload.text,
-                timestamp: Date.now(),
-              }];
-            }
-          }
-          return { ...prev, messages: updated };
-        });
+        if (payload.text) {
+          updateSession(sessionId, (prev) => updateOrCreate(prev, "assistant", payload.text));
+        }
       } catch {}
     });
 
     eventSource.addEventListener("thinking", (e) => {
       try {
         const payload = JSON.parse(e.data);
-        updateSession(sessionId, (prev) => {
-          const last = prev.messages[prev.messages.length - 1];
-          if (last?.role === "thinking") {
-            const updated = [...prev.messages];
-            updated[updated.length - 1] = { ...last, content: payload.text };
-            return { ...prev, messages: updated };
-          }
-          if (last?.role === "assistant") {
-            if (turnEndMessageCount >= 0) {
-              for (let i = prev.messages.length - 1; i > turnEndMessageCount; i--) {
-                if (prev.messages[i].role === "thinking") {
-                  const updated = [...prev.messages];
-                  updated[i] = { ...updated[i], content: payload.text };
-                  return { ...prev, messages: updated };
-                }
-              }
-            } else {
-              let lastUserIdx = -1;
-              for (let i = prev.messages.length - 1; i >= 0; i--) {
-                if (prev.messages[i].role === "user") { lastUserIdx = i; break; }
-              }
-              for (let i = prev.messages.length - 1; i > lastUserIdx; i--) {
-                if (prev.messages[i].role === "thinking") {
-                  const updated = [...prev.messages];
-                  updated[i] = { ...updated[i], content: payload.text };
-                  return { ...prev, messages: updated };
-                }
-              }
-            }
-          }
-          return {
-            ...prev,
-            messages: [...prev.messages, { id: crypto.randomUUID(), role: "thinking", content: payload.text, timestamp: Date.now() }],
-          };
-        });
+        updateSession(sessionId, (prev) => updateOrCreate(prev, "thinking", payload.text));
       } catch {}
     });
 
@@ -452,7 +381,10 @@ export function useSessionManager(baseUrl: string) {
           ...prev,
           messages: prev.messages.map((m) =>
             m.id === tool_call_id && m.toolCall
-              ? { ...m, content: m.content + partial_output }
+              // Subagent: full accumulated text (replace); other tools: incremental deltas (append)
+              ? m.toolCall?.name === "subagent"
+                ? { ...m, content: partial_output }
+                : { ...m, content: m.content + partial_output }
               : m
           ),
         }));
@@ -466,7 +398,7 @@ export function useSessionManager(baseUrl: string) {
           ...prev,
           messages: prev.messages.map((m) =>
             m.id === payload.tool_call_id && m.toolCall
-              ? { ...m, content: payload.output, toolCall: { ...m.toolCall, output: payload.output, isError: payload.is_error, isStreaming: false } }
+              ? { ...m, content: payload.output, toolCall: { ...m.toolCall, output: payload.output, isError: (payload.tool_name === "goal" && typeof payload.output === "string" && payload.output.startsWith("BLOCKED:")) ? false : payload.is_error, isStreaming: false } }
               : m
           ),
         }));
@@ -537,6 +469,13 @@ export function useSessionManager(baseUrl: string) {
         if (data.title) {
           renameSessionEntry(sessionId, data.title);
         }
+      } catch {}
+    });
+
+    eventSource.addEventListener("goal_updated", (e) => {
+      try {
+        const payload: GoalUpdatedPayload = JSON.parse(e.data);
+        callbacks?.onGoalUpdated?.(payload);
       } catch {}
     });
 

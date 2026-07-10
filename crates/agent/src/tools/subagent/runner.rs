@@ -16,7 +16,7 @@ use crate::inter_agent::AgentStatus;
 use crate::permission::Ruleset;
 use crate::permission::manager::PermissionManager;
 use crate::permission::sandbox::Sandbox as SandboxTrait;
-use crate::tools::registry::create_coding_tools;
+use crate::tools::registry::{create_coding_tools, create_coding_tools_with_goal_manager};
 
 use super::stats::{SingleResult, SubagentStats};
 
@@ -27,6 +27,7 @@ fn agent_source_str(agent: &AgentConfig) -> &str {
     match agent.source {
         AgentSource::User => "user",
         AgentSource::Project => "project",
+        AgentSource::Builtin => "builtin",
     }
 }
 
@@ -37,11 +38,14 @@ fn build_subagent_loop_config(
     child_event_handler: AgentEventHandler,
     fs_policy: Option<std::sync::Arc<crate::permission::fs_policy::FileSystemPolicy>>,
     cwd: Option<std::path::PathBuf>,
-    permission_manager: Option<Arc<PermissionManager>>,
-    mode_rulesets: Option<Vec<Ruleset>>,
+    _permission_manager: Option<Arc<PermissionManager>>,
+    _mode_rulesets: Option<Vec<Ruleset>>,
     sandbox: Option<Arc<dyn SandboxTrait>>,
     sandbox_enabled: Option<Arc<AtomicBool>>,
+    get_api_key: Option<Arc<dyn Fn() -> Option<String> + Send + Sync>>,
+    agent_id: Option<String>,
     parent_goal_manager: Option<Arc<crate::session::goal::GoalManager>>,
+    _tool_execution_permission: Option<String>,
 ) -> AgentLoopConfig {
     AgentLoopConfig {
         model,
@@ -53,7 +57,7 @@ fn build_subagent_loop_config(
         temperature: None,
         extension_runner: None,
         transform_context: None,
-        get_api_key: None,
+        get_api_key,
         before_tool_call: None,
         should_stop_after_turn: None,
         get_steering_messages: None,
@@ -62,18 +66,20 @@ fn build_subagent_loop_config(
         provider_max_retry_delay_ms: None,
         approve: None,
         question: None,
-        agent_id: None,
+        agent_id,
         agent_registry: None,
         on_turn_complete: None,
         on_event: Some(child_event_handler),
         fs_policy,
         cwd,
-        permission_hooks: permission_manager
-            .as_ref()
-            .map(|pm| pm.hook_registry.clone()),
-        mode_rulesets,
+        // Subagents are sandboxed by fs_policy and filtered tools.
+        // Inheriting the parent's permission_manager would cause tool
+        // calls to get blocked (no interactive approval in a subagent).
+        permission_hooks: None,
+        mode_rulesets: None,
         tool_event_bus: None,
-        permission_manager,
+        permission_manager: None,
+        tool_execution_permission: Some("auto_approve".to_string()),
         sandbox,
         sandbox_enabled,
         cancel_signal_tx: None,
@@ -137,15 +143,21 @@ async fn run_subagent_turn(
     permission_manager: Option<Arc<PermissionManager>>,
     mode_rulesets: Option<Vec<Ruleset>>,
     sandbox: Option<Arc<dyn SandboxTrait>>,
+    get_api_key: Option<Arc<dyn Fn() -> Option<String> + Send + Sync>>,
     parent_goal_manager: Option<Arc<crate::session::goal::GoalManager>>,
+    tool_execution_permission: Option<String>,
 ) -> SingleResult {
     let mut result = SingleResult {
         agent: agent.name.clone(),
         ..Default::default()
     };
 
-    // Build tool set: default tools filtered by agent.tools, excluding subagent
-    let mut tools = create_coding_tools();
+    // Build tool set with real goal tool wired to parent's GoalManager
+    let mut tools = if let Some(ref pgm) = parent_goal_manager {
+        create_coding_tools_with_goal_manager(None, pgm.clone())
+    } else {
+        create_coding_tools()
+    };
     tools.retain(|t| t.name != "subagent");
     if let Some(ref tool_names) = agent.tools
         && !tool_names.is_empty()
@@ -160,22 +172,25 @@ async fn run_subagent_turn(
     let on_event_output = output.clone();
     let on_event_stats = stats.clone();
     let on_event_progress = progress.cloned();
+    // Accumulate a tool trace (formatted text) that gets prepended to each
+    // progress update so the user sees what tools the subagent is using.
+    let tool_trace: Arc<Mutex<String>> = Arc::new(Mutex::new(String::new()));
 
     let child_event_handler: AgentEventHandler = Arc::new(move |event| {
         match &event {
             AgentEvent::MessageEnd { message } => {
                 if let Message::Assistant(msg) = message {
-                    // Capture text content
+                    // Capture text content for final output
                     let mut out = on_event_output.lock().unwrap();
                     for block in &msg.content {
                         if let ContentBlock::Text(t) = block {
                             out.push_str(&t.text);
                             out.push('\n');
-                            if let Some(ref tx) = on_event_progress {
-                                let _ = tx.send(t.text.clone() + "\n");
-                            }
                         }
                     }
+                    // Do NOT send progress from MessageEnd — MessageUpdate already
+                    // sent the latest accumulated text. Sending again here causes
+                    // duplicate content in the frontend (append vs replace mismatch).
                     // Track usage
                     let s = &mut *on_event_stats.lock().unwrap();
                     s.input += msg.usage.input;
@@ -193,10 +208,77 @@ async fn run_subagent_turn(
                     && let Message::Assistant(msg) = message
                 {
                     for block in &msg.content {
-                        if let ContentBlock::Text(t) = block {
-                            let _ = tx.send(t.text.clone());
+                        match block {
+                            ContentBlock::Text(t) => {
+                                // Prepend tool trace so tool calls appear above
+                                // the current thinking/analysis text.
+                                let trace = tool_trace.lock().unwrap();
+                                let full = if trace.is_empty() {
+                                    t.text.clone()
+                                } else {
+                                    format!("{}\n\n{}", trace, t.text)
+                                };
+                                let _ = tx.send(full);
+                            }
+                            ContentBlock::Thinking(t) if !t.thinking.is_empty() => {
+                                let _ = tx.send(format!("[thinking] {}", t.thinking));
+                            }
+                            _ => {}
                         }
                     }
+                }
+            }
+            AgentEvent::ToolExecutionStart {
+                tool_name, args, ..
+            } => {
+                // Format tool start into the tool trace
+                let args_str = serde_json::to_string_pretty(args)
+                    .unwrap_or_default()
+                    .lines()
+                    .map(|l| l.trim().trim_matches('"'))
+                    .filter(|l| !l.is_empty() && *l != "{")
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                let header = format!("### 🔧 Tool: {}\n```", tool_name);
+                let args_line = if args_str.is_empty() || args_str == "}" {
+                    String::new()
+                } else {
+                    format!("\n{}", args_str)
+                };
+                let mut trace = tool_trace.lock().unwrap();
+                trace.push_str(&header);
+                if !args_line.is_empty() {
+                    trace.push_str(&args_line);
+                }
+                trace.push_str("\n```\n");
+            }
+            AgentEvent::ToolExecutionEnd {
+                result, is_error, ..
+            } => {
+                // Append tool result summary to the trace
+                let preview = result
+                    .get("content")
+                    .and_then(|c| c.as_array())
+                    .and_then(|arr| arr.first())
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                let lines: Vec<&str> = preview.lines().collect();
+                let truncated = if lines.len() > 5 {
+                    let mut v: Vec<&str> = lines.iter().take(5).copied().collect();
+                    v.push("...");
+                    v.join("\n")
+                } else {
+                    lines.join("\n")
+                };
+                let mut trace = tool_trace.lock().unwrap();
+                if !truncated.is_empty() {
+                    if *is_error {
+                        trace.push_str(&format!("❌ *Error:* {}\n\n", truncated));
+                    } else {
+                        trace.push_str(&format!("```\n{}\n```\n\n", truncated));
+                    }
+                } else {
+                    trace.push_str("\n");
                 }
             }
             _ => {}
@@ -215,7 +297,10 @@ async fn run_subagent_turn(
         mode_rulesets,
         sandbox,
         None, // subagents inherit parent sandbox_enabled via ToolContext
+        get_api_key,
+        Some(agent.name.clone()),
         parent_goal_manager,
+        tool_execution_permission,
     );
 
     let initial_messages = vec![Message::User(UserMessage::text(format!("Task: {}", task)))];
@@ -296,12 +381,14 @@ async fn run_single_agent(
     registry: Option<&Arc<AgentRegistry>>,
     parent_agent_id: &str,
     parent_model: Option<Model>,
+    get_api_key: Option<Arc<dyn Fn() -> Option<String> + Send + Sync>>,
     fs_policy: Option<std::sync::Arc<crate::permission::fs_policy::FileSystemPolicy>>,
     cwd: Option<std::path::PathBuf>,
     permission_manager: Option<Arc<PermissionManager>>,
     mode_rulesets: Option<Vec<Ruleset>>,
     sandbox: Option<Arc<dyn SandboxTrait>>,
     parent_goal_manager: Option<Arc<crate::session::goal::GoalManager>>,
+    tool_execution_permission: Option<String>,
 ) -> SingleResult {
     let mut result = SingleResult {
         agent: agent.name.clone(),
@@ -327,7 +414,9 @@ async fn run_single_agent(
         permission_manager,
         mode_rulesets,
         sandbox,
+        get_api_key,
         parent_goal_manager,
+        tool_execution_permission,
     )
     .await
 }
@@ -359,12 +448,14 @@ async fn execute_subagent_with_events(
         ctx.agent_registry.as_ref(),
         parent_id,
         ctx.default_model.clone(),
+        ctx.get_api_key.clone(),
         ctx.fs_policy.clone(),
         ctx.cwd.clone(),
         ctx.permission_manager.clone(),
         ctx.permission_manager.as_ref().map(|_| Vec::new()),
         ctx.sandbox.clone(),
         parent_goal_manager,
+        ctx.tool_execution_permission.clone(),
     )
     .await;
 
@@ -450,6 +541,8 @@ async fn run_parallel_agents(
     registry: Option<Arc<AgentRegistry>>,
     parent_id: String,
     parent_model: Option<Model>,
+    parent_get_api_key: Option<Arc<dyn Fn() -> Option<String> + Send + Sync>>,
+    parent_tool_execution_permission: Option<String>,
 ) -> Vec<SingleResult> {
     if tasks.is_empty() {
         return Vec::new();
@@ -462,6 +555,9 @@ async fn run_parallel_agents(
     let agent_mode = std::sync::Arc::new(agent_mode);
     let registry = registry.map(std::sync::Arc::new);
     let parent_model = parent_model.map(std::sync::Arc::new);
+    let parent_get_api_key = parent_get_api_key.map(std::sync::Arc::new);
+    let parent_tool_execution_permission =
+        parent_tool_execution_permission.map(std::sync::Arc::new);
 
     let mut handles = Vec::with_capacity(limit);
     for _ in 0..limit {
@@ -472,6 +568,8 @@ async fn run_parallel_agents(
         let registry = registry.clone();
         let parent_id = parent_id.clone();
         let parent_model = parent_model.clone();
+        let parent_get_api_key = parent_get_api_key.clone();
+        let parent_tool_execution_permission = parent_tool_execution_permission.clone();
         handles.push(tokio::spawn(async move {
             loop {
                 let i = index.fetch_add(1, std::sync::atomic::Ordering::SeqCst) as usize;
@@ -489,12 +587,14 @@ async fn run_parallel_agents(
                     registry.as_deref(),
                     &parent_id,
                     model,
+                    parent_get_api_key.as_deref().cloned(),
                     None,
                     None,
                     None,
                     None,
                     None,
                     None,
+                    parent_tool_execution_permission.as_deref().cloned(),
                 )
                 .await;
                 let mut guard = results.lock().unwrap();
@@ -878,6 +978,8 @@ async fn execute_subagent(
             ctx.agent_registry.clone(),
             ctx.agent_id.unwrap_or_else(|| "root".to_string()),
             ctx.default_model.clone(),
+            ctx.get_api_key.clone(),
+            ctx.tool_execution_permission.clone(),
         )
         .await;
 

@@ -139,6 +139,17 @@ export interface GitChange {
   status: string;
 }
 
+export interface GoalUpdatedPayload {
+  objective: string;
+  completionCriterion: string;
+  status: string;
+  tokenBudget: number | null;
+  tokensUsed: number;
+  timeUsedSeconds: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface GitInfo {
   branch: string;
   changes: GitChange[];

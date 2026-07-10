@@ -31,7 +31,7 @@ import {
   updateSessionEntry,
   initSessions,
 } from "./stores/sessions";
-import type { ChatMessage } from "./types/events";
+import type { ChatMessage, GoalUpdatedPayload } from "./types/events";
 
 async function detectBaseUrl(): Promise<string> {
   const params = new URLSearchParams(window.location.search);
@@ -53,7 +53,7 @@ export default function App() {
   const [baseUrl, setBaseUrl] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarPinned, setSidebarPinned] = useState(true);
-  const [activeGoal, setActiveGoal] = useState<{ objective: string; startTime: number } | null>(null);
+  const [activeGoal, setActiveGoal] = useState<{ objective: string; startTime: number; status?: string; timeUsedSeconds?: number } | null>(null);
   const [settingsUrl, setSettingsUrl] = useState("");
   const { cycleThemeMode } = useTheme();
 
@@ -104,6 +104,16 @@ export default function App() {
       .catch(() => {});
   }, [baseUrl]);
 
+  const handleGoalUpdated = useCallback(
+    (updated: GoalUpdatedPayload) => {
+      setActiveGoal((prev) => {
+        if (!prev) return null;
+        return { ...prev, status: updated.status, timeUsedSeconds: updated.timeUsedSeconds };
+      });
+    },
+    []
+  );
+
   const {
     activeSessionId,
     activeMessages,
@@ -123,7 +133,7 @@ export default function App() {
     answerQuestion,
     deleteSession,
     forkSession,
-  } = useSessionManager(baseUrl ?? "");
+  } = useSessionManager(baseUrl ?? "", { onGoalUpdated: handleGoalUpdated });
 
   const pendingSendRef = useRef<{ text: string; extraMode: string | null } | null>(null);
 

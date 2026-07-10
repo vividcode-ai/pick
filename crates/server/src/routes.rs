@@ -25,6 +25,7 @@ use crate::events;
 use crate::git::get_git_info;
 use crate::session::SseSessionState;
 use axum::extract::Path;
+use pick_agent::agent_registry::AgentRegistry;
 use pick_agent::command::review::REVIEW_SYSTEM_PROMPT;
 
 #[derive(Deserialize, ToSchema)]
@@ -252,7 +253,13 @@ pub async fn ask(
     let cwd = state.session_manager.get_cwd();
     let cwd_for_event = cwd.clone();
     let system_prompt = session.system_prompt.clone();
-    let tools = session.tools.clone();
+    let tools = {
+        let gm = sse_state.goal_manager.read().unwrap().clone();
+        pick_agent::tools::registry::create_coding_tools_with_goal_manager(
+            Some(agent_mode.clone()),
+            gm.unwrap_or_else(|| Arc::new(pick_agent::session::GoalManager::new())),
+        )
+    };
 
     let thinking_level = match req.thinking_level.as_deref() {
         Some("minimal") => ThinkingLevel::Minimal,
@@ -673,6 +680,15 @@ async fn run_agent_loop_queue(
         };
 
         let fs_policy = Arc::new(FileSystemPolicy::new_workspace_default(&cwd));
+        let agent_registry = AgentRegistry::new();
+
+        let tool_execution_permission = pick_agent::settings::SettingsManager::load_from_paths(
+            pick_agent::settings::get_global_settings_path(),
+            pick_agent::settings::get_project_settings_path(&cwd),
+        )
+        .get()
+        .tool_execution_permission
+        .clone();
 
         let config = AgentLoopConfig {
             model: model.clone(),
@@ -765,7 +781,7 @@ async fn run_agent_loop_queue(
             approve: approve.clone(),
             question: question.clone(),
             agent_id: None,
-            agent_registry: None,
+            agent_registry: Some(agent_registry),
             on_event: Some(Arc::new(move |event| {
                 for server_event in events::serialize_event(&event) {
                     let sse_event = Event::default()
@@ -798,6 +814,7 @@ async fn run_agent_loop_queue(
             skill_paths: Vec::new(),
             parent_goal_manager: sse_state.goal_manager.read().unwrap().clone(),
             on_turn_complete: None,
+            tool_execution_permission,
         };
 
         let et_agent = sse_state.event_tx.clone();
@@ -882,6 +899,21 @@ async fn run_agent_loop_queue(
                     .event(&agent_end_event.event_type)
                     .data(serde_json::to_string(&agent_end_event.payload).unwrap_or_default());
                 let _ = et_agent.send(Ok(sse_event));
+
+                // Send goal_updated event so the frontend can update the status bar
+                let goal_payload = {
+                    let guard = sse_state.goal_manager.read().unwrap();
+                    guard
+                        .as_ref()
+                        .and_then(|gm| gm.get())
+                        .and_then(|entry| serde_json::to_value(&entry).ok())
+                };
+                if let Some(payload) = goal_payload {
+                    let sse_event = Event::default()
+                        .event("goal_updated")
+                        .data(serde_json::to_string(&payload).unwrap_or_default());
+                    let _ = et_agent.send(Ok(sse_event));
+                }
 
                 // Check if cancelled by user
                 if *cancel_rx.borrow() {

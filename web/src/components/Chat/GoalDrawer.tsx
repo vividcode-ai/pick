@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { Target, Pencil, Clock, Trash2, Play, Pause } from "lucide-react";
 
-interface GoalInfo {
+export interface GoalInfo {
   objective: string;
   startTime: number;
+  status?: string;
+  timeUsedSeconds?: number;
 }
 
 interface GoalDrawerProps {
@@ -30,6 +32,12 @@ export function GoalDrawer({ goal, onEdit, onPause, onDelete, noWrapper }: GoalD
 
   useEffect(() => {
     if (!goal) return;
+    if (goal.status === "complete") {
+      if (goal.timeUsedSeconds != null) {
+        setElapsed(goal.timeUsedSeconds * 1000);
+      }
+      return;
+    }
     setEditText(goal.objective);
     const tick = () => setElapsed(Date.now() - goal.startTime);
     tick();
@@ -84,8 +92,14 @@ export function GoalDrawer({ goal, onEdit, onPause, onDelete, noWrapper }: GoalD
           <span className="text-sm text-[var(--text-primary)] truncate">{goal.objective}</span>
         )}
         <span className="flex items-center gap-1 text-xs text-[var(--text-muted)] shrink-0">
-          <Clock className="w-3 h-3" />
-          {formatElapsed(elapsed)}
+          {goal.status === "complete" ? (
+            <span className="text-green-500 font-medium">Completed</span>
+          ) : (
+            <span className="flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              {formatElapsed(elapsed)}
+            </span>
+          )}
         </span>
       </div>
 

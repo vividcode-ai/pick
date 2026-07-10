@@ -312,6 +312,7 @@ pub(crate) fn build_agent_config(
     });
 
     let sm = crate::core::settings::SettingsManager::load(&ctx.cwd);
+    let tool_execution_permission = sm.get().tool_execution_permission.clone();
     let enable_skills = sm.get_enable_skill_commands();
     let skill_paths: Vec<std::path::PathBuf> = if enable_skills {
         ctx.resource_loader
@@ -357,6 +358,7 @@ pub(crate) fn build_agent_config(
         approve,
         skill_paths,
         parent_goal_manager: None,
+        tool_execution_permission,
     }
 }
 

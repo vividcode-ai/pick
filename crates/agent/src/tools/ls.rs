@@ -73,6 +73,7 @@ pub fn create_ls_tool() -> AgentTool {
                                     pm,
                                     ctx.question.as_ref(),
                                     ctx.tool_event_bus.as_ref(),
+                                    ctx.tool_execution_permission.as_deref().unwrap_or("prompt"),
                                 )
                                 .await?;
                             if !authorized {

@@ -211,6 +211,7 @@ pub async fn check_authorization(
     pm: &crate::permission::manager::PermissionManager,
     question: Option<&crate::core::state::QuestionFn>,
     tool_event_bus: Option<&Arc<crate::core::hooks::ToolEventBus>>,
+    tool_execution_permission: &str,
 ) -> Result<bool, String> {
     use crate::core::hooks::{ToolEvent, WaitingKind};
     use crate::core::state::{QuestionOption, QuestionPrompt};
@@ -219,6 +220,11 @@ pub async fn check_authorization(
         return Ok(true);
     }
     if pm.external_auth.consume_once(tool, path) {
+        return Ok(true);
+    }
+
+    // Auto-approve when tool_execution_permission is "auto_approve"
+    if tool_execution_permission == "auto_approve" {
         return Ok(true);
     }
 

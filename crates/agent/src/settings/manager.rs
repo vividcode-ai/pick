@@ -48,6 +48,7 @@ fn merge_primitive(base: &mut Settings, overrides: &Settings) {
     merge_opt!(disabled_mcp_servers);
     merge_opt!(permission);
     merge_opt!(packages);
+    merge_opt!(tool_execution_permission);
     merge_opt!(themes);
 }
 

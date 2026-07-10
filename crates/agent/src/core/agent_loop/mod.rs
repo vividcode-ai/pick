@@ -107,6 +107,7 @@ pub struct AgentLoopConfig {
     /// For sub-agents: the parent session's GoalManager.
     /// Set when spawning a child agent; None for the main session.
     pub parent_goal_manager: Option<Arc<GoalManager>>,
+    pub tool_execution_permission: Option<String>,
 }
 
 /// Result from a single agent run

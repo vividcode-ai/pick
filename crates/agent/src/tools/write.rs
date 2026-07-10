@@ -74,6 +74,7 @@ pub fn create_write_tool() -> AgentTool {
                         if let Some(ref pm) = ctx.permission_manager {
                             let authorized = crate::permission::external_dir::check_authorization(
                                 "Write", file_path, pm, ctx.question.as_ref(), ctx.tool_event_bus.as_ref(),
+                                ctx.tool_execution_permission.as_deref().unwrap_or("prompt"),
                             ).await?;
                             if !authorized {
                                 return Ok(AgentToolResult {

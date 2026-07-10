@@ -182,6 +182,8 @@ pub struct Settings {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub disabled_mcp_servers: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_execution_permission: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub permission: Option<PermissionConfig>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub enable_mcp_tools: Option<bool>,

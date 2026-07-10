@@ -97,19 +97,26 @@ pub fn serialize_event(event: &AgentEvent) -> Vec<WsEvent> {
                     }
                 }
 
-                if !text.is_empty() || thinking.is_some() {
-                    vec![WsEvent {
+                let mut events = Vec::new();
+                if !text.is_empty() {
+                    events.push(WsEvent {
                         event_type: "message_update".to_string(),
                         payload: serde_json::to_value(MessageUpdatePayload {
                             text,
-                            thinking,
+                            thinking: None,
                             delta: false,
                         })
                         .unwrap_or_default(),
-                    }]
-                } else {
-                    Vec::new()
+                    });
                 }
+                if let Some(t) = thinking {
+                    events.push(WsEvent {
+                        event_type: "thinking".to_string(),
+                        payload: serde_json::to_value(ThinkingPayload { text: t })
+                            .unwrap_or_default(),
+                    });
+                }
+                events
             } else {
                 Vec::new()
             }

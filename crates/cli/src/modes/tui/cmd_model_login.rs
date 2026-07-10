@@ -126,6 +126,12 @@ pub(crate) fn handle_settings_command(ctx: &mut TuiContext) {
     let sandbox = sm.get_permission().sandbox_enabled;
     let mcp_tools = sm.get_enable_mcp_tools();
     let notif = sm.get_enable_system_notifications();
+    let tep = sm
+        .get()
+        .tool_execution_permission
+        .as_deref()
+        .unwrap_or("prompt")
+        .to_string();
 
     let items = vec![
         SelectItem::new(
@@ -133,6 +139,10 @@ pub(crate) fn handle_settings_command(ctx: &mut TuiContext) {
             "auto-compact",
         ),
         SelectItem::new(format!("Sandbox  [{}]", s(sandbox)), "sandbox"),
+        SelectItem::new(
+            format!("Tool exec permission  [{}]", tep),
+            "tool-execution-permission",
+        ),
         SelectItem::new(format!("MCP tools  [{}]", s(mcp_tools)), "mcp-tools"),
         SelectItem::new(
             format!("System notifications  [{}]", s(notif)),

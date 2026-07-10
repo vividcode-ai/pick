@@ -122,12 +122,16 @@ pub fn create_goal_tool_stub() -> AgentTool {
 pub fn create_goal_tool(goal_manager: Arc<GoalManager>) -> AgentTool {
     AgentTool {
         name: "goal".to_string(),
-        description: "Manage the active goal. Use `op` parameter: \
-            create (requires objective + completion_criterion), get, \
-            complete, pause, resume, cancel."
+        description: "Manage the active goal. NOTE: `complete` is BLOCKED for the main agent — \
+            you MUST use `subagent(agent:\"goal-verify\")` to verify and complete the goal. \
+            Use `op` parameter: create, get, complete (blocked), pause, resume, cancel."
             .to_string(),
-        prompt_snippet: Some("Manage the active goal".to_string()),
-        prompt_guidelines: vec![],
+        prompt_snippet: Some("Manage the active goal; complete is blocked — use goal-verify subagent".to_string()),
+        prompt_guidelines: vec![
+            "IMPORTANT: `goal(op:\"complete\")` will be BLOCKED for the main agent.".to_string(),
+            "After completing the work, call `subagent(agent: \"goal-verify\", task: \"...\")` to independently verify.".to_string(),
+            "The goal-verify agent will call `goal(op:\"complete\")` if it confirms the goal is met.".to_string(),
+        ],
         usage_example: None,
         label: "goal".to_string(),
         parameters: make_params(

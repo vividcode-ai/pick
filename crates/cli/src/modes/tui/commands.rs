@@ -71,6 +71,7 @@ pub(crate) fn apply_tui_command(tui: &mut TuiApp, cmd: TuiCommand) {
             let dialog = QuestionDialog::new(qdata);
             tui.question_dialog = Some(dialog);
             tui.question_response_tx = Some(response_tx);
+            tui.chat.mark_turn_end();
             tui.state = pick_tui::app::AppState::Questioning;
         }
         TuiCommand::RequestApproval {
@@ -94,6 +95,7 @@ pub(crate) fn apply_tui_command(tui: &mut TuiApp, cmd: TuiCommand) {
             let dialog = QuestionDialog::new(qdata);
             tui.question_dialog = Some(dialog);
             tui.question_response_tx = Some(response_tx);
+            tui.chat.mark_turn_end();
             tui.state = pick_tui::app::AppState::Questioning;
         }
         TuiCommand::ToolConfirm {
@@ -113,6 +115,7 @@ pub(crate) fn apply_tui_command(tui: &mut TuiApp, cmd: TuiCommand) {
             let dialog = QuestionDialog::new(qdata);
             tui.question_dialog = Some(dialog);
             tui.question_response_tx = Some(response_tx);
+            tui.chat.mark_turn_end();
             tui.state = pick_tui::app::AppState::Questioning;
         }
         TuiCommand::GoalUpdated(goal) => {

@@ -10,6 +10,7 @@ import fuzzysort from "fuzzysort";
 import type { ProviderInfo } from "../../types/events";
 import { ModelThinkingSelector } from "./ModelThinkingSelector";
 import { CommandMode } from "./CommandMode";
+import { ToolExecPermission } from "./ToolExecPermission";
 import { GoalDrawer } from "./GoalDrawer";
 
 interface MentionItem {
@@ -456,6 +457,7 @@ export function ChatInput({
             {/* Left: extra mode icon + command dropdown */}
             <div className="flex-1 flex items-center justify-start">
               <CommandMode value={extraMode} onChange={setExtraMode} disabled={disabled} connected={connected} />
+              <ToolExecPermission />
 
               <div className="relative flex items-center" ref={commandRef}>
                 <button

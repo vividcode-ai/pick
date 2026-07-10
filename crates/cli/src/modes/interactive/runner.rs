@@ -1016,6 +1016,7 @@ pub async fn run_interactive_mode(
                     })),
                     skill_paths,
                     parent_goal_manager: None,
+                    tool_execution_permission: None,
                 };
 
                 match crate::core::agent_session::run_agent_loop_with_retry(

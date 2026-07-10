@@ -12,6 +12,7 @@ pub(crate) async fn handle_settings_selection(ctx: &mut TuiContext, val: &str) {
     match val {
         "auto-compact" => settings_values::toggle_compact(&mut sm, ctx).await,
         "sandbox" => settings_values::toggle_sandbox_enabled(&mut sm, ctx).await,
+        "tool-execution-permission" => show_tool_exec_permission_selector(ctx, &sm),
         "show-images" => settings_values::toggle_show_images(&mut sm, ctx).await,
         "auto-resize-images" => settings_values::toggle_auto_resize_images(&mut sm, ctx).await,
         "block-images" => settings_values::toggle_block_images(&mut sm, ctx).await,
@@ -72,6 +73,9 @@ pub(crate) async fn handle_settings_selection(ctx: &mut TuiContext, val: &str) {
         }
         other if other.starts_with("http-timeout-") => {
             settings_values::apply_http_timeout(&mut sm, ctx, other).await
+        }
+        other if other.starts_with("tep-") => {
+            settings_values::apply_tool_exec_permission(&mut sm, ctx, other).await
         }
         other if other.starts_with("de-") => {
             settings_values::apply_de_action(&mut sm, ctx, other).await
@@ -187,6 +191,30 @@ fn show_ac_max_visible_selector(ctx: &mut TuiContext, sm: &SettingsManager) {
         }),
     ];
     let select = SelectList::new("Autocomplete Max Items", items);
+    ctx.tui.start_selection(select);
+    ctx.tui.finalize_turn();
+}
+
+fn show_tool_exec_permission_selector(ctx: &mut TuiContext, sm: &SettingsManager) {
+    ctx.pending_command = Some("settings".to_string());
+    let current = sm
+        .get()
+        .tool_execution_permission
+        .as_deref()
+        .unwrap_or("prompt")
+        .to_string();
+    let items = vec![
+        SelectItem::new("prompt - 需要询问授权", "tep-prompt")
+            .with_description(if current == "prompt" { "current" } else { "" }),
+        SelectItem::new("auto_approve - 完全自动执行", "tep-auto_approve").with_description(
+            if current == "auto_approve" {
+                "current"
+            } else {
+                ""
+            },
+        ),
+    ];
+    let select = SelectList::new("Tool Execution Permission", items);
     ctx.tui.start_selection(select);
     ctx.tui.finalize_turn();
 }

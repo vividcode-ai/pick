@@ -209,8 +209,11 @@ async fn handle_tool_execution(
             continue;
         }
 
+        // Check tool_execution_permission: if "auto_approve", skip all permission hooks
+        let auto_approve = config.tool_execution_permission.as_deref() == Some("auto_approve");
+
         // Permission pre-tool-use hooks + permission request hooks
-        if let Some(ref hook_registry) = config.permission_hooks {
+        if !auto_approve && let Some(ref hook_registry) = config.permission_hooks {
             if hook_registry.has_pre_hooks()
                 || hook_registry.has_permission_hooks()
                 || config.mode_rulesets.is_some()
@@ -452,41 +455,48 @@ async fn handle_tool_execution(
                     continue;
                 }
                 crate::permission::Action::Ask => {
-                    all_terminate = false;
-                    let msg = "Error: Tool requires approval but no permission hooks configured";
-                    if let Some(ref handler) = config.on_event {
-                        handler(AgentEvent::ToolExecutionStart {
-                            tool_call_id: tc.id.clone(),
-                            tool_name: tc.name.clone(),
-                            args: tc.arguments.clone(),
-                        });
-                        handler(AgentEvent::ToolExecutionEnd {
-                            tool_call_id: tc.id.clone(),
-                            tool_name: tc.name.clone(),
-                            result: serde_json::json!({"error": msg}),
-                            is_error: true,
-                        });
-                    }
-                    let error_msg = pick_ai::types::ToolResultMessage::new(
-                        &tc.id,
-                        &tc.name,
-                        vec![ContentBlock::text(msg)],
-                        true,
-                    );
-                    state.messages.push(Message::ToolResult(error_msg.clone()));
-                    tool_results.push(error_msg);
-                    if let Some(ref pm) = config.permission_manager {
-                        pm.audit(
+                    // The `goal` tool has built-in authorization: BLOCKED for the main
+                    // agent (points to goal-verify subagent) and allowed for sub-agents.
+                    // Bypass the mode_ruleset check so the tool's own execute function
+                    // (which returns the proper BLOCKED message) is reached.
+                    if tc.name != "goal" {
+                        all_terminate = false;
+                        let msg =
+                            "Error: Tool requires approval but no permission hooks configured";
+                        if let Some(ref handler) = config.on_event {
+                            handler(AgentEvent::ToolExecutionStart {
+                                tool_call_id: tc.id.clone(),
+                                tool_name: tc.name.clone(),
+                                args: tc.arguments.clone(),
+                            });
+                            handler(AgentEvent::ToolExecutionEnd {
+                                tool_call_id: tc.id.clone(),
+                                tool_name: tc.name.clone(),
+                                result: serde_json::json!({"error": msg}),
+                                is_error: true,
+                            });
+                        }
+                        let error_msg = pick_ai::types::ToolResultMessage::new(
+                            &tc.id,
                             &tc.name,
-                            perm_key,
-                            &tool_args_str,
-                            crate::permission::audit::AuditDecision::Ask,
-                            crate::permission::audit::AuditLayer::ModeRuleset,
-                            msg,
-                            None,
+                            vec![ContentBlock::text(msg)],
+                            true,
                         );
+                        state.messages.push(Message::ToolResult(error_msg.clone()));
+                        tool_results.push(error_msg);
+                        if let Some(ref pm) = config.permission_manager {
+                            pm.audit(
+                                &tc.name,
+                                perm_key,
+                                &tool_args_str,
+                                crate::permission::audit::AuditDecision::Ask,
+                                crate::permission::audit::AuditLayer::ModeRuleset,
+                                msg,
+                                None,
+                            );
+                        }
+                        continue;
                     }
-                    continue;
                 }
             }
         }
@@ -624,7 +634,9 @@ async fn handle_tool_execution(
             sandbox: config.sandbox.clone(),
             sandbox_enabled: config.sandbox_enabled.clone(),
             tool_event_bus: config.tool_event_bus.clone(),
+            get_api_key: config.get_api_key.clone(),
             parent_goal_manager: config.parent_goal_manager.clone(),
+            tool_execution_permission: config.tool_execution_permission.clone(),
         };
 
         // Spawn a task to forward progress events while the tool executes
@@ -899,7 +911,9 @@ async fn handle_tool_execution(
             let permission_manager = config.permission_manager.clone();
             let sandbox_enabled = sandbox_enabled.clone();
             let tool_event_bus = config.tool_event_bus.clone();
+            let get_api_key = config.get_api_key.clone();
             let parent_goal_manager = config.parent_goal_manager.clone();
+            let tool_execution_permission = config.tool_execution_permission.clone();
             parallel_tool_infos.push((tc.name.clone(), tc.id.clone()));
             parallel_handles.push(tokio::spawn(async move {
                 let (progress_tx, _progress_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
@@ -917,7 +931,9 @@ async fn handle_tool_execution(
                     sandbox: None,
                     sandbox_enabled: sandbox_enabled.clone(),
                     tool_event_bus: tool_event_bus.clone(),
+                    get_api_key: get_api_key.clone(),
                     parent_goal_manager: parent_goal_manager.clone(),
+                    tool_execution_permission: tool_execution_permission.clone(),
                 };
                 let validated_args =
                     match validate_tool_arguments(&tool, &tc.arguments, &tc.arguments) {

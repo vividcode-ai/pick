@@ -29,6 +29,9 @@ export interface WebSettings {
   collapse_changelog: boolean;
   install_telemetry: boolean;
 
+  // Permission
+  tool_execution_permission: "prompt" | "auto_approve";
+
   // Warnings
   anthropic_extra_usage: boolean;
 }
@@ -55,6 +58,8 @@ const DEFAULTS: WebSettings = {
   quiet_startup: false,
   collapse_changelog: false,
   install_telemetry: false,
+
+  tool_execution_permission: "prompt",
 
   anthropic_extra_usage: true,
 };
@@ -87,6 +92,7 @@ interface RawSettings {
   images?: { auto_resize?: boolean; block_images?: boolean };
   compaction?: { enabled?: boolean };
   permission?: { sandbox_enabled?: boolean };
+  tool_execution_permission?: "prompt" | "auto_approve";
   enable_mcp_tools?: boolean;
   enable_skill_commands?: boolean;
   hide_thinking_block?: boolean;
@@ -109,6 +115,7 @@ function fromRust(raw: RawSettings): WebSettings {
     block_images: raw.images?.block_images ?? DEFAULTS.block_images,
     auto_compact: raw.compaction?.enabled ?? DEFAULTS.auto_compact,
     sandbox_enabled: raw.permission?.sandbox_enabled ?? DEFAULTS.sandbox_enabled,
+    tool_execution_permission: raw.tool_execution_permission ?? DEFAULTS.tool_execution_permission,
     mcp_tools: raw.enable_mcp_tools ?? DEFAULTS.mcp_tools,
     skill_commands: raw.enable_skill_commands ?? DEFAULTS.skill_commands,
     show_thinking: !(raw.hide_thinking_block ?? false),
@@ -136,6 +143,7 @@ function toRustPatch(ws: WebSettings): Record<string, unknown> {
     },
     compaction: { enabled: ws.auto_compact },
     permission: { sandbox_enabled: ws.sandbox_enabled },
+    tool_execution_permission: ws.tool_execution_permission,
     enable_mcp_tools: ws.mcp_tools,
     enable_skill_commands: ws.skill_commands,
     hide_thinking_block: !ws.show_thinking,

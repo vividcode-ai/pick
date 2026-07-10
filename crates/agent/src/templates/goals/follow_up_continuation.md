@@ -11,6 +11,16 @@ Continue working toward the active thread goal.
 
 Budget: {{ tokens_used }} tokens used · {{ token_budget }} budget · {{ remaining_tokens }} remaining
 
+⚠️ CRITICAL: You CANNOT mark the goal complete yourself.
+Calling `goal(op: "complete")` will be BLOCKED. Instead, after completing all work:
+
+1. Call `goal(op: "complete")` → it will return BLOCKED
+2. Immediately call: subagent(agent: "goal-verify", task: "Verify the goal '{{ objective }}' is fully satisfied. Criterion: {{ completion_criterion }}. If satisfied, call goal(op:'complete') to mark it done — you have permission as a subagent.")
+3. The goal-verify agent independently inspects your work and calls goal(op:"complete") if all requirements are met
+4. Fix any issues the verifier finds and re-verify
+
+Do NOT skip this. Only the independent goal-verify agent can mark completion.
+
 ──────── Scope ────────
 Keep the full objective intact. Do not shrink, narrow, or redefine success. Make concrete progress toward the requested end state; temporary rough edges are acceptable as long as the trajectory is correct.
 

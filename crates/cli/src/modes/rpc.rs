@@ -215,6 +215,7 @@ pub async fn run_rpc_mode(
                         cancel_signal_tx: None,
                         skill_paths: Vec::new(),
                         parent_goal_manager: None,
+                        tool_execution_permission: None,
                         on_turn_complete: None,
                     };
 

@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 pub enum AgentSource {
     User,
     Project,
+    Builtin,
 }
 
 /// Scope for agent discovery
@@ -122,6 +123,51 @@ pub fn find_nearest_project_agents_dir(cwd: &Path) -> Option<PathBuf> {
     None
 }
 
+const BUILTIN_GOAL_VERIFY_SYSTEM_PROMPT: &str = r#"You are an independent goal completion agent. Your responsibility is to inspect the current state of the codebase and determine whether the session goal has been fully achieved. If it has, you MUST mark it complete.
+
+**Workflow:**
+
+1. Call `goal(op:"get")` to read the current session goal and completion criteria.
+2. Break down the goal and completion criteria into concrete, verifiable requirements.
+3. Check each requirement individually against the current codebase state.
+4. Evaluation dimensions:
+   - **Completeness**: Are all requirements implemented? Partial implementation counts as NOT SATISFIED.
+   - **Correctness**: Are the logic, edge cases, and error handling correct?
+   - **Integration**: Does it follow existing project patterns? Are import paths and type signatures consistent?
+   - **Reliability**: Are there unhandled edge cases, race conditions, or environment assumptions?
+
+**CRITICAL — You MUST call `goal(op:"complete")` when all requirements pass.**
+This is your primary purpose. You are a sub-agent with special permission to mark goals complete — the main agent cannot do it themselves.
+
+- If all requirements are verified with direct evidence → **MUST call `goal(op:"complete")`** immediately.
+- If any requirement is not satisfied → return a detailed verification report with each item labeled: SATISFIED / NOT SATISFIED / UNCERTAIN, including file paths, line numbers, or command output as evidence.
+- Do not create or modify any files. You are a read-only verifier."#;
+
+/// Return built-in agents bundled with the binary.
+/// These serve as defaults when no user or project agent definition exists.
+fn get_builtin_agents() -> Vec<AgentConfig> {
+    vec![AgentConfig {
+        name: "goal-verify".to_string(),
+        description: "Independent goal verification agent. Inspects the current codebase state \
+             and determines whether the session goal has been fully achieved. \
+             Use this via the `subagent` tool when goal(op:\"complete\") returns BLOCKED."
+            .to_string(),
+        tools: Some(vec![
+            "read".to_string(),
+            "grep".to_string(),
+            "find".to_string(),
+            "ls".to_string(),
+            "bash".to_string(),
+            "webfetch".to_string(),
+            "goal".to_string(),
+        ]),
+        model: None,
+        system_prompt: BUILTIN_GOAL_VERIFY_SYSTEM_PROMPT.to_string(),
+        source: AgentSource::Builtin,
+        file_path: PathBuf::new(),
+    }]
+}
+
 /// Discover agents from user and/or project directories
 pub fn discover_agents(cwd: &Path, agent_dir: &Path, scope: &AgentScope) -> AgentDiscoveryResult {
     let user_dir = agent_dir.join("agents");
@@ -139,7 +185,11 @@ pub fn discover_agents(cwd: &Path, agent_dir: &Path, scope: &AgentScope) -> Agen
         load_agents_from_dir(project_agents_dir.as_ref().unwrap(), AgentSource::Project)
     };
 
+    // Built-in agents (lowest priority, overridden by user/project files)
     let mut agent_map: HashMap<String, AgentConfig> = HashMap::new();
+    for agent in get_builtin_agents() {
+        agent_map.insert(agent.name.clone(), agent);
+    }
 
     match scope {
         AgentScope::Both | AgentScope::User => {
@@ -212,6 +262,7 @@ pub fn format_agent_list(agents: &[AgentConfig], max_items: usize) -> (String, u
             let source = match a.source {
                 AgentSource::User => "user",
                 AgentSource::Project => "project",
+                AgentSource::Builtin => "builtin",
             };
             format!("{} ({}): {}", a.name, source, a.description)
         })
@@ -370,7 +421,13 @@ Worker system prompt."#;
         std::fs::create_dir_all(&agent_dir).unwrap();
 
         let result = discover_agents(&cwd, &agent_dir.join(".."), &AgentScope::User);
-        assert!(result.agents.is_empty());
+        assert_eq!(
+            result.agents.len(),
+            1,
+            "expected only builtin goal-verify agent"
+        );
+        assert_eq!(result.agents[0].name, "goal-verify");
+        assert_eq!(result.agents[0].source, AgentSource::Builtin);
         assert!(result.project_agents_dir.is_none());
     }
 }

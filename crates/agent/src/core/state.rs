@@ -120,6 +120,8 @@ pub struct ToolContext {
     pub sandbox: Option<Arc<dyn SandboxTrait>>,
     pub sandbox_enabled: Option<Arc<AtomicBool>>,
     pub tool_event_bus: Option<std::sync::Arc<super::hooks::ToolEventBus>>,
+    pub get_api_key: Option<Arc<dyn Fn() -> Option<String> + Send + Sync>>,
+    pub tool_execution_permission: Option<String>,
     /// For sub-agents: the parent session's GoalManager.
     /// Set when spawning a child agent; None for the main session.
     pub parent_goal_manager: Option<Arc<GoalManager>>,
@@ -141,6 +143,8 @@ impl Clone for ToolContext {
             sandbox: self.sandbox.clone(),
             sandbox_enabled: self.sandbox_enabled.clone(),
             tool_event_bus: self.tool_event_bus.clone(),
+            get_api_key: self.get_api_key.clone(),
+            tool_execution_permission: self.tool_execution_permission.clone(),
             parent_goal_manager: self.parent_goal_manager.clone(),
         }
     }
@@ -170,6 +174,11 @@ impl std::fmt::Debug for ToolContext {
                 "tool_event_bus",
                 &self.tool_event_bus.as_ref().map(|_| "ToolEventBus"),
             )
+            .field(
+                "get_api_key",
+                &self.get_api_key.as_ref().map(|_| "GetApiKeyFn"),
+            )
+            .field("tool_execution_permission", &self.tool_execution_permission)
             .finish()
     }
 }

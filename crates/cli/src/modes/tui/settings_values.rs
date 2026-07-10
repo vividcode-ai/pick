@@ -560,6 +560,25 @@ pub(crate) async fn apply_http_timeout(sm: &mut SettingsManager, ctx: &mut TuiCo
     }
 }
 
+pub(crate) async fn apply_tool_exec_permission(
+    sm: &mut SettingsManager,
+    ctx: &mut TuiContext,
+    val: &str,
+) {
+    let mode = val.trim_start_matches("tep-");
+    let mut update = Settings::default();
+    update.tool_execution_permission = Some(mode.to_string());
+    match sm.set_global(update) {
+        Ok(()) => ctx.tui.chat.add_system_message(&format!(
+            "Tool execution permission set to \x1b[1m{}\x1b[0m.",
+            mode
+        )),
+        Err(e) => ctx
+            .tui
+            .show_error(&format!("Failed to save setting: {}", e)),
+    }
+}
+
 pub(crate) async fn apply_de_action(sm: &mut SettingsManager, ctx: &mut TuiContext, val: &str) {
     let action = val.trim_start_matches("de-");
     let mut update = Settings::default();

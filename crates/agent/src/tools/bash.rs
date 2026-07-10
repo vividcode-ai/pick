@@ -113,34 +113,38 @@ pub fn create_bash_tool() -> AgentTool {
                             ep.evaluate(command),
                             crate::permission::exec_policy::ExecDecision::Prompt
                         )
-                        && let Some(ref approve) = ctx.approve
                     {
-                        // Publish WaitingForUser event before prompting
-                        if let Some(ref bus) = ctx.tool_event_bus {
-                            bus.publish(&ToolEvent::WaitingForUser {
-                                tool_name: "bash".to_string(),
-                                tool_call_id: tool_call_id.to_string(),
-                                input: args.clone(),
-                                kind: WaitingKind::Permission {
-                                    permission: "bash".to_string(),
-                                },
-                                summary: format!("Command '{}' may be dangerous.", command),
-                            })
+                        // Auto-approve if tool_execution_permission is "auto_approve"
+                        if ctx.tool_execution_permission.as_deref() == Some("auto_approve") {
+                            // Skip approval dialog, proceed with execution
+                        } else if let Some(ref approve) = ctx.approve {
+                            // Publish WaitingForUser event before prompting
+                            if let Some(ref bus) = ctx.tool_event_bus {
+                                bus.publish(&ToolEvent::WaitingForUser {
+                                    tool_name: "bash".to_string(),
+                                    tool_call_id: tool_call_id.to_string(),
+                                    input: args.clone(),
+                                    kind: WaitingKind::Permission {
+                                        permission: "bash".to_string(),
+                                    },
+                                    summary: format!("Command '{}' may be dangerous.", command),
+                                })
+                                .await;
+                            }
+                            let approved = approve(
+                                "Exec Policy".to_string(),
+                                format!("Command '{}' may be dangerous.", command),
+                            )
                             .await;
-                        }
-                        let approved = approve(
-                            "Exec Policy".to_string(),
-                            format!("Command '{}' may be dangerous.", command),
-                        )
-                        .await;
-                        if !approved {
-                            return Ok(AgentToolResult {
-                                content: vec![ContentBlock::text(
-                                    "Error: Command blocked by user — exec policy required approval",
-                                )],
-                                is_error: true,
-                                terminate: false,
-                            });
+                            if !approved {
+                                return Ok(AgentToolResult {
+                                    content: vec![ContentBlock::text(
+                                        "Error: Command blocked by user — exec policy required approval",
+                                    )],
+                                    is_error: true,
+                                    terminate: false,
+                                });
+                            }
                         }
                     }
                 }
@@ -292,6 +296,7 @@ pub fn create_bash_tool() -> AgentTool {
                                 pm,
                                 ctx.question.as_ref(),
                                 ctx.tool_event_bus.as_ref(),
+                                ctx.tool_execution_permission.as_deref().unwrap_or("prompt"),
                             )
                             .await?
                         } else {
