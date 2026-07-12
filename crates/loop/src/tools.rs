@@ -229,7 +229,7 @@ mod tests {
     use crate::types::LoopJob;
 
     fn make_manager_with_goal() -> Arc<RwLock<LoopManager>> {
-        let mgr = LoopManager::new("test", "test.json".into());
+        let mgr = LoopManager::new("test.json".into());
         let mut goal_job = LoopJob::new_goal("g1".into(), "test goal".into(), vec![], vec![], 0);
         goal_job.status = LoopJobStatus::Running;
         let mut mgr = mgr;
@@ -295,7 +295,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_no_active_goal() {
-        let lm = Arc::new(RwLock::new(LoopManager::new("test", "test.json".into())));
+        let lm = Arc::new(RwLock::new(LoopManager::new("test.json".into())));
         let tool = create_goal_complete_tool(lm);
         let args = serde_json::json!({"summary": "done", "evidence": ""});
         let result = (tool.execute)("call4".into(), args, ToolContext::default())

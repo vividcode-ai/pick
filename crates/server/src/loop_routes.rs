@@ -24,6 +24,8 @@ pub struct LoopJobResponse {
     pub next_due_ms: i64,
     pub last_run_at: Option<i64>,
     pub created_at: i64,
+    pub goal_status: Option<String>,
+    pub goal_progress: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -72,6 +74,8 @@ pub async fn list_loops(
             next_due_ms: j.due_in_ms(chrono::Utc::now().timestamp_millis()),
             last_run_at: j.last_run_at,
             created_at: j.created_at,
+            goal_status: j.goal_status.clone(),
+            goal_progress: j.goal_progress.clone(),
         })
         .collect();
     Json(jobs).into_response()
@@ -135,13 +139,16 @@ pub async fn create_loop(
         }
     }
 
-    // Send SSE event
+    // Send SSE events
     let event = serde_json::json!({"job_id": job_id});
     let _ = sse_state
         .event_tx
         .send(Ok(axum::response::sse::Event::default()
             .event("loop_created")
             .data(serde_json::to_string(&event).unwrap_or_default())));
+
+    // Explicitly send loop_updated so the frontend panel refreshes immediately
+    send_loop_update(&sse_state).await;
 
     debug!("Loop job created: {}", job_id);
     (StatusCode::CREATED, Json(serde_json::json!({"id": job_id}))).into_response()
@@ -276,7 +283,7 @@ pub async fn clear_loops(
 }
 
 /// Send a loop_updated SSE event with current state.
-async fn send_loop_update(sse_state: &crate::session::SseSessionState) {
+pub(crate) async fn send_loop_update(sse_state: &crate::session::SseSessionState) {
     let mgr = sse_state.loop_manager.read().await;
     let jobs: Vec<LoopJobResponse> = mgr
         .list()
@@ -295,6 +302,8 @@ async fn send_loop_update(sse_state: &crate::session::SseSessionState) {
             next_due_ms: j.due_in_ms(chrono::Utc::now().timestamp_millis()),
             last_run_at: j.last_run_at,
             created_at: j.created_at,
+            goal_status: j.goal_status.clone(),
+            goal_progress: j.goal_progress.clone(),
         })
         .collect();
     let payload = serde_json::json!({"jobs": jobs});
@@ -303,4 +312,119 @@ async fn send_loop_update(sse_state: &crate::session::SseSessionState) {
         .send(Ok(axum::response::sse::Event::default()
             .event("loop_updated")
             .data(serde_json::to_string(&payload).unwrap_or_default())));
+}
+
+// ── Goal subcommands ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+pub struct GoalCompleteRequest {
+    pub summary: Option<String>,
+    pub evidence: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GoalBlockedRequest {
+    pub reason: Option<String>,
+    pub needed: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GoalProgressRequest {
+    pub summary: Option<String>,
+    pub next: Option<String>,
+}
+
+/// POST /sessions/{id}/loops/{job_id}/goal-complete
+pub async fn goal_complete(
+    State(state): State<Arc<AppState>>,
+    Path((session_id, job_id)): Path<(String, String)>,
+    Json(req): Json<GoalCompleteRequest>,
+) -> impl IntoResponse {
+    let sse_state = match state.sse_sessions.read().await.get(&session_id).cloned() {
+        Some(s) => s,
+        None => return (StatusCode::NOT_FOUND, "Session not found").into_response(),
+    };
+
+    let mut mgr = sse_state.loop_manager.write().await;
+    let result = if let Some(job) = mgr.get_mut(&job_id) {
+        job.goal_status = Some("completed".to_string());
+        job.status = pick_loop::LoopJobStatus::Done;
+        job.goal_progress.push(format!(
+            "COMPLETED: {} | Evidence: {}",
+            req.summary.as_deref().unwrap_or("Goal completed"),
+            req.evidence.as_deref().unwrap_or("")
+        ));
+        let _ = mgr.save();
+        format!(
+            "Goal completed: {}",
+            req.summary.as_deref().unwrap_or("done")
+        )
+    } else {
+        return (StatusCode::NOT_FOUND, "Job not found").into_response();
+    };
+
+    send_loop_update(&sse_state).await;
+    (StatusCode::OK, result).into_response()
+}
+
+/// POST /sessions/{id}/loops/{job_id}/goal-blocked
+pub async fn goal_blocked(
+    State(state): State<Arc<AppState>>,
+    Path((session_id, job_id)): Path<(String, String)>,
+    Json(req): Json<GoalBlockedRequest>,
+) -> impl IntoResponse {
+    let sse_state = match state.sse_sessions.read().await.get(&session_id).cloned() {
+        Some(s) => s,
+        None => return (StatusCode::NOT_FOUND, "Session not found").into_response(),
+    };
+
+    let mut mgr = sse_state.loop_manager.write().await;
+    let result = if let Some(job) = mgr.get_mut(&job_id) {
+        job.goal_status = Some("blocked".to_string());
+        job.status = pick_loop::LoopJobStatus::Paused;
+        let reason = req.reason.as_deref().unwrap_or("Unknown reason");
+        job.goal_progress.push(format!("BLOCKED: {}", reason));
+        job.last_verify_failure = Some(format!(
+            "Goal blocked: {} | Needed: {}",
+            reason,
+            req.needed.as_deref().unwrap_or("")
+        ));
+        let _ = mgr.save();
+        format!("Goal blocked: {}", reason)
+    } else {
+        return (StatusCode::NOT_FOUND, "Job not found").into_response();
+    };
+
+    send_loop_update(&sse_state).await;
+    (StatusCode::OK, result).into_response()
+}
+
+/// POST /sessions/{id}/loops/{job_id}/goal-progress
+pub async fn goal_progress(
+    State(state): State<Arc<AppState>>,
+    Path((session_id, job_id)): Path<(String, String)>,
+    Json(req): Json<GoalProgressRequest>,
+) -> impl IntoResponse {
+    let sse_state = match state.sse_sessions.read().await.get(&session_id).cloned() {
+        Some(s) => s,
+        None => return (StatusCode::NOT_FOUND, "Session not found").into_response(),
+    };
+
+    let mut mgr = sse_state.loop_manager.write().await;
+    let result = if let Some(job) = mgr.get_mut(&job_id) {
+        let summary = req.summary.as_deref().unwrap_or("Progress made");
+        let next = req.next.as_deref().unwrap_or("Continue working");
+        job.goal_progress
+            .push(format!("PROGRESS: {} | Next: {}", summary, next));
+        if job.goal_progress.len() > 30 {
+            job.goal_progress.drain(0..job.goal_progress.len() - 30);
+        }
+        let _ = mgr.save();
+        format!("Progress recorded: {}", summary)
+    } else {
+        return (StatusCode::NOT_FOUND, "Job not found").into_response();
+    };
+
+    send_loop_update(&sse_state).await;
+    (StatusCode::OK, result).into_response()
 }

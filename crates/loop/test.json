@@ -28,22 +28,19 @@
       "batch": null,
       "watch_paths": [],
       "watch_snapshot": {},
-      "goal_status": "blocked",
+      "goal_status": "active",
       "goal_acceptance": [],
       "goal_checks": [],
       "goal_progress": [
-        "BLOCKED: Need user input"
+        "PROGRESS: Fixed the parser | Next: Add tests"
       ],
-      "status": "Paused",
+      "status": "Running",
       "run_count": 0,
       "failure_count": 0,
       "last_run_at": null,
       "last_verify_failure": null,
-      "created_at": 1783658880184,
-      "updated_at": 1783658880184
-    }
-  ]
-}880184
+      "created_at": 1783666491408,
+      "updated_at": 1783666491408
     }
   ]
 }

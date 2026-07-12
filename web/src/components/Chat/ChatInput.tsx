@@ -9,7 +9,7 @@ import { ChevronDown, Loader2 } from "lucide-react";
 import fuzzysort from "fuzzysort";
 import type { ProviderInfo } from "../../types/events";
 import { ModelThinkingSelector } from "./ModelThinkingSelector";
-import { CommandMode } from "./CommandMode";
+import { CommandMode, type ExtraMode } from "./CommandMode";
 import { ToolExecPermission } from "./ToolExecPermission";
 import { GoalDrawer } from "./GoalDrawer";
 import { LoopPanel } from "../Loop/LoopPanel";
@@ -20,7 +20,7 @@ interface MentionItem {
 }
 
 interface ChatInputProps {
-  onSend: (text: string, opts?: { mode?: "build" | "plan"; extraMode?: "goal" | "loop" | null }) => void;
+  onSend: (text: string, opts?: { mode?: "build" | "plan"; extraMode?: ExtraMode | null }) => void;
   disabled: boolean;
   onCancel?: () => void;
   connected: boolean;
@@ -41,6 +41,7 @@ interface ChatInputProps {
   activeGoal: { objective: string; startTime: number } | null;
   onClearGoal: () => void;
   loopJobs?: import("../../types/events").LoopJobResponse[];
+  loopSending?: boolean;
 }
 
 export function ChatInput({
@@ -65,13 +66,14 @@ export function ChatInput({
   activeGoal,
   onClearGoal,
   loopJobs,
+  loopSending,
 }: ChatInputProps) {
   const [input, setInput] = useState("");
   const [currentCommand, setCurrentCommand] = useState<"build" | "plan">(
     "build",
   );
   const [commandOpen, setCommandOpen] = useState(false);
-  const [extraMode, setExtraMode] = useState<"goal" | "loop" | null>(null);
+  const [extraMode, setExtraMode] = useState<ExtraMode>(null);
   const [browsingHistory, setBrowsingHistory] = useState(false);
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionQuery, setMentionQuery] = useState("");
@@ -347,8 +349,8 @@ export function ChatInput({
   return (
     <div className="w-full px-4 py-3">
       <div className="max-w-[90%] md:max-w-[70%] lg:max-w-[40%] mx-auto">
-        {/* Top bar: working status + goal on the same line */}
-        {(streaming || activeGoal) && (
+        {/* Top bar: working status + loop/goal on the same line */}
+        {(streaming || activeGoal || loopSending || (loopJobs != null && loopJobs.length > 0)) && (
           <div className="flex items-center gap-3 pb-3 px-1">
             {streaming && (
               <div className="flex items-center gap-2 text-[var(--text-muted)] shrink-0 whitespace-nowrap">
@@ -356,8 +358,22 @@ export function ChatInput({
                 <span className="text-sm">Working...</span>
               </div>
             )}
-            {activeGoal && (
-              <div className={streaming ? "min-w-0 flex-1" : "w-full"}>
+            {/* Middle content: LoopPanel shell takes precedence over GoalDrawer */}
+            <div className={streaming ? "min-w-0 flex-1" : "w-full"}>
+              {loopJobs != null && loopJobs.length > 0 ? (
+                <div className="bg-[var(--surface-elevated)]/40 rounded-lg border border-[var(--border-base)] overflow-hidden px-3 py-1.5">
+                  <LoopPanel
+                    jobs={loopJobs}
+                    baseUrl={baseUrl}
+                    sessionId={sessionId ?? null}
+                  />
+                </div>
+              ) : loopSending ? (
+                <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] px-1">
+                  <span className="w-2 h-2 bg-[var(--text-accent)] rounded-full animate-pulse" />
+                  <span>Creating loop job...</span>
+                </div>
+              ) : activeGoal ? (
                 <GoalDrawer
                   goal={activeGoal}
                   onEdit={(newObjective) => {}}
@@ -365,18 +381,14 @@ export function ChatInput({
                   onDelete={onClearGoal}
                   noWrapper={!!streaming}
                 />
-              </div>
-            )}
-            {loopJobs && loopJobs.length > 0 && (
-              <div className="w-full">
-                <LoopPanel
-                  jobs={loopJobs}
-                  baseUrl={baseUrl}
-                  sessionId={sessionId ?? null}
-                />
-              </div>
-            )}
-            {/* Invisible spacer: mirrors Working width so Goal is centered */}
+              ) : streaming ? (
+                <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] px-1">
+                  <span className="w-2 h-2 bg-[var(--text-accent)] rounded-full animate-pulse" />
+                  <span>Awaiting loop job...</span>
+                </div>
+              ) : null}
+            </div>
+            {/* Invisible spacer: mirrors Working width so content is centered */}
             {streaming && (
               <div
                 className="flex items-center gap-2 text-[var(--text-muted)] shrink-0 whitespace-nowrap invisible"

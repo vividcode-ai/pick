@@ -677,4 +677,6 @@ pub struct SseSessionState {
     pub loop_manager: Arc<tokio::sync::RwLock<pick_loop::LoopManager>>,
     /// Loop scheduler
     pub loop_scheduler: Arc<pick_loop::LoopScheduler>,
+    /// Wakeup signal for the agent loop when new messages arrive
+    pub loop_wakeup: Arc<tokio::sync::Notify>,
 }

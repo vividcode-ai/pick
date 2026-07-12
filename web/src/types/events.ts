@@ -153,6 +153,8 @@ export interface LoopJobResponse {
   next_due_ms: number;
   last_run_at: number | null;
   created_at: number;
+  goal_status?: string | null;
+  goal_progress?: string[];
 }
 
 export interface LoopUpdatedPayload {

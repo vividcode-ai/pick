@@ -76,6 +76,17 @@ mod tests {
             "loop-now",
             "loop-stop",
             "loop-help",
+            "loop-ask",
+            "loop-command",
+            "loop-cmd",
+            "loop-shell",
+            "loop-goal-status",
+            "loop-goal-pause",
+            "loop-goal-resume",
+            "loop-goal-clear",
+            "loop-goal-done",
+            "loop-goal-complete",
+            "loop-goal-blocked",
         ]
         .into_iter()
         .collect();

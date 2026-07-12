@@ -336,8 +336,11 @@ pub(crate) fn build_agent_config(
     });
 
     // Wrap on_turn_complete with loop hooks
-    let on_turn_complete =
-        pick_loop::integration::build_turn_complete_hook(Some(on_turn_complete), loop_manager);
+    let on_turn_complete = pick_loop::integration::build_turn_complete_hook(
+        Some(on_turn_complete),
+        loop_manager,
+        None,
+    );
 
     let sm = crate::core::settings::SettingsManager::load(&ctx.cwd);
     let tool_execution_permission = sm.get().tool_execution_permission.clone();

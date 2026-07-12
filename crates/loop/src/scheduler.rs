@@ -516,14 +516,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_empty_no_trigger() {
-        let mgr = Arc::new(RwLock::new(LoopManager::new("test", "test.json".into())));
+        let mgr = Arc::new(RwLock::new(LoopManager::new("test.json".into())));
         let sched = LoopScheduler::new(mgr);
         assert_eq!(sched.maybe_run_due_jobs().await, 0);
     }
 
     #[tokio::test]
     async fn test_maybe_run_due_jobs() {
-        let mgr = Arc::new(RwLock::new(LoopManager::new("test", "test.json".into())));
+        let mgr = Arc::new(RwLock::new(LoopManager::new("test.json".into())));
         let job = LoopJob::new_prompt("j1".into(), "t".into(), "a".into(), 0, true);
         mgr.write().await.create(job);
 
@@ -541,7 +541,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_run_lock() {
-        let mgr = Arc::new(RwLock::new(LoopManager::new("test", "test.json".into())));
+        let mgr = Arc::new(RwLock::new(LoopManager::new("test.json".into())));
         let sched = LoopScheduler::new(mgr);
         sched.run_lock.store(true, Ordering::Release);
         assert_eq!(sched.maybe_run_due_jobs().await, 0);
@@ -549,7 +549,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_trigger_job() {
-        let mgr = Arc::new(RwLock::new(LoopManager::new("test", "test.json".into())));
+        let mgr = Arc::new(RwLock::new(LoopManager::new("test.json".into())));
         let job = LoopJob::new_prompt("j1".into(), "t".into(), "a".into(), 300_000, false);
         mgr.write().await.create(job);
 

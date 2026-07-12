@@ -392,6 +392,19 @@ pub fn create_app(state: Arc<AppState>) -> Router {
             "/sessions/{id}/loops/{job_id}/trigger",
             post(loop_routes::trigger_loop),
         )
+        // Goal subcommands
+        .route(
+            "/sessions/{id}/loops/{job_id}/goal-complete",
+            post(loop_routes::goal_complete),
+        )
+        .route(
+            "/sessions/{id}/loops/{job_id}/goal-blocked",
+            post(loop_routes::goal_blocked),
+        )
+        .route(
+            "/sessions/{id}/loops/{job_id}/goal-progress",
+            post(loop_routes::goal_progress),
+        )
         .route("/files/content", get(files::read_file_handler))
         .route("/files/list", get(files::list_dir_handler))
         .route("/find/text", get(files::find_text_handler))

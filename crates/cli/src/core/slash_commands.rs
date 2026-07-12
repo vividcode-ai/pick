@@ -189,6 +189,50 @@ pub const BUILTIN_SLASH_COMMANDS: &[BuiltinSlashCommand] = &[
         name: "loop-help",
         description: "Show loop help",
     },
+    BuiltinSlashCommand {
+        name: "loop-ask",
+        description: "Recurring prompt that waits for first interval: /loop-ask <interval> <prompt>",
+    },
+    BuiltinSlashCommand {
+        name: "loop-command",
+        description: "Execute a command on interval: /loop-command <interval> <command>",
+    },
+    BuiltinSlashCommand {
+        name: "loop-cmd",
+        description: "Alias for /loop-command",
+    },
+    BuiltinSlashCommand {
+        name: "loop-shell",
+        description: "Execute a shell command on interval: /loop-shell <interval> <command>",
+    },
+    BuiltinSlashCommand {
+        name: "loop-goal-status",
+        description: "Show goal-driven loop status",
+    },
+    BuiltinSlashCommand {
+        name: "loop-goal-pause",
+        description: "Pause a goal-driven loop",
+    },
+    BuiltinSlashCommand {
+        name: "loop-goal-resume",
+        description: "Resume a goal-driven loop",
+    },
+    BuiltinSlashCommand {
+        name: "loop-goal-clear",
+        description: "Clear goal-driven loops",
+    },
+    BuiltinSlashCommand {
+        name: "loop-goal-done",
+        description: "Mark a goal-driven loop as complete: /loop-goal-done <summary>",
+    },
+    BuiltinSlashCommand {
+        name: "loop-goal-complete",
+        description: "Alias for /loop-goal-done",
+    },
+    BuiltinSlashCommand {
+        name: "loop-goal-blocked",
+        description: "Mark a goal-driven loop as blocked: /loop-goal-blocked <reason>",
+    },
 ];
 
 /// New commands added beyond the original built-in list

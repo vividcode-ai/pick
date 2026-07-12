@@ -9,16 +9,14 @@ use crate::types::{LoopJob, LoopJobStatus, LoopStore};
 #[derive(Debug, Clone)]
 pub struct LoopManager {
     jobs: Vec<LoopJob>,
-    session_id: String,
     persistence_path: PathBuf,
 }
 
 impl LoopManager {
     /// Create a new empty manager.
-    pub fn new(session_id: &str, persistence_path: PathBuf) -> Self {
+    pub fn new(persistence_path: PathBuf) -> Self {
         Self {
             jobs: Vec::new(),
-            session_id: session_id.to_string(),
             persistence_path,
         }
     }
@@ -90,6 +88,10 @@ impl LoopManager {
                     && !j.max_runs_reached()
                     && !j.max_runtime_exceeded(now_ms)
                     && j.is_due(now_ms)
+                    // interval_ms=0 jobs fire once on initial trigger; skip
+                    // auto-re-trigger for jobs that already ran to prevent
+                    // runaway watchdog / scheduler cycling.
+                    && (j.interval_ms > 0 || j.run_count == 0)
             })
             .collect()
     }
@@ -226,22 +228,13 @@ impl LoopManager {
     /// Load jobs from the persistence file. Returns a new manager.
     pub fn load(path: &Path) -> Self {
         if !path.exists() {
-            let session_id = path
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("unknown")
-                .to_string();
-            return Self::new(&session_id, path.to_path_buf());
+            return Self::new(path.to_path_buf());
         }
         let json = match std::fs::read_to_string(path) {
             Ok(s) => s,
             Err(e) => {
                 warn!("Failed to read loop state file ({}): {}", path.display(), e);
-                let session_id = path
-                    .file_stem()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("unknown");
-                return Self::new(session_id, path.to_path_buf());
+                return Self::new(path.to_path_buf());
             }
         };
         let store: LoopStore = match serde_json::from_str(&json) {
@@ -252,20 +245,11 @@ impl LoopManager {
                     path.display(),
                     e
                 );
-                let session_id = path
-                    .file_stem()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("unknown");
-                return Self::new(session_id, path.to_path_buf());
+                return Self::new(path.to_path_buf());
             }
         };
-        let session_id = path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("unknown");
         Self {
             jobs: store.jobs,
-            session_id: session_id.to_string(),
             persistence_path: path.to_path_buf(),
         }
     }
@@ -312,6 +296,10 @@ mod tests {
     use crate::types::LoopJob;
     use tempfile::TempDir;
 
+    fn test_mgr() -> LoopManager {
+        LoopManager::new(PathBuf::from("/tmp/test.json"))
+    }
+
     fn test_job(name: &str) -> LoopJob {
         LoopJob::new_prompt(
             uuid::Uuid::now_v7().to_string(),
@@ -324,7 +312,7 @@ mod tests {
 
     #[test]
     fn test_create_and_get() {
-        let mut mgr = LoopManager::new("sess-1", PathBuf::from("/tmp/test.json"));
+        let mut mgr = test_mgr();
         let job = test_job("test");
         let id = mgr.create(job);
         assert!(mgr.get(&id).is_some());
@@ -332,7 +320,7 @@ mod tests {
 
     #[test]
     fn test_create_replaces_same_name() {
-        let mut mgr = LoopManager::new("sess-1", PathBuf::from("/tmp/test.json"));
+        let mut mgr = test_mgr();
         let j1 = test_job("foo");
         let j2 = LoopJob::new_prompt(
             uuid::Uuid::now_v7().to_string(),
@@ -341,8 +329,8 @@ mod tests {
             0,
             true,
         );
-        let id1 = mgr.create(j1);
-        let id2 = mgr.create(j2);
+        let _id1 = mgr.create(j1);
+        let _id2 = mgr.create(j2);
         // Only one job with name "foo" should exist
         assert_eq!(mgr.list().len(), 1);
         assert_eq!(mgr.list()[0].action, "replaced");
@@ -350,7 +338,7 @@ mod tests {
 
     #[test]
     fn test_remove() {
-        let mut mgr = LoopManager::new("sess-1", PathBuf::from("/tmp/test.json"));
+        let mut mgr = test_mgr();
         let j = test_job("x");
         let id = mgr.create(j);
         assert!(mgr.remove(&id));
@@ -360,7 +348,7 @@ mod tests {
 
     #[test]
     fn test_clear() {
-        let mut mgr = LoopManager::new("sess-1", PathBuf::from("/tmp/test.json"));
+        let mut mgr = test_mgr();
         mgr.create(test_job("a"));
         mgr.create(test_job("b"));
         mgr.clear();
@@ -369,7 +357,7 @@ mod tests {
 
     #[test]
     fn test_state_transitions() {
-        let mut mgr = LoopManager::new("sess-1", PathBuf::from("/tmp/test.json"));
+        let mut mgr = test_mgr();
         let j = test_job("x");
         let id = mgr.create(j);
 
@@ -385,7 +373,7 @@ mod tests {
 
     #[test]
     fn test_pause_resume() {
-        let mut mgr = LoopManager::new("sess-1", PathBuf::from("/tmp/test.json"));
+        let mut mgr = test_mgr();
         let j = test_job("x");
         let id = mgr.create(j);
 
@@ -398,7 +386,7 @@ mod tests {
 
     #[test]
     fn test_pause_fails_on_done() {
-        let mut mgr = LoopManager::new("sess-1", PathBuf::from("/tmp/test.json"));
+        let mut mgr = test_mgr();
         let j = test_job("x");
         let id = mgr.create(j);
         mgr.mark_done(&id);
@@ -407,7 +395,7 @@ mod tests {
 
     #[test]
     fn test_record_run() {
-        let mut mgr = LoopManager::new("sess-1", PathBuf::from("/tmp/test.json"));
+        let mut mgr = test_mgr();
         let mut j = test_job("x");
         j.max_runs = Some(3);
         let id = mgr.create(j);
@@ -420,7 +408,7 @@ mod tests {
 
     #[test]
     fn test_record_failure() {
-        let mut mgr = LoopManager::new("sess-1", PathBuf::from("/tmp/test.json"));
+        let mut mgr = test_mgr();
         let mut j = test_job("x");
         j.max_failures = Some(2);
         let id = mgr.create(j);
@@ -433,7 +421,7 @@ mod tests {
     #[test]
     fn test_due_jobs() {
         let now = chrono::Utc::now().timestamp_millis();
-        let mut mgr = LoopManager::new("sess-1", PathBuf::from("/tmp/test.json"));
+        let mut mgr = test_mgr();
 
         // Job with interval=0 (idle-driven) → always due
         let mut j1 = test_job("idle");
@@ -465,7 +453,7 @@ mod tests {
 
         // Create and save
         {
-            let mut mgr = LoopManager::new("sess-1", path.clone());
+            let mut mgr = LoopManager::new(path.clone());
             mgr.create(test_job("a"));
             mgr.create(test_job("b"));
             mgr.save().unwrap();
@@ -481,7 +469,7 @@ mod tests {
     #[test]
     fn test_recover_stale_runs() {
         let now = chrono::Utc::now().timestamp_millis();
-        let mut mgr = LoopManager::new("sess-1", PathBuf::from("/tmp/test.json"));
+        let mut mgr = test_mgr();
         let mut j = test_job("stale");
         j.status = LoopJobStatus::Running;
         j.last_run_at = Some(now - 120_000); // 2 minutes ago

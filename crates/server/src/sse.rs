@@ -79,18 +79,37 @@ pub async fn handle_sse(
         &loops_path,
     )));
 
+    // Create loop wakeup signal
+    let loop_wakeup = Arc::new(tokio::sync::Notify::new());
+
     // Build trigger callback
     let loop_mq = message_queue.clone();
     let loop_event_tx = tx.clone();
     let loop_mgr_cb = loop_manager.clone();
+    let loop_wakeup_cb = loop_wakeup.clone();
     let trigger_cb: pick_loop::scheduler::TriggerCallback = Arc::new(move |job| {
         let mq = loop_mq.clone();
         let et = loop_event_tx.clone();
         let mgr = loop_mgr_cb.clone();
+        let wakeup = loop_wakeup_cb.clone();
         Box::pin(async move {
-            let msg = pick_loop::integration::build_loop_message(&job);
-            if let Ok(mut q) = mq.lock() {
-                q.enqueue(msg);
+            let is_shell_or_command = job.kind == "shell" || job.kind == "command";
+
+            if is_shell_or_command {
+                // Execute shell/command directly (e.g. npm test, /compact)
+                let _ = tokio::process::Command::new("sh")
+                    .arg("-c")
+                    .arg(&job.action)
+                    .output()
+                    .await;
+            } else {
+                // Enqueue message for agent (prompt, goal, ask)
+                let msg = pick_loop::integration::build_loop_message(&job);
+                if let Ok(mut q) = mq.lock() {
+                    q.enqueue(msg);
+                }
+                // Wake up the agent loop so it processes the new message immediately
+                wakeup.notify_one();
             }
             // Send full loop state
             let all_info: Vec<pick_loop::types::LoopJobStatusInfo> = {
@@ -135,6 +154,7 @@ pub async fn handle_sse(
                 goal_manager: Arc::new(RwLock::new(None)),
                 loop_manager,
                 loop_scheduler,
+                loop_wakeup,
             },
         );
     }

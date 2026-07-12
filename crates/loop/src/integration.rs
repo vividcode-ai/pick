@@ -17,6 +17,7 @@ use tokio::sync::RwLock;
 
 use crate::goal::{build_goal_prompt, decorate_prompt};
 use crate::manager::LoopManager;
+use crate::scheduler::LoopScheduler;
 use crate::types::LoopJob;
 
 // ── Hook factories ─────────────────────────────────────────────────────────
@@ -61,9 +62,15 @@ pub fn build_steering_hook(
 ///
 /// After a turn completes, if a loop job is configured for immediate re-run,
 /// re-enqueue it so the outer loop picks it up.
+///
+/// NOTE: interval_ms=0 follow-up re-injection has been removed because it
+/// caused the inner agent loop to run forever (each turn re-injected the
+/// same prompt). interval_ms > 0 jobs are re-triggered by the scheduler's
+/// timer. interval_ms=0 jobs fire once on creation; manual re-triggering
+/// via the API or a new session-idle event replaces follow-up injection.
 pub fn build_follow_up_hook(
     inner_hook: Option<Arc<dyn Fn(&AgentRunResult) -> Vec<Message> + Send + Sync>>,
-    loop_manager: Arc<RwLock<LoopManager>>,
+    _loop_manager: Arc<RwLock<LoopManager>>,
 ) -> Arc<dyn Fn(&AgentRunResult) -> Vec<Message> + Send + Sync> {
     Arc::new(move |result| {
         let mut msgs = Vec::new();
@@ -71,22 +78,6 @@ pub fn build_follow_up_hook(
         // 1. Run existing hook
         if let Some(ref inner) = inner_hook {
             msgs.extend(inner(result));
-        }
-
-        // 2. Check for idle-driven (interval=0) loop jobs that should
-        //    re-run immediately
-        if let Ok(mgr) = loop_manager.try_read() {
-            for job in mgr.list() {
-                if job.interval_ms == 0
-                    && !job.max_runs_reached()
-                    && !job.is_goal()
-                    && (job.status == crate::types::LoopJobStatus::Running
-                        || job.status == crate::types::LoopJobStatus::Idle)
-                {
-                    let prompt = decorate_prompt(job);
-                    msgs.push(Message::User(UserMessage::text(prompt)));
-                }
-            }
         }
 
         msgs
@@ -131,14 +122,20 @@ pub fn build_should_stop_hook(
 
 /// Build an on_turn_complete hook that runs verify, postrun, checkpoint,
 /// and reschedule logic for loop jobs.
+///
+/// `loop_scheduler` is optional — when `Some`, idle jobs are rescheduled
+/// so their next trigger is `interval_ms` from the completion of this run
+/// rather than from the original `schedule()` call.
 pub fn build_turn_complete_hook(
     inner_hook: Option<
         Arc<dyn Fn(&[Message]) -> Pin<Box<dyn Send + Future<Output = ()>>> + Send + Sync>,
     >,
     loop_manager: Arc<RwLock<LoopManager>>,
+    loop_scheduler: Option<Arc<LoopScheduler>>,
 ) -> Arc<dyn Fn(&[Message]) -> Pin<Box<dyn Send + Future<Output = ()>>> + Send + Sync> {
     Arc::new(move |messages| {
         let lm = loop_manager.clone();
+        let ls = loop_scheduler.clone();
         let inner = inner_hook.clone();
         // Clone messages so they can be moved into the async block
         let msgs_clone: Vec<Message> = messages.to_vec();
@@ -162,52 +159,66 @@ pub fn build_turn_complete_hook(
             };
 
             for id in running_ids {
-                let mut mgr = lm.write().await;
-                let reached_max = mgr.record_run(&id);
+                let reached_max = {
+                    let mut mgr = lm.write().await;
+                    let reached_max = mgr.record_run(&id);
 
-                // Run verify command (if configured)
-                let verify_cmd = mgr.get(&id).and_then(|j| j.verify_command.clone());
-                if let Some(ref cmd) = verify_cmd {
-                    let output = tokio::process::Command::new("sh")
-                        .arg("-c")
-                        .arg(cmd)
-                        .output()
-                        .await;
-                    match output {
-                        Ok(out) if !out.status.success() => {
-                            let stderr = String::from_utf8_lossy(&out.stderr).to_string();
-                            mgr.record_failure(&id, Some(stderr));
-                        }
-                        Ok(_) => {
-                            if let Some(job) = mgr.get_mut(&id) {
-                                job.failure_count = 0;
-                                job.last_verify_failure = None;
+                    // Run verify command (if configured)
+                    let verify_cmd = mgr.get(&id).and_then(|j| j.verify_command.clone());
+                    if let Some(ref cmd) = verify_cmd {
+                        let output = tokio::process::Command::new("sh")
+                            .arg("-c")
+                            .arg(cmd)
+                            .output()
+                            .await;
+                        match output {
+                            Ok(out) if !out.status.success() => {
+                                let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+                                mgr.record_failure(&id, Some(stderr));
+                            }
+                            Ok(_) => {
+                                if let Some(job) = mgr.get_mut(&id) {
+                                    job.failure_count = 0;
+                                    job.last_verify_failure = None;
+                                }
+                            }
+                            Err(e) => {
+                                tracing::warn!("Failed to run verify for job {}: {}", id, e);
                             }
                         }
-                        Err(e) => {
-                            tracing::warn!("Failed to run verify for job {}: {}", id, e);
+                    }
+
+                    // Run postrun command (if configured)
+                    let postrun_cmd = mgr.get(&id).and_then(|j| j.postrun_command.clone());
+                    if let Some(ref cmd) = postrun_cmd {
+                        let _ = tokio::process::Command::new("sh")
+                            .arg("-c")
+                            .arg(cmd)
+                            .output()
+                            .await;
+                    }
+
+                    if reached_max {
+                        mgr.mark_done(&id);
+                    } else {
+                        mgr.mark_idle(&id);
+                    }
+
+                    let _ = mgr.save();
+                    reached_max
+                }; // <-- mgr write guard dropped HERE (before reschedule)
+
+                // Reschedule the timer so the next fire is `interval_ms` from
+                // now (not from the original schedule() call). This ensures
+                // the interval is measured between agent run completions.
+                if let Some(ref ls) = ls {
+                    if !reached_max {
+                        if let Some(job) = lm.read().await.get(&id).cloned() {
+                            ls.schedule(&job).await;
                         }
                     }
                 }
-
-                // Run postrun command (if configured)
-                let postrun_cmd = mgr.get(&id).and_then(|j| j.postrun_command.clone());
-                if let Some(ref cmd) = postrun_cmd {
-                    let _ = tokio::process::Command::new("sh")
-                        .arg("-c")
-                        .arg(cmd)
-                        .output()
-                        .await;
-                }
-
-                if reached_max {
-                    mgr.mark_done(&id);
-                } else {
-                    mgr.mark_idle(&id);
-                }
-
-                let _ = mgr.save();
-            } // drop mgr here, scheduler can pick up the changes
+            }
         })
     })
 }
@@ -228,7 +239,7 @@ mod tests {
 
     #[test]
     fn test_build_steering_hook_no_inner() {
-        let mgr = Arc::new(RwLock::new(LoopManager::new("test", "test.json".into())));
+        let mgr = Arc::new(RwLock::new(LoopManager::new("test.json".into())));
         let hook = build_steering_hook(None, mgr);
         let msgs = hook();
         // No running jobs → nothing injected
@@ -237,7 +248,7 @@ mod tests {
 
     #[test]
     fn test_build_steering_hook_with_inner() {
-        let mgr = Arc::new(RwLock::new(LoopManager::new("test", "test.json".into())));
+        let mgr = Arc::new(RwLock::new(LoopManager::new("test.json".into())));
         let inner: Option<Arc<dyn Fn() -> Vec<Message> + Send + Sync>> = Some(Arc::new(|| {
             vec![Message::User(UserMessage::text("from inner"))]
         }));

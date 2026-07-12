@@ -9,8 +9,11 @@ pub(crate) async fn handle_loop(ctx: &mut TuiContext, cmd_name: &str, args: &[St
 
     // If command is a specific sub-command, prepend it for parsing
     let full_input = match cmd_name {
-        "loop" => input,
+        "loop" => input.clone(),
         "loop-goal" => format!("goal {}", input),
+        "loop-ask" => format!("ask {}", input),
+        "loop-command" | "loop-cmd" => format!("command {}", input),
+        "loop-shell" => format!("shell {}", input),
         "loop-status" => "status".to_string(),
         "loop-pause" => format!("pause {}", input),
         "loop-resume" => format!("resume {}", input),
@@ -19,8 +22,161 @@ pub(crate) async fn handle_loop(ctx: &mut TuiContext, cmd_name: &str, args: &[St
         "loop-now" => format!("now {}", input),
         "loop-stop" => "stop".to_string(),
         "loop-help" => "help".to_string(),
-        _ => input,
+        // Goal subcommands handled above (match cmd_name)
+        _ if cmd_name.starts_with("loop-goal-") => input.clone(),
+        _ => input.clone(),
     };
+
+    // Handle goal subcommands directly (not via LoopCommand parser)
+    match cmd_name {
+        "loop-goal-status" => {
+            let mgr = ctx.loop_manager.read().await;
+            let goals: Vec<_> = mgr.list().iter().filter(|j| j.is_goal()).collect();
+            if goals.is_empty() {
+                ctx.tui.chat.add_system_message("No goal-driven loop jobs.");
+                return;
+            }
+            ctx.tui
+                .chat
+                .add_system_message("\x1b[1mGoal Loop Jobs:\x1b[0m");
+            for job in &goals {
+                let status = job.goal_status.as_deref().unwrap_or("active");
+                ctx.tui.chat.add_system_message(&format!(
+                    "  {}. \x1b[1m{}\x1b[0m  status: {}  runs: {}",
+                    job.name, job.action, status, job.run_count
+                ));
+            }
+            return;
+        }
+        "loop-goal-pause" => {
+            let target = if input.is_empty() {
+                None
+            } else {
+                Some(input.as_str())
+            };
+            let mut mgr = ctx.loop_manager.write().await;
+            let paused: Vec<String> = mgr
+                .list()
+                .iter()
+                .filter(|j| j.is_goal() && (target.is_none() || target == Some(&j.id)))
+                .map(|j| j.id.clone())
+                .collect();
+            for id in &paused {
+                let _ = mgr.pause(id);
+            }
+            if !paused.is_empty() {
+                let _ = mgr.save();
+                ctx.tui.chat.add_system_message(&format!(
+                    "\x1b[33mPaused {} goal(s).\x1b[0m",
+                    paused.len()
+                ));
+            } else {
+                ctx.tui
+                    .chat
+                    .add_system_message("\x1b[31mNo matching goal loop found.\x1b[0m");
+            }
+            return;
+        }
+        "loop-goal-resume" => {
+            let target = if input.is_empty() {
+                None
+            } else {
+                Some(input.as_str())
+            };
+            let mut mgr = ctx.loop_manager.write().await;
+            let ids: Vec<String> = mgr
+                .list()
+                .iter()
+                .filter(|j| j.is_goal() && (target.is_none() || target == Some(&j.id)))
+                .map(|j| j.id.clone())
+                .collect();
+            for id in &ids {
+                if let Some(job) = mgr.get_mut(id) {
+                    job.status = pick_loop::LoopJobStatus::Idle;
+                    job.goal_status = Some("active".to_string());
+                }
+            }
+            if !ids.is_empty() {
+                let _ = mgr.save();
+                ctx.tui
+                    .chat
+                    .add_system_message(&format!("\x1b[32mResumed {} goal(s).\x1b[0m", ids.len()));
+            } else {
+                ctx.tui
+                    .chat
+                    .add_system_message("\x1b[31mNo matching goal loop found.\x1b[0m");
+            }
+            return;
+        }
+        "loop-goal-clear" => {
+            let mut mgr = ctx.loop_manager.write().await;
+            mgr.clear();
+            let _ = mgr.save();
+            ctx.tui
+                .chat
+                .add_system_message(&format!("\x1b[33mCleared all goal loops.\x1b[0m"));
+            return;
+        }
+        "loop-goal-done" | "loop-goal-complete" => {
+            let summary = if input.is_empty() {
+                "Goal completed via CLI"
+            } else {
+                &input
+            };
+            let mut mgr = ctx.loop_manager.write().await;
+            let target_id = mgr
+                .list()
+                .iter()
+                .find(|j| j.is_goal() && j.status == pick_loop::LoopJobStatus::Running)
+                .map(|j| j.id.clone());
+            if let Some(id) = target_id {
+                if let Some(job) = mgr.get_mut(&id) {
+                    job.goal_status = Some("completed".to_string());
+                    job.status = pick_loop::LoopJobStatus::Done;
+                    job.goal_progress.push(format!("COMPLETED: {}", summary));
+                }
+                let _ = mgr.save();
+                ctx.tui
+                    .chat
+                    .add_system_message(&format!("\x1b[32m✓ Goal completed: {}\x1b[0m", summary));
+            } else {
+                ctx.tui
+                    .chat
+                    .add_system_message("\x1b[31mNo active running goal loop.\x1b[0m");
+            }
+            return;
+        }
+        "loop-goal-blocked" => {
+            let reason = if input.is_empty() {
+                "Blocked via CLI"
+            } else {
+                &input
+            };
+            let mut mgr = ctx.loop_manager.write().await;
+            let target_id = mgr
+                .list()
+                .iter()
+                .find(|j| j.is_goal() && j.status == pick_loop::LoopJobStatus::Running)
+                .map(|j| j.id.clone());
+            if let Some(id) = target_id {
+                if let Some(job) = mgr.get_mut(&id) {
+                    job.goal_status = Some("blocked".to_string());
+                    job.status = pick_loop::LoopJobStatus::Paused;
+                    job.goal_progress.push(format!("BLOCKED: {}", reason));
+                }
+                let _ = mgr.save();
+                ctx.tui
+                    .chat
+                    .add_system_message(&format!("\x1b[33mGoal blocked: {}\x1b[0m", reason));
+            } else {
+                ctx.tui
+                    .chat
+                    .add_system_message("\x1b[31mNo active running goal loop.\x1b[0m");
+            }
+            return;
+        }
+        _ => {}
+    }
 
     let cmd = match parse_loop_command(&full_input) {
         Ok(c) => c,
@@ -62,6 +218,34 @@ pub(crate) async fn handle_loop(ctx: &mut TuiContext, cmd_name: &str, args: &[St
 
             let mut job = if kind == "goal" || cmd_name == "loop-goal" {
                 LoopJob::new_goal(id, objective, acceptance, vec![], interval_ms)
+            } else if cmd_name == "loop-shell" {
+                let mut j = LoopJob::new_prompt(
+                    uuid::Uuid::now_v7().to_string(),
+                    name.clone(),
+                    action,
+                    interval_ms,
+                    true,
+                );
+                j.kind = "shell".to_string();
+                j
+            } else if cmd_name == "loop-command" || cmd_name == "loop-cmd" {
+                let mut j = LoopJob::new_prompt(
+                    uuid::Uuid::now_v7().to_string(),
+                    name.clone(),
+                    action,
+                    interval_ms,
+                    false, // command loops wait for first interval
+                );
+                j.kind = "command".to_string();
+                j
+            } else if cmd_name == "loop-ask" {
+                LoopJob::new_prompt(
+                    uuid::Uuid::now_v7().to_string(),
+                    name.clone(),
+                    action,
+                    interval_ms,
+                    false, // ask waits for first interval
+                )
             } else {
                 LoopJob::new_prompt(
                     uuid::Uuid::now_v7().to_string(),

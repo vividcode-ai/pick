@@ -55,6 +55,7 @@ export default function App() {
   const [sidebarPinned, setSidebarPinned] = useState(true);
   const [activeGoal, setActiveGoal] = useState<{ objective: string; startTime: number; status?: string; timeUsedSeconds?: number } | null>(null);
   const [loopJobs, setLoopJobs] = useState<LoopJobResponse[]>([]);
+  const [loopSending, setLoopSending] = useState(false);
   const [settingsUrl, setSettingsUrl] = useState("");
   const { cycleThemeMode } = useTheme();
 
@@ -118,6 +119,7 @@ export default function App() {
   const handleLoopUpdated = useCallback(
     (payload: LoopUpdatedPayload) => {
       setLoopJobs(payload.jobs);
+      setLoopSending(false);
     },
     []
   );
@@ -146,8 +148,11 @@ export default function App() {
     onLoopUpdated: handleLoopUpdated,
   });
 
-  const pendingSendRef = useRef<{ text: string; extraMode: string | null } | null>(null);
+  const pendingSendRef = useRef<{ text: string; extraMode?: string | null } | null>(null);
+  const activeSessionIdRef = useRef<string | null>(null);
 
+  // Keep ref in sync
+  activeSessionIdRef.current = activeSessionId;
   useEffect(() => {
     if (activeSessionId && pendingSendRef.current !== null) {
       const { text, extraMode } = pendingSendRef.current;
@@ -177,8 +182,36 @@ export default function App() {
     }
   }, [sidebarPinned]);
 
+  // NOTE: loopSending is intentionally NOT reset here on session change.
+  // When a fresh session sends a loop command, createSession() sets a new
+  // activeSessionId before the server has created the loop job. Clearing
+  // loopSending at that point would hide the "Creating loop job..." indicator
+  // before loop_updated arrives, causing a blank gap in the top bar.
+  // handleLoopUpdated (via onLoopUpdated callback) will clear loopSending
+  // when the server responds with the job list.
+
+  // Polling fallback for loop jobs: if the loop_updated SSE event is lost
+  // (e.g. due to EventSource reconnect, network glitch, or server timing),
+  // this interval fetches jobs directly from the REST endpoint.
+  useEffect(() => {
+    if (!loopSending || !activeSessionId || !baseUrl) return;
+    const id = setInterval(async () => {
+      try {
+        const res = await fetch(`${baseUrl}/sessions/${activeSessionId}/loops`);
+        if (!res.ok) return;
+        const jobs = await res.json() as LoopJobResponse[];
+        if (jobs.length > 0) {
+          setLoopJobs(jobs);
+          setLoopSending(false);
+        }
+      } catch { /* poll retry */ }
+    }, 1500);
+    const timeout = setTimeout(() => clearInterval(id), 30_000);
+    return () => { clearInterval(id); clearTimeout(timeout); };
+  }, [loopSending, activeSessionId, baseUrl]);
+
   const handleSend = useCallback(
-    (text: string, opts?: { mode?: string; extraMode?: string | null }) => {
+    (text: string, opts?: { mode?: string; extraMode?: import("./components/Chat/CommandMode").ExtraMode }) => {
       if (!activeSessionId) {
         pendingSendRef.current = { text, extraMode: opts?.extraMode ?? null };
         createSession(selectedModel, selectedProvider).then((result) => {
@@ -193,6 +226,9 @@ export default function App() {
       }
       if (opts?.extraMode === "goal") {
         setActiveGoal({ objective: text, startTime: Date.now() });
+      }
+      if (opts?.extraMode?.startsWith("loop")) {
+        setLoopSending(true);
       }
     },
     [activeSessionId, createSession, selectedModel, selectedProvider, ask, thinkingLevel]
@@ -427,6 +463,7 @@ export default function App() {
       activeGoal={activeGoal}
       onClearGoal={() => setActiveGoal(null)}
       loopJobs={loopJobs}
+      loopSending={loopSending}
     />
   );
 

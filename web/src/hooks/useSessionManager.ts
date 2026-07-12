@@ -262,7 +262,7 @@ export function useSessionManager(
     cancelEvictionTimer(sessionId);
 
     // Add user message to local display immediately
-    const userExtraMode = extraMode === "goal" ? "goal" as const : extraMode === "loop" ? "loop" as const : undefined;
+    const userExtraMode = extraMode === "goal" ? "goal" as const : (extraMode === "loop" || extraMode === "loop-goal" || extraMode === "loop-command" || extraMode === "loop-shell" || extraMode === "loop-ask") ? "loop" as const : undefined;
     updateSession(sessionId, (prev) => ({
       ...prev,
       messages: [

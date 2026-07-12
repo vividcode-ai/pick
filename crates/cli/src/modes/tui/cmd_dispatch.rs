@@ -137,7 +137,10 @@ pub(crate) async fn handle_slash_command(
             SlashCommandResult::Consumed
         }
         "loop" | "loop-goal" | "loop-status" | "loop-pause" | "loop-resume" | "loop-remove"
-        | "loop-clear" | "loop-now" | "loop-stop" | "loop-help" => {
+        | "loop-clear" | "loop-now" | "loop-stop" | "loop-help" | "loop-ask" | "loop-command"
+        | "loop-cmd" | "loop-shell" | "loop-goal-status" | "loop-goal-pause"
+        | "loop-goal-resume" | "loop-goal-clear" | "loop-goal-done" | "loop-goal-complete"
+        | "loop-goal-blocked" => {
             cmd_loop::handle_loop(ctx, cmd_name, args).await;
             SlashCommandResult::Consumed
         }

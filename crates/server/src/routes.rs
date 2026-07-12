@@ -6,6 +6,7 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::response::sse::Event;
+use chrono::Utc;
 
 use pick_agent::core::agent_loop::AgentLoopConfig;
 use pick_agent::core::state::ThinkingLevel;
@@ -113,38 +114,134 @@ pub async fn ask(
 
     let agent_mode = sse_state.agent_mode.read().unwrap().clone();
 
-    // Handle extra mode: if "goal", parse the prompt and create a goal
-    if let Some(extra_mode) = &req.extra_mode
-        && extra_mode == "goal"
-    {
-        let (objective, criterion) = if let Some(pos) = req.prompt.find("||") {
-            let obj = req.prompt[..pos].trim().to_string();
-            let crit = req.prompt[pos + 2..].trim().to_string();
-            (obj, crit)
-        } else {
-            (req.prompt.clone(), String::new())
-        };
-        let mut gm = sse_state.goal_manager.write().unwrap();
-        let goal_manager =
-            gm.get_or_insert_with(|| Arc::new(pick_agent::session::GoalManager::new()));
-        if goal_manager.get().is_some() {
-            warn!(
-                "Goal already exists for session {}, clearing first",
-                req.session_id
+    // Handle extra mode
+    let mut enqueue_message = true;
+    if let Some(extra_mode) = &req.extra_mode {
+        if extra_mode == "goal" {
+            let (objective, criterion) = if let Some(pos) = req.prompt.find("||") {
+                let obj = req.prompt[..pos].trim().to_string();
+                let crit = req.prompt[pos + 2..].trim().to_string();
+                (obj, crit)
+            } else {
+                (req.prompt.clone(), String::new())
+            };
+            let mut gm = sse_state.goal_manager.write().unwrap();
+            let goal_manager =
+                gm.get_or_insert_with(|| Arc::new(pick_agent::session::GoalManager::new()));
+            if goal_manager.get().is_some() {
+                warn!(
+                    "Goal already exists for session {}, clearing first",
+                    req.session_id
+                );
+                let _ = goal_manager.clear();
+            }
+            if let Err(e) = goal_manager.create(objective, criterion, None, None) {
+                error!("Failed to create goal: {}", e);
+            } else {
+                info!("Goal created for session {}", req.session_id);
+            }
+        } else if extra_mode == "loop"
+            || extra_mode == "loop-ask"
+            || extra_mode == "loop-command"
+            || extra_mode == "loop-shell"
+            || extra_mode == "loop-goal"
+        {
+            // Parse optional interval prefix: "10m fix build cache" → interval=10min, action="fix build cache"
+            let (interval_ms, action) = parse_loop_interval(&req.prompt);
+            let name = if action.len() > 27 {
+                format!("{}...", action.chars().take(27).collect::<String>())
+            } else {
+                action.clone()
+            };
+            let immediate = extra_mode != "loop-ask"
+                && extra_mode != "loop-command"
+                && extra_mode != "loop-shell";
+
+            let job = if extra_mode == "loop-goal" {
+                pick_loop::LoopJob::new_goal(
+                    uuid::Uuid::now_v7().to_string(),
+                    action,
+                    vec![], // acceptance criteria (none for inline goal)
+                    vec![], // checks (none)
+                    interval_ms,
+                )
+            } else {
+                let mut j = pick_loop::LoopJob::new_prompt(
+                    uuid::Uuid::now_v7().to_string(),
+                    name,
+                    action,
+                    interval_ms,
+                    immediate,
+                );
+                if extra_mode == "loop-command" {
+                    j.kind = "command".to_string();
+                } else if extra_mode == "loop-shell" {
+                    j.kind = "shell".to_string();
+                }
+                j
+            };
+
+            let job_id = {
+                let mut mgr = sse_state.loop_manager.write().await;
+                let id = mgr.create(job);
+                let _ = mgr.save();
+                id
+            };
+            // Schedule and/or trigger based on immediacy.
+            //
+            // Design principle:
+            //   * immediate=true  → run NOW, schedule() AFTER completion via
+            //                        on_turn_complete hook.
+            //   * immediate=false → schedule() a timer; let the timer fire and
+            //                        trigger_callback handle enqueueing.
+            //
+            // Critical insight: spawn_job_timer checks `status == Idle`. If we
+            // schedule() BEFORE mark_running(), the timer is born while the job
+            // is Running — when it fires 30s later it sees Running != Idle and
+            // self-destructs (breaks out of its loop) instead of triggering.
+            {
+                let mgr = sse_state.loop_manager.read().await;
+                if let Some(job) = mgr.get(&job_id).cloned() {
+                    if immediate {
+                        drop(mgr);
+                        // Immediate run: enqueue the loop message directly.
+                        // The on_turn_complete hook will schedule() after the
+                        // agent finishes and marks the job idle.
+                        {
+                            let mut m = sse_state.loop_manager.write().await;
+                            m.mark_running(&job_id);
+                            let now_ms = Utc::now().timestamp_millis();
+                            if let Some(j) = m.get_mut(&job_id) {
+                                j.last_run_at = Some(now_ms);
+                            }
+                            let _ = m.save();
+                        }
+                        let msg = pick_loop::integration::build_loop_message(&job);
+                        sse_state.message_queue.lock().unwrap().enqueue(msg);
+                        sse_state.loop_wakeup.notify_one();
+                    } else {
+                        // Non-immediate (loop-ask, loop-command, loop-shell):
+                        // schedule the timer. It will trigger via trigger_callback.
+                        sse_state.loop_scheduler.schedule(&job).await;
+                    }
+                }
+            }
+            // Send loop_updated so the frontend panel refreshes immediately
+            crate::loop_routes::send_loop_update(&sse_state).await;
+            enqueue_message = false;
+            debug!(
+                "Loop job ({}) created for session {}",
+                extra_mode, req.session_id
             );
-            let _ = goal_manager.clear();
-        }
-        if let Err(e) = goal_manager.create(objective, criterion, None, None) {
-            error!("Failed to create goal: {}", e);
-        } else {
-            info!("Goal created for session {}", req.session_id);
         }
     }
 
-    // Enqueue the user message
-    {
+    // Enqueue the user message (skipped for loop mode — trigger_job handles it)
+    if enqueue_message {
         let msg = AiMessage::User(UserMessage::text(&req.prompt));
         sse_state.message_queue.lock().unwrap().enqueue(msg);
+        // Wake up the agent loop so it processes the new message immediately
+        sse_state.loop_wakeup.notify_one();
     }
 
     // Try to claim the in_flight flag
@@ -557,7 +654,23 @@ async fn run_agent_loop_queue(
 ) {
     let et_on_event = sse_state.event_tx.clone();
 
+    // Create cancel channel for the entire loop lifecycle
+    let (cancel_tx, mut cancel_rx) = watch::channel(false);
+    {
+        let mut sessions = state.sse_sessions.write().await;
+        if let Some(s) = sessions.get_mut(&session_id) {
+            s.cancel_tx = Some(cancel_tx.clone());
+        }
+    }
+
     loop {
+        // --- Check for cancel signal ---
+        if *cancel_rx.borrow() {
+            debug!("Agent loop cancelled by user for session {}", session_id);
+            cleanup_loop(&state, &session_id, &sse_state, true).await;
+            return;
+        }
+
         // --- Drain queued messages ---
         let queued_msgs = { sse_state.message_queue.lock().unwrap().drain_all() };
 
@@ -589,22 +702,29 @@ async fn run_agent_loop_queue(
             .as_ref()
             .map(|s| s.messages.clone())
             .unwrap_or_default();
-        all_msgs.extend(queued_msgs);
 
-        if all_msgs.is_empty() {
-            // Nothing to process ¡ª mark done and exit
-            cleanup_loop(&state, &session_id, &sse_state, false).await;
-            break;
-        }
-
-        // --- Create per-iteration cancel_tx ---
-        let (cancel_tx, cancel_rx) = watch::channel(false);
-        {
-            let mut sessions = state.sse_sessions.write().await;
-            if let Some(s) = sessions.get_mut(&session_id) {
-                s.cancel_tx = Some(cancel_tx.clone());
+        if queued_msgs.is_empty() {
+            // Re-check the queue after the session fetch above, because
+            // drain_all() ran before the `.await` — a message (e.g. from
+            // the loop scheduler's trigger_callback) may have been enqueued
+            // during that yield. Without this re-check, the stale empty
+            // queued_msgs causes the agent loop to enter select! and wait
+            // forever with a message stranded in the queue.
+            if sse_state.message_queue.lock().unwrap().has_items() {
+                continue;
             }
+            // No new messages — wait for loop scheduler to trigger or cancel signal.
+            // NOTE: we check queued_msgs (not all_msgs) because session messages are
+            // never empty after the first run — checking all_msgs would cause the
+            // outer loop to re-process the entire conversation history indefinitely.
+            tokio::select! {
+                _ = sse_state.loop_wakeup.notified() => {}
+                _ = cancel_rx.changed() => {}
+            }
+            continue;
         }
+
+        all_msgs.extend(queued_msgs);
 
         let mq_steer = sse_state.message_queue.clone();
         let mq_follow = sse_state.message_queue.clone();
@@ -834,12 +954,13 @@ async fn run_agent_loop_queue(
             tool_event_bus: None,
             sandbox: None,
             sandbox_enabled: None,
-            cancel_signal_tx: Some(Arc::new(cancel_tx)),
+            cancel_signal_tx: Some(Arc::new(cancel_tx.clone())),
             skill_paths: Vec::new(),
             parent_goal_manager: sse_state.goal_manager.read().unwrap().clone(),
             on_turn_complete: Some({
                 let lm = sse_state.loop_manager.clone();
-                pick_loop::integration::build_turn_complete_hook(None, lm)
+                let ls = sse_state.loop_scheduler.clone();
+                pick_loop::integration::build_turn_complete_hook(None, lm, Some(ls))
             }),
             tool_execution_permission,
         };
@@ -946,13 +1067,13 @@ async fn run_agent_loop_queue(
                 if *cancel_rx.borrow() {
                     debug!("Agent loop cancelled by user for session {}", sid);
                     cleanup_loop(&state, &session_id, &sse_state, true).await;
-                    break;
+                    return;
                 }
 
-                // If no more messages queued, stop looping
+                // If no more messages queued, loop back to wait for scheduler trigger
                 if sse_state.message_queue.lock().unwrap().is_empty() {
-                    cleanup_loop(&state, &session_id, &sse_state, false).await;
-                    break;
+                    // Keep loop alive — scheduler will wake via loop_wakeup
+                    continue;
                 }
                 // Otherwise continue loop to process next queued messages
             }
@@ -963,7 +1084,7 @@ async fn run_agent_loop_queue(
                 );
                 let _ = et_agent.send(Ok(sse_event));
                 cleanup_loop(&state, &session_id, &sse_state, true).await;
-                break;
+                return;
             }
         }
     }
@@ -1066,4 +1187,114 @@ pub async fn answer_question(
         }
     }
     (StatusCode::NOT_FOUND, "Question not found").into_response()
+}
+
+/// Parse an optional interval prefix from a loop prompt.
+///
+/// Syntax: `10m do something` or `30s do something` or `1h do something`
+/// Units: `s` (seconds), `m` (minutes), `h` (hours).
+///
+/// If no prefix matches, returns (0, original_text) — 0 means "fire every turn".
+fn parse_loop_interval(text: &str) -> (u64, String) {
+    let trimmed = text.trim();
+    let mut chars = trimmed.char_indices().peekable();
+
+    // Consume an optional leading `*/` (common crontab-like syntax)
+    if trimmed.starts_with("*/") {
+        let after_slash = &trimmed[2..];
+        return parse_loop_interval(after_slash);
+    }
+
+    // Try to match digits at start
+    let digits_end = {
+        let mut end = None;
+        while let Some(&(i, ch)) = chars.peek() {
+            if ch.is_ascii_digit() {
+                end = Some(i + 1);
+                chars.next();
+            } else {
+                break;
+            }
+        }
+        end
+    };
+
+    match digits_end {
+        Some(end) => {
+            let num_str = &trimmed[..end];
+            let rest = &trimmed[end..];
+            if let Some(unit) = rest.chars().next() {
+                let multiplier = match unit {
+                    's' => 1_000,
+                    'm' => 60_000,
+                    'h' => 3_600_000,
+                    _ => return (0, trimmed.to_string()), // not a unit
+                };
+                if let Ok(num) = num_str.parse::<u64>() {
+                    let interval = num * multiplier;
+                    let action = rest[1..].trim().to_string();
+                    if action.is_empty() {
+                        return (interval, num_str.to_string() + &rest);
+                    }
+                    return (interval, action);
+                }
+            }
+            (0, trimmed.to_string())
+        }
+        None => (0, trimmed.to_string()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_loop_interval_minutes() {
+        let (ms, action) = parse_loop_interval("10m fix build cache");
+        assert_eq!(ms, 600_000);
+        assert_eq!(action, "fix build cache");
+    }
+
+    #[test]
+    fn test_parse_loop_interval_seconds() {
+        let (ms, action) = parse_loop_interval("30s poll deploy");
+        assert_eq!(ms, 30_000);
+        assert_eq!(action, "poll deploy");
+    }
+
+    #[test]
+    fn test_parse_loop_interval_hours() {
+        let (ms, action) = parse_loop_interval("1h cleanup temp");
+        assert_eq!(ms, 3_600_000);
+        assert_eq!(action, "cleanup temp");
+    }
+
+    #[test]
+    fn test_parse_loop_interval_no_prefix() {
+        let (ms, action) = parse_loop_interval("fix build cache");
+        assert_eq!(ms, 0);
+        assert_eq!(action, "fix build cache");
+    }
+
+    #[test]
+    fn test_parse_loop_interval_cron_prefix() {
+        let (ms, action) = parse_loop_interval("*/30s check status");
+        assert_eq!(ms, 30_000);
+        assert_eq!(action, "check status");
+    }
+
+    #[test]
+    fn test_parse_loop_interval_multi_spaces() {
+        let (ms, action) = parse_loop_interval("10m   fix build cache");
+        assert_eq!(ms, 600_000);
+        assert_eq!(action, "fix build cache");
+    }
+
+    #[test]
+    fn test_parse_loop_interval_empty_action() {
+        let (ms, action) = parse_loop_interval("5m");
+        assert_eq!(ms, 300_000);
+        assert_eq!(action, "5m"); // no action → returns raw text as action
+    }
 }
