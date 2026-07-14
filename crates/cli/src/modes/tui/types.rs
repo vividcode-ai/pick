@@ -78,6 +78,8 @@ pub(crate) enum TuiCommand {
     ToggleGoalPanel,
     /// Loop job status update for status bar display
     LoopStatusUpdated(Vec<pick_loop::types::LoopJobStatusInfo>),
+    /// Loop scheduler triggered a job run — start agent with prompt text
+    RunLoopAgent(String),
 }
 
 /// TUI approval hook that shows a permission dialog in the TUI viewport

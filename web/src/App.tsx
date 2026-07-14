@@ -16,6 +16,7 @@ import {
   registerDefaultCommands,
   type Command,
 } from "./stores/commands";
+import { invoke } from "@tauri-apps/api/core";
 import {
   openSettings,
   subscribeToSettings,
@@ -30,23 +31,28 @@ import {
   unarchiveSessionEntry,
   updateSessionEntry,
   initSessions,
+  getSnapshot as getSessionsSnapshot,
 } from "./stores/sessions";
+import { getEnvType, setEnvType } from "./stores/env";
+import { fetchProjects, switchProject, getCurrentCwd, removeProject } from "./stores/projects";
+import { ProjectModal } from "./components/Project/ProjectModal";
 import type { ChatMessage, GoalUpdatedPayload, LoopJobResponse, LoopUpdatedPayload } from "./types/events";
 
-async function detectBaseUrl(): Promise<string> {
+async function detectBaseUrl(): Promise<{ url: string; isTauri: boolean }> {
   const params = new URLSearchParams(window.location.search);
-  if (params.get("server")) return params.get("server")!;
+  if (params.get("server")) return { url: params.get("server")!, isTauri: false };
 
-  if (typeof window !== "undefined" && (window as any).__TAURI__) {
-    try {
-      const url = await (window as any).__TAURI__.invoke("get_server_url");
-      if (url) return url.replace(/\/+$/, "");
-    } catch {}
+  // Tauri v2 IPC: check if running in Tauri by attempting invoke
+  try {
+    const tauriUrl = await invoke<string>("get_server_url");
+    if (tauriUrl) return { url: tauriUrl.replace(/\/+$/, ""), isTauri: true };
+  } catch {
+    // not running in Tauri, fall through
   }
 
   const origin = window.location.origin;
   const stored = localStorage.getItem("pick_server_url");
-  return stored || origin;
+  return { url: stored || origin, isTauri: false };
 }
 
 export default function App() {
@@ -55,6 +61,7 @@ export default function App() {
   const [sidebarPinned, setSidebarPinned] = useState(true);
   const [activeGoal, setActiveGoal] = useState<{ objective: string; startTime: number; status?: string; timeUsedSeconds?: number } | null>(null);
   const [loopJobs, setLoopJobs] = useState<LoopJobResponse[]>([]);
+  const [projectModalOpen, setProjectModalOpen] = useState(false);
   const [loopSending, setLoopSending] = useState(false);
   const [settingsUrl, setSettingsUrl] = useState("");
   const { cycleThemeMode } = useTheme();
@@ -75,9 +82,13 @@ export default function App() {
   } = useModelState(baseUrl);
 
   useEffect(() => {
-    detectBaseUrl().then((url) => {
+    detectBaseUrl().then(({ url, isTauri }) => {
       setBaseUrl(url);
       setSettingsUrl(url);
+      setEnvType(isTauri ? "tauri" : "web");
+      if (isTauri) {
+        fetchProjects(url);
+      }
     });
   }, []);
 
@@ -91,7 +102,7 @@ export default function App() {
     fetch(`${baseUrl}/sessions`)
       .then((res) => (res.ok ? res.json() : []))
       .then((list: any[]) => {
-        const entries = list.map((s) => ({
+        const entries = list.map((s: any) => ({
           id: s.id,
           title: s.title,
           createdAt: s.created_at,
@@ -100,8 +111,9 @@ export default function App() {
           provider: s.provider,
           thinkingLevel: s.thinking_level,
           archived: s.archived || false,
+          cwd: s.cwd || undefined,
         }));
-        if (entries.length > 0) initSessions(entries);
+        initSessions(entries);  // always call to clear stale data
       })
       .catch(() => {});
   }, [baseUrl]);
@@ -164,9 +176,9 @@ export default function App() {
   useEffect(() => {
     registerDefaultCommands({
       newSession: () => {
-        createSession(selectedModel, selectedProvider).then((result) => {
+        createSession(selectedModel, selectedProvider, getCurrentCwd() ?? undefined).then((result) => {
           if (result) {
-            addSessionEntry(result.id, result.title, selectedModel, selectedProvider, thinkingLevel);
+            addSessionEntry(result.id, result.title, selectedModel, selectedProvider, thinkingLevel, getCurrentCwd() ?? undefined);
           }
         });
       },
@@ -214,9 +226,9 @@ export default function App() {
     (text: string, opts?: { mode?: string; extraMode?: import("./components/Chat/CommandMode").ExtraMode }) => {
       if (!activeSessionId) {
         pendingSendRef.current = { text, extraMode: opts?.extraMode ?? null };
-        createSession(selectedModel, selectedProvider).then((result) => {
+        createSession(selectedModel, selectedProvider, getCurrentCwd() ?? undefined).then((result) => {
           if (result) {
-            addSessionEntry(result.id, result.title, selectedModel, selectedProvider, thinkingLevel);
+            addSessionEntry(result.id, result.title, selectedModel, selectedProvider, thinkingLevel, getCurrentCwd() ?? undefined);
           } else {
             pendingSendRef.current = null;
           }
@@ -238,7 +250,7 @@ export default function App() {
     (text: string) => {
       if (!activeSessionId) {
         pendingSendRef.current = { text, extraMode: null };
-        createSession(selectedModel, selectedProvider).then((result) => {
+        createSession(selectedModel, selectedProvider, getCurrentCwd() ?? undefined).then((result) => {
           if (!result) pendingSendRef.current = null;
         });
       } else {
@@ -246,6 +258,69 @@ export default function App() {
       }
     },
     [activeSessionId, createSession, selectedModel, selectedProvider, ask]
+  );
+
+  const handleProjectSwitch = useCallback(
+    async (path: string) => {
+      if (!baseUrl) return;
+      const ok = await switchProject(baseUrl, path, false);
+      if (ok) {
+        await fetchProjects(baseUrl);
+      }
+    },
+    [baseUrl]
+  );
+
+  // Separate handler for the ProjectModal: switch cwd, load sessions
+  // from the project directory, then auto-create a fresh session.
+  const handleModalProjectSwitch = useCallback(
+    async (path: string) => {
+      if (!baseUrl) return;
+      const ok = await switchProject(baseUrl, path, true);
+      if (ok) {
+        // Reload project list and sessions (server just loaded project's
+        // sessions into memory — need to sync them to the frontend).
+        await fetchProjects(baseUrl);
+        try {
+          const res = await fetch(`${baseUrl}/sessions`);
+          if (res.ok) {
+            const list = await res.json();
+            const entries = list.map((s: any) => ({
+              id: s.id,
+              title: s.title,
+              createdAt: s.created_at,
+              updatedAt: s.updated_at,
+              modelId: s.model_id,
+              provider: s.provider,
+              thinkingLevel: s.thinking_level,
+              archived: s.archived || false,
+              cwd: s.cwd || undefined,
+            }));
+            initSessions(entries);
+          }
+        } catch {}
+        // Auto-create a fresh session tied to the newly opened project
+        const cwd = getCurrentCwd() ?? undefined;
+        const result = await createSession(selectedModel, selectedProvider, cwd);
+        if (result) {
+          addSessionEntry(result.id, result.title, selectedModel, selectedProvider, thinkingLevel, cwd);
+        }
+        setProjectModalOpen(false);
+      }
+    },
+    [baseUrl, createSession, selectedModel, selectedProvider, thinkingLevel]
+  );
+
+  const handleDeleteProject = useCallback(
+    async (path: string) => {
+      if (!baseUrl) return;
+      await removeProject(baseUrl, path);
+      // Remove sessions belonging to the deleted project so the
+      // project group disappears from the sidebar immediately.
+      const remaining = getSessionsSnapshot().filter((s) => s.cwd !== path);
+      initSessions(remaining);
+    },
+    [baseUrl]
   );
 
   const handleCommitRequest = useCallback(
@@ -302,9 +377,10 @@ export default function App() {
   }, [activeSessionId, baseUrl]);
 
   const handleNewSession = useCallback(() => {
-    createSession(selectedModel, selectedProvider).then((result) => {
+    const cwd = getCurrentCwd() ?? undefined;
+    createSession(selectedModel, selectedProvider, cwd).then((result) => {
       if (result) {
-        addSessionEntry(result.id, result.title, selectedModel, selectedProvider, thinkingLevel);
+        addSessionEntry(result.id, result.title, selectedModel, selectedProvider, thinkingLevel, cwd);
       }
     });
   }, [createSession, selectedModel, selectedProvider, thinkingLevel]);
@@ -386,7 +462,7 @@ export default function App() {
     }
     const result = await forkSession(activeSessionId, userCount);
     if (result) {
-      addSessionEntry(result.id as string, result.title as string, selectedModel, selectedProvider, thinkingLevel);
+      addSessionEntry(result.id as string, result.title as string, selectedModel, selectedProvider, thinkingLevel, getCurrentCwd() ?? undefined);
     }
   }, [baseUrl, activeSessionId, forkSession, activeMessages, selectedModel, selectedProvider, thinkingLevel]);
 
@@ -496,6 +572,10 @@ export default function App() {
             streamingSessions={streamingSessions}
             pinned={sidebarPinned}
             onTogglePinned={() => setSidebarPinned((v) => !v)}
+            isTauri={getEnvType() === "tauri"}
+            onProjectManagement={() => setProjectModalOpen(true)}
+            onProjectSwitch={handleProjectSwitch}
+            onDeleteProject={handleDeleteProject}
           />
         }
       >
@@ -522,6 +602,16 @@ export default function App() {
         commands={commands}
         onExecute={handleExecuteCommand}
       />
+
+      {getEnvType() === "tauri" && (
+        <ProjectModal
+          open={projectModalOpen}
+          onClose={() => setProjectModalOpen(false)}
+          baseUrl={baseUrl ?? ""}
+          isTauri={true}
+          onProjectSwitch={handleModalProjectSwitch}
+        />
+      )}
     </>
   );
 }

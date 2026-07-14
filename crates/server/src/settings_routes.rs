@@ -6,16 +6,11 @@ use crate::AppState;
 
 /// GET /settings — returns the merged settings (global + project)
 pub async fn get_settings(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    let cwd = state
-        .config
-        .cwd
-        .as_deref()
-        .map(std::path::Path::new)
-        .unwrap_or_else(|| std::path::Path::new("."));
+    let cwd = state.project_manager.get_cwd();
 
     let sm = pick_agent::settings::SettingsManager::load_from_paths(
         pick_agent::settings::get_global_settings_path(),
-        pick_agent::settings::get_project_settings_path(cwd),
+        pick_agent::settings::get_project_settings_path(&cwd),
     );
 
     Json(sm.get().clone())
@@ -26,16 +21,11 @@ pub async fn update_settings(
     State(state): State<Arc<AppState>>,
     Json(update): Json<pick_agent::settings::Settings>,
 ) -> impl IntoResponse {
-    let cwd = state
-        .config
-        .cwd
-        .as_deref()
-        .map(std::path::Path::new)
-        .unwrap_or_else(|| std::path::Path::new("."));
+    let cwd = state.project_manager.get_cwd();
 
     let mut sm = pick_agent::settings::SettingsManager::load_from_paths(
         pick_agent::settings::get_global_settings_path(),
-        pick_agent::settings::get_project_settings_path(cwd),
+        pick_agent::settings::get_project_settings_path(&cwd),
     );
 
     match sm.set_global(update) {

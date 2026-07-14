@@ -56,7 +56,7 @@ pub async fn handle_sse(
     State(state): State<Arc<AppState>>,
     Query(query): Query<SseQuery>,
 ) -> impl IntoResponse {
-    let session = state.session_manager.get(&session_id).await;
+    let session = state.session_manager.read().await.get(&session_id).await;
     if session.is_none() {
         return (StatusCode::NOT_FOUND, "Session not found").into_response();
     }
@@ -70,7 +70,7 @@ pub async fn handle_sse(
 
     // Initialize loop components
     let cwd_path = {
-        let s = state.session_manager.get(&session_id).await;
+        let s = state.session_manager.read().await.get(&session_id).await;
         s.and_then(|s| s.cwd.map(std::path::PathBuf::from))
             .unwrap_or_else(|| std::env::current_dir().unwrap_or_default())
     };
@@ -160,7 +160,7 @@ pub async fn handle_sse(
     }
 
     // Send initial git info
-    if let Some(s) = state.session_manager.get(&session_id).await {
+    if let Some(s) = state.session_manager.read().await.get(&session_id).await {
         let cwd = s.cwd.and_then(|c| {
             let p = std::path::PathBuf::from(&c);
             if p.exists() { Some(p) } else { None }

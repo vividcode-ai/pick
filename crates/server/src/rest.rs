@@ -28,6 +28,9 @@ pub struct CreateSessionRequest {
     pub model_id: Option<String>,
     pub provider: Option<String>,
     pub thinking_level: Option<String>,
+    /// Project working directory to associate this session with.
+    /// When absent the current server cwd is used.
+    pub cwd: Option<String>,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -82,7 +85,7 @@ pub async fn health() -> impl IntoResponse {
     )
 )]
 pub async fn list_sessions(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    let sessions = state.session_manager.list_info().await;
+    let sessions = state.session_manager.read().await.list_info().await;
     Json(sessions)
 }
 
@@ -110,7 +113,16 @@ pub async fn create_session(
 
     let (session_id, title) = state
         .session_manager
-        .create(model_id, provider, thinking_level, system_prompt, tools)
+        .write()
+        .await
+        .create(
+            model_id,
+            provider,
+            thinking_level,
+            system_prompt,
+            tools,
+            req.cwd,
+        )
         .await;
 
     (
@@ -136,7 +148,7 @@ pub async fn get_session(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Result<Json<SessionInfo>, StatusCode> {
-    let session = state.session_manager.get(&id).await;
+    let session = state.session_manager.read().await.get(&id).await;
     match session {
         Some(s) => Ok(Json(s.to_info())),
         None => Err(StatusCode::NOT_FOUND),
@@ -160,7 +172,7 @@ pub async fn delete_session(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> StatusCode {
-    if state.session_manager.delete(&id).await {
+    if state.session_manager.write().await.delete(&id).await {
         StatusCode::NO_CONTENT
     } else {
         StatusCode::NOT_FOUND
@@ -188,6 +200,8 @@ pub async fn update_session(
 ) -> StatusCode {
     if state
         .session_manager
+        .write()
+        .await
         .update_session(
             &id,
             req.title,
@@ -222,7 +236,13 @@ pub async fn fork_session(
     Path(id): Path<String>,
     Query(query): Query<ForkQuery>,
 ) -> impl IntoResponse {
-    match state.session_manager.fork(&id, query.message_count).await {
+    match state
+        .session_manager
+        .write()
+        .await
+        .fork(&id, query.message_count)
+        .await
+    {
         Some((new_id, title)) => (
             StatusCode::CREATED,
             Json(CreateSessionResponse {
@@ -257,6 +277,8 @@ pub async fn get_session_messages(
 ) -> impl IntoResponse {
     match state
         .session_manager
+        .read()
+        .await
         .get_messages(&id, query.offset, query.limit)
         .await
     {
@@ -287,7 +309,7 @@ pub async fn get_session_status(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    match state.session_manager.get(&id).await {
+    match state.session_manager.read().await.get(&id).await {
         Some(s) => Json(serde_json::json!({
             "id": s.id,
             "status": s.status,
@@ -333,7 +355,7 @@ pub async fn summarize_session(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    let session = match state.session_manager.get(&id).await {
+    let session = match state.session_manager.read().await.get(&id).await {
         Some(s) => s,
         None => return (StatusCode::NOT_FOUND, "Session not found").into_response(),
     };
@@ -479,7 +501,7 @@ pub async fn get_session_git_info(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    let session = match state.session_manager.get(&id).await {
+    let session = match state.session_manager.read().await.get(&id).await {
         Some(s) => s,
         None => return (StatusCode::NOT_FOUND, "Session not found").into_response(),
     };
@@ -524,7 +546,7 @@ pub async fn get_session_git_diffs(
     Path(id): Path<String>,
     Query(query): Query<GitDiffsQuery>,
 ) -> impl IntoResponse {
-    let session = match state.session_manager.get(&id).await {
+    let session = match state.session_manager.read().await.get(&id).await {
         Some(s) => s,
         None => return (StatusCode::NOT_FOUND, "Session not found").into_response(),
     };
@@ -593,7 +615,7 @@ pub async fn get_session_single_diff(
     Path(id): Path<String>,
     Query(query): Query<GitSingleDiffQuery>,
 ) -> impl IntoResponse {
-    let session = match state.session_manager.get(&id).await {
+    let session = match state.session_manager.read().await.get(&id).await {
         Some(s) => s,
         None => return (StatusCode::NOT_FOUND, "Session not found").into_response(),
     };
@@ -622,7 +644,7 @@ pub async fn get_session_branches(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    let session = match state.session_manager.get(&id).await {
+    let session = match state.session_manager.read().await.get(&id).await {
         Some(s) => s,
         None => return (StatusCode::NOT_FOUND, "Session not found").into_response(),
     };

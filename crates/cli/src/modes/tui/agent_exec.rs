@@ -339,7 +339,7 @@ pub(crate) fn build_agent_config(
     let on_turn_complete = pick_loop::integration::build_turn_complete_hook(
         Some(on_turn_complete),
         loop_manager,
-        None,
+        ctx.loop_scheduler.clone(),
     );
 
     let sm = crate::core::settings::SettingsManager::load(&ctx.cwd);

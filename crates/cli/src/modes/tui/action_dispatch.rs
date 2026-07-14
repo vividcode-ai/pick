@@ -442,6 +442,26 @@ async fn handle_settings_models_selection(ctx: &mut TuiContext, val: &str) {
     }
 }
 
+/// Handle a loop-triggered agent run.
+/// Called when the loop scheduler fires and enqueues a job prompt.
+/// - If agent is idle: starts a normal agent submission with the prompt text.
+/// - If agent is running: queues to steer_queue for next agent turn.
+pub(crate) async fn handle_loop_trigger(ctx: &mut TuiContext, text: String) {
+    if ctx.agent_is_running {
+        // Agent is busy — queue for the next steer cycle
+        if let Ok(mut queue) = ctx.steer_queue.lock() {
+            queue.enqueue(Message::User(UserMessage::text(&text)));
+        }
+        // Show the pending message above the editor
+        if !ctx.tui.pending_user_messages.contains(&text) {
+            ctx.tui.pending_user_messages.push_back(text);
+        }
+        return;
+    }
+    // Idle — start a normal agent run with the loop prompt
+    handle_submit(ctx, text).await;
+}
+
 /// Handle Submit action — the main message submission flow (flat EventStream model).
 /// Sets up user message, spawns agent task + watcher, and returns immediately.
 /// The main loop handles all events (agent streaming, keyboard, lifecycle) through cmd_rx.

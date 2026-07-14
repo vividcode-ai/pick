@@ -149,6 +149,8 @@ pub struct TuiApp {
     pub status_subtext: Option<String>,
     /// Loop job status line (rendered separately from goal status)
     pub loop_status_text: Option<String>,
+    /// Detailed loop job info for display above the editor (serialized LoopJobStatusInfo)
+    pub loop_jobs: Vec<serde_json::Value>,
     pub status_frame: usize,
     pub agent_start_time: Option<std::time::Instant>,
     /// Set to true once streaming has ever started. Prevents the viewport

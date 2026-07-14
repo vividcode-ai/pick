@@ -523,12 +523,21 @@ fn display_help(ctx: &mut TuiContext) {
 /// Update the TUI status bar with loop job counts.
 async fn update_status_bar(ctx: &mut TuiContext) {
     let mgr = ctx.loop_manager.read().await;
-    let active = mgr.active_count();
     let total = mgr.list().len();
     if total > 0 {
-        let parts = vec![format!("🔄 {}/{}", active, total)];
-        ctx.tui.set_loop_status(Some(&parts.join("  ")));
+        // Populate detailed loop job info for display above editor
+        let jobs: Vec<pick_loop::types::LoopJobStatusInfo> = mgr
+            .list()
+            .iter()
+            .map(pick_loop::types::LoopJobStatusInfo::from)
+            .collect();
+        let jobs_json: Vec<serde_json::Value> = jobs
+            .into_iter()
+            .filter_map(|j| serde_json::to_value(j).ok())
+            .collect();
+        ctx.tui.set_loop_jobs(jobs_json);
     } else {
         ctx.tui.set_loop_status(None);
+        ctx.tui.set_loop_jobs(Vec::new());
     }
 }

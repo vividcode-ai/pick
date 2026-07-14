@@ -96,6 +96,24 @@ pub async fn run_tui_mode(
                 _ = spinner_timer.tick() => {
                     ctx.tui.advance_spinner();
                     ctx.tui.update_terminal_title();
+                    // Refresh loop job status every 10 ticks (~1s) for live countdown
+                    ctx.loop_refresh_counter += 1;
+                    if ctx.loop_refresh_counter >= 10 {
+                        ctx.loop_refresh_counter = 0;
+                        if !ctx.tui.loop_jobs.is_empty() {
+                            let mgr = ctx.loop_manager.read().await;
+                            let jobs: Vec<pick_loop::types::LoopJobStatusInfo> = mgr
+                                .list()
+                                .iter()
+                                .map(pick_loop::types::LoopJobStatusInfo::from)
+                                .collect();
+                            let jobs_json: Vec<serde_json::Value> = jobs
+                                .into_iter()
+                                .filter_map(|j| serde_json::to_value(j).ok())
+                                .collect();
+                            ctx.tui.set_loop_jobs(jobs_json);
+                        }
+                    }
                 }
 
                 // OS-level Ctrl+C signal fallback. On Windows, crossterm raw
@@ -120,6 +138,9 @@ pub async fn run_tui_mode(
                         }
                         Some(TuiCommand::AgentFinished { result, prev_len, cancel_requested }) => {
                             action_dispatch::handle_agent_finished(&mut ctx, result, prev_len, cancel_requested).await;
+                        }
+                        Some(TuiCommand::RunLoopAgent(text)) => {
+                            action_dispatch::handle_loop_trigger(&mut ctx, text).await;
                         }
                         Some(TuiCommand::ShareResult { url, error }) => {
                             handle_share_result(&mut ctx, url, error);
@@ -240,6 +261,9 @@ pub async fn run_tui_mode(
                             cancel_requested,
                         )
                         .await;
+                    }
+                    Ok(TuiCommand::RunLoopAgent(text)) => {
+                        action_dispatch::handle_loop_trigger(&mut ctx, text).await;
                     }
                     Ok(TuiCommand::ShareResult { url, error }) => {
                         handle_share_result(&mut ctx, url, error);

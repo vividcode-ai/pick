@@ -181,6 +181,7 @@ pub async fn delete_loop(
             .send(Ok(axum::response::sse::Event::default()
                 .event("loop_deleted")
                 .data(serde_json::to_string(&event).unwrap_or_default())));
+        send_loop_update(&sse_state).await;
         (StatusCode::OK, "Removed").into_response()
     } else {
         (StatusCode::NOT_FOUND, "Job not found").into_response()

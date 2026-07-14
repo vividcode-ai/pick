@@ -214,14 +214,46 @@ pub fn create_webfetch_tool() -> AgentTool {
                     return Err("URL must start with http:// or https://".to_string());
                 }
 
-                // Check network policy if available (hard block — policy denies cannot be overridden)
+                // Check network policy if available
                 if let Some(ref pm) = ctx.permission_manager {
-                    pm.check_network(url).map_err(|e| format!("NetworkPolicy: {}", e))?;
+                    use crate::permission::network::NetworkDenyReason;
+                    match pm.check_network_detailed(url) {
+                        Ok(()) => {} // allowed
+                        Err(NetworkDenyReason::Blocked(e)) => {
+                            return Err(format!("NetworkPolicy: {}", e));
+                        }
+                        Err(NetworkDenyReason::NotAllowed(e)) => {
+                            // Not in allowlist — prompt user for permission
+                            if let Some(ref approve) = ctx.approve {
+                                if let Some(ref bus) = ctx.tool_event_bus {
+                                    bus.publish(&ToolEvent::WaitingForUser {
+                                        tool_name: "webfetch".to_string(),
+                                        tool_call_id: tool_call_id.to_string(),
+                                        input: args.clone(),
+                                        kind: WaitingKind::Permission {
+                                            permission: "webfetch".to_string(),
+                                        },
+                                        summary: format!("Fetch URL '{}'", url),
+                                    })
+                                    .await;
+                                }
+                                if !approve("webfetch".to_string(), url.to_string()).await {
+                                    return Ok(AgentToolResult {
+                                        content: vec![ContentBlock::text(
+                                            "Permission denied for webfetch",
+                                        )],
+                                        is_error: true,
+                                        terminate: false,
+                                    });
+                                }
+                            } else {
+                                return Err(format!("NetworkPolicy: {}", e));
+                            }
+                        }
+                    }
                 } else {
                     // No network policy configured — ask user for permission
-                    if let Some(ref approve) = ctx.approve
-                    {
-                        // Publish WaitingForUser event before prompting
+                    if let Some(ref approve) = ctx.approve {
                         if let Some(ref bus) = ctx.tool_event_bus {
                             bus.publish(&ToolEvent::WaitingForUser {
                                 tool_name: "webfetch".to_string(),

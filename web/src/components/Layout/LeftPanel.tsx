@@ -1,4 +1,4 @@
-import { Puzzle, Settings, MessageSquarePlus, Pin, PinOff } from "lucide-react";
+import { Puzzle, Settings, MessageSquarePlus, Pin, PinOff, Folder } from "lucide-react";
 import { ThemeModeToggle } from "../ThemeModeToggle";
 import { SessionList } from "./SessionList";
 
@@ -14,6 +14,10 @@ interface LeftPanelProps {
   onRenameSession: (id: string, title: string) => void;
   onArchiveSession: (id: string) => void;
   streamingSessions?: Record<string, boolean>;
+  isTauri?: boolean;
+  onProjectManagement?: () => void;
+  onProjectSwitch?: (path: string) => void;
+  onDeleteProject?: (path: string) => void;
 }
 
 export function LeftPanel({
@@ -28,6 +32,10 @@ export function LeftPanel({
   onRenameSession,
   onArchiveSession,
   streamingSessions,
+  isTauri,
+  onProjectManagement,
+  onProjectSwitch,
+  onDeleteProject,
 }: LeftPanelProps) {
   return (
     <>
@@ -39,6 +47,15 @@ export function LeftPanel({
         >
           <MessageSquarePlus className="w-5 h-5" />
         </button>
+        {isTauri && (
+          <button
+            onClick={onProjectManagement}
+            title="Project Management"
+            className="p-2 rounded-md hover:bg-[var(--surface-hover)] text-neutral-400 hover:text-[var(--text-primary)] transition-colors"
+          >
+            <Folder className="w-5 h-5" />
+          </button>
+        )}
         <button
           onClick={onPlugins}
           title="Plugins"
@@ -65,6 +82,9 @@ export function LeftPanel({
         onRenameSession={onRenameSession}
         onArchiveSession={onArchiveSession}
         streamingSessions={streamingSessions}
+        isTauri={isTauri}
+        onProjectSwitch={onProjectSwitch}
+        onDeleteProject={onDeleteProject}
       />
 
       <div className="border-t px-3 py-3 space-y-2" style={{ borderColor: "var(--border-divider)" }}>

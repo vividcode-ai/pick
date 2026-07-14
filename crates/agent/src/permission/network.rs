@@ -10,6 +10,15 @@ pub struct NetworkPolicy {
     pub block_all: bool,
 }
 
+/// Reason why network access was denied.
+#[derive(Debug, Clone, PartialEq)]
+pub enum NetworkDenyReason {
+    /// URL matched the blocklist (private IP, localhost, etc.) — always deny, no override.
+    Blocked(String),
+    /// URL is not in the allowed domains list — user may override via prompt.
+    NotAllowed(String),
+}
+
 impl NetworkPolicy {
     pub fn new_full_access() -> Self {
         Self {
@@ -65,6 +74,50 @@ impl NetworkPolicy {
                     .collect(),
             ),
         }
+    }
+
+    pub fn with_extra_allowed_domains(mut self, extra: &[String]) -> Self {
+        if !extra.is_empty() {
+            if let Some(ref mut allowed) = self.allowed_domains {
+                allowed.extend(extra.iter().cloned());
+            }
+        }
+        self
+    }
+
+    /// Detailed network access decision that distinguishes
+    /// between "blocked by blocklist" and "not in allowed list".
+    pub fn can_access_detailed(&self, url: &str) -> Result<(), NetworkDenyReason> {
+        if self.allow_all {
+            return Ok(());
+        }
+        if self.block_all {
+            return Err(NetworkDenyReason::Blocked(format!(
+                "Network access is blocked: '{}'",
+                url
+            )));
+        }
+
+        let domain = extract_domain(url);
+
+        if self.is_blocked(&domain) {
+            return Err(NetworkDenyReason::Blocked(format!(
+                "Network access denied: '{}' is blocked by policy",
+                url
+            )));
+        }
+
+        if let Some(ref allowed) = self.allowed_domains {
+            let is_allowed = allowed.iter().any(|a| domain_matches(&domain, a));
+            if !is_allowed {
+                return Err(NetworkDenyReason::NotAllowed(format!(
+                    "Network access denied: '{}' is not in the allowed domains list",
+                    url
+                )));
+            }
+        }
+
+        Ok(())
     }
 
     pub fn can_access(&self, url: &str) -> Result<(), String> {

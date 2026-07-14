@@ -13,6 +13,7 @@ use pick_agent::core::state::ThinkingLevel;
 use pick_agent::permission::fs_policy::FileSystemPolicy;
 use pick_agent::permission::manager::PermissionManager;
 use pick_agent::permission::{Action, Rule, Ruleset};
+use pick_agent::settings::{SettingsManager, get_global_settings_path, get_project_settings_path};
 use pick_ai::types::Message as AiMessage;
 use pick_ai::types::UserMessage;
 use serde::Deserialize;
@@ -21,7 +22,6 @@ use tracing::{debug, error, info, warn};
 use utoipa::ToSchema;
 
 use crate::AppState;
-use crate::approval::SseApprovalHook;
 use crate::events;
 use crate::git::get_git_info;
 use crate::session::SseSessionState;
@@ -73,7 +73,13 @@ pub async fn ask(
     State(state): State<Arc<AppState>>,
     Json(req): Json<AskRequest>,
 ) -> impl IntoResponse {
-    let session = match state.session_manager.get(&req.session_id).await {
+    let session = match state
+        .session_manager
+        .read()
+        .await
+        .get(&req.session_id)
+        .await
+    {
         Some(s) => s,
         None => {
             return (
@@ -324,13 +330,23 @@ pub async fn ask(
         },
     ));
 
+    let sm = SettingsManager::load_from_paths(
+        get_global_settings_path(),
+        get_project_settings_path(&state.session_manager.read().await.get_cwd()),
+    );
+    let settings = sm.get();
+    let profile = settings
+        .permission
+        .as_ref()
+        .map(|p| p.permission_profile.as_str())
+        .unwrap_or(":workspace");
     let permission_manager = Arc::new(PermissionManager::new(
-        "danger-full-access",
-        &std::env::current_dir().unwrap_or_default(),
-        None,
+        profile,
+        &state.session_manager.read().await.get_cwd(),
+        settings.permission.as_ref(),
         &[],
     ));
-    let sse_hook = Arc::new(SseApprovalHook {
+    let sse_hook = Arc::new(crate::approval::SseApprovalHook {
         event_tx: sse_state.event_tx.clone(),
         pending_approvals: sse_state.pending_approvals.clone(),
     });
@@ -347,9 +363,12 @@ pub async fn ask(
             as std::sync::Arc<dyn Fn() -> Option<String> + Send + Sync>
     });
 
-    let cwd = state.session_manager.get_cwd();
+    let cwd = state.session_manager.read().await.get_cwd();
     let cwd_for_event = cwd.clone();
-    let system_prompt = session.system_prompt.clone();
+    // Rebuild system prompt dynamically so it reflects the current project cwd
+    // (the stored session.system_prompt was built at session creation time and
+    //  may reference an outdated working directory after project switch).
+    let system_prompt = state.build_system_prompt(&session.provider, &session.model_id);
     let tools = {
         let gm = sse_state.goal_manager.read().unwrap().clone();
         pick_agent::tools::registry::create_coding_tools_with_goal_manager(
@@ -410,7 +429,7 @@ pub async fn start_review(
     State(state): State<Arc<AppState>>,
     Path(session_id): Path<String>,
 ) -> impl IntoResponse {
-    let session = match state.session_manager.get(&session_id).await {
+    let session = match state.session_manager.read().await.get(&session_id).await {
         Some(s) => s,
         None => {
             return (
@@ -578,10 +597,20 @@ pub async fn start_review(
         },
     ));
 
+    let sm = SettingsManager::load_from_paths(
+        get_global_settings_path(),
+        get_project_settings_path(&state.session_manager.read().await.get_cwd()),
+    );
+    let settings = sm.get();
+    let profile = settings
+        .permission
+        .as_ref()
+        .map(|p| p.permission_profile.as_str())
+        .unwrap_or(":workspace");
     let permission_manager = Arc::new(PermissionManager::new(
-        "danger-full-access",
-        &std::env::current_dir().unwrap_or_default(),
-        None,
+        profile,
+        &state.session_manager.read().await.get_cwd(),
+        settings.permission.as_ref(),
         &[],
     ));
     let sse_hook = Arc::new(crate::approval::SseApprovalHook {
@@ -696,8 +725,16 @@ async fn run_agent_loop_queue(
             }
         }
 
+        // --- Ensure messages are lazy-loaded from disk ---
+        state
+            .session_manager
+            .read()
+            .await
+            .load_session_messages(&session_id)
+            .await;
+
         // --- Get session messages ---
-        let session = state.session_manager.get(&session_id).await;
+        let session = state.session_manager.read().await.get(&session_id).await;
         let mut all_msgs = session
             .as_ref()
             .map(|s| s.messages.clone())
@@ -997,12 +1034,14 @@ async fn run_agent_loop_queue(
 
                 state
                     .session_manager
+                    .write()
+                    .await
                     .update_messages(&sid, agent_result.messages)
                     .await;
 
                 // Auto-generate session title from first user message
                 let generated_title = {
-                    let session = state.session_manager.get(&sid).await;
+                    let session = state.session_manager.read().await.get(&sid).await;
                     if let Some(session) = session {
                         let is_default = session.title.starts_with("New session -")
                             || session.title.starts_with("Session -");
@@ -1027,6 +1066,8 @@ async fn run_agent_loop_queue(
                             if let Some(t) = title {
                                 state
                                     .session_manager
+                                    .write()
+                                    .await
                                     .update_session(&sid, Some(t.clone()), None, None, None, None)
                                     .await;
                                 Some(t)
@@ -1061,6 +1102,23 @@ async fn run_agent_loop_queue(
                         .event("goal_updated")
                         .data(serde_json::to_string(&payload).unwrap_or_default());
                     let _ = et_agent.send(Ok(sse_event));
+                }
+
+                // Send loop_updated so the panel reflects the updated run_count
+                // (record_run() was called inside build_turn_complete_hook during
+                // run_agent_loop, but no event was emitted after it)
+                {
+                    let all_info: Vec<pick_loop::types::LoopJobStatusInfo> = {
+                        let mgr = sse_state.loop_manager.read().await;
+                        mgr.list()
+                            .iter()
+                            .map(pick_loop::types::LoopJobStatusInfo::from)
+                            .collect()
+                    };
+                    let payload = serde_json::json!({"jobs": all_info});
+                    let _ = et_agent.send(Ok(Event::default()
+                        .event("loop_updated")
+                        .data(serde_json::to_string(&payload).unwrap_or_default())));
                 }
 
                 // Check if cancelled by user

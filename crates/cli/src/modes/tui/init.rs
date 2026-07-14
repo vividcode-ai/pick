@@ -361,19 +361,21 @@ pub(crate) async fn init_tui_mode(
         )))
     };
 
-    // Build trigger callback: pushes a loop message into steer_queue and signals TUI
-    let loop_steer_queue = steer_queue.clone();
+    // Build trigger callback: sends loop prompt to TUI main loop via RunLoopAgent
     let loop_cmd_tx = cmd_tx.clone();
     let loop_mgr_for_cb = loop_manager.clone();
     let trigger_cb: pick_loop::scheduler::TriggerCallback = Arc::new(move |job| {
-        let steer = loop_steer_queue.clone();
         let tx = loop_cmd_tx.clone();
         let mgr = loop_mgr_for_cb.clone();
         Box::pin(async move {
-            let msg = pick_loop::integration::build_loop_message(&job);
-            if let Ok(mut q) = steer.lock() {
-                q.enqueue(msg);
-            }
+            // Build the prompt text for this loop job (same as build_loop_message)
+            let text = if job.is_goal() {
+                pick_loop::goal::build_goal_prompt(&job)
+            } else {
+                pick_loop::goal::decorate_prompt(&job)
+            };
+            // Signal the TUI to start an agent run with this prompt
+            let _ = tx.send(TuiCommand::RunLoopAgent(text));
             // Send full job list so status bar shows correct counts
             let all_info: Vec<pick_loop::types::LoopJobStatusInfo> = {
                 let m = mgr.read().await;
@@ -400,7 +402,7 @@ pub(crate) async fn init_tui_mode(
     let mut tools = tools;
     tools.extend(loop_tools);
 
-    let ctx = TuiContext {
+    let mut ctx = TuiContext {
         tui,
         terminal_manager,
         cmd_tx,
@@ -456,7 +458,25 @@ pub(crate) async fn init_tui_mode(
         share_saved_editor_text: String::new(),
         loop_manager,
         loop_scheduler,
+        loop_refresh_counter: 0,
     };
+
+    // Initialize loop status display for any jobs loaded from persistence
+    {
+        let mgr = ctx.loop_manager.read().await;
+        let loaded_jobs: Vec<pick_loop::types::LoopJobStatusInfo> = mgr
+            .list()
+            .iter()
+            .map(pick_loop::types::LoopJobStatusInfo::from)
+            .collect();
+        if !loaded_jobs.is_empty() {
+            let jobs_json: Vec<serde_json::Value> = loaded_jobs
+                .into_iter()
+                .filter_map(|j| serde_json::to_value(j).ok())
+                .collect();
+            ctx.tui.set_loop_jobs(jobs_json);
+        }
+    }
 
     (ctx, cmd_rx, evt_rx)
 }

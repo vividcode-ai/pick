@@ -8,6 +8,8 @@ pub mod git;
 pub mod loop_routes;
 pub mod mcp_routes;
 pub mod plugins;
+pub mod project_manager;
+pub mod project_routes;
 pub mod prompt_history_routes;
 pub mod pty;
 pub mod rest;
@@ -26,7 +28,6 @@ use axum::Router;
 use axum::routing::{delete, get, post, put};
 use pick_agent::prompt_history::PromptHistoryManager;
 use pick_agent::session::manager::SessionManager as AgentSessionManager;
-use pick_ai::types::Message;
 use pick_mcp::McpManager;
 use pick_mcp::config::McpServerConfig;
 use pty::PtyManager;
@@ -38,7 +39,7 @@ use tower_http::cors::CorsLayer;
 use tracing::debug;
 
 pub struct AppState {
-    pub session_manager: session::SessionManager,
+    pub session_manager: RwLock<session::SessionManager>,
     pub sse_sessions: RwLock<HashMap<String, SseSessionState>>,
     pub config: ServerConfig,
     pub default_provider: Option<String>,
@@ -48,6 +49,7 @@ pub struct AppState {
     pub last_provider: std::sync::RwLock<Option<String>>,
     pub last_model: std::sync::RwLock<Option<String>>,
     pub thinking_level: std::sync::RwLock<Option<String>>,
+    pub project_manager: project_manager::ProjectManager,
     pub pty_manager: PtyManager,
     pub mcp_manager: McpManager,
     pub mcp_configs: RwLock<Vec<McpServerConfig>>,
@@ -91,10 +93,10 @@ impl AppState {
         let last_model = config.last_model.clone();
         let thinking_level = config.thinking_level.clone();
         Self {
-            session_manager: session::SessionManager::new_with_cwd(
+            session_manager: RwLock::new(session::SessionManager::new_with_cwd(
                 session_dir,
                 cwd_path.to_path_buf(),
-            ),
+            )),
             sse_sessions: RwLock::new(HashMap::new()),
             config,
             default_provider: None,
@@ -104,6 +106,7 @@ impl AppState {
             last_provider: std::sync::RwLock::new(last_provider),
             last_model: std::sync::RwLock::new(last_model),
             thinking_level: std::sync::RwLock::new(thinking_level),
+            project_manager: project_manager::ProjectManager::new(cwd_path.to_path_buf()),
             pty_manager: PtyManager::new(Some(cwd)),
             mcp_manager: McpManager::new(),
             mcp_configs: RwLock::new(Vec::new()),
@@ -114,21 +117,15 @@ impl AppState {
 
     pub fn build_system_prompt(&self, provider: &str, model_id: &str) -> String {
         use pick_agent::system_prompt;
-        use std::path::Path;
 
-        let cwd = self
-            .config
-            .cwd
-            .as_deref()
-            .map(Path::new)
-            .unwrap_or_else(|| Path::new("."));
+        let cwd = self.project_manager.get_cwd();
         let agent_dir = system_prompt::get_agent_dir();
         let tools = self.get_tools();
 
-        let context_files = system_prompt::load_project_context_files(cwd, &agent_dir);
+        let context_files = system_prompt::load_project_context_files(&cwd, &agent_dir);
 
-        let custom = system_prompt::discover_custom_prompt(&agent_dir, cwd);
-        let append = system_prompt::discover_append_prompt(&agent_dir, cwd);
+        let custom = system_prompt::discover_custom_prompt(&agent_dir, &cwd);
+        let append = system_prompt::discover_append_prompt(&agent_dir, &cwd);
         let mut append_parts = append;
         append_parts.push(format!("Provider: {}  Model: {}", provider, model_id));
 
@@ -138,7 +135,7 @@ impl AppState {
             &context_files,
             custom.as_deref(),
             Some(&append_parts.join("\n")),
-            cwd,
+            &cwd,
         )
     }
 
@@ -178,7 +175,7 @@ impl AppState {
         }
     }
 
-    fn home_dir() -> Option<std::path::PathBuf> {
+    pub(crate) fn home_dir() -> Option<std::path::PathBuf> {
         #[cfg(target_os = "windows")]
         {
             std::env::var("USERPROFILE")
@@ -188,6 +185,217 @@ impl AppState {
         #[cfg(not(target_os = "windows"))]
         {
             std::env::var("HOME").ok().map(std::path::PathBuf::from)
+        }
+    }
+
+    /// Load sessions from all known project directories (for startup).
+    /// Reads `~/.pick/projects.json` and scans each project's `.pick/sessions/`
+    /// directory in addition to the current cwd and the global session dir.
+    /// Load sessions for the multi-project startup display.
+    /// Strategy:
+    ///   1. Load each known project's own `.pick/sessions/` dir tagged with
+    ///      that project's path — these are authoritative for per-project
+    ///      attribution.
+    ///   2. Load the global directory (~/.pick/agent/sessions/) using the
+    ///      session header's own `cwd`.  This fills in sessions that were
+    ///      created before project management existed.  Important: project‑
+    ///      specific loads run FIRST so that global‑dir copies of the same
+    ///      session do NOT overwrite the correct project‑specific cwd tag.
+    pub async fn load_all_projects_sessions(&self) {
+        // 1. Load each known project directory individually.
+        let all_paths = self.project_manager.get_all_project_paths();
+        for project_path in &all_paths {
+            let session_dir = project_path.join(".pick").join("sessions");
+            if session_dir.exists() {
+                debug!("Loading sessions from project: {}", project_path.display());
+                self.load_single_session_dir(&session_dir, project_path)
+                    .await;
+            }
+        }
+
+        // 2. Load the global session directory.  Sessions already placed
+        //    by step 1 are skipped because they already carry the correct
+        //    project cwd.
+        if let Some(home) = Self::home_dir() {
+            let global_dir = home.join(".pick").join("agent").join("sessions");
+            if global_dir.exists() {
+                debug!("Loading sessions from global dir: {}", global_dir.display());
+                self.load_global_session_dir(&global_dir).await;
+            }
+        }
+    }
+
+    /// Scan a single session directory and insert all sessions found,
+    /// tagging each with the given `cwd_label` (the project directory path).
+    async fn load_single_session_dir(&self, dir: &Path, cwd_label: &Path) {
+        let mut rd = match tokio::fs::read_dir(dir).await {
+            Ok(r) => r,
+            Err(_) => return,
+        };
+        loop {
+            let entry = match rd.next_entry().await {
+                Ok(Some(e)) => e,
+                Ok(None) => break,
+                Err(_) => break,
+            };
+            if entry.path().extension() != Some(OsStr::new("jsonl")) {
+                continue;
+            }
+            match AgentSessionManager::open(entry.path(), cwd_label.to_path_buf()).await {
+                Ok(agent) => {
+                    let id = agent.header().map(|h| h.id.clone()).unwrap_or_default();
+                    let title = agent.get_session_name().unwrap_or("Session").to_string();
+                    let model_id = agent
+                        .header()
+                        .and_then(|h| h.model.clone())
+                        .unwrap_or_else(|| "claude-sonnet-4-20250514".to_string());
+                    let provider = agent
+                        .header()
+                        .and_then(|h| h.provider.clone())
+                        .unwrap_or_else(|| "anthropic".to_string());
+                    let thinking_level = agent
+                        .header()
+                        .and_then(|h| h.thinking_level.clone())
+                        .unwrap_or_else(|| "off".to_string());
+                    let path = agent
+                        .session_path()
+                        .map(|p| p.to_string_lossy().to_string());
+
+                    let archived = agent.header().map(|h| h.archived).unwrap_or(false);
+
+                    // NOTE: messages are lazily loaded from disk when the
+                    // session is actually used (get_messages or agent loop).
+                    // We only load header metadata at startup for speed.
+                    let session = session::AgentSession {
+                        id,
+                        title,
+                        model_id,
+                        provider,
+                        thinking_level,
+                        system_prompt: String::new(),
+                        tools: Vec::new(),
+                        messages: Vec::new(),
+                        created_at: agent.header().map(|h| h.created_at).unwrap_or_default(),
+                        updated_at: agent.header().map(|h| h.updated_at).unwrap_or_default(),
+                        status: "idle".to_string(),
+                        fork_parent_id: None,
+                        session_path: path,
+                        persisted_messages_count: 0,
+                        cwd: Some(cwd_label.to_string_lossy().to_string()),
+                        archived,
+                    };
+                    self.session_manager
+                        .write()
+                        .await
+                        .insert_session(session)
+                        .await;
+                    debug!("Loaded session meta: {}", entry.path().display());
+                }
+                Err(e) => {
+                    debug!("Failed to load session {}: {}", entry.path().display(), e);
+                }
+            }
+        }
+    }
+
+    /// Scan the global session directory (~/.pick/agent/sessions/).
+    /// Each session's `cwd` is read from its own header so it can be linked
+    /// back to the correct project directory.
+    async fn load_global_session_dir(&self, dir: &Path) {
+        let mut rd = match tokio::fs::read_dir(dir).await {
+            Ok(r) => r,
+            Err(_) => return,
+        };
+        loop {
+            let entry = match rd.next_entry().await {
+                Ok(Some(e)) => e,
+                Ok(None) => break,
+                Err(_) => break,
+            };
+            if entry.path().extension() != Some(OsStr::new("jsonl")) {
+                continue;
+            }
+            // Use the session file's own parent directory as the open cwd,
+            // but we'll override the session cwd with the header value below.
+            match AgentSessionManager::open(entry.path(), dir.to_path_buf()).await {
+                Ok(agent) => {
+                    let id = agent.header().map(|h| h.id.clone()).unwrap_or_default();
+
+                    // Skip sessions that are already loaded from a project
+                    // directory — those carry the correct per‑project cwd
+                    // whereas the global‑dir copy uses a potentially stale
+                    // header cwd.
+                    {
+                        let sessions = self.session_manager.read().await;
+                        if sessions.get(&id).await.is_some() {
+                            debug!(
+                                "Skipping global session {} (already loaded from project)",
+                                id
+                            );
+                            continue;
+                        }
+                    }
+
+                    let title = agent.get_session_name().unwrap_or("Session").to_string();
+                    let model_id = agent
+                        .header()
+                        .and_then(|h| h.model.clone())
+                        .unwrap_or_else(|| "claude-sonnet-4-20250514".to_string());
+                    let provider = agent
+                        .header()
+                        .and_then(|h| h.provider.clone())
+                        .unwrap_or_else(|| "anthropic".to_string());
+                    let thinking_level = agent
+                        .header()
+                        .and_then(|h| h.thinking_level.clone())
+                        .unwrap_or_else(|| "off".to_string());
+                    let path = agent
+                        .session_path()
+                        .map(|p| p.to_string_lossy().to_string());
+
+                    let archived = agent.header().map(|h| h.archived).unwrap_or(false);
+
+                    // Use the session header's own `cwd` so it maps back
+                    // to the correct project, falling back to the global
+                    // dir for sessions that predate the cwd field.
+                    let session_cwd = agent
+                        .header()
+                        .and_then(|h| h.cwd.clone())
+                        .unwrap_or_else(|| dir.to_string_lossy().to_string());
+
+                    let session = session::AgentSession {
+                        id,
+                        title,
+                        model_id,
+                        provider,
+                        thinking_level,
+                        system_prompt: String::new(),
+                        tools: Vec::new(),
+                        messages: Vec::new(),
+                        created_at: agent.header().map(|h| h.created_at).unwrap_or_default(),
+                        updated_at: agent.header().map(|h| h.updated_at).unwrap_or_default(),
+                        status: "idle".to_string(),
+                        fork_parent_id: None,
+                        session_path: path,
+                        persisted_messages_count: 0,
+                        cwd: Some(session_cwd),
+                        archived,
+                    };
+                    self.session_manager
+                        .write()
+                        .await
+                        .insert_session(session)
+                        .await;
+                    debug!("Loaded global session meta: {}", entry.path().display());
+                }
+                Err(e) => {
+                    debug!(
+                        "Failed to load global session {}: {}",
+                        entry.path().display(),
+                        e
+                    );
+                }
+            }
         }
     }
 
@@ -240,23 +448,18 @@ impl AppState {
                             .header()
                             .and_then(|h| h.thinking_level.clone())
                             .unwrap_or_else(|| "off".to_string());
-                        let messages: Vec<Message> = {
-                            let leaf_id = match agent.get_leaf_id() {
-                                Some(id) => id.to_string(),
-                                None => continue,
-                            };
-                            agent
-                                .get_path_to_root(&leaf_id)
-                                .iter()
-                                .filter_map(|e| Message::try_from(*e).ok())
-                                .collect()
-                        };
-                        let msg_count = messages.len();
                         let path = agent
                             .session_path()
                             .map(|p| p.to_string_lossy().to_string());
 
                         let archived = agent.header().map(|h| h.archived).unwrap_or(false);
+
+                        // Always use the parameter `cwd` (the project's canonical path)
+                        // as the session label.  Using the session header's own cwd
+                        // would carry stale paths from earlier runs, causing multiple
+                        // distinct strings (with the same basename) to appear in the
+                        // frontend's project‑key Set → duplicate project entries.
+                        let session_cwd = cwd.to_string_lossy().to_string();
 
                         let session = session::AgentSession {
                             id,
@@ -266,17 +469,21 @@ impl AppState {
                             thinking_level,
                             system_prompt: String::new(),
                             tools: Vec::new(),
-                            messages,
+                            messages: Vec::new(),
                             created_at: agent.header().map(|h| h.created_at).unwrap_or_default(),
                             updated_at: agent.header().map(|h| h.updated_at).unwrap_or_default(),
                             status: "idle".to_string(),
                             fork_parent_id: None,
                             session_path: path,
-                            persisted_messages_count: msg_count,
-                            cwd: Some(cwd.to_string_lossy().to_string()),
+                            persisted_messages_count: 0,
+                            cwd: Some(session_cwd),
                             archived,
                         };
-                        self.session_manager.insert_session(session).await;
+                        self.session_manager
+                            .write()
+                            .await
+                            .insert_session(session)
+                            .await;
                         debug!("Loaded session meta: {}", entry.path().display());
                     }
                     Err(e) => {
@@ -451,6 +658,16 @@ pub fn create_app(state: Arc<AppState>) -> Router {
             "/prompt-history/push",
             post(prompt_history_routes::push_history),
         )
+        // Project management
+        .route(
+            "/cwd",
+            get(project_routes::get_cwd).post(project_routes::set_cwd),
+        )
+        .route(
+            "/projects",
+            get(project_routes::list_projects).post(project_routes::add_project),
+        )
+        .route("/projects/remove", post(project_routes::remove_project))
         .route("/openapi.json", get(docs::openapi_json))
         .route("/docs", get(docs::docs_ui))
         .fallback(spa::spa_handler)
@@ -461,21 +678,15 @@ pub fn create_app(state: Arc<AppState>) -> Router {
 pub async fn run_server(config: ServerConfig) -> Result<(), Box<dyn std::error::Error>> {
     let state = Arc::new(AppState::new(config.clone()));
 
-    // Load persisted sessions from disk
-    let cwd = config
-        .cwd
-        .as_deref()
-        .map(Path::new)
-        .unwrap_or_else(|| Path::new("."))
-        .to_path_buf();
-    state.load_persisted_sessions(&cwd).await;
+    // Load sessions from all known projects (current cwd + all in ~/.pick/projects.json)
+    state.load_all_projects_sessions().await;
 
     // Load MCP servers from settings in background (don't block startup)
     {
+        let mcp_cwd = state.project_manager.get_cwd();
         let state_for_mcp = state.clone();
-        let cwd_for_mcp = cwd.clone();
         tokio::spawn(async move {
-            state_for_mcp.load_mcp_from_settings(&cwd_for_mcp).await;
+            state_for_mcp.load_mcp_from_settings(&mcp_cwd).await;
         });
     }
 
@@ -502,21 +713,15 @@ pub async fn run_server_on_listener(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let state = Arc::new(AppState::new(config.clone()));
 
-    // Load persisted sessions from disk
-    let cwd = config
-        .cwd
-        .as_deref()
-        .map(Path::new)
-        .unwrap_or_else(|| Path::new("."))
-        .to_path_buf();
-    state.load_persisted_sessions(&cwd).await;
+    // Load sessions from all known projects (current cwd + all in ~/.pick/projects.json)
+    state.load_all_projects_sessions().await;
 
     // Load MCP servers from settings in background (don't block startup)
     {
+        let mcp_cwd = state.project_manager.get_cwd();
         let state_for_mcp = state.clone();
-        let cwd_for_mcp = cwd.clone();
         tokio::spawn(async move {
-            state_for_mcp.load_mcp_from_settings(&cwd_for_mcp).await;
+            state_for_mcp.load_mcp_from_settings(&mcp_cwd).await;
         });
     }
 

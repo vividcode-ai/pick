@@ -202,7 +202,7 @@ export function useSessionManager(
     }
   }, [baseUrl, startEvictionTimer, cancelEvictionTimer, updateSession]);
 
-  const createSession = useCallback(async (modelId?: string, provider?: string) => {
+  const createSession = useCallback(async (modelId?: string, provider?: string, cwd?: string) => {
     try {
       const prevId = activeSessionIdRef.current;
       if (prevId) {
@@ -212,10 +212,12 @@ export function useSessionManager(
         }
       }
 
+      const body: Record<string, any> = { model_id: modelId, provider };
+      if (cwd) body.cwd = cwd;
       const res = await fetch(`${baseUrl}/sessions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ model_id: modelId, provider }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) return null;
       const data = await res.json();
@@ -472,7 +474,6 @@ export function useSessionManager(
     });
 
     eventSource.addEventListener("agent_end", (e) => {
-      turnEndMessageCount = -1;
       updateSession(sessionId, (prev) => ({ ...prev, streaming: false, pendingApproval: null, pendingQuestion: null }));
       if (sessionId !== activeSessionIdRef.current) {
         startEvictionTimer(sessionId);
@@ -504,6 +505,9 @@ export function useSessionManager(
     eventSource.addEventListener("loop_execution_start", (e) => {
       try {
         const payload: LoopExecutionPayload = JSON.parse(e.data);
+        // Set streaming=true so the "Working..." indicator shows in ChatInput
+        // for subsequent loop executions triggered by the scheduler (not a user ask).
+        updateSession(sessionId, (prev) => ({ ...prev, streaming: true }));
         callbacks?.onLoopExecutionStart?.(payload);
       } catch {}
     });

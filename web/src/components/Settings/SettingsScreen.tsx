@@ -1,5 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { ArrowLeft, Palette, Server, Bell, Archive, Activity, Bot } from "lucide-react";
+import { ArrowLeft, Palette, Server, Bell, Archive, Activity, Bot, Shield } from "lucide-react";
 import {
   closeSettings,
   setActiveSettingsSection,
@@ -14,6 +14,7 @@ import { NotificationsSection } from "./NotificationsSection";
 import { ArchivedSessionsSection } from "./ArchivedSectionsSection";
 import { McpSection } from "./McpSection";
 import { AgentSection } from "./AgentSection";
+import { PermissionSection } from "./PermissionSection";
 
 interface SettingsScreenProps {
   serverUrl: string;
@@ -29,6 +30,7 @@ const navItems: { id: SettingsSectionId; icon: typeof Palette; label: string }[]
   { id: "archived", icon: Archive, label: "Archived" },
   { id: "mcp", icon: Activity, label: "MCP" },
   { id: "agent", icon: Bot, label: "Agent" },
+  { id: "permission", icon: Shield, label: "Permissions" },
 ];
 
 export function SettingsScreen({
@@ -70,6 +72,8 @@ export function SettingsScreen({
         return <McpSection serverUrl={serverUrl} />;
       case "agent":
         return <AgentSection serverUrl={serverUrl} />;
+      case "permission":
+        return <PermissionSection />;
     }
   };
 

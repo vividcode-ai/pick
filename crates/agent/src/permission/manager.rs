@@ -58,7 +58,7 @@ impl PermissionManager {
             None
         };
 
-        let network_policy = if profile.network_access != NetworkAccess::Full {
+        let mut network_policy = if profile.network_access != NetworkAccess::Full {
             match profile.network_access {
                 NetworkAccess::Blocked => Some(Arc::new(NetworkPolicy::new_blocked())),
                 NetworkAccess::Restricted | NetworkAccess::ProxyOnly => {
@@ -69,6 +69,18 @@ impl PermissionManager {
         } else {
             Some(Arc::new(NetworkPolicy::new_full_access()))
         };
+
+        // Merge extra allowed domains from user config into the restricted network policy
+        if let Some(ref extra) = config.and_then(|c| c.network_allowed_domains.as_ref()) {
+            if !extra.is_empty() {
+                if let Some(ref policy) = network_policy.take() {
+                    let p: NetworkPolicy = Arc::as_ref(policy)
+                        .clone()
+                        .with_extra_allowed_domains(extra);
+                    network_policy = Some(Arc::new(p));
+                }
+            }
+        }
 
         let guardian = if profile.guardian_enabled {
             Some(Arc::new(Guardian::new(GuardianConfig {
@@ -191,6 +203,17 @@ impl PermissionManager {
     pub fn check_network(&self, url: &str) -> Result<(), String> {
         if let Some(ref np) = self.network_policy {
             np.can_access(url)
+        } else {
+            Ok(())
+        }
+    }
+
+    pub fn check_network_detailed(
+        &self,
+        url: &str,
+    ) -> Result<(), super::network::NetworkDenyReason> {
+        if let Some(ref np) = self.network_policy {
+            np.can_access_detailed(url)
         } else {
             Ok(())
         }

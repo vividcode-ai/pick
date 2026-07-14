@@ -126,6 +126,8 @@ pub(crate) struct TuiContext {
     // Loop (scheduled jobs)
     pub loop_manager: Arc<tokio::sync::RwLock<pick_loop::LoopManager>>,
     pub loop_scheduler: Option<Arc<pick_loop::LoopScheduler>>,
+    /// Counter for periodic loop status refresh (every 10 spinner ticks ≈ 1s)
+    pub loop_refresh_counter: u32,
 
     // Update action to execute after TUI exits
     pub pending_update: Option<crate::core::update_action::UpdateAction>,

@@ -9,6 +9,7 @@ export interface SessionEntry {
   provider?: string;
   thinkingLevel?: string;
   archived?: boolean;
+  cwd?: string;
 }
 
 let sessions: SessionEntry[] = [];
@@ -32,10 +33,10 @@ export function initSessions(list: SessionEntry[]) {
   emitChange();
 }
 
-export function addSessionEntry(id: string, title?: string, modelId?: string, provider?: string, thinkingLevel?: string) {
+export function addSessionEntry(id: string, title?: string, modelId?: string, provider?: string, thinkingLevel?: string, cwd?: string) {
   const now = Date.now();
   sessions = [
-    { id, title: title || `Session ${sessions.length + 1}`, createdAt: now, updatedAt: now, modelId, provider, thinkingLevel },
+    { id, title: title || `Session ${sessions.length + 1}`, createdAt: now, updatedAt: now, modelId, provider, thinkingLevel, cwd },
     ...sessions,
   ];
   emitChange();

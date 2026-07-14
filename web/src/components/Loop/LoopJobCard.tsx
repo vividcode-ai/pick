@@ -1,5 +1,5 @@
-import { Play, Pause, Trash2, Repeat, CheckCircle, AlertCircle } from "lucide-react";
-import { useState } from "react";
+import { Play, Pause, Trash2, Repeat, CheckCircle, AlertCircle, Clock } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import type { LoopJobResponse } from "../../types/events";
 
 interface LoopJobCardProps {
@@ -30,9 +30,39 @@ function formatNextDue(ms: number): string {
   return `${hours}h ${mins % 60}m`;
 }
 
+function formatCountdown(ms: number): string {
+  if (ms <= 0) return "0s";
+  const totalSecs = Math.ceil(ms / 1000);
+  const secs = totalSecs % 60;
+  const mins = Math.floor(totalSecs / 60) % 60;
+  const hours = Math.floor(totalSecs / 3600);
+  if (hours > 0) return `${hours}h ${mins}m ${secs}s`;
+  if (mins > 0) return `${mins}m ${secs}s`;
+  return `${secs}s`;
+}
+
 export function LoopJobCard({ job, onPause, onResume, onDelete, onTrigger, baseUrl, sessionId }: LoopJobCardProps) {
   const [showGoalInput, setShowGoalInput] = useState<"complete" | "blocked" | "progress" | null>(null);
   const [goalInput, setGoalInput] = useState("");
+  const [countdownMs, setCountdownMs] = useState(job.next_due_ms);
+  const prevNextDueRef = useRef(job.next_due_ms);
+
+  // Sync countdown when server pushes fresh next_due_ms
+  useEffect(() => {
+    if (job.next_due_ms !== prevNextDueRef.current) {
+      setCountdownMs(job.next_due_ms);
+      prevNextDueRef.current = job.next_due_ms;
+    }
+  }, [job.next_due_ms]);
+
+  // Real-time countdown tick for idle interval-based jobs
+  useEffect(() => {
+    if (job.status !== "idle") return;
+    const timer = setInterval(() => {
+      setCountdownMs(prev => Math.max(0, prev - 1000));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [job.status]);
 
   const statusColor =
     job.status === "running"
@@ -71,7 +101,7 @@ export function LoopJobCard({ job, onPause, onResume, onDelete, onTrigger, baseU
 
   return (
     <div>
-      <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg border border-[var(--border-base)] bg-[var(--surface-base)]">
+      <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-[var(--surface-base)]">
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <span className={`text-sm ${statusColor}`}>
             {STATUS_ICONS[job.status] || "🔄"}
@@ -96,9 +126,14 @@ export function LoopJobCard({ job, onPause, onResume, onDelete, onTrigger, baseU
             </div>
             <div className="flex items-center gap-3 text-xs text-[var(--text-muted)] mt-0.5">
               <span>runs {job.run_count}{job.max_runs != null ? `/${job.max_runs}` : ""}</span>
-              {job.status === "idle" && (
+              {job.status === "idle" && job.interval_ms > 0 ? (
+                <span className="flex items-center gap-1 text-[var(--text-accent)]">
+                  <Clock className="w-3 h-3" />
+                  <span className="tabular-nums">{formatCountdown(countdownMs)}</span>
+                </span>
+              ) : job.status === "idle" ? (
                 <span>next {formatNextDue(job.next_due_ms)}</span>
-              )}
+              ) : null}
               {job.status === "paused" && <span>paused</span>}
               {job.status === "done" && <span>completed</span>}
               {job.status === "failed" && <span>failed ({job.failure_count})</span>}

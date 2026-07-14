@@ -182,6 +182,15 @@ impl TuiApp {
         };
         let has_pending_layout = pending_lines > 0;
 
+        let has_loop_jobs = !self.loop_jobs.is_empty();
+        let loop_jobs_lines_count: u16 = if has_loop_jobs {
+            let count = self.loop_jobs.len();
+            // header + each job + trailing blank
+            1 + count as u16 + 1
+        } else {
+            0
+        };
+
         let has_todo = !self.todo_items.is_empty()
             && self.todo_items.iter().any(|t| {
                 let s = t.get("status").and_then(|v| v.as_str()).unwrap_or("");
@@ -200,6 +209,7 @@ impl TuiApp {
             + 2
             + if has_status { 3 } else { 0 }
             + pending_lines
+            + loop_jobs_lines_count
             + if has_todo { todo_lines + 1 } else { 0 }
             + if has_usage { 2 } else { 0 }
             + self.autocomplete_space_lines
@@ -218,6 +228,14 @@ impl TuiApp {
         if has_status {
             constraints.push(Constraint::Length(1));
             constraints.push(Constraint::Length(1));
+            constraints.push(Constraint::Length(1));
+        }
+        // Loop jobs detail section — between status bar and pending messages
+        if has_loop_jobs {
+            constraints.push(Constraint::Length(1));
+            for _ in 0..self.loop_jobs.len() {
+                constraints.push(Constraint::Length(1));
+            }
             constraints.push(Constraint::Length(1));
         }
         // Pending messages — between status bar and editor
@@ -395,6 +413,96 @@ impl TuiApp {
                             i += 1;
                         }
 
+                        render_at!(i, Line::from(""));
+                        i += 1;
+                    }
+
+                    // Loop jobs detail section — rendered after status bar
+                    if has_loop_jobs {
+                        let dim = Style::default().add_modifier(Modifier::DIM);
+                        let count = self.loop_jobs.len();
+                        render_at!(
+                            i,
+                            Line::from(Span::styled(format!("── Loop Jobs ({}) ──", count), dim,))
+                        );
+                        i += 1;
+                        let now_ms = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_millis() as i64;
+
+                        for job in &self.loop_jobs {
+                            let name = job.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                            let status = job.get("status").and_then(|v| v.as_str()).unwrap_or("");
+                            let run_count =
+                                job.get("run_count").and_then(|v| v.as_u64()).unwrap_or(0);
+                            let max_runs = job.get("max_runs").and_then(|v| v.as_u64());
+                            let interval_ms =
+                                job.get("interval_ms").and_then(|v| v.as_u64()).unwrap_or(0);
+                            let last_run_at = job.get("last_run_at").and_then(|v| v.as_i64());
+                            let kind = job.get("kind").and_then(|v| v.as_str()).unwrap_or("");
+
+                            // Status icon
+                            let icon = match status {
+                                "idle" => "\u{1f7e2}",    // 🟢
+                                "running" => "\u{1f535}", // 🔵
+                                "paused" => "\u{1f7e1}",  // 🟡
+                                "done" => "\u{2705}",     // ✅
+                                "failed" => "\u{274c}",   // ❌
+                                _ => "\u{26ab}",          // ⚫
+                            };
+
+                            // Format run count
+                            let runs_str = match max_runs {
+                                Some(max) => format!("{}/{}", run_count, max),
+                                None => format!("{}/\u{221e}", run_count),
+                            };
+
+                            // Compute live countdown from interval_ms + last_run_at
+                            let is_active = status == "idle" || status == "running";
+                            let remaining_ms = if is_active && interval_ms > 0 {
+                                if let Some(last) = last_run_at {
+                                    let next = last + interval_ms as i64;
+                                    (next - now_ms).max(0)
+                                } else {
+                                    0 // never run → due now
+                                }
+                            } else if interval_ms == 0 {
+                                0 // idle-driven
+                            } else {
+                                i64::MAX // paused/done/failed
+                            };
+
+                            // Format remaining time
+                            let next_str = if remaining_ms <= 0 {
+                                "now".to_string()
+                            } else if remaining_ms < 1000 {
+                                format!("{}ms", remaining_ms)
+                            } else {
+                                format!("{}s", remaining_ms / 1000)
+                            };
+
+                            // Truncate name to fit available width
+                            let max_name = (width as usize).saturating_sub(30);
+                            let name_display = if name.len() > max_name {
+                                let mut truncated: String =
+                                    name.chars().take(max_name.saturating_sub(3)).collect();
+                                truncated.push_str("...");
+                                truncated
+                            } else {
+                                name.to_string()
+                            };
+
+                            let line = Line::from(Span::styled(
+                                format!(
+                                    "  {} {}  [{}/{}]  runs: {}  next: {}",
+                                    icon, name_display, status, kind, runs_str, next_str
+                                ),
+                                dim,
+                            ));
+                            render_at!(i, line);
+                            i += 1;
+                        }
                         render_at!(i, Line::from(""));
                         i += 1;
                     }
@@ -1350,6 +1458,11 @@ impl TuiApp {
     /// Set the loop job status line (separate from goal/status text).
     pub fn set_loop_status(&mut self, status: Option<&str>) {
         self.loop_status_text = status.map(|s| s.to_string());
+    }
+
+    /// Set detailed loop job info for display above the editor.
+    pub fn set_loop_jobs(&mut self, jobs: Vec<serde_json::Value>) {
+        self.loop_jobs = jobs;
     }
 
     /// Advance the spinner animation frame by one.

@@ -64,6 +64,12 @@ pub struct PermissionConfig {
     /// permission safeguards (exec policy, guardian, fs policy) remain active.
     #[serde(default = "default_sandbox_enabled")]
     pub sandbox_enabled: bool,
+
+    /// Extra domains to allow in addition to the profile's default allowlist.
+    /// Only used when the profile has restricted network access.
+    /// Example: ["*.baidu.com", "tophub.today"]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub network_allowed_domains: Option<Vec<String>>,
 }
 
 fn default_permission_profile() -> String {
@@ -77,6 +83,7 @@ impl Default for PermissionConfig {
             granular: None,
             permission_profile: default_permission_profile(),
             sandbox_enabled: default_sandbox_enabled(),
+            network_allowed_domains: None,
         }
     }
 }

@@ -152,6 +152,18 @@ impl SessionManager {
             .insert(session.id.clone(), session);
     }
 
+    /// Change the working directory at runtime.
+    /// Also updates session_dir to point to the new cwd's `.pick/sessions/`.
+    pub fn set_cwd(&mut self, new_cwd: PathBuf) {
+        self.cwd = new_cwd.clone();
+        self.session_dir = new_cwd.join(".pick").join("sessions");
+    }
+
+    /// Clear all in-memory sessions (for reload from a new directory).
+    pub async fn clear_sessions(&self) {
+        self.sessions.write().await.clear();
+    }
+
     pub async fn create(
         &self,
         model_id: String,
@@ -159,13 +171,18 @@ impl SessionManager {
         thinking_level: String,
         system_prompt: String,
         tools: Vec<AgentTool>,
+        explicit_cwd: Option<String>,
     ) -> (String, String) {
         let id = uuid::Uuid::now_v7().to_string();
         let title = format!(
             "New session - {}",
             chrono::Utc::now().format("%Y-%m-%d %H:%M")
         );
-        let cwd_str = self.cwd.to_string_lossy().to_string();
+        // When the frontend knows which project this session belongs to
+        // (e.g. selected-project-aware creation), it sends explicit_cwd
+        // so the session is attributed to the correct project immediately
+        // without waiting for a server-side cwd switch.
+        let cwd_str = explicit_cwd.unwrap_or_else(|| self.cwd.to_string_lossy().to_string());
         let session = AgentSession {
             id: id.clone(),
             title: title.clone(),
@@ -632,12 +649,63 @@ impl SessionManager {
         self.cwd.clone()
     }
 
+    /// Load full message content from disk for a session that was loaded
+    /// with metadata only (lazy loading).
+    pub async fn load_session_messages(&self, id: &str) {
+        let (path_str, cwd) = {
+            let sessions = self.sessions.read().await;
+            let s = match sessions.get(id) {
+                Some(s) => s,
+                None => return,
+            };
+            let p = match s.session_path.clone() {
+                Some(p) => p,
+                None => return,
+            };
+            let c = s.cwd.clone().unwrap_or_else(|| {
+                std::env::current_dir()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string()
+            });
+            (p, PathBuf::from(c))
+        };
+
+        if let Ok(agent) =
+            pick_agent::session::manager::SessionManager::open(PathBuf::from(&path_str), cwd).await
+        {
+            if let Some(leaf_id) = agent.get_leaf_id() {
+                let messages: Vec<Message> = agent
+                    .get_path_to_root(&leaf_id)
+                    .iter()
+                    .filter_map(|e| Message::try_from(*e).ok())
+                    .collect();
+                let count = messages.len();
+                let mut sessions = self.sessions.write().await;
+                if let Some(s) = sessions.get_mut(id) {
+                    s.messages = messages;
+                    s.persisted_messages_count = count;
+                }
+            }
+        }
+    }
+
     pub async fn get_messages(
         &self,
         id: &str,
         offset: Option<usize>,
         limit: Option<usize>,
     ) -> Option<(Vec<Message>, usize)> {
+        // Lazy-load messages from disk if not yet loaded
+        {
+            let sessions = self.sessions.read().await;
+            if let Some(s) = sessions.get(id) {
+                if s.messages.is_empty() && s.session_path.is_some() {
+                    drop(sessions);
+                    self.load_session_messages(id).await;
+                }
+            }
+        }
         let sessions = self.sessions.read().await;
         let session = sessions.get(id)?;
         let total = session.messages.len();

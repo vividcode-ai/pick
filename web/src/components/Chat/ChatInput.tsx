@@ -381,7 +381,7 @@ export function ChatInput({
                   onDelete={onClearGoal}
                   noWrapper={!!streaming}
                 />
-              ) : streaming ? (
+              ) : streaming && loopSending ? (
                 <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] px-1">
                   <span className="w-2 h-2 bg-[var(--text-accent)] rounded-full animate-pulse" />
                   <span>Awaiting loop job...</span>

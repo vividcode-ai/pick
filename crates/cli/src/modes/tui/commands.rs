@@ -127,6 +127,8 @@ pub(crate) fn apply_tui_command(tui: &mut TuiApp, cmd: TuiCommand) {
         }
         // AgentFinished is handled directly in runner.rs, not here
         TuiCommand::AgentFinished { .. } => {}
+        // RunLoopAgent is handled directly in runner.rs, not here
+        TuiCommand::RunLoopAgent(_) => {}
         TuiCommand::SteeringMessageConsumed(text) => {
             // A queued message was consumed by the agent — move from pending to chat
             if let Some(pos) = tui.pending_user_messages.iter().position(|m| m == &text) {
@@ -152,14 +154,16 @@ pub(crate) fn apply_tui_command(tui: &mut TuiApp, cmd: TuiCommand) {
         }
         TuiCommand::LoopStatusUpdated(jobs) => {
             let total = jobs.len();
-            let active = jobs
-                .iter()
-                .filter(|j| j.status == "idle" || j.status == "running")
-                .count();
             if total > 0 {
-                tui.set_loop_status(Some(&format!("🔄 {}/{}", active, total)));
+                // Serialize job info for the detailed section above editor
+                let jobs_json: Vec<serde_json::Value> = jobs
+                    .into_iter()
+                    .filter_map(|j| serde_json::to_value(j).ok())
+                    .collect();
+                tui.set_loop_jobs(jobs_json);
             } else {
                 tui.set_loop_status(None);
+                tui.set_loop_jobs(Vec::new());
             }
         }
     }

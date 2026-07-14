@@ -1,4 +1,5 @@
 use tauri::Manager;
+use tauri_plugin_dialog::DialogExt;
 use tokio::runtime::Runtime;
 
 struct ServerState {
@@ -16,6 +17,21 @@ fn get_server_url(state: tauri::State<ServerState>) -> Option<String> {
 #[tauri::command]
 fn get_os_info() -> String {
     std::env::consts::OS.to_string()
+}
+
+/// Open a native directory picker dialog.
+/// Returns the selected path as a String, or None if cancelled.
+#[tauri::command]
+async fn pick_directory(app: tauri::AppHandle) -> Result<Option<String>, String> {
+    use tokio::sync::oneshot;
+    let (tx, rx) = oneshot::channel();
+    app.dialog().file().pick_folder(move |f| {
+        let _ = tx.send(
+            f.and_then(|p| p.into_path().ok())
+                .map(|p| p.to_string_lossy().to_string()),
+        );
+    });
+    rx.await.map_err(|_| "Dialog cancelled".to_string())
 }
 
 /// Load last used provider/model/thinking from ~/.pick/agent/auth.json.
@@ -79,13 +95,18 @@ fn run_desktop() {
             app.manage(ServerRuntime(rt));
 
             if let Some(window) = app.get_webview_window("main") {
+                let _ = window.maximize();
                 let _ = window.show();
                 let _ = window.set_focus();
             }
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![get_server_url, get_os_info])
+        .invoke_handler(tauri::generate_handler![
+            get_server_url,
+            get_os_info,
+            pick_directory
+        ])
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())

@@ -258,7 +258,7 @@ pub fn create_bash_tool() -> AgentTool {
                 };
 
                 // Pre-check: absolute path access control + external directory authorization
-                if let (Some(ref fp), Some(ref cwd)) = (ctx.fs_policy, ctx.cwd)
+                if let (Some(ref fp), Some(ref cwd)) = (ctx.fs_policy, ctx.cwd.as_ref())
                     && !fp.allow_absolute_paths()
                 {
                     let abs_paths =
@@ -323,11 +323,23 @@ pub fn create_bash_tool() -> AgentTool {
                 } else {
                     let mut c = tokio::process::Command::new(&shell_config.shell);
                     c.args(&shell_config.args).arg(command);
+                    if let Some(ref cwd) = ctx.cwd {
+                        c.current_dir(cwd);
+                    }
                     c
                 };
                 cmd.stdout(std::process::Stdio::piped())
                     .stderr(std::process::Stdio::piped())
                     .kill_on_drop(true);
+
+                // On Windows, prevent the command from creating a console window.
+                // Without this flag every shell command spawns a flashing terminal.
+                #[cfg(windows)]
+                {
+                    use std::os::windows::process::CommandExt;
+                    const CREATE_NO_WINDOW: u32 = 0x08000000;
+                    cmd.as_std_mut().creation_flags(CREATE_NO_WINDOW);
+                }
 
                 let timeout_secs = args.get("timeout").and_then(|v| v.as_u64());
 

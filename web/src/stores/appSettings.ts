@@ -32,6 +32,9 @@ export interface WebSettings {
   // Permission
   tool_execution_permission: "prompt" | "auto_approve";
 
+  // Network
+  network_allowed_domains: string[];
+
   // Warnings
   anthropic_extra_usage: boolean;
 }
@@ -60,6 +63,8 @@ const DEFAULTS: WebSettings = {
   install_telemetry: false,
 
   tool_execution_permission: "prompt",
+
+  network_allowed_domains: [],
 
   anthropic_extra_usage: true,
 };
@@ -91,7 +96,7 @@ interface RawSettings {
   terminal?: { show_images?: boolean; image_width_cells?: number };
   images?: { auto_resize?: boolean; block_images?: boolean };
   compaction?: { enabled?: boolean };
-  permission?: { sandbox_enabled?: boolean };
+  permission?: { sandbox_enabled?: boolean; network_allowed_domains?: string[] };
   tool_execution_permission?: "prompt" | "auto_approve";
   enable_mcp_tools?: boolean;
   enable_skill_commands?: boolean;
@@ -115,6 +120,7 @@ function fromRust(raw: RawSettings): WebSettings {
     block_images: raw.images?.block_images ?? DEFAULTS.block_images,
     auto_compact: raw.compaction?.enabled ?? DEFAULTS.auto_compact,
     sandbox_enabled: raw.permission?.sandbox_enabled ?? DEFAULTS.sandbox_enabled,
+    network_allowed_domains: raw.permission?.network_allowed_domains ?? DEFAULTS.network_allowed_domains,
     tool_execution_permission: raw.tool_execution_permission ?? DEFAULTS.tool_execution_permission,
     mcp_tools: raw.enable_mcp_tools ?? DEFAULTS.mcp_tools,
     skill_commands: raw.enable_skill_commands ?? DEFAULTS.skill_commands,
@@ -142,7 +148,7 @@ function toRustPatch(ws: WebSettings): Record<string, unknown> {
       block_images: ws.block_images,
     },
     compaction: { enabled: ws.auto_compact },
-    permission: { sandbox_enabled: ws.sandbox_enabled },
+    permission: { sandbox_enabled: ws.sandbox_enabled, network_allowed_domains: ws.network_allowed_domains },
     tool_execution_permission: ws.tool_execution_permission,
     enable_mcp_tools: ws.mcp_tools,
     enable_skill_commands: ws.skill_commands,

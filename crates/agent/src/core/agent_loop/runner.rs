@@ -1,7 +1,7 @@
 //! Agent loop runner - the core execution loop
 
 use pick_ai::types::{
-    AssistantMessage, ContentBlock, Context, Message, ToolCall, ToolDefinition, Usage,
+    AssistantMessage, ContentBlock, Context, Message, ToolCall, ToolDefinition, Usage, UserMessage,
 };
 
 use super::super::events::AgentEvent;
@@ -1232,28 +1232,16 @@ async fn execute_turn(
         );
         state
             .messages
-            .push(Message::ToolResult(pick_ai::types::ToolResultMessage::new(
-                "",
-                "",
-                vec![ContentBlock::text(recovery_msg)],
-                false,
-            )));
+            .push(Message::User(UserMessage::text(recovery_msg)));
 
         // If skill files were read, suggest updating them
         if !state.read_skill_paths.is_empty() {
-            state
-                .messages
-                .push(Message::ToolResult(pick_ai::types::ToolResultMessage::new(
-                    "",
-                    "",
-                    vec![ContentBlock::text(
-                        "[System] Additionally, you previously read one or more skill files. \
-                         If the errors above were caused by incorrect or outdated instructions \
-                         in those skills, consider updating the skill file(s) with the corrected \
-                         approach using the edit tool.",
-                    )],
-                    false,
-                )));
+            state.messages.push(Message::User(UserMessage::text(
+                "[System] Additionally, you previously read one or more skill files. \
+                     If the errors above were caused by incorrect or outdated instructions \
+                     in those skills, consider updating the skill file(s) with the corrected \
+                     approach using the edit tool.",
+            )));
         }
     }
 
@@ -1265,12 +1253,7 @@ async fn execute_turn(
         );
         state
             .messages
-            .push(Message::ToolResult(pick_ai::types::ToolResultMessage::new(
-                "",
-                "",
-                vec![ContentBlock::text(fallback_msg)],
-                false,
-            )));
+            .push(Message::User(UserMessage::text(fallback_msg)));
         if let Some(ref handler) = config.on_event {
             handler(AgentEvent::TurnEnd {
                 message: Message::Assistant(assistant_msg),
@@ -1441,12 +1424,7 @@ async fn execute_continue_turn(
         );
         state
             .messages
-            .push(Message::ToolResult(pick_ai::types::ToolResultMessage::new(
-                "",
-                "",
-                vec![ContentBlock::text(recovery_msg)],
-                false,
-            )));
+            .push(Message::User(UserMessage::text(recovery_msg)));
     }
 
     // If consecutive tool errors exceed hard threshold, force text-only mode
@@ -1457,12 +1435,7 @@ async fn execute_continue_turn(
         );
         state
             .messages
-            .push(Message::ToolResult(pick_ai::types::ToolResultMessage::new(
-                "",
-                "",
-                vec![ContentBlock::text(fallback_msg)],
-                false,
-            )));
+            .push(Message::User(UserMessage::text(fallback_msg)));
         if let Some(ref handler) = config.on_event {
             handler(AgentEvent::TurnEnd {
                 message: Message::Assistant(assistant_msg),
