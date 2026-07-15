@@ -227,6 +227,17 @@ jobs:
           if [ -d "$BUNDLE_DIR/nsis" ];       then cp "$BUNDLE_DIR/nsis/"*.exe     desktop-artifacts/ 2>/dev/null || true; fi
           if [ -d "$BUNDLE_DIR/macos" ];      then cp -R "$BUNDLE_DIR/macos/"*.app desktop-artifacts/ 2>/dev/null || true; fi
           ls -la desktop-artifacts/ || echo "(desktop-artifacts is empty)"
+          # Strip version number from filenames: Pick-Desktop_0.1.19_amd64.deb → Pick-Desktop_amd64.deb
+          VERSION="$(grep -m1 '^version' Cargo.toml | sed -E 's/version *= *\"([^\"]+)\".*/\1/')"
+          echo "Stripping version '${VERSION}' from filenames..."
+          for f in desktop-artifacts/*; do
+            [ -f "$f" ] || continue
+            newname="$(echo "$f" | sed "s/_${VERSION}_/_/g")"
+            if [ "$f" != "$newname" ]; then
+              mv -v "$f" "$newname"
+            fi
+          done
+          ls -la desktop-artifacts/
 
       - name: Upload desktop artifacts
         if: always()
