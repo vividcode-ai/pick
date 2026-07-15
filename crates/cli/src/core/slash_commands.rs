@@ -302,11 +302,11 @@ mod tests {
     }
 
     #[test]
-    fn test_exactly_38_commands() {
+    fn test_exactly_49_commands() {
         assert_eq!(
             BUILTIN_SLASH_COMMANDS.len(),
-            38,
-            "must have exactly 38 built-in slash commands"
+            49,
+            "must have exactly 49 built-in slash commands"
         );
     }
 
