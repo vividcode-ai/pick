@@ -196,16 +196,14 @@ jobs:
       - name: Build frontend
         run: npm --prefix web run build
 
-      - name: Inject version into tauri.conf.json & build
+      - name: Build Tauri desktop app
         shell: bash
         run: |
           cd tauri
-          VERSION="$(grep -m1 '^version' ../Cargo.toml | sed -E 's/version *= *\"([^\"]+)\".*/\1/')"
-          echo "Injecting version: ${VERSION}"
+          # Disable beforeBuildCommand (frontend already built) and skip version injection
           node -e "
           const fs = require('fs');
           const cfg = JSON.parse(fs.readFileSync('tauri.conf.json', 'utf8'));
-          cfg.version = process.env.VERSION;
           cfg.build.beforeBuildCommand = 'echo frontend-already-built';
           fs.writeFileSync('_ci_tauri.conf.json', JSON.stringify(cfg, null, 2));
           "
@@ -227,15 +225,11 @@ jobs:
           if [ -d "$BUNDLE_DIR/nsis" ];       then cp "$BUNDLE_DIR/nsis/"*.exe     desktop-artifacts/ 2>/dev/null || true; fi
           if [ -d "$BUNDLE_DIR/macos" ];      then cp -R "$BUNDLE_DIR/macos/"*.app desktop-artifacts/ 2>/dev/null || true; fi
           ls -la desktop-artifacts/ || echo "(desktop-artifacts is empty)"
-          # Strip version number from filenames: Pick-Desktop_0.1.19_amd64.deb → Pick-Desktop_amd64.deb
-          VERSION="$(grep -m1 '^version' Cargo.toml | sed -E 's/version *= *\"([^\"]+)\".*/\1/')"
-          echo "Stripping version '${VERSION}' from filenames..."
+          # Strip version from filenames: Pick-Desktop_0.0.0_amd64.deb → Pick-Desktop_amd64.deb
           for f in desktop-artifacts/*; do
             [ -f "$f" ] || continue
-            newname="$(echo "$f" | sed "s/_${VERSION}_/_/g")"
-            if [ "$f" != "$newname" ]; then
-              mv -v "$f" "$newname"
-            fi
+            newname="$(echo "$f" | sed -E 's/_0\.0\.0_/_/g; s/-0\.0\.0-/-/g')"
+            [ "$f" != "$newname" ] && mv -v "$f" "$newname"
           done
           ls -la desktop-artifacts/
 
