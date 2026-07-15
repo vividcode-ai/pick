@@ -146,9 +146,95 @@ jobs:
           compression-level: 0
           if-no-files-found: error
 
+  build-desktop:
+    needs: [check]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-x86_64
+          - os: ubuntu-24.04-arm
+            target: linux-aarch64
+          - os: macos-latest
+            target: macos-aarch64
+          - os: windows-latest
+            target: windows-x86_64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: 1.95.0
+          cache: true
+
+      - name: Install Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libsoup-3.0-dev \
+            libjavascriptcoregtk-4.1-dev
+
+      - name: Install frontend dependencies
+        run: npm --prefix web ci
+
+      - name: Build frontend
+        run: npm --prefix web run build
+
+      - name: Inject version into tauri.conf.json & build
+        shell: bash
+        run: |
+          cd tauri
+          VERSION="$(grep -m1 '^version' ../Cargo.toml | sed -E 's/version *= *\"([^\"]+)\".*/\1/')"
+          echo "Injecting version: ${VERSION}"
+          node -e "
+          const fs = require('fs');
+          const cfg = JSON.parse(fs.readFileSync('tauri.conf.json', 'utf8'));
+          cfg.version = process.env.VERSION;
+          cfg.build.beforeBuildCommand = 'echo frontend-already-built';
+          fs.writeFileSync('_ci_tauri.conf.json', JSON.stringify(cfg, null, 2));
+          "
+          npx @tauri-apps/cli@latest build --config _ci_tauri.conf.json
+
+      - name: Stage desktop artifacts
+        shell: bash
+        run: |
+          mkdir -p desktop-artifacts
+          BUNDLE_DIR="tauri/target/release/bundle"
+          if [ -d "$BUNDLE_DIR/deb" ];       then cp "$BUNDLE_DIR/deb/"*.deb       desktop-artifacts/ 2>/dev/null || true; fi
+          if [ -d "$BUNDLE_DIR/appimage" ];   then cp "$BUNDLE_DIR/appimage/"*.AppImage desktop-artifacts/ 2>/dev/null || true; fi
+          if [ -d "$BUNDLE_DIR/dmg" ];        then cp "$BUNDLE_DIR/dmg/"*.dmg      desktop-artifacts/ 2>/dev/null || true; fi
+          if [ -d "$BUNDLE_DIR/msi" ];        then cp "$BUNDLE_DIR/msi/"*.msi      desktop-artifacts/ 2>/dev/null || true; fi
+          if [ -d "$BUNDLE_DIR/nsis" ];       then cp "$BUNDLE_DIR/nsis/"*.exe     desktop-artifacts/ 2>/dev/null || true; fi
+          if [ -d "$BUNDLE_DIR/macos" ];      then cp -R "$BUNDLE_DIR/macos/"*.app desktop-artifacts/ 2>/dev/null || true; fi
+          ls -la desktop-artifacts/
+
+      - name: Upload desktop artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pick-desktop-${{ matrix.target }}
+          path: desktop-artifacts/*
+          compression-level: 0
+          if-no-files-found: warn
+
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build, tag-check]
+    needs: [build, tag-check, build-desktop]
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.extract_version.outputs.version }}
@@ -183,6 +269,11 @@ jobs:
           find . -name '*.tar.gz' -exec sha256sum {} \; > pick-package_SHA256SUMS
           cat pick-package_SHA256SUMS
 
+      - name: Generate desktop checksums
+        run: |
+          find . -name 'pick-desktop-*' -type f -exec sha256sum {} \; > pick-desktop_SHA256SUMS || true
+          cat pick-desktop_SHA256SUMS 2>/dev/null || echo "(no desktop artifacts)"
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
@@ -194,6 +285,11 @@ jobs:
             pick-package-windows-x86_64/*.tar.gz
             pick-package-windows-aarch64/*.tar.gz
             pick-package_SHA256SUMS
+            pick-desktop-linux-x86_64/*
+            pick-desktop-linux-aarch64/*
+            pick-desktop-macos-aarch64/*
+            pick-desktop-windows-x86_64/*
+            pick-desktop_SHA256SUMS
             scripts/install/install.sh
             scripts/install/install.ps1
           generate_release_notes: true

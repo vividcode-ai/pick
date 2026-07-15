@@ -1,6 +1,6 @@
 {
   "$schema": "https://raw.githubusercontent.com/nicedouble/tauri/2.x/crates/tauri-cli/schema.json",
-  "productName": "Pick",
+  "productName": "Pick-Desktop",
   "version": "0.1.0",
   "identifier": "ai.pick.desktop",
   "build": {
