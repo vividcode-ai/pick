@@ -145,10 +145,11 @@ impl LoopScheduler {
         drop(mgr);
 
         // Reschedule if still active
-        if let Some(job) = self.manager.read().await.get(job_id).cloned() {
-            if job.status == LoopJobStatus::Idle && !job.max_runs_reached() {
-                self.schedule(&job).await;
-            }
+        if let Some(job) = self.manager.read().await.get(job_id).cloned()
+            && job.status == LoopJobStatus::Idle
+            && !job.max_runs_reached()
+        {
+            self.schedule(&job).await;
         }
     }
 
@@ -189,31 +190,30 @@ impl LoopScheduler {
             let mut mgr = self.manager.write().await;
             for job in &due {
                 // Check stop_file
-                if let Some(ref stop_file) = job.stop_file {
-                    if stop_file.exists() {
-                        debug!(
-                            "Stop file '{}' exists for job {}, removing",
-                            stop_file.display(),
-                            job.id
-                        );
-                        mgr.mark_done(&job.id);
-                        let _ = mgr.save();
-                        continue;
-                    }
+                if let Some(ref stop_file) = job.stop_file
+                    && stop_file.exists()
+                {
+                    debug!(
+                        "Stop file '{}' exists for job {}, removing",
+                        stop_file.display(),
+                        job.id
+                    );
+                    mgr.mark_done(&job.id);
+                    let _ = mgr.save();
+                    continue;
                 }
 
                 // Check until condition (stored in a status file)
-                if let Some(ref until) = job.until {
-                    if let Ok(content) = std::fs::read_to_string(
+                if let Some(ref until) = job.until
+                    && let Ok(content) = std::fs::read_to_string(
                         crate::manager::loops_dir(std::path::Path::new(".")).join("until.txt"),
-                    ) {
-                        if content.contains(until) {
-                            debug!("Until condition matched for job {}, removing", job.id);
-                            mgr.mark_done(&job.id);
-                            let _ = mgr.save();
-                            continue;
-                        }
-                    }
+                    )
+                    && content.contains(until)
+                {
+                    debug!("Until condition matched for job {}, removing", job.id);
+                    mgr.mark_done(&job.id);
+                    let _ = mgr.save();
+                    continue;
                 }
 
                 // Check watch_paths: update snapshot and skip if unchanged
@@ -230,10 +230,7 @@ impl LoopScheduler {
                                 .map(|d| d.as_secs())
                                 .unwrap_or(0);
                             let snapshot = format!("{}:{}", mtime, meta.len());
-                            let was_changed = job
-                                .watch_snapshot
-                                .get(&key)
-                                .map_or(true, |old| old != &snapshot);
+                            let was_changed = job.watch_snapshot.get(&key) != Some(&snapshot);
                             if was_changed {
                                 changed = true;
                             }
@@ -373,22 +370,22 @@ impl LoopScheduler {
                     {
                         let mut mgr = manager.write().await;
                         for job in &due {
-                            if let Some(ref stop_file) = job.stop_file {
-                                if stop_file.exists() {
-                                    mgr.mark_done(&job.id);
-                                    let _ = mgr.save();
-                                    continue;
-                                }
+                            if let Some(ref stop_file) = job.stop_file
+                                && stop_file.exists()
+                            {
+                                mgr.mark_done(&job.id);
+                                let _ = mgr.save();
+                                continue;
                             }
                             if let Some(ref until) = job.until {
                                 let p = crate::manager::loops_dir(std::path::Path::new("."))
                                     .join("until.txt");
-                                if let Ok(content) = std::fs::read_to_string(p) {
-                                    if content.contains(until) {
-                                        mgr.mark_done(&job.id);
-                                        let _ = mgr.save();
-                                        continue;
-                                    }
+                                if let Ok(content) = std::fs::read_to_string(p)
+                                    && content.contains(until)
+                                {
+                                    mgr.mark_done(&job.id);
+                                    let _ = mgr.save();
+                                    continue;
                                 }
                             }
                             if !job.watch_paths.is_empty() {
@@ -404,7 +401,7 @@ impl LoopScheduler {
                                             .map(|d| d.as_secs())
                                             .unwrap_or(0);
                                         let sn = format!("{}:{}", mtime, meta.len());
-                                        if job.watch_snapshot.get(&key).map_or(true, |o| o != &sn) {
+                                        if job.watch_snapshot.get(&key) != Some(&sn) {
                                             changed = true;
                                         }
                                         new_snap.insert(key, sn);
@@ -439,20 +436,20 @@ impl LoopScheduler {
     /// Stop the watchdog.
     pub fn stop_watchdog(&self) {
         self.shutdown.store(true, Ordering::Release);
-        if let Ok(mut guard) = self.watchdog_handle.lock() {
-            if let Some(handle) = guard.take() {
-                handle.abort();
-            }
+        if let Ok(mut guard) = self.watchdog_handle.lock()
+            && let Some(handle) = guard.take()
+        {
+            handle.abort();
         }
     }
 
     // ── Internal helpers ───────────────────────────────────────────────────
 
     fn cancel_timer(&self, job_id: &str) {
-        if let Ok(mut timers) = self.job_timers.lock() {
-            if let Some(handle) = timers.remove(job_id) {
-                handle.abort();
-            }
+        if let Ok(mut timers) = self.job_timers.lock()
+            && let Some(handle) = timers.remove(job_id)
+        {
+            handle.abort();
         }
     }
 
@@ -486,11 +483,11 @@ impl LoopScheduler {
                 }
 
                 // Trigger
-                if let Some(ref cb) = trigger_cb {
-                    if let Some(job) = manager.read().await.get(&job_id).cloned() {
-                        debug!("[timer] Triggering loop job {} ({})", job_id, job_name);
-                        cb(job).await;
-                    }
+                if let Some(ref cb) = trigger_cb
+                    && let Some(job) = manager.read().await.get(&job_id).cloned()
+                {
+                    debug!("[timer] Triggering loop job {} ({})", job_id, job_name);
+                    cb(job).await;
                 }
             }
         })

@@ -97,7 +97,7 @@ impl ProjectManager {
         let mut store = self.load_store()?;
         store
             .projects
-            .sort_by(|a, b| b.last_used_at.cmp(&a.last_used_at));
+            .sort_by_key(|b| std::cmp::Reverse(b.last_used_at));
         Ok(store.projects)
     }
 

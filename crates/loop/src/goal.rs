@@ -66,11 +66,8 @@ AVAILABLE GOAL TOOLS:
         } else {
             checks
         },
-        verify_section = if job.verify_command.is_some() {
-            format!(
-                "\n\nVERIFICATION COMMAND: {}",
-                job.verify_command.as_ref().unwrap()
-            )
+        verify_section = if let Some(cmd) = &job.verify_command {
+            format!("\n\nVERIFICATION COMMAND: {}", cmd)
         } else {
             String::new()
         },

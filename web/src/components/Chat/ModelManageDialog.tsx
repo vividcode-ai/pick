@@ -1,7 +1,6 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { Search, X, Check } from "lucide-react";
 import type { ProviderInfo, FlatModel } from "../../types/events";
-import { PROVIDER_DISPLAY_NAMES } from "./ModelSelector";
 import { ApiKeyDialog } from "./ApiKeyDialog";
 
 interface ModelManageDialogProps {
@@ -55,8 +54,8 @@ export function ModelManageDialog({
       p.models.map((m) => ({
         ...m,
         provider: p.provider,
-        providerDisplayName: PROVIDER_DISPLAY_NAMES[p.provider] || p.provider,
-        searchText: `${m.name} ${PROVIDER_DISPLAY_NAMES[p.provider] || p.provider} ${m.id}`.toLowerCase(),
+        providerDisplayName: p.provider,
+        searchText: `${m.name} ${p.provider} ${m.id}`.toLowerCase(),
       }))
     );
   }, [providers]);
@@ -142,9 +141,7 @@ export function ModelManageDialog({
             </div>
           ) : (
             grouped.map((group) => {
-              const rawProvider = providerMap.get(
-                Object.entries(PROVIDER_DISPLAY_NAMES).find(([, v]) => v === group.category)?.[0] ?? ""
-              );
+              const rawProvider = providerMap.get(group.category);
               const hasKey = rawProvider?.has_key ?? false;
               return (
                 <fieldset

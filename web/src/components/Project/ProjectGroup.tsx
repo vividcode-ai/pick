@@ -7,7 +7,6 @@ interface ProjectGroupProps {
   name: string;
   path: string;
   sessions: SessionEntry[];
-  isCurrent?: boolean;
   isSelected?: boolean;
   activeSessionId: string | null;
   onSelectSession: (id: string) => void;
@@ -22,7 +21,6 @@ export function ProjectGroup({
   name,
   path,
   sessions,
-  isCurrent,
   isSelected,
   activeSessionId,
   onSelectSession,
@@ -38,11 +36,10 @@ export function ProjectGroup({
 
   return (
     <div
-      className="mb-1"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      {/* Project header — click to select and show its sessions */}
+      {/* Project header */}
       <div className="relative">
         <button
           onClick={onSelect}
@@ -57,7 +54,6 @@ export function ProjectGroup({
           <span className="truncate">{groupName}</span>
         </button>
 
-        {/* Delete button — appears on hover, positioned to the right */}
         {isDeletable && hovered && (
           <button
             onClick={(e) => {
@@ -72,9 +68,9 @@ export function ProjectGroup({
         )}
       </div>
 
-      {/* Session items — only visible when this project is selected */}
+      {/* Session items — expand inline when selected (accordion) */}
       {isSelected && (
-        <div className="ml-3 mt-0.5 space-y-0.5 border-l border-[var(--border-base)] pl-2">
+        <div className="ml-3 mb-1 space-y-0.5 border-l border-[var(--border-base)] pl-2">
           {sessions.length > 0 ? (
             sessions.map((session) => (
               <SessionItem

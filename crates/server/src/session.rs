@@ -673,19 +673,18 @@ impl SessionManager {
 
         if let Ok(agent) =
             pick_agent::session::manager::SessionManager::open(PathBuf::from(&path_str), cwd).await
+            && let Some(leaf_id) = agent.get_leaf_id()
         {
-            if let Some(leaf_id) = agent.get_leaf_id() {
-                let messages: Vec<Message> = agent
-                    .get_path_to_root(&leaf_id)
-                    .iter()
-                    .filter_map(|e| Message::try_from(*e).ok())
-                    .collect();
-                let count = messages.len();
-                let mut sessions = self.sessions.write().await;
-                if let Some(s) = sessions.get_mut(id) {
-                    s.messages = messages;
-                    s.persisted_messages_count = count;
-                }
+            let messages: Vec<Message> = agent
+                .get_path_to_root(leaf_id)
+                .iter()
+                .filter_map(|e| Message::try_from(*e).ok())
+                .collect();
+            let count = messages.len();
+            let mut sessions = self.sessions.write().await;
+            if let Some(s) = sessions.get_mut(id) {
+                s.messages = messages;
+                s.persisted_messages_count = count;
             }
         }
     }
@@ -699,11 +698,12 @@ impl SessionManager {
         // Lazy-load messages from disk if not yet loaded
         {
             let sessions = self.sessions.read().await;
-            if let Some(s) = sessions.get(id) {
-                if s.messages.is_empty() && s.session_path.is_some() {
-                    drop(sessions);
-                    self.load_session_messages(id).await;
-                }
+            if let Some(s) = sessions.get(id)
+                && s.messages.is_empty()
+                && s.session_path.is_some()
+            {
+                drop(sessions);
+                self.load_session_messages(id).await;
             }
         }
         let sessions = self.sessions.read().await;

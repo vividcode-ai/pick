@@ -78,36 +78,31 @@ export function SessionList({
   }, [onProjectSwitch, currentCwd]);
 
   if (isTauri) {
-    const selectedGroup = projectList.find((g) => g.cwd === selectedProject);
-
     return (
       <div className="flex flex-col min-h-0 flex-1">
         <SessionSearch query={query} onQueryChange={setQuery} />
-        <div className="flex-1 overflow-y-auto px-2 py-1">
+        <div className="flex-1 overflow-y-auto px-2 py-1 space-y-0.5">
           {projectList.length === 0 ? (
             <div className="text-xs text-neutral-500 text-center py-8">
               {query ? "No matching sessions" : "No sessions yet"}
             </div>
           ) : (
-            <div className="space-y-0.5">
-              {projectList.map((group) => (
-                <ProjectGroup
-                  key={group.cwd}
-                  name={group.name}
-                  path={group.cwd}
-                  sessions={group.sessions}
-                  isCurrent={group.isCurrent}
-                  isSelected={selectedProject === group.cwd}
-                  activeSessionId={activeSessionId}
-                  onSelectSession={onSelectSession}
-                  onRenameSession={onRenameSession}
-                  onArchiveSession={onArchiveSession}
-                  streamingSessions={streamingSessions}
-                  onSelect={() => handleSelectProject(group.cwd)}
-                  onDelete={onDeleteProject}
-                />
-              ))}
-            </div>
+            projectList.map((group) => (
+              <ProjectGroup
+                key={group.cwd}
+                name={group.name}
+                path={group.cwd}
+                sessions={group.sessions}
+                isSelected={selectedProject === group.cwd}
+                activeSessionId={activeSessionId}
+                onSelectSession={onSelectSession}
+                onRenameSession={onRenameSession}
+                onArchiveSession={onArchiveSession}
+                streamingSessions={streamingSessions}
+                onSelect={() => handleSelectProject(group.cwd)}
+                onDelete={onDeleteProject}
+              />
+            ))
           )}
         </div>
       </div>

@@ -20,6 +20,12 @@ use crate::manager::LoopManager;
 use crate::scheduler::LoopScheduler;
 use crate::types::LoopJob;
 
+// ── Type aliases for complex hook types ─────────────────────────────────────
+
+type RunResultHook = Arc<dyn Fn(&AgentRunResult) -> Vec<Message> + Send + Sync>;
+type MessageFilter = Arc<dyn Fn(&AssistantMessage) -> bool + Send + Sync>;
+type BatchHook = Arc<dyn Fn(&[Message]) -> Pin<Box<dyn Send + Future<Output = ()>>> + Send + Sync>;
+
 // ── Hook factories ─────────────────────────────────────────────────────────
 
 /// Build a steering messages hook that injects loop prompt messages.
@@ -69,9 +75,9 @@ pub fn build_steering_hook(
 /// timer. interval_ms=0 jobs fire once on creation; manual re-triggering
 /// via the API or a new session-idle event replaces follow-up injection.
 pub fn build_follow_up_hook(
-    inner_hook: Option<Arc<dyn Fn(&AgentRunResult) -> Vec<Message> + Send + Sync>>,
+    inner_hook: Option<RunResultHook>,
     _loop_manager: Arc<RwLock<LoopManager>>,
-) -> Arc<dyn Fn(&AgentRunResult) -> Vec<Message> + Send + Sync> {
+) -> RunResultHook {
     Arc::new(move |result| {
         let mut msgs = Vec::new();
 
@@ -86,15 +92,15 @@ pub fn build_follow_up_hook(
 
 /// Build a should-stop hook that checks loop job limits.
 pub fn build_should_stop_hook(
-    inner_hook: Option<Arc<dyn Fn(&AssistantMessage) -> bool + Send + Sync>>,
+    inner_hook: Option<MessageFilter>,
     loop_manager: Arc<RwLock<LoopManager>>,
-) -> Arc<dyn Fn(&AssistantMessage) -> bool + Send + Sync> {
+) -> MessageFilter {
     Arc::new(move |msg| {
         // 1. Check existing hook
-        if let Some(ref inner) = inner_hook {
-            if inner(msg) {
-                return true;
-            }
+        if let Some(ref inner) = inner_hook
+            && inner(msg)
+        {
+            return true;
         }
 
         // 2. Check if any running loop job has exceeded limits
@@ -105,7 +111,7 @@ pub fn build_should_stop_hook(
                     if job.max_runtime_exceeded(now) {
                         return true;
                     }
-                    if job.timeout_ms.map_or(false, |t| {
+                    if job.timeout_ms.is_some_and(|t| {
                         job.last_run_at
                             .map(|last| (now - last) >= t as i64)
                             .unwrap_or(false)
@@ -127,12 +133,10 @@ pub fn build_should_stop_hook(
 /// so their next trigger is `interval_ms` from the completion of this run
 /// rather than from the original `schedule()` call.
 pub fn build_turn_complete_hook(
-    inner_hook: Option<
-        Arc<dyn Fn(&[Message]) -> Pin<Box<dyn Send + Future<Output = ()>>> + Send + Sync>,
-    >,
+    inner_hook: Option<BatchHook>,
     loop_manager: Arc<RwLock<LoopManager>>,
     loop_scheduler: Option<Arc<LoopScheduler>>,
-) -> Arc<dyn Fn(&[Message]) -> Pin<Box<dyn Send + Future<Output = ()>>> + Send + Sync> {
+) -> BatchHook {
     Arc::new(move |messages| {
         let lm = loop_manager.clone();
         let ls = loop_scheduler.clone();
@@ -211,12 +215,11 @@ pub fn build_turn_complete_hook(
                 // Reschedule the timer so the next fire is `interval_ms` from
                 // now (not from the original schedule() call). This ensures
                 // the interval is measured between agent run completions.
-                if let Some(ref ls) = ls {
-                    if !reached_max {
-                        if let Some(job) = lm.read().await.get(&id).cloned() {
-                            ls.schedule(&job).await;
-                        }
-                    }
+                if let Some(ref ls) = ls
+                    && !reached_max
+                    && let Some(job) = lm.read().await.get(&id).cloned()
+                {
+                    ls.schedule(&job).await;
                 }
             }
         })
@@ -226,7 +229,7 @@ pub fn build_turn_complete_hook(
 /// Helper to build a user message from a loop job.
 pub fn build_loop_message(job: &LoopJob) -> Message {
     let text = match job.kind.as_str() {
-        "goal" | _ if job.is_goal() => build_goal_prompt(job),
+        _ if job.is_goal() => build_goal_prompt(job),
         _ => decorate_prompt(job),
     };
     Message::User(UserMessage::text(text))

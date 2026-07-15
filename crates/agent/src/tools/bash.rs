@@ -258,7 +258,7 @@ pub fn create_bash_tool() -> AgentTool {
                 };
 
                 // Pre-check: absolute path access control + external directory authorization
-                if let (Some(ref fp), Some(ref cwd)) = (ctx.fs_policy, ctx.cwd.as_ref())
+                if let (Some(ref fp), Some(cwd)) = (ctx.fs_policy, ctx.cwd.as_ref())
                     && !fp.allow_absolute_paths()
                 {
                     let abs_paths =

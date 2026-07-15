@@ -114,7 +114,7 @@ pub(crate) async fn handle_loop(ctx: &mut TuiContext, cmd_name: &str, args: &[St
             let _ = mgr.save();
             ctx.tui
                 .chat
-                .add_system_message(&format!("\x1b[33mCleared all goal loops.\x1b[0m"));
+                .add_system_message("\x1b[33mCleared all goal loops.\x1b[0m");
             return;
         }
         "loop-goal-done" | "loop-goal-complete" => {

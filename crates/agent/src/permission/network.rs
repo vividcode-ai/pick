@@ -77,10 +77,10 @@ impl NetworkPolicy {
     }
 
     pub fn with_extra_allowed_domains(mut self, extra: &[String]) -> Self {
-        if !extra.is_empty() {
-            if let Some(ref mut allowed) = self.allowed_domains {
-                allowed.extend(extra.iter().cloned());
-            }
+        if !extra.is_empty()
+            && let Some(ref mut allowed) = self.allowed_domains
+        {
+            allowed.extend(extra.iter().cloned());
         }
         self
     }

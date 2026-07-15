@@ -17,59 +17,6 @@ interface ModelSelectorProps {
   onEnsureVisible: (key: string) => void;
 }
 
-export const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
-  "anthropic": "Anthropic",
-  "amazon-bedrock": "Amazon Bedrock",
-  "azure-openai-responses": "Azure OpenAI",
-  "cerebras": "Cerebras",
-  "cloudflare-ai-gateway": "Cloudflare AI Gateway",
-  "cloudflare-workers-ai": "Cloudflare Workers AI",
-  "deepseek": "DeepSeek",
-  "fireworks": "Fireworks",
-  "google": "Google Gemini",
-  "google-vertex": "Google Vertex AI",
-  "groq": "Groq",
-  "huggingface": "Hugging Face",
-  "kimi-coding": "Kimi For Coding",
-  "mistral": "Mistral",
-  "minimax": "MiniMax",
-  "moonshotai": "Moonshot AI",
-  "opencode": "OpenCode Zen",
-  "opencode-go": "OpenCode Go",
-  "openai": "OpenAI",
-  "openrouter": "OpenRouter",
-  "together": "Together AI",
-  "vercel-ai-gateway": "Vercel AI Gateway",
-  "xai": "xAI",
-  "zai": "Z.AI",
-  "nvidia": "NVIDIA",
-  "xiaomi": "Xiaomi MiMo",
-};
-
-const PROVIDER_COLORS: Record<string, string> = {
-  "anthropic": "#d4a574",
-  "openai": "#00a67e",
-  "deepseek": "#4f6ef7",
-  "google": "#4285f4",
-  "github-copilot": "#6e40c9",
-  "mistral": "#ffb347",
-  "groq": "#f97316",
-  "together": "#8b5cf6",
-  "openrouter": "#64748b",
-  "perplexity": "#1a1a2e",
-  "xai": "#141414",
-  "meta": "#0668e1",
-  "cohere": "#39594d",
-  "fireworks": "#f43f5e",
-  "cerebras": "#10b981",
-  "nvidia": "#76b900",
-  "xiaomi": "#ff6900",
-};
-
-function getProviderColor(provider: string): string {
-  return PROVIDER_COLORS[provider] || "#64748b";
-}
-
 export function ModelSelector({
   providers,
   selectedModel,
@@ -105,8 +52,6 @@ export function ModelSelector({
     prevManageOpen.current = manageOpen;
   }, [manageOpen]);
 
-  const displayNameCache = useMemo(() => PROVIDER_DISPLAY_NAMES, []);
-
   const allModels: FlatModel[] = useMemo(() => {
     const hidden = new Set(hiddenModels);
     return providers
@@ -115,12 +60,12 @@ export function ModelSelector({
         p.models.map((m) => ({
           ...m,
           provider: p.provider,
-          providerDisplayName: displayNameCache[p.provider] || p.provider,
-          searchText: `${m.name} ${displayNameCache[p.provider] || p.provider} ${m.id}`.toLowerCase(),
+          providerDisplayName: p.provider,
+          searchText: `${m.name} ${p.provider} ${m.id}`.toLowerCase(),
         }))
       )
       .filter((m) => !hidden.has(`${m.provider}/${m.id}`));
-  }, [providers, displayNameCache, manageRefreshKey, hiddenModels]);
+  }, [providers, manageRefreshKey, hiddenModels]);
 
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -147,12 +92,6 @@ export function ModelSelector({
         disabled={disabled}
         className="selector-trigger"
       >
-        {selectedDetail && (
-          <span
-            className="w-2 h-2 rounded-full shrink-0"
-            style={{ backgroundColor: getProviderColor(selectedDetail.provider) }}
-          />
-        )}
         <span className="selector-trigger-primary">
           {selectedDetail?.name || "Select model"}
         </span>

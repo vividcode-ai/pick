@@ -196,11 +196,11 @@ impl LoopManager {
                 job.last_verify_failure = Some(r);
             }
             job.updated_at = now;
-            if let Some(max) = job.max_failures {
-                if job.failure_count >= max {
-                    job.status = LoopJobStatus::Failed;
-                    return true;
-                }
+            if let Some(max) = job.max_failures
+                && job.failure_count >= max
+            {
+                job.status = LoopJobStatus::Failed;
+                return true;
             }
         }
         false
@@ -258,19 +258,18 @@ impl LoopManager {
     pub fn recover_stale_runs(&mut self, max_age_ms: i64) {
         let now = chrono::Utc::now().timestamp_millis();
         for job in &mut self.jobs {
-            if job.status == LoopJobStatus::Running {
-                if let Some(last) = job.last_run_at {
-                    if now - last > max_age_ms {
-                        warn!(
-                            "Recovering stale running job {} (last_run={}, age={}ms)",
-                            job.id,
-                            last,
-                            now - last
-                        );
-                        job.status = LoopJobStatus::Idle;
-                        job.failure_count += 1;
-                    }
-                }
+            if job.status == LoopJobStatus::Running
+                && let Some(last) = job.last_run_at
+                && now - last > max_age_ms
+            {
+                warn!(
+                    "Recovering stale running job {} (last_run={}, age={}ms)",
+                    job.id,
+                    last,
+                    now - last
+                );
+                job.status = LoopJobStatus::Idle;
+                job.failure_count += 1;
             }
         }
     }

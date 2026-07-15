@@ -53,10 +53,10 @@ pub fn parse_loop_command(input: &str) -> Result<LoopCommand, String> {
     }
 
     // Check for subcommands
-    if let Some(rest) = input.strip_prefix("status") {
-        if rest.is_empty() || rest.starts_with(' ') {
-            return Ok(LoopCommand::Status);
-        }
+    if let Some(rest) = input.strip_prefix("status")
+        && (rest.is_empty() || rest.starts_with(' '))
+    {
+        return Ok(LoopCommand::Status);
     }
     if let Some(rest) = input.strip_prefix("pause") {
         let id = rest.trim().to_string();
@@ -259,10 +259,10 @@ fn take_flag_value<'a>(text: &'a str, flag: &str) -> Option<(&'a str, &'a str)> 
             return None;
         }
         // Quoted value: --flag "value"
-        if let Some(val) = after.strip_prefix('"') {
-            if let Some(pos) = val.find('"') {
-                return Some((&val[..pos], val[pos + 1..].trim_start()));
-            }
+        if let Some(val) = after.strip_prefix('"')
+            && let Some(pos) = val.find('"')
+        {
+            return Some((&val[..pos], val[pos + 1..].trim_start()));
         }
         // Unquoted value: --flag value (space-separated)
         let (val, rest) = split_first(after);

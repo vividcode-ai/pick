@@ -71,15 +71,14 @@ impl PermissionManager {
         };
 
         // Merge extra allowed domains from user config into the restricted network policy
-        if let Some(ref extra) = config.and_then(|c| c.network_allowed_domains.as_ref()) {
-            if !extra.is_empty() {
-                if let Some(ref policy) = network_policy.take() {
-                    let p: NetworkPolicy = Arc::as_ref(policy)
-                        .clone()
-                        .with_extra_allowed_domains(extra);
-                    network_policy = Some(Arc::new(p));
-                }
-            }
+        if let Some(extra) = config.and_then(|c| c.network_allowed_domains.as_ref())
+            && !extra.is_empty()
+            && let Some(ref policy) = network_policy.take()
+        {
+            let p: NetworkPolicy = Arc::as_ref(policy)
+                .clone()
+                .with_extra_allowed_domains(extra);
+            network_policy = Some(Arc::new(p));
         }
 
         let guardian = if profile.guardian_enabled {

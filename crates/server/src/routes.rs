@@ -909,6 +909,7 @@ async fn run_agent_loop_queue(
                 let mq = mq_follow.clone();
                 let et = et_follow.clone();
                 let gm = gm_follow.clone();
+                #[allow(clippy::type_complexity)]
                 let follow_inner: Arc<
                     dyn Fn(
                             &pick_agent::core::agent_loop::AgentRunResult,
@@ -1258,8 +1259,7 @@ fn parse_loop_interval(text: &str) -> (u64, String) {
     let mut chars = trimmed.char_indices().peekable();
 
     // Consume an optional leading `*/` (common crontab-like syntax)
-    if trimmed.starts_with("*/") {
-        let after_slash = &trimmed[2..];
+    if let Some(after_slash) = trimmed.strip_prefix("*/") {
         return parse_loop_interval(after_slash);
     }
 
@@ -1292,7 +1292,7 @@ fn parse_loop_interval(text: &str) -> (u64, String) {
                     let interval = num * multiplier;
                     let action = rest[1..].trim().to_string();
                     if action.is_empty() {
-                        return (interval, num_str.to_string() + &rest);
+                        return (interval, num_str.to_string() + rest);
                     }
                     return (interval, action);
                 }
