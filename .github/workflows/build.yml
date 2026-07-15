@@ -215,22 +215,27 @@ jobs:
         shell: bash
         run: |
           mkdir -p desktop-artifacts
-          BUNDLE_DIR="tauri/target/release/bundle"
+          # This is a Cargo workspace — Tauri outputs bundles to the
+          # workspace root target/, not inside tauri/target/.
+          BUNDLE_DIR="target/release/bundle"
+          echo "Looking for bundles in: ${BUNDLE_DIR}"
+          ls -la "${BUNDLE_DIR}/" 2>/dev/null || echo "(no bundle dir)"
           if [ -d "$BUNDLE_DIR/deb" ];       then cp "$BUNDLE_DIR/deb/"*.deb       desktop-artifacts/ 2>/dev/null || true; fi
           if [ -d "$BUNDLE_DIR/appimage" ];   then cp "$BUNDLE_DIR/appimage/"*.AppImage desktop-artifacts/ 2>/dev/null || true; fi
           if [ -d "$BUNDLE_DIR/dmg" ];        then cp "$BUNDLE_DIR/dmg/"*.dmg      desktop-artifacts/ 2>/dev/null || true; fi
           if [ -d "$BUNDLE_DIR/msi" ];        then cp "$BUNDLE_DIR/msi/"*.msi      desktop-artifacts/ 2>/dev/null || true; fi
           if [ -d "$BUNDLE_DIR/nsis" ];       then cp "$BUNDLE_DIR/nsis/"*.exe     desktop-artifacts/ 2>/dev/null || true; fi
           if [ -d "$BUNDLE_DIR/macos" ];      then cp -R "$BUNDLE_DIR/macos/"*.app desktop-artifacts/ 2>/dev/null || true; fi
-          ls -la desktop-artifacts/
+          ls -la desktop-artifacts/ || echo "(desktop-artifacts is empty)"
 
       - name: Upload desktop artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: pick-desktop-${{ matrix.target }}
           path: desktop-artifacts/*
           compression-level: 0
-          if-no-files-found: warn
+          if-no-files-found: ignore
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -272,10 +277,13 @@ jobs:
       - name: Generate desktop checksums
         run: |
           find . -name 'pick-desktop-*' -type f -exec sha256sum {} \; > pick-desktop_SHA256SUMS || true
-          cat pick-desktop_SHA256SUMS 2>/dev/null || echo "(no desktop artifacts)"
+          if [ ! -s pick-desktop_SHA256SUMS ]; then
+            echo "# No desktop artifacts for this release" > pick-desktop_SHA256SUMS
+          fi
+          cat pick-desktop_SHA256SUMS
 
       - name: Create release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             pick-package-linux-x86_64/*.tar.gz
