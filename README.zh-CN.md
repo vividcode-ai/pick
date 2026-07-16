@@ -1,3 +1,6 @@
+<h1 align="center"><strong>Pick</strong></h1>
+<p align="center">AI coding agent</p>
+
 [English](README.md)
 
 ![Pick TUI](docs/image/tui.png)
@@ -6,7 +9,7 @@
 
 **Pick** 是一款运行在终端中的 AI 编程助手。它支持接入多种 LLM 提供商（Anthropic、OpenAI、Google、Mistral、Bedrock 等），能够理解你的代码仓库，并通过自然语言对话完成文件读写、代码编辑、命令执行、代码搜索等任务。
 
-基于pi重构为 Rust版本，兼具高性能和高可靠性。
+基于 pi 重构为 Rust 版本，兼具高性能和高可靠性。
 
 ## 特性
 
@@ -28,31 +31,6 @@
 - **跨平台** — 终端 CLI/TUI（Windows、Linux、macOS）、桌面 GUI（Windows、Linux、macOS）、Web、移动端（Android、iOS）
 - **Web 与桌面 GUI** — 基于 React 的 Web 界面，由内置 HTTP 服务器提供服务；Tauri 桌面封装提供原生体验
 - **移动端支持** — 通过 Tauri 支持 Android 和 iOS 应用
-
-## 架构
-
-```text
-pick-tui（终端 UI，不依赖其他 pick crate）
-pick-ai（LLM 抽象层，不依赖其他 pick crate）
-    ↑
-pick-agent（依赖 pick-ai 和 pick-tui）
-    ↑
-├── pick-cli — 二进制入口，生成 `pick` 可执行文件
-├── pick-mcp — MCP 协议客户端
-├── pick-sandbox — 进程隔离
-├── pick-server — HTTP/WS 服务器，为 Web UI 提供服务
-    ↑
-└── pick-desktop — Tauri 应用（桌面 GUI + 移动端）
-```
-
-- **pick-ai** — 统一的多提供商 LLM 抽象层，基于提供者注册模式
-- **pick-agent** — 智能体主循环、工具系统、会话/JSONL 存储、扩展加载器
-- **pick-tui** — 基于 crossterm 的终端 UI，自定义差分渲染引擎
-- **pick-cli** — CLI 二进制入口、参数解析、设置、认证、所有运行模式
-- **pick-mcp** — 模型上下文协议客户端（stdio、SSE、streamable HTTP）
-- **pick-sandbox** — 平台特定的进程隔离（Windows Job Objects、Linux bwrap、macOS Seatbelt）
-- **pick-server** — 基于 Axum 的 HTTP/WS 服务器，提供 Web 前端和 WebSocket API
-- **pick-desktop** — Tauri 2.0 封装，支持桌面端（Windows、Linux、macOS）和移动端（Android、iOS）
 
 ## 平台
 
@@ -76,6 +54,7 @@ npm install -g @vividcodeai/pick
 ```
 
 > npm 安装会自动下载您系统对应的平台二进制文件。
+
 ### Linux / macOS
 
 ```bash
@@ -88,46 +67,19 @@ curl -fsSL https://github.com/vividcode-ai/pick/releases/latest/download/install
 irm https://github.com/vividcode-ai/pick/releases/latest/download/install.ps1 | iex
 ```
 
-### 从源码编译
-
-```bash
-git clone https://github.com/vividcode-ai/pick.git
-cd pick
-cargo build --release
-./target/release/pick --help
-```
-
 ## 快速开始
-
 ```bash
 # 启动 TUI 模式（默认）
 pick
-
-# 指定模型和提供商启动
-pick -m claude-sonnet-4-20250514 -p anthropic
-
-# 单次问答（print 模式）
-pick -P "这个项目是做什么的？"
-
-# 交互式 REPL 模式
-pick --mode interactive
-
-# 恢复之前的会话
-pick -s <session-id>
-
-# 列出可用模型
-pick --list-models
-
-# 计划模式（只读调研，确认后再实施变更）
-pick --agent-mode plan -P "这个模块应该如何重构？"
-
+```
+```bash
 # 启动 Web 服务器，打开浏览器界面
-pick server --open
+pick server
 ```
 
 ## 文档
 
-详细文档（英文）见 [docs/](docs/README.md) 目录：
+详细文档见 [docs/](docs/README.md) 目录：
 
 | 文档 | 说明 |
 |------|------|

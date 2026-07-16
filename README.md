@@ -1,3 +1,6 @@
+<h1 align="center"><strong>Pick</strong></h1>
+<p align="center">AI coding agent</p>
+
 [中文文档](README.zh-CN.md)
 
 ![Pick TUI](docs/image/tui-en.png)
@@ -28,31 +31,6 @@ A Rust port of the pi AI coding agent, combining high performance with reliabili
 - **Cross-platform** — Terminal CLI/TUI (Windows, Linux, macOS), Desktop GUI (Windows, Linux, macOS), Web, Mobile (Android, iOS)
 - **Web & Desktop GUI** — React-based web interface served by built-in HTTP server; Tauri desktop wrapper for native experience
 - **Mobile support** — Android and iOS apps via Tauri
-
-## Architecture
-
-```text
-pick-tui (terminal UI, no pick deps)
-pick-ai  (LLM abstraction, no pick deps)
-    ↑
-pick-agent (depends on pick-ai, pick-tui)
-    ↑
-├── pick-cli — Binary entrypoint, produces `pick`
-├── pick-mcp — MCP protocol client
-├── pick-sandbox — Process isolation
-├── pick-server — HTTP/WS server for web UI
-    ↑
-└── pick-desktop — Tauri app (desktop GUI + mobile)
-```
-
-- **pick-ai** — Unified multi-provider LLM abstraction with provider registry pattern
-- **pick-agent** — Agent loop, tool system, session/JSONL storage, extension loader
-- **pick-tui** — Crossterm-based terminal UI with custom differential rendering engine
-- **pick-cli** — CLI binary, argument parsing, settings, auth, all run modes
-- **pick-mcp** — Model Context Protocol client (stdio, SSE, streamable HTTP)
-- **pick-sandbox** — Platform-specific process isolation (Windows Job Objects, Linux bwrap, macOS Seatbelt)
-- **pick-server** — Axum-based HTTP/WS server, serves web frontend and provides WebSocket API
-- **pick-desktop** — Tauri 2.0 wrapper for desktop (Windows, Linux, macOS) and mobile (Android, iOS)
 
 ## Platforms
 
@@ -89,41 +67,14 @@ curl -fsSL https://github.com/vividcode-ai/pick/releases/latest/download/install
 irm https://github.com/vividcode-ai/pick/releases/latest/download/install.ps1 | iex
 ```
 
-### From source
-
-```bash
-git clone https://github.com/vividcode-ai/pick.git
-cd pick
-cargo build --release
-./target/release/pick --help
-```
-
 ## Quick Start
-
 ```bash
 # Start TUI (default mode)
 pick
-
-# Start with a specific model and provider
-pick -m claude-sonnet-4-20250514 -p anthropic
-
-# One-shot question (print mode)
-pick -P "What does this project do?"
-
-# Interactive REPL mode
-pick --mode interactive
-
-# Resume a previous session
-pick -s <session-id>
-
-# List available models
-pick --list-models
-
-# Plan mode (read-only research before making changes)
-pick --agent-mode plan -P "How should I refactor this?"
-
+```
+```bash
 # Start web server with browser UI
-pick server --open
+pick server
 ```
 
 ## Documentation

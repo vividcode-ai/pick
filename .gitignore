@@ -9,5 +9,4 @@ __pycache__/
 !examples/**/.pick/
 node_modules/
 web/dist/
-tauri/icons/icon.png
 *.log
