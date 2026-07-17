@@ -738,12 +738,7 @@ pub async fn get_workspace_branches(State(state): State<Arc<AppState>>) -> impl 
 
 /// Resolve the server's workspace directory from AppState.
 fn resolve_workspace_cwd(state: &AppState) -> std::path::PathBuf {
-    state
-        .config
-        .cwd
-        .as_ref()
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(|| std::env::current_dir().unwrap_or_default())
+    state.project_manager.get_cwd()
 }
 
 #[derive(Serialize, ToSchema)]

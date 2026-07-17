@@ -27,9 +27,10 @@ interface BottomPanelProps {
   onAsk?: ((prompt: string) => void) | null;
   provider?: string;
   modelId?: string;
+  currentCwd?: string;
 }
 
-export function BottomPanel({ baseUrl, visible, onClose, onFullscreenChange, sessionId, onAsk, provider, modelId }: BottomPanelProps) {
+export function BottomPanel({ baseUrl, visible, onClose, onFullscreenChange, sessionId, onAsk, provider, modelId, currentCwd }: BottomPanelProps) {
   const [tabs, setTabs] = useState<TabItem[]>([{ id: 0, kind: "terminal" }]);
   const [activeIdx, setActiveIdx] = useState(0);
   const [panelHeight, setPanelHeight] = useState(() => Math.floor(window.innerHeight * 0.4));
@@ -127,6 +128,18 @@ export function BottomPanel({ baseUrl, visible, onClose, onFullscreenChange, ses
       if (ws?.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: "resize", cols, rows }));
       }
+    });
+
+    const unbindKeyHandler = term.attachCustomKeyEventHandler((event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'c') {
+        if (term.hasSelection()) {
+          if (event.type === 'keydown') {
+            navigator.clipboard.writeText(term.getSelection());
+          }
+          return false;
+        }
+      }
+      return true;
     });
 
     termMapRef.current.set(id, term);
@@ -537,9 +550,9 @@ export function BottomPanel({ baseUrl, visible, onClose, onFullscreenChange, ses
                   className="h-full"
                 />
               ) : tab.kind === "codereview" ? (
-                <CodeReviewContent baseUrl={baseUrl} sessionId={sessionId} onAsk={onAsk} provider={provider} modelId={modelId} />
+                <CodeReviewContent baseUrl={baseUrl} sessionId={sessionId} onAsk={onAsk} provider={provider} modelId={modelId} currentCwd={currentCwd} />
               ) : (
-                <FileBrowserContent baseUrl={baseUrl} onAsk={onAsk} />
+                <FileBrowserContent baseUrl={baseUrl} onAsk={onAsk} rootCwd={currentCwd || "."} />
               )}
             </div>
           ))}

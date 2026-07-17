@@ -15,14 +15,14 @@ use tracing::{debug, warn};
 /// Manages PTY (terminal) sessions
 pub struct PtyManager {
     sessions: Arc<RwLock<HashMap<String, PtySession>>>,
-    cwd: Option<String>,
+    cwd: Arc<tokio::sync::RwLock<Option<String>>>,
 }
 
 impl Clone for PtyManager {
     fn clone(&self) -> Self {
         Self {
             sessions: self.sessions.clone(),
-            cwd: self.cwd.clone(),
+            cwd: Arc::clone(&self.cwd),
         }
     }
 }
@@ -44,19 +44,24 @@ impl PtyManager {
     pub fn new(cwd: Option<String>) -> Self {
         Self {
             sessions: Arc::new(RwLock::new(HashMap::new())),
-            cwd,
+            cwd: Arc::new(tokio::sync::RwLock::new(cwd)),
         }
     }
 
-    pub fn cwd(&self) -> Option<&str> {
-        self.cwd.as_deref()
+    pub async fn set_cwd(&self, cwd: String) {
+        *self.cwd.write().await = Some(cwd);
+    }
+
+    pub async fn cwd(&self) -> Option<String> {
+        self.cwd.read().await.clone()
     }
 
     pub async fn create(&self) -> String {
         let id = uuid::Uuid::now_v7().to_string();
         let now = chrono::Utc::now().timestamp_millis();
         let shell = detect_shell();
-        let child = match spawn_shell_piped(&shell, self.cwd.as_deref()) {
+        let cwd = self.cwd.read().await.clone();
+        let child = match spawn_shell_piped(&shell, cwd.as_deref()) {
             Ok(c) => c,
             Err(e) => {
                 warn!("Failed to spawn shell {}: {}", shell, e);
@@ -208,7 +213,7 @@ pub async fn ws_handler(
     ws: WebSocketUpgrade,
     State(state): State<Arc<crate::AppState>>,
 ) -> impl IntoResponse {
-    let cwd = state.pty_manager.cwd().map(|s| s.to_string());
+    let cwd = state.pty_manager.cwd().await;
     ws.on_upgrade(move |socket| async move {
         if let Err(e) = handle_pty_connection(socket, cwd).await {
             warn!("PTY session error: {}", e);

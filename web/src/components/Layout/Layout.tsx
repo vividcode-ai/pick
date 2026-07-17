@@ -22,6 +22,7 @@ interface LayoutProps {
   onAsk?: ((prompt: string) => void) | null;
   provider?: string;
   modelId?: string;
+  currentCwd?: string;
   children: ReactNode;
 }
 
@@ -43,6 +44,7 @@ export function Layout({
   onAsk,
   provider,
   modelId,
+  currentCwd,
   children,
 }: LayoutProps) {
   const [rightPanelOpenLocal, setRightPanelOpenLocal] = useState(false);
@@ -183,6 +185,7 @@ export function Layout({
             onAsk={onAsk}
             provider={provider}
             modelId={modelId}
+            currentCwd={currentCwd}
           />
         )}
 

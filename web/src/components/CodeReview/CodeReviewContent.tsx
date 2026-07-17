@@ -17,9 +17,10 @@ interface CodeReviewContentProps {
   onAsk?: ((prompt: string) => void) | null;
   provider?: string;
   modelId?: string;
+  currentCwd?: string;
 }
 
-export function CodeReviewContent({ baseUrl, sessionId, onAsk, provider, modelId }: CodeReviewContentProps) {
+export function CodeReviewContent({ baseUrl, sessionId, onAsk, provider, modelId, currentCwd }: CodeReviewContentProps) {
   // ── URL builder: use session endpoint when available, standalone otherwise ──
   const gitApi = useCallback((path: string) => {
     const base = sessionId ? `${baseUrl}/sessions/${sessionId}` : baseUrl;
@@ -79,7 +80,7 @@ export function CodeReviewContent({ baseUrl, sessionId, onAsk, provider, modelId
       })
       .then((data: GitInfo) => setGitInfo(data))
       .catch(() => {});
-  }, [gitApi]);
+  }, [gitApi, currentCwd]);
 
   // ── Fetch branch suggestions ──
   useEffect(() => {
@@ -87,7 +88,7 @@ export function CodeReviewContent({ baseUrl, sessionId, onAsk, provider, modelId
       .then((r) => r.json())
       .then((data: string[]) => setBranchSuggestions(data))
       .catch(() => {});
-  }, [gitApi]);
+  }, [gitApi, currentCwd]);
 
   // ── Fetch git diffs (meta only = instant) ──
   useEffect(() => {
@@ -112,7 +113,7 @@ export function CodeReviewContent({ baseUrl, sessionId, onAsk, provider, modelId
         setDiffError(e.message || "Failed to load diffs");
         setLoadingDiffs(false);
       });
-  }, [gitApi, diffParams]);
+  }, [gitApi, diffParams, currentCwd]);
 
   // ── Load patch on demand when a file is expanded ──
   const loadPatch = useCallback(async (filePath: string) => {

@@ -59,8 +59,8 @@ pub async fn set_cwd(
             .into_response();
     }
 
-    // Canonicalize path
-    let canonical = match path.canonicalize() {
+    // Canonicalize path (uses dunce to avoid Windows \\?\ prefix)
+    let canonical = match dunce::canonicalize(path) {
         Ok(p) => p,
         Err(e) => {
             return (
@@ -92,7 +92,10 @@ pub async fn set_cwd(
         debug!("Failed to persist project: {}", e);
     }
 
-    // 5. Optionally load persisted sessions from the new project directory.
+    // 5. Update PtyManager so new terminals use the project directory
+    state.pty_manager.set_cwd(cwd_str.clone()).await;
+
+    // 6. Optionally load persisted sessions from the new project directory.
     //    This is needed when the project is opened from the modal so that
     //    existing sessions appear in the sidebar.
     if req.load_sessions {

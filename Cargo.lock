@@ -3872,7 +3872,7 @@ dependencies = [
 
 [[package]]
 name = "pick-agent"
-version = "0.1.18"
+version = "0.1.20"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3900,7 +3900,7 @@ dependencies = [
 
 [[package]]
 name = "pick-ai"
-version = "0.1.18"
+version = "0.1.20"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3928,7 +3928,7 @@ dependencies = [
 
 [[package]]
 name = "pick-cli"
-version = "0.1.18"
+version = "0.1.20"
 dependencies = [
  "anyhow",
  "arboard",
@@ -3992,7 +3992,7 @@ dependencies = [
 
 [[package]]
 name = "pick-loop"
-version = "0.1.18"
+version = "0.1.20"
 dependencies = [
  "chrono",
  "pick-agent",
@@ -4008,7 +4008,7 @@ dependencies = [
 
 [[package]]
 name = "pick-mcp"
-version = "0.1.18"
+version = "0.1.20"
 dependencies = [
  "anyhow",
  "futures",
@@ -4023,7 +4023,7 @@ dependencies = [
 
 [[package]]
 name = "pick-sandbox"
-version = "0.1.18"
+version = "0.1.20"
 dependencies = [
  "libc",
  "pick-agent",
@@ -4032,13 +4032,14 @@ dependencies = [
 
 [[package]]
 name = "pick-server"
-version = "0.1.18"
+version = "0.1.20"
 dependencies = [
  "anyhow",
  "async-trait",
  "axum",
  "chrono",
  "dirs 5.0.1",
+ "dunce",
  "futures",
  "mime_guess",
  "pick-agent",
@@ -4062,7 +4063,7 @@ dependencies = [
 
 [[package]]
 name = "pick-slack-bot"
-version = "0.1.18"
+version = "0.1.20"
 dependencies = [
  "anyhow",
  "futures",
@@ -4077,7 +4078,7 @@ dependencies = [
 
 [[package]]
 name = "pick-tui"
-version = "0.1.18"
+version = "0.1.20"
 dependencies = [
  "ansi-to-tui",
  "anyhow",

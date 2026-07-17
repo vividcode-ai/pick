@@ -559,6 +559,7 @@ export default function App() {
         onAsk={handleAsk}
         provider={selectedProvider}
         modelId={selectedModel}
+        currentCwd={getCurrentCwd() ?? undefined}
         leftPanel={
           <LeftPanel
             onNewSession={handleNewSession}

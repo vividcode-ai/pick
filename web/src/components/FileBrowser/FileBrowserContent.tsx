@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Search, X, Loader2 } from "lucide-react";
 import { FileTree } from "./FileTree";
 import { FilePreview } from "./FilePreview";
@@ -9,9 +9,10 @@ const MAX_RIGHT_WIDTH = 600;
 interface FileBrowserContentProps {
   baseUrl: string;
   onAsk?: ((prompt: string) => void) | null;
+  rootCwd?: string;
 }
 
-export function FileBrowserContent({ baseUrl, onAsk }: FileBrowserContentProps) {
+export function FileBrowserContent({ baseUrl, onAsk, rootCwd }: FileBrowserContentProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<{ path: string; name: string }[] | null>(null);
   const [searching, setSearching] = useState(false);
@@ -19,6 +20,11 @@ export function FileBrowserContent({ baseUrl, onAsk }: FileBrowserContentProps) 
   const [showTree, setShowTree] = useState(true);
   const [rightWidth, setRightWidth] = useState(280);
   const resizingRef = useRef(false);
+
+  useEffect(() => {
+    setSelectedFile(null);
+    setSearchResults(null);
+  }, [rootCwd]);
 
   const handleFileSelect = useCallback((path: string) => {
     setSelectedFile(path);
@@ -175,9 +181,10 @@ export function FileBrowserContent({ baseUrl, onAsk }: FileBrowserContentProps) 
             <div className="py-1">
               <FileTree
                 baseUrl={baseUrl}
-                rootPath="."
+                rootPath={rootCwd || "."}
                 onFileSelect={handleFileSelect}
                 selectedFile={selectedFile}
+                key={rootCwd || "."}
               />
             </div>
           ) : null}
