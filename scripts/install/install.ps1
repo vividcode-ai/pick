@@ -2,7 +2,6 @@
 # Usage: irm https://github.com/vividcode-ai/pick/releases/latest/download/install.ps1 | iex
 
 $ErrorActionPreference = "Stop"
-$ProgressPreference = "SilentlyContinue"
 
 # Force TLS 1.2 (required for GitHub API on older PowerShell)
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
@@ -41,8 +40,11 @@ Write-Host "Latest version: ${Version}" -ForegroundColor Green
 # Download
 $DownloadUrl = "https://github.com/${Repo}/releases/download/v${Version}/${Archive}"
 $TempArchive = Join-Path $env:TEMP $Archive
+$prevProgress = $ProgressPreference
+$ProgressPreference = "Continue"
 Write-Host "Downloading ${DownloadUrl}..." -ForegroundColor Cyan
 Invoke-WebRequest -Uri $DownloadUrl -OutFile $TempArchive
+$ProgressPreference = $prevProgress
 
 # Download and verify checksum
 $ChecksumsUrl = "https://github.com/${Repo}/releases/download/v${Version}/pick-package_SHA256SUMS"

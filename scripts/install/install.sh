@@ -56,7 +56,7 @@ echo "Latest version: ${VERSION}"
 DOWNLOAD_URL="https://github.com/${REPO}/releases/download/v${VERSION}/${ARCHIVE}"
 echo "Downloading ${DOWNLOAD_URL}..."
 mkdir -p "${RELEASES_DIR}/${VERSION}-${TARGET}"
-curl -fsSL "${DOWNLOAD_URL}" -o "/tmp/${ARCHIVE}"
+curl -fL --progress-bar "${DOWNLOAD_URL}" -o "/tmp/${ARCHIVE}"
 
 # Download and verify checksum
 CHECKSUMS_URL="https://github.com/${REPO}/releases/download/v${VERSION}/pick-package_SHA256SUMS"
