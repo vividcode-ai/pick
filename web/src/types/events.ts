@@ -96,6 +96,7 @@ export interface ModelInfo {
   id: string;
   name: string;
   reasoning: boolean;
+  supported_thinking_levels?: string[];
   context?: number;
   cost_input?: number;
   cost_output?: number;

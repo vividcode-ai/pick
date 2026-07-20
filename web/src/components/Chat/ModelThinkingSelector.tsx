@@ -4,12 +4,14 @@ import fuzzysort from "fuzzysort";
 import type { ProviderInfo, FlatModel } from "../../types/events";
 import { ModelManageDialog } from "./ModelManageDialog";
 
-const THINKING_LEVELS = [
-  { value: "off", label: "Off" },
-  { value: "low", label: "Low" },
-  { value: "medium", label: "Medium" },
-  { value: "high", label: "High" },
-];
+const THINKING_LEVEL_LABELS: Record<string, string> = {
+  off: "Off",
+  minimal: "Minimal",
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+  xhigh: "XHigh",
+};
 
 interface ModelThinkingSelectorProps {
   providers: ProviderInfo[];
@@ -86,7 +88,19 @@ export function ModelThinkingSelector({
     [allModels, selectedModel, selectedProvider]
   );
 
-  const selectedLabel = THINKING_LEVELS.find((l) => l.value === thinkingLevel)?.label || "Off";
+  const supportedThinkingLevels = useMemo(() => {
+    return selectedDetail?.supported_thinking_levels ?? (
+      selectedDetail?.reasoning
+        ? ["off", "low", "medium", "high"]
+        : ["off"]
+    );
+  }, [selectedDetail]);
+
+  const effectiveThinkingLevel = supportedThinkingLevels.includes(thinkingLevel)
+    ? thinkingLevel
+    : "off";
+
+  const selectedLabel = THINKING_LEVEL_LABELS[effectiveThinkingLevel] ?? "Off";
 
   const handleSelect = useCallback(
     (item: FlatModel | undefined) => {
@@ -214,20 +228,20 @@ export function ModelThinkingSelector({
                 >
                   <div className="thinking-sub-popover">
                     <div className="selector-listbox min-w-[90px]" style={{ padding: "0.25rem", maxHeight: "200px", overflowY: "auto" }}>
-                      {THINKING_LEVELS.map((level) => {
-                        const levelSelected = level.value === thinkingLevel;
+                      {supportedThinkingLevels.map((value) => {
+                        const levelSelected = value === effectiveThinkingLevel;
                         return (
                           <div
-                            key={level.value}
+                            key={value}
                             className="selector-option"
                             data-selected={levelSelected}
                             onClick={(e) => {
                               e.stopPropagation();
-                              onThinkingLevelChange(level.value);
+                              onThinkingLevelChange(value);
                             }}
                           >
                             <div className="selector-option-content">
-                              <span className="selector-option-label">{level.label}</span>
+                              <span className="selector-option-label">{THINKING_LEVEL_LABELS[value] ?? value}</span>
                             </div>
                             {levelSelected && (
                               <span className="selector-option-indicator">

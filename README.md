@@ -1,6 +1,17 @@
 <h1 align="center"><strong>Pick</strong></h1>
 <p align="center">AI coding agent</p>
 
+Every developer lives on a spectrum of code — from apprentice writing their
+first function to architect shaping entire systems.
+
+**Pick is the tool that accelerates this journey.** It doesn't just help you
+write code; it reshapes how you think about it, transforming you from a
+<em>code executor</em> into an <em>AI-native creator</em>.
+
+Each conversation peels away a layer of limitation; each automation steps
+into a new phase. You are not static — Pick helps you rewrite yourself,
+every day, into a better you.
+
 [中文文档](README.zh-CN.md)
 
 ![Pick TUI](docs/image/tui-en.png)

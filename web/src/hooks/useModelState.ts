@@ -112,9 +112,16 @@ export function useModelState(baseUrl: string | null) {
       setSelectedModel(modelId);
       setSelectedProvider(provider);
       setInited(true);
+      // Clamp thinking level to model's supported levels
+      const model = providers
+        .find((p) => p.provider === provider)
+        ?.models.find((m) => m.id === modelId);
+      if (model?.supported_thinking_levels && !model.supported_thinking_levels.includes(thinkingLevel)) {
+        setThinkingLevel("off");
+      }
       onCancel?.();
     },
-    []
+    [providers, thinkingLevel]
   );
 
   const handleThinkingLevelChange = useCallback(
@@ -131,13 +138,21 @@ export function useModelState(baseUrl: string | null) {
         if (session.modelId && session.provider) {
           setSelectedModel(session.modelId);
           setSelectedProvider(session.provider);
+          // Clamp thinking level to model's supported levels
+          const model = providers
+            .find((p) => p.provider === session.provider)
+            ?.models.find((m) => m.id === session.modelId);
+          if (model?.supported_thinking_levels && session.thinkingLevel && !model.supported_thinking_levels.includes(session.thinkingLevel)) {
+            setThinkingLevel("off");
+            return;
+          }
         }
         if (session.thinkingLevel) {
           setThinkingLevel(session.thinkingLevel);
         }
       }
     },
-    []
+    [providers]
   );
 
   return {

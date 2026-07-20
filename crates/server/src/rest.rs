@@ -422,6 +422,7 @@ pub struct ModelInfo {
     pub id: String,
     pub name: String,
     pub reasoning: bool,
+    pub supported_thinking_levels: Vec<String>,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -464,6 +465,10 @@ pub async fn list_providers(State(state): State<Arc<AppState>>) -> impl IntoResp
                     id: m.id.clone(),
                     name: m.name.clone(),
                     reasoning: m.reasoning,
+                    supported_thinking_levels: pick_ai::models::get_supported_thinking_levels(m)
+                        .iter()
+                        .map(|l| l.as_str().to_string())
+                        .collect(),
                 })
                 .collect();
             ProviderInfo {

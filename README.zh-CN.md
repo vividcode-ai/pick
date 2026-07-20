@@ -1,6 +1,14 @@
 <h1 align="center"><strong>Pick</strong></h1>
 <p align="center">AI coding agent</p>
 
+每个开发者都处于一条编码光谱之上——从初写函数的学徒，到架构全局的专家。
+
+**Pick 就是加速这条跃迁之路的工具。** 它不只是帮你写代码，而是重塑你
+思考代码的方式，让你从<em>代码执行者</em>蜕变为<em>AI 原生创造者</em>。
+
+每一次对话，都在剥离一层旧有的局限；每一次自动化，都在踏入一个新的阶段。
+你不是一成不变的——Pick 帮你每天重写它，成为更好的我。
+
 [English](README.md)
 
 ![Pick TUI](docs/image/tui.png)

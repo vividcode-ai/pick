@@ -260,6 +260,17 @@ impl ThinkingLevel {
     pub fn is_enabled(&self) -> bool {
         !matches!(self, ThinkingLevel::Off)
     }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ThinkingLevel::Off => "off",
+            ThinkingLevel::Minimal => "minimal",
+            ThinkingLevel::Low => "low",
+            ThinkingLevel::Medium => "medium",
+            ThinkingLevel::High => "high",
+            ThinkingLevel::XHigh => "xhigh",
+        }
+    }
 }
 
 /// Token usage statistics
