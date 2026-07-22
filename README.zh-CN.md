@@ -1,6 +1,10 @@
 <h1 align="center"><strong>Pick</strong></h1>
 <p align="center">AI coding agent</p>
 
+**Pick** 是一款运行在终端中的 AI 编程助手。它支持接入多种 LLM 提供商（Anthropic、OpenAI、Google、Mistral、Bedrock 等），能够理解你的代码仓库，并通过自然语言对话完成文件读写、代码编辑、命令执行、代码搜索等任务。
+
+基于 pi 重构为 Rust 版本，兼具高性能和高可靠性。
+
 每个开发者都处于一条编码光谱之上——从初写函数的学徒，到架构全局的专家。
 
 **Pick 就是加速这条跃迁之路的工具。** 它不只是帮你写代码，而是重塑你
@@ -12,12 +16,6 @@
 [English](README.md)
 
 ![Pick TUI](docs/image/tui.png)
-
-# Pick
-
-**Pick** 是一款运行在终端中的 AI 编程助手。它支持接入多种 LLM 提供商（Anthropic、OpenAI、Google、Mistral、Bedrock 等），能够理解你的代码仓库，并通过自然语言对话完成文件读写、代码编辑、命令执行、代码搜索等任务。
-
-基于 pi 重构为 Rust 版本，兼具高性能和高可靠性。
 
 ## 特性
 

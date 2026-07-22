@@ -1,6 +1,10 @@
 <h1 align="center"><strong>Pick</strong></h1>
 <p align="center">AI coding agent</p>
 
+**Pick** is an AI coding assistant that runs in your terminal. It connects to multiple LLM providers (Anthropic, OpenAI, Google, Mistral, Bedrock, etc.), understands your codebase, and can read, write, edit files, run commands, search code, and more — all through natural language conversation.
+
+A Rust port of the pi AI coding agent, combining high performance with reliability.
+
 Every developer lives on a spectrum of code — from apprentice writing their
 first function to architect shaping entire systems.
 
@@ -15,12 +19,6 @@ every day, into a better you.
 [中文文档](README.zh-CN.md)
 
 ![Pick TUI](docs/image/tui-en.png)
-
-# Pick
-
-**Pick** is an AI coding assistant that runs in your terminal. It connects to multiple LLM providers (Anthropic, OpenAI, Google, Mistral, Bedrock, etc.), understands your codebase, and can read, write, edit files, run commands, search code, and more — all through natural language conversation.
-
-A Rust port of the pi AI coding agent, combining high performance with reliability.
 
 ## Features
 
