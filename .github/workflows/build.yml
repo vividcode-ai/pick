@@ -248,7 +248,7 @@ jobs:
             ext="${base##*.}"
             name="${base%.*}"
             name=$(echo "$name" | sed -E 's/_0\.0\.0(_|$)/\1/g; s/-0\.0\.0(-|$)/-/g')
-            name=$(echo "$name" | sed -E 's/_(amd64|x86_64|aarch64|arm64|x64)$/_${{ matrix.target }}/')
+            name=$(echo "$name" | sed -E 's/_(amd64|x86_64|aarch64|arm64|x64)([_-]|$)/_${{ matrix.target }}\2/')
             name=$(echo "$name" | tr '[:upper:]' '[:lower:]')
             newname="$dir/${name}.${ext}"
             [ "$f" != "$newname" ] && mv -v "$f" "$newname"
