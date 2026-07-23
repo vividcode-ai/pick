@@ -45,12 +45,12 @@ every day, into a better you.
 
 Pick is available on multiple platforms with different interfaces:
 
-| Interface | Technology | Supported Targets |
-|-----------|-----------|-------------------|
-| **Terminal** | CLI / TUI (crossterm + ratatui) | Windows, Linux, macOS |
-| **Desktop** | Tauri GUI (React frontend) | Windows, Linux, macOS |
-| **Web** | Browser (Vite + React + pick-server) | Any modern browser |
-| **Mobile** | Tauri app (React frontend) | Android, iOS |
+| Interface | Technology | Supported Targets | Minimum System Version |
+|-----------|-----------|-------------------|-----------------------|
+| **Terminal** | CLI / TUI (crossterm + ratatui) | Windows, Linux, macOS | Windows 10+ · macOS 10.15+ · glibc 2.17+ (Ubuntu 16.04+, Debian 9+, Fedora 28+) |
+| **Desktop** | Tauri GUI (React frontend) | Windows, Linux, macOS | Windows 10 1607+ · macOS 10.15+ · Linux: GTK3 + WebKit2GTK 4.1 (Ubuntu 22.04+, Debian 12+, Fedora 38+, Arch Linux) |
+| **Web** | Browser (Vite + React + pick-server) | Any modern browser | — |
+| **Mobile** | Tauri app (React frontend) | Android, iOS | — |
 
 The terminal CLI/TUI is the primary interface. Desktop, web, and mobile use the same core `pick-agent` engine through a built-in HTTP/WS server (`pick-server`), with a React frontend.
 
@@ -75,6 +75,19 @@ curl -fsSL https://github.com/vividcode-ai/pick/releases/latest/download/install
 ```powershell
 irm https://github.com/vividcode-ai/pick/releases/latest/download/install.ps1 | iex
 ```
+
+### Desktop (GUI)
+
+Download the desktop application from the [latest release](https://github.com/vividcode-ai/pick/releases/latest):
+
+| Platform | File |
+|----------|------|
+| **Windows (x86_64)** | `pick-desktop_windows-x86_64.msi` or `pick-desktop_windows-x86_64.exe` |
+| **Windows (ARM64)** | `pick-desktop_windows-aarch64.msi` or `pick-desktop_windows-aarch64.exe` |
+| **macOS (x86_64)** | `pick-desktop_macos-x86_64.dmg` |
+| **macOS (ARM64)** | `pick-desktop_macos-aarch64.dmg` |
+| **Linux (x86_64)** | `pick-desktop_linux-x86_64.deb` or `pick-desktop_linux-x86_64.AppImage` |
+| **Linux (ARM64)** | `pick-desktop_linux-aarch64.deb` or `pick-desktop_linux-aarch64.AppImage` |
 
 ## Quick Start
 ```bash

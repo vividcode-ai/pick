@@ -42,12 +42,12 @@
 
 Pick 支持多种平台和界面：
 
-| 界面 | 技术 | 支持目标 |
-|------|------|----------|
-| **终端** | CLI / TUI（crossterm + ratatui） | Windows、Linux、macOS |
-| **桌面** | Tauri GUI（React 前端） | Windows、Linux、macOS |
-| **Web** | 浏览器（Vite + React + pick-server） | 任何现代浏览器 |
-| **移动端** | Tauri 应用（React 前端） | Android、iOS |
+| 界面 | 技术 | 支持目标 | 最低系统版本 |
+|------|------|----------|-------------|
+| **终端** | CLI / TUI（crossterm + ratatui） | Windows、Linux、macOS | Windows 10+ · macOS 10.15+ · glibc 2.17+（Ubuntu 16.04+、Debian 9+、Fedora 28+） |
+| **桌面** | Tauri GUI（React 前端） | Windows、Linux、macOS | Windows 10 1607+ · macOS 10.15+ · Linux：GTK3 + WebKit2GTK 4.1（Ubuntu 22.04+、Debian 12+、Fedora 38+、Arch Linux） |
+| **Web** | 浏览器（Vite + React + pick-server） | 任何现代浏览器 | — |
+| **移动端** | Tauri 应用（React 前端） | Android、iOS | — |
 
 终端 CLI/TUI 是主要界面。桌面端、Web 和移动端通过内置 HTTP/WS 服务器（`pick-server`）复用同一核心 `pick-agent` 引擎，并使用 React 前端。
 
@@ -72,6 +72,19 @@ curl -fsSL https://github.com/vividcode-ai/pick/releases/latest/download/install
 ```powershell
 irm https://github.com/vividcode-ai/pick/releases/latest/download/install.ps1 | iex
 ```
+
+### 桌面端（GUI）
+
+从 [最新发布](https://github.com/vividcode-ai/pick/releases/latest) 下载桌面应用程序：
+
+| 平台 | 文件 |
+|------|------|
+| **Windows（x86_64）** | `pick-desktop_windows-x86_64.msi` 或 `pick-desktop_windows-x86_64.exe` |
+| **Windows（ARM64）** | `pick-desktop_windows-aarch64.msi` 或 `pick-desktop_windows-aarch64.exe` |
+| **macOS（x86_64）** | `pick-desktop_macos-x86_64.dmg` |
+| **macOS（ARM64）** | `pick-desktop_macos-aarch64.dmg` |
+| **Linux（x86_64）** | `pick-desktop_linux-x86_64.deb` 或 `pick-desktop_linux-x86_64.AppImage` |
+| **Linux（ARM64）** | `pick-desktop_linux-aarch64.deb` 或 `pick-desktop_linux-aarch64.AppImage` |
 
 ## 快速开始
 ```bash
